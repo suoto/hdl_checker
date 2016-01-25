@@ -1,0 +1,29 @@
+language: python
+python:
+  - "2.7"
+
+before_script:
+    - "git submodule update"
+    - "mkdir -p ~/ghdl"
+    - "cd ~/ghdl"
+    - "if [ ! -f ghdl.tar.gz ]; then wget http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz -O ghdl.tar.gz; fi"
+    - "tar zxvf ghdl.tar.gz"
+    - "export PATH=$PWD/bin:$PATH"
+    - "cd -"
+    - "ghdl --version"
+    - "ghdl --help"
+
+# command to install dependencies
+install: "pip install -r requirements.txt"
+# command to run tests
+script: coverage run -m nose2 -v
+after_success:
+  - "coverage combine"
+  - "coverage html"
+  - "codecov"
+after_script:
+    - "ls -la"
+cache:
+  directories:
+  - ~/ghdl/
+

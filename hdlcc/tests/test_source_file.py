@@ -4,7 +4,6 @@ from testfixtures import LogCapture
 import logging
 import os
 
-import hdlcc
 import sys
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'python'))
 import time
@@ -112,58 +111,110 @@ with LogCapture() as l:
                     source_fd.flush()
                 it.assertTrue(it.source.changed(), "Source change not detected")
 
-        with it.having('a package code'):
-            @it.has_setup
-            def setup():
-                open(_FILENAME, 'w').write('\n'.join(_VHD_SAMPLE_PACKAGE))
-                it._source_mtime = os.path.getmtime(_FILENAME)
-
-            @it.should('parse a file without errors')
+            @it.should('return updated dependencies')
             def test(case):
-                it.source = VhdlSourceFile(_FILENAME)
-
-            @it.should('return its design units')
-            def test(case):
-                design_units = it.source.getDesignUnits()
-                _logger.debug("Design units: %s", design_units)
-                it.assertNotEqual(design_units, None, "No design_units units found")
-                it.assertEqual([{'type' : 'package', 'name' : 'package_with_constants'}], design_units)
-
-            @it.should('return its dependencies')
-            def test(case):
+                file_desc = open(_FILENAME, 'w')
+                file_desc.write('library some_library;\n')
+                file_desc.write('    use some_library.some_package;\n')
+                file_desc.write('\n'.join(_VHD_SAMPLE_ENTITY))
+                file_desc.close()
+                time.sleep(0.1)
                 dependencies = it.source.getDependencies()
                 _logger.warn("Dependencies: %s", dependencies)
                 it.assertNotEqual(dependencies, None, "No dependencies found")
-                it.assertEqual(
+                it.assertEqual(sorted(
                     [{'unit': 'std_logic_1164', 'library': 'ieee'},
                      {'unit': 'std_logic_arith', 'library': 'ieee'},
-                     {'unit': 'std_logic_unsigned', 'library': 'ieee'},
-                     {'unit': 'very_common_pkg', 'library': 'basic_library'},
-                     {'unit': 'package_with_constants', 'library': 'work'}],
-                    dependencies)
+                     {'unit': 'some_package', 'library': 'some_library'},
+                     {'unit': 'package_with_constants', 'library': 'work'}]),
+                    sorted(dependencies))
 
-
-            @it.should('return source modification time')
+            @it.should('handle implicit libraries')
             def test(case):
-                it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
-
-            @it.should('detect a file change')
-            def test(case):
+                file_desc = open(_FILENAME, 'w')
+                file_desc.write('    use work.another_package;\n')
+                file_desc.write('\n'.join(_VHD_SAMPLE_ENTITY))
+                file_desc.close()
                 time.sleep(0.1)
-                with open(_FILENAME, 'w') as source_fd:
-                    source_fd.write('\n'.join(_VHD_SAMPLE_PACKAGE))
-                    source_fd.write('\n')
-                    source_fd.flush()
-                it.assertTrue(it.source.changed(), "Source change not detected")
+                dependencies = it.source.getDependencies()
+                _logger.warn("Dependencies: %s", dependencies)
+                it.assertNotEqual(dependencies, None, "No dependencies found")
+                it.assertEqual(sorted(
+                    [{'unit': 'std_logic_1164', 'library': 'ieee'},
+                     {'unit': 'std_logic_arith', 'library': 'ieee'},
+                     {'unit': 'another_package', 'library': 'work'},
+                     {'unit': 'package_with_constants', 'library': 'work'}]),
+                    sorted(dependencies))
 
-            @it.should('detect a file change')
+            @it.should('handle libraries without packages')
             def test(case):
+                file_desc = open(_FILENAME, 'w')
+                file_desc.write('library remove_me;\n')
+                file_desc.write('\n'.join(_VHD_SAMPLE_ENTITY))
+                file_desc.close()
                 time.sleep(0.1)
-                with open(_FILENAME, 'w') as source_fd:
-                    source_fd.write('\n'.join(_VHD_SAMPLE_PACKAGE))
-                    source_fd.write('\n')
-                    source_fd.flush()
-                it.assertTrue(it.source.changed(), "Source change not detected")
+                dependencies = it.source.getDependencies()
+                _logger.warn("Dependencies: %s", dependencies)
+                it.assertNotEqual(dependencies, None, "No dependencies found")
+                it.assertEqual(sorted(
+                    [{'unit': 'std_logic_1164', 'library': 'ieee'},
+                     {'unit': 'std_logic_arith', 'library': 'ieee'},
+                     #  {'unit': 'some_package', 'library': 'some_library'},
+                     {'unit': 'package_with_constants', 'library': 'work'}]),
+                    sorted(dependencies))
+
+        #  with it.having('a package code'):
+        #      @it.has_setup
+        #      def setup():
+        #          open(_FILENAME, 'w').write('\n'.join(_VHD_SAMPLE_PACKAGE))
+        #          it._source_mtime = os.path.getmtime(_FILENAME)
+
+        #      @it.should('parse a file without errors')
+        #      def test(case):
+        #          it.source = VhdlSourceFile(_FILENAME)
+
+        #      @it.should('return its design units')
+        #      def test(case):
+        #          design_units = it.source.getDesignUnits()
+        #          _logger.debug("Design units: %s", design_units)
+        #          it.assertNotEqual(design_units, None, "No design_units units found")
+        #          it.assertEqual([{'type' : 'package', 'name' : 'package_with_constants'}], design_units)
+
+        #      @it.should('return its dependencies')
+        #      def test(case):
+        #          dependencies = it.source.getDependencies()
+        #          _logger.warn("Dependencies: %s", dependencies)
+        #          it.assertNotEqual(dependencies, None, "No dependencies found")
+        #          it.assertEqual(
+        #              [{'unit': 'std_logic_1164', 'library': 'ieee'},
+        #               {'unit': 'std_logic_arith', 'library': 'ieee'},
+        #               {'unit': 'std_logic_unsigned', 'library': 'ieee'},
+        #               {'unit': 'very_common_pkg', 'library': 'basic_library'},
+        #               {'unit': 'package_with_constants', 'library': 'work'}],
+        #              dependencies)
+
+
+        #      @it.should('return source modification time')
+        #      def test(case):
+        #          it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
+
+        #      @it.should('detect a file change')
+        #      def test(case):
+        #          time.sleep(0.1)
+        #          with open(_FILENAME, 'w') as source_fd:
+        #              source_fd.write('\n'.join(_VHD_SAMPLE_PACKAGE))
+        #              source_fd.write('\n')
+        #              source_fd.flush()
+        #          it.assertTrue(it.source.changed(), "Source change not detected")
+
+        #      @it.should('detect a file change')
+        #      def test(case):
+        #          time.sleep(0.1)
+        #          with open(_FILENAME, 'w') as source_fd:
+        #              source_fd.write('\n'.join(_VHD_SAMPLE_PACKAGE))
+        #              source_fd.write('\n')
+        #              source_fd.flush()
+        #          it.assertTrue(it.source.changed(), "Source change not detected")
 
 it.createTests(globals())
 

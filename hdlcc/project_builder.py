@@ -479,7 +479,8 @@ class ProjectBuilder(object):
     def setProjectFile(self, project_file):
         self._project_file = {'filename'  : os.path.abspath(project_file),
                               'timestamp' : 0,
-                              'valid'     : True,
+                              'valid'     : True if os.path.exists(project_file)
+                                            else False,
                               'cache'     : None}
 
 

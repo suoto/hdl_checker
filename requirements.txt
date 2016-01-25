@@ -1,0 +1,7 @@
+nose2
+nose2-cov
+argcomplete
+prettytable
+testfixtures
+coverage
+codecov

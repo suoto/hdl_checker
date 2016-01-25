@@ -1,8 +1,9 @@
+import os
 import sys
 import logging
 
 try:
-    sys.path.insert(0, '/home/souto/temp/rainbow_logging_handler')
+    sys.path.insert(0, os.path.expanduser('~/temp/rainbow_logging_handler'))
     from rainbow_logging_handler import RainbowLoggingHandler
     _COLOR_LOGGING = True
 except ImportError:

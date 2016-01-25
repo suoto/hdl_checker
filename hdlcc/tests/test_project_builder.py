@@ -4,11 +4,11 @@ from testfixtures import LogCapture
 import logging
 import os
 
-import sys
-sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'python'))
+#  import sys
+#  sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'python'))
 
 from hdlcc.project_builder import ProjectBuilder
-import hdlcc.config
+#  import hdlcc.config
 #  hdlcc.config.Config.setupBuild()
 
 class StandaloneProjectBuilder(ProjectBuilder):
@@ -39,7 +39,7 @@ with LogCapture() as l:
 
             @it.should('add a project file')
             def test(case):
-                it.project.setProjectFile(os.path.expanduser('~/HDL Code Checker-examples/ghdl.prj'))
+                it.project.setProjectFile('dependencies/vim-hdl-examples/ghdl.prj')
 
             @it.should('read project file and build by dependency')
             def test(case):
@@ -52,13 +52,13 @@ with LogCapture() as l:
             @it.should('get messages by path')
             def test(case):
                 records = it.project.getMessagesByPath(\
-                    os.path.expanduser('~/HDL Code Checker-examples/another_library/foo.vhd'))
+                    os.path.expanduser('dependencies/vim-hdl-examples/another_library/foo.vhd'))
                 it.assertNotEqual(len(records), 0)
 
             @it.should('recover from cache')
             def test(case):
                 it.project = StandaloneProjectBuilder()
-                it.project.setProjectFile(os.path.expanduser('~/HDL Code Checker-examples/ghdl.prj'))
+                it.project.setProjectFile(os.path.expanduser('dependencies/vim-hdl-examples/ghdl.prj'))
                 it.project.setup()
 
 #          with it.having('an invalid project file'):

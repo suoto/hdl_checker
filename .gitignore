@@ -60,3 +60,10 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+
+*.swp
+tags
+# .coverage
+# htmlcov/
+source.vhd
