@@ -136,6 +136,8 @@ class BaseCompiler(object):
                     str(source))
 
         if build:
+            if flags is None:
+                flags = []
             # Build a set of unique flags and pass it as tuple
             build_flags = set()
             build_flags.update(source.flags)

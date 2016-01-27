@@ -14,12 +14,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Fallback compiler for cases where no compiler is found"
 
-import os
-import re
-import subprocess
 from hdlcc.compilers import BaseCompiler
-from hdlcc.utils import shell
-from hdlcc import exceptions
 
 class Fallback(BaseCompiler):
     "Dummy fallback compiler"

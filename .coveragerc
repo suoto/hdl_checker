@@ -1,8 +1,9 @@
 [run]
-branch = True
-parallel = True
 source = hdlcc
 omit = hdlcc/tests/*
+
+branch = True
+parallel = True
 
 [report]
 show_missing = True
@@ -19,4 +20,6 @@ exclude_lines =
     except ImportError:
     if __name__ == '__main__':
     @abc.abstractproperty 
+    @abc.abstractmethod
 
+# vim:ft=cfg:

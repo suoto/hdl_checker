@@ -147,7 +147,7 @@ class GHDL(BaseCompiler):
 
         return stdout
 
-    def _elaborateSource(self, source, flags=None):
+    def _elaborateSource(self, source, flags=None): # pragma: no cover
         workdir = os.path.join(self._target_folder)
 
         stdout = []

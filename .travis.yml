@@ -22,7 +22,7 @@ after_success:
   - "coverage html"
   - "codecov"
 after_script:
-    - "ls -la"
+    - "cat test.log"
 cache:
   directories:
   - ~/ghdl/

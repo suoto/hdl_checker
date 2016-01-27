@@ -2,12 +2,25 @@ import os
 import sys
 import logging
 
-try:
-    sys.path.insert(0, os.path.expanduser('~/temp/rainbow_logging_handler'))
-    from rainbow_logging_handler import RainbowLoggingHandler
-    _COLOR_LOGGING = True
-except ImportError:
-    _COLOR_LOGGING = False
+#  try:
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), \
+        '..', '..', 'dependencies', 'rainbow_logging_handler'))
+from rainbow_logging_handler import RainbowLoggingHandler
+_COLOR_LOGGING = True
+#  except ImportError:
+#      _COLOR_LOGGING = False
+
+class StreamToFile(object):
+    def __init__(self, filename):
+        self._filename = filename
+
+    def write(self, s):
+        file_desc = open(self._filename, 'a')
+        file_desc.write(str(s))
+        file_desc.close()
+
+    def isatty(self):
+        return True
 
 def _setupStreamHandler(stream):
     if _COLOR_LOGGING:
@@ -30,7 +43,9 @@ def _setupStreamHandler(stream):
     else:
         stream_handler = logging.StreamHandler(stream)
 
-    logging.root.handlers = [stream_handler]
+    logging.root.addHandler(stream_handler)
 
-_setupStreamHandler(sys.stdout)
+_stream = StreamToFile('test.log')
+open('test.log', 'w').close()
+_setupStreamHandler(_stream)
 

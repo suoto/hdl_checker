@@ -126,13 +126,13 @@ class VhdlSourceFile(object):
                 if match_dict['package_name'] is not None:
                     unit = {'name' : match_dict['package_name'],
                             'type' : 'package'}
-                elif match_dict['package_body_name'] is not None:
+                if match_dict['package_body_name'] is not None:
                     unit = {'name' : match_dict['package_body_name'],
                             'type' : 'package body'}
-                elif match_dict['entity_name'] is not None:
+                if match_dict['entity_name'] is not None:
                     unit = {'name' : match_dict['entity_name'],
                             'type' : 'entity'}
-                elif match_dict['library_name'] is not None:
+                if match_dict['library_name'] is not None:
                     libraries += re.split(r"\s*,\s*", match_dict['library_name'])
 
                 if unit:

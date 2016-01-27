@@ -46,7 +46,6 @@ class Config(object):
     # source will be the cached ontes until we force rebuilding it
     cache_error_messages = True
 
-
     _logger = logging.getLogger(__name__)
 
     _added_stream_handler = False
@@ -72,7 +71,7 @@ class Config(object):
         else:
             stream_handler = logging.StreamHandler(stream)
 
-        stream_handler.formatter = logging.Formatter(Config.log_format)
+        #  stream_handler.formatter = logging.Formatter(Config.log_format)
         #  logging.root.addHandler(stream_handler)
         logging.root.handlers = [stream_handler]
         logging.root.setLevel(Config.log_level)
