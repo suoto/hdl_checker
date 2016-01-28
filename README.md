@@ -1,12 +1,131 @@
- [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
- [![Build status](https://ci.appveyor.com/api/projects/status/hum48l6gwoqofwk8/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master)
- [![codecov.io](https://codecov.io/github/suoto/hdlcc/coverage.svg?branch=master)](https://codecov.io/github/suoto/hdlcc?branch=master)
+# HDL Code Checker [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc) [![codecov.io](https://codecov.io/github/suoto/hdlcc/coverage.svg?branch=master)](https://codecov.io/github/suoto/hdlcc?branch=master) [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
 
-# HDL Code Checker
+`hdlcc` provides a Python API between a VHDL project and some HDL compilers to
+catch errors and warnings the compilers generate that can be used to populate
+syntax checkers and linters of text editors. It takes into account the sources
+dependencies when building so you don't need to provide a source list ordered by
+hand.
 
-`hdlcc` is a tool that catches errors and warnings from HDL compilers so they can
-be processed later. It was designed to be a syntax checker back end provider to text
-editors.
+* [Installation] (#installation)
+* [Usage] (#usage)
+  * [Standalone](#standalone)
+  * [Within Python](#within-python)
+* [Editor support] (#editor-support)
+* [Supported third-party compilers] (#supported-third-party-compilers)
+* [Style checking] (#style-checking)
+* [Issues] (#issues)
+* [License] (#license)
+
+---
+
+## Installation
+
+This is mostly up to you. Common methods:
+
+* Git submodule
+
+    ```sh
+    $ cd your/repo/path
+    $ git submodule add https://github.com/suoto/hdlcc your/repo/submodules/path
+    $ git submodule update
+    ```
+
+* Python distutils (under development)
+
+    ```sh
+    $ git clone https://github.com/suoto/hdlcc
+    $ cd hdlcc
+    $ python setup.py install
+    ```
+
+---
+
+## Usage
+
+`hdlcc` requires a configuration file listing libraries, source files, build flags,
+etc. See the [wiki](https://github.com/suoto/hdlcc/wiki#project-file-formats) for
+details on how to write it.
+
+Besides that, it can be used [standalone](#standalone) or [within Python](#within-python).
+
+### Standalone
+
+You can use [hdlcc/hdlcc.py](https://github.com/suoto/hdlcc/blob/master/hdlcc.py)
+as a standalone tool and a source for some usage examples.
+
+```shell
+$ ./hdlcc.py  -h
+usage: hdlcc.py [-h] [--verbose] [--clean] [--build]
+                [--sources [SOURCES [SOURCES ...]]] [--debug-print-sources]
+                [--debug-print-compile-order] [--debug-parse-source-file]
+                [--debug-run-static-check]
+                [--debug-profiling [OUTPUT_FILENAME]]
+                project_file
+
+positional arguments:
+  project_file          Configuration file that defines what should be built
+                        (lists sources, libraries, build flags and so on
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --verbose, -v         Increases verbose level. Use multiple times to
+                        increase more
+  --clean, -c           Cleans the project before building
+  --build, -b           Builds the project given by <project_file>
+  --sources [SOURCES [SOURCES ...]], -s [SOURCES [SOURCES ...]]
+                        Source(s) file(s) to build individually
+  --debug-print-sources
+  --debug-print-compile-order
+  --debug-parse-source-file
+  --debug-run-static-check
+  --debug-profiling [OUTPUT_FILENAME]
+```
+
+### Within Python
+
+Full API docs are not yet available. The example below should get you started, if
+you need more info, check the code or open an issue at the [issue tracker][issue_tracker]
+requesting help.
+
+1. Subclass the ```ProjectBuilder``` class from ```hdlcc.project_builder```
+
+    ```python
+    from hdlcc.project_builder import ProjectBuilder
+
+    class StandaloneProjectBuilder(ProjectBuilder):
+        _ui_logger = logging.getLogger('UI')
+        def handleUiInfo(self, message):
+            self._ui_logger.info(message)
+
+        def handleUiWarning(self, message):
+            self._ui_logger.warning(message)
+
+        def handleUiError(self, message):
+            self._ui_logger.error(message)
+    ```
+
+1. Create a project object, select the configuration file and launch the first
+ build
+
+    ```python
+    project = StandaloneProjectBuilder()
+    project.setProjectFile('path/to/config/file')
+    project.readConfigFile()
+    project.buildByDependency()
+
+    ```
+
+1. You can now build a single file and get records that describe the messages it
+ returns
+
+    ```python
+    for record in project.getMessagesByPath('path/to/the/source'):
+        print "[{error_type}-{error_number}] @ " \
+              "({line_number},{column}): {error_message}"\
+                .format(**record)
+    ```
+
+---
 
 ## Editor support
 
@@ -14,11 +133,7 @@ editors.
  plugin.
 * Komodo: under development at [Komodo HDL Lint](https://github.com/suoto/komodo-hdl-lint)
 
-## Usage
-
-`hdlcc` requires a configuration file listing libraries, source files, build flags,
-etc. See the [wiki](https://github.com/suoto/hdlcc/wiki#project-file-formats) for
-details on how to write it.
+---
 
 ## Supported third-party compilers
 
@@ -33,6 +148,8 @@ Tools with experimental support (need more testing):
 Tools with planned support:
 
 * [NVC](https://github.com/nickg/nvc)
+
+---
 
 ## Style checking
 
@@ -58,6 +175,8 @@ idelay_ctrl_u : idelay_ctrl
               refclk => refclk,
               rst    => rst);
 ```
+
+---
 
 ## Issues
 

@@ -127,13 +127,6 @@ class ProjectBuilder(object):
         "Sanity checks to ensure the state after unpickling is still valid"
         self.builder.checkEnvironment()
 
-    def _shouldReadConfigFile(self):
-        cache_fname = os.path.join(os.path.dirname(self._project_file['filename']), \
-            '.' + os.path.basename(self._project_file['filename']))
-
-        self._logger.info("Reading configuration file: '%s'", \
-                str(self._project_file['filename']))
-
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
         sources = []
@@ -238,7 +231,7 @@ class ProjectBuilder(object):
             source = self.sources[os.path.abspath(path)]
         except KeyError:
             msg = {
-                'checker'        : 'msim',
+                'checker'        : '',
                 'line_number'    : '',
                 'column'         : '',
                 'filename'       : '',

@@ -175,4 +175,5 @@ from hdlcc.compilers.ghdl import GHDL
 
 __all__ = ['MSim', 'XVHDL', 'Fallback', 'GHDL']
 
+AVAILABLE_BUILDERS = MSim, XVHDL, Fallback, GHDL
 
