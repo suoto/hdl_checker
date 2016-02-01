@@ -2,11 +2,12 @@
 
 set -x
 
-git clean -fdx
-git submodule update
-git submodule foreach git clean -fdx
-coverage run -m nose2 $*
+git clean -fd
+# git submodule update
+git submodule foreach git clean -fd
+coverage run -m nose2 "$@"
 coverage combine
 coverage html
-coverage report
+# coverage report
+
 

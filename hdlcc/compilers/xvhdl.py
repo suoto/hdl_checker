@@ -114,14 +114,5 @@ class XVHDL(BaseCompiler):
                '--work', source.library]
         cmd += flags
         cmd += [source.filename]
-
-        self._logger.debug(" ".join(cmd))
-
-        try:
-            stdout = list(subprocess.check_output(cmd, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
-
-        return stdout
+        return self._subprocessRunner(cmd)
 

@@ -15,6 +15,7 @@
 
 import os
 import sys
+import time
 import logging
 
 try:
@@ -24,18 +25,6 @@ try:
     _COLOR_LOGGING = True
 except ImportError:
     _COLOR_LOGGING = False
-
-class StreamToFile(object):
-    def __init__(self, filename):
-        self._filename = filename
-
-    def write(self, s):
-        file_desc = open(self._filename, 'a')
-        file_desc.write(str(s))
-        file_desc.close()
-
-    def isatty(self):
-        return True
 
 def _setupStreamHandler(stream):
     if _COLOR_LOGGING:
@@ -58,9 +47,7 @@ def _setupStreamHandler(stream):
     else:
         stream_handler = logging.StreamHandler(stream)
 
-    logging.root.addHandler(stream_handler)
+    logging.root.handlers = [stream_handler]
 
-_stream = StreamToFile('test.log')
-open('test.log', 'w').close()
-_setupStreamHandler(_stream)
+_setupStreamHandler(sys.stdout)
 

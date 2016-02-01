@@ -13,14 +13,19 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-from nose2.tools import such
-import logging
-import os
+# pylint: disable=function-redefined, missing-docstring
 
-from hdlcc.project_builder import ProjectBuilder
+import os
+import logging
+
+from nose2.tools import such
+
+from hdlcc import ProjectBuilder
+
 _logger = logging.getLogger(__name__)
 
-if os.environ.get('BUILDER', None) == 'msim':
+_BUILDER = os.environ.get('BUILDER', 'ghdl')
+if _BUILDER == 'msim':
     _PRJ_FILENAME = 'dependencies/vim-hdl-examples/project.prj'
 else:
     _PRJ_FILENAME = 'dependencies/vim-hdl-examples/ghdl.prj'

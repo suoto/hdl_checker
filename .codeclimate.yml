@@ -1,6 +1,10 @@
 engines:
   duplication:
     enabled: true
+    # exclude_fingerprints:
+    #   - eb822d347e50c0fa52e2f38618f13830
+    #   - 27bea60fe8eaa2e17238525d10d7b4b5
+    #   - a08d260ad33781bf458736bb0c81055e
     config:
       languages:
       - python
@@ -10,8 +14,10 @@ engines:
     enabled: true
     config: 
       python_version: 2
+      threshold: "C"
 ratings:
   paths:
     - "**.py"
-exclude_paths: []
+exclude_paths:
+  - hdlcc/tests/*
 

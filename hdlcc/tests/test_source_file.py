@@ -13,12 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-from nose2.tools import such
-from testfixtures import LogCapture
-import logging
-import os
-
 import sys
+import os
+import time
+import logging
+from nose2.tools import such
+
+# pylint: disable=function-redefined, missing-docstring
+
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), \
         '..', 'python'))
 
@@ -52,11 +54,15 @@ _FILENAME = 'source.vhd'
 def _writeListToFile(filename, _list):
     "Well... writes '_list' to 'filename'"
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
+    os.popen("touch %s" % filename, 'r').read()
+    time.sleep(0.3)
 
 with such.A('VHDL source file object') as it:
     with it.having('an entity code'):
         @it.has_setup
         def setup():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
             it._code = \
 """library ieee;
 use ieee.std_logic_1164.all;
@@ -89,20 +95,26 @@ end clock_divider;
         def test(case):
             it.source = VhdlSourceFile(_FILENAME)
 
-        @it.should('return its design units')
+        @it.should('detect a file change')
         def test(case):
-            design_units = it.source.getDesignUnits()
+            code = list(it._code)
+            _writeListToFile(_FILENAME, code)
+            it.assertTrue(it.source.changed(), "Source change not detected")
+
+        @it.should('return its entities')
+        def test(case):
+            design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
-            it.assertEqual([{'type' : 'entity', 'name' : 'clock_divider'}],
-                           design_units)
+            it.assertItemsEqual([{'type' : 'entity', 'name' : 'clock_divider'}],
+                                design_units)
 
         @it.should('return its dependencies')
         def test(case):
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
-            it.assertEqual(
+            it.assertItemsEqual(
                 [{'unit': 'std_logic_1164', 'library': 'ieee'},
                  {'unit': 'std_logic_arith', 'library': 'ieee'},
                  {'unit': 'package_with_constants', 'library': 'work'}],
@@ -123,15 +135,12 @@ end clock_divider;
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
-            try:
-                it.assertEqual(sorted(
-                    [{'unit': 'std_logic_1164', 'library': 'ieee'},
-                     {'unit': 'std_logic_arith', 'library': 'ieee'},
-                     {'unit': 'some_package', 'library': 'some_library'},
-                     {'unit': 'package_with_constants', 'library': 'work'}]),
-                    sorted(dependencies))
-            except:
-                _logger.exception("Test failed")
+            it.assertItemsEqual(
+                [{'unit': 'std_logic_1164', 'library': 'ieee'},
+                 {'unit': 'std_logic_arith', 'library': 'ieee'},
+                 {'unit': 'some_package', 'library': 'some_library'},
+                 {'unit': 'package_with_constants', 'library': 'work'}],
+                dependencies)
 
         @it.should('handle implicit libraries')
         def test(case):
@@ -142,15 +151,12 @@ end clock_divider;
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
-            try:
-                it.assertEqual(sorted(
-                    [{'unit': 'std_logic_1164', 'library': 'ieee'},
-                     {'unit': 'std_logic_arith', 'library': 'ieee'},
-                     {'unit': 'another_package', 'library': 'work'},
-                     {'unit': 'package_with_constants', 'library': 'work'}]),
-                    sorted(dependencies))
-            except:
-                _logger.exception("Test failed")
+            it.assertItemsEqual(
+                [{'unit': 'std_logic_1164', 'library': 'ieee'},
+                 {'unit': 'std_logic_arith', 'library': 'ieee'},
+                 {'unit': 'another_package', 'library': 'work'},
+                 {'unit': 'package_with_constants', 'library': 'work'}],
+                dependencies)
 
         @it.should('handle libraries without packages')
         def test(case):
@@ -160,16 +166,16 @@ end clock_divider;
 
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
+            _logger.info("==========")
+            for dep in dependencies:
+                _logger.info(str(dep))
+            _logger.info("==========")
             it.assertNotEqual(dependencies, None, "No dependencies found")
-            try:
-                it.assertEqual(sorted(
-                    [{'unit': 'std_logic_1164', 'library': 'ieee'},
-                     {'unit': 'std_logic_arith', 'library': 'ieee'},
-                     #  {'unit': 'some_package', 'library': 'some_library'},
-                     {'unit': 'package_with_constants', 'library': 'work'}]),
-                    sorted(dependencies))
-            except:
-                _logger.exception("Test failed")
+            it.assertItemsEqual(
+                [{'unit': 'std_logic_1164', 'library': 'ieee'},
+                 {'unit': 'std_logic_arith', 'library': 'ieee'},
+                 {'unit': 'package_with_constants', 'library': 'work'}],
+                dependencies)
 
     with it.having('a package code'):
         @it.has_setup
@@ -181,19 +187,21 @@ end clock_divider;
         def test(case):
             it.source = VhdlSourceFile(_FILENAME)
 
-        @it.should('return its design units')
+        @it.should('return the names of the packages found')
         def test(case):
-            design_units = it.source.getDesignUnits()
+            design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
-            it.assertEqual([{'type' : 'package', 'name' : 'package_with_constants'}], design_units)
+            it.assertItemsEqual(
+                [{'type' : 'package', 'name' : 'package_with_constants'}],
+                design_units)
 
         @it.should('return its dependencies')
         def test(case):
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
-            it.assertEqual(
+            it.assertItemsEqual(
                 [{'unit': 'std_logic_1164', 'library': 'ieee'},
                  {'unit': 'std_logic_arith', 'library': 'ieee'},
                  {'unit': 'std_logic_unsigned', 'library': 'ieee'},

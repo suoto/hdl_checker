@@ -18,6 +18,7 @@ import logging
 import os
 import abc
 import time
+import subprocess
 from threading import Lock
 
 from hdlcc.config import Config
@@ -72,6 +73,18 @@ class BaseCompiler(object):
     def _getUnitsToRebuild(self, line):
         "Finds units that the compilers is telling us to rebuild"
         raise NotImplementedError
+
+    def _subprocessRunner(self, cmd_with_args):
+        "Finds units that the compilers is telling us to rebuild"
+        self._logger.debug(" ".join(cmd_with_args))
+
+        try:
+            stdout = list(subprocess.check_output(cmd_with_args, \
+                    stderr=subprocess.STDOUT).split("\n"))
+        except subprocess.CalledProcessError as exc:
+            stdout = list(exc.output.split("\n"))
+
+        return stdout
 
     @abc.abstractmethod
     def checkEnvironment(self):

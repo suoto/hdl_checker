@@ -58,10 +58,11 @@ class MSim(BaseCompiler):
         self.builtin_libraries = ['ieee', 'std', 'unisim', 'xilinxcorelib', \
                 'synplify', 'synopsis', 'maxii', 'family_support']
 
-        # FIXME: Check ModelSim changelog to find out which version
-        # started to support 'vlib -type directory' flags. We know
-        # 10.3a accepts and 10.1a doesn't. ModelSim 10.3a reference
-        # manual mentions 3 library formats (6.2-, 6.3 to 10.2, 10.2+)
+        # Use vlib with '-type directory' switch to get a more consistent
+        # folder organization. The vlib command has 3 variants:
+        # - version <= 6.2: "Old" library organization
+        # - 6.3 <= version <= 10.2: Has the switch but defaults to directory
+        # version >= 10.2+: Has the switch and the default is not directory
         if self._version >= '10.2':
             self._vlib_args = ['-type', 'directory']
         else:
@@ -137,18 +138,11 @@ class MSim(BaseCompiler):
     def _buildSource(self, source, flags=None):
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-work', \
                 os.path.join(self._target_folder, source.library)]
-        cmd += flags
+        if flags:
+            cmd += flags
         cmd += [source.filename]
 
-        self._logger.debug(" ".join(cmd))
-
-        try:
-            stdout = list(subprocess.check_output(cmd, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
-
-        return stdout
+        return self._subprocessRunner(cmd)
 
     def _createLibrary(self, source):
         if os.path.exists(os.path.join(self._target_folder, source.library)):

@@ -56,10 +56,14 @@ class ProjectBuilder(object):
         self._lock = threading.Lock()
 
     @staticmethod
+    def _getCacheFilename(project_file):
+        return os.path.join(os.path.dirname(project_file), \
+            '.' + os.path.basename(project_file))
+
+    @staticmethod
     def clean(project_file):
         "Clean up generated files for a clean build"
-        cache_fname = os.path.join(os.path.dirname(project_file), \
-            '.' + os.path.basename(project_file))
+        cache_fname = ProjectBuilder._getCacheFilename(project_file)
 
         if os.path.exists(cache_fname):
             try:
@@ -131,9 +135,7 @@ class ProjectBuilder(object):
         "Finds the source files that have 'design_unit' defined"
         sources = []
         for source in self.sources.values():
-            design_units = set(["%s.%s" % (source.library, x['name']) \
-                    for x in source.getDesignUnits()])
-            if design_unit in design_units:
+            if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
         assert sources, "Design unit %s not found" % design_unit
         return sources
@@ -141,18 +143,18 @@ class ProjectBuilder(object):
     def _translateSourceDependencies(self, source):
         """Translate raw dependency list parsed from a given source to the
         project name space"""
-        filtered_dependencies = []
         for dependency in source.getDependencies():
-            if dependency['library'] in self.builder.builtin_libraries:
+            if dependency['library'] in self.builder.builtin_libraries or \
+               dependency['unit'] == 'all' or \
+               (dependency['library'] == source.library and \
+                dependency['unit'] in [x['name'] for x in source.getDesignUnits()]):
                 continue
-            if dependency['unit'] == 'all':
-                continue
-            if dependency['library'] == source.library and \
-                    dependency['unit'] in \
-                        [x['name'] for x in source.getDesignUnits()]:
-                continue
-            filtered_dependencies += [dependency]
-        return filtered_dependencies
+            yield dependency
+
+    def _getSourceDependenciesSet(self, source):
+        "Returns a set containing the dependencies of a given source"
+        return set(["%s.%s" % (x['library'], x['unit']) \
+                for x in self._translateSourceDependencies(source)])
 
     def _getBuildSteps(self):
         "Yields source objects that can be built given the units already built"
@@ -163,29 +165,20 @@ class ProjectBuilder(object):
                 raise StopIteration()
             empty_step = True
             for source in self.sources.values():
-                design_units = set(["%s.%s" % (source.library, x['name']) \
-                        for x in source.getDesignUnits()])
-                dependencies = set(["%s.%s" % (x['library'], x['unit']) \
-                        for x in self._translateSourceDependencies(source)])
+                dependencies = self._getSourceDependenciesSet(source)
 
                 missing_dependencies = dependencies - set(self._units_built)
 
                 # If there are missing dependencies skip this file for now
-                if missing_dependencies:
+                if missing_dependencies or source.abspath in sources_built:
                     self._logger.debug("Skipping %s for now because it has "
                                        "missing dependencies: %s", source,
                                        list(missing_dependencies))
                     continue
 
-                # If we have already built this source, skip it also
-                if source.abspath in sources_built:
-                    continue
+                self._logger.debug("All dependencies for %s are met", str(source))
 
-                self._logger.debug(
-                    "All dependencies for %s are met: %s", str(source),
-                    ", ".join(["'%s'" % str(x) for x in dependencies]))
-
-                self._units_built += list(design_units)
+                self._units_built += list(source.getDesignUnitsDotted())
                 sources_built += [source.abspath]
                 empty_step = False
                 yield source
@@ -196,12 +189,11 @@ class ProjectBuilder(object):
                 for missing_path in \
                         list(set(self.sources.keys()) - set(sources_built)):
                     source = self.sources[missing_path]
-                    dependencies = set(["%s.%s" % (x['library'], x['unit']) \
-                            for x in self._translateSourceDependencies(source)])
+                    dependencies = self._getSourceDependenciesSet(source)
                     missing_dependencies = dependencies - set(self._units_built)
                     if missing_dependencies:
                         sources_not_built = True
-                        self._logger.warning(
+                        self._logger.info(
                             "Couldn't build source '%s'. Missing dependencies: %s",
                             str(source),
                             ", ".join([str(x) for x in missing_dependencies]))
@@ -244,8 +236,7 @@ class ProjectBuilder(object):
                         'after it finishes)'
             return [msg]
 
-        dependencies = set(["%s.%s" % (x['library'], x['unit']) \
-                for x in self._translateSourceDependencies(source)])
+        dependencies = self._getSourceDependenciesSet(source)
 
         self._logger.debug("Source '%s' depends on %s", str(source), \
                 ", ".join(["'%s'" % str(x) for x in dependencies]))
@@ -257,13 +248,13 @@ class ProjectBuilder(object):
             self.saveCache()
             return records
 
-        if self._lock.locked():
+        elif self._lock.locked():
             self.handleUiWarning("Project setup is still running...")
             return []
 
-        with self._lock:
-            records = self._getMessagesFromCompilerInner(path, *args, **kwargs)
-        return records
+        else:
+            with self._lock:
+                return self._getMessagesFromCompilerInner(path, *args, **kwargs)
 
     def _getMessagesFromCompilerInner(self, path, batch_mode=False):
         """Builds a given source file handling rebuild of units reported by the
@@ -308,8 +299,7 @@ class ProjectBuilder(object):
     def readConfigFile(self):
         "Reads the configuration given by self._project_file['filename']"
 
-        cache_fname = os.path.join(os.path.dirname(self._project_file['filename']), \
-            '.' + os.path.basename(self._project_file['filename']))
+        cache_fname = self._getCacheFilename(self._project_file['filename'])
 
         self._logger.info("Reading configuration file: '%s'", \
                 str(self._project_file['filename']))
@@ -379,7 +369,7 @@ class ProjectBuilder(object):
 
         # Remove from our sources the files that are no longes listed
         # in the configuration file.
-        # FIXME: Check feasibility to tell the builder to remove compiled
+        # TODO: Check feasibility to tell the builder to remove compiled
         # files so the removed file is actually removed from the library
         for source in set(self.sources.keys()) - \
                 set([os.path.abspath(x[0]) for x in source_list]):
@@ -403,14 +393,12 @@ class ProjectBuilder(object):
 
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
-        cache_fname = os.path.join(os.path.dirname(self._project_file['filename']), \
-            '.' + os.path.basename(self._project_file['filename']))
+        cache_fname = self._getCacheFilename(self._project_file['filename'])
         pickle.dump(self, open(cache_fname, 'w'))
 
     def cleanCache(self):
         "Remove the cached project data and clean all libraries as well"
-        cache_fname = os.path.join(os.path.dirname(self._project_file['filename']), \
-            '.' + os.path.basename(self._project_file['filename']))
+        cache_fname = self._getCacheFilename(self._project_file['filename'])
 
         try:
             os.remove(cache_fname)
@@ -434,9 +422,7 @@ class ProjectBuilder(object):
         for source in self._getBuildSteps():
             records, _ = self.builder.build(source, \
                     flags=self._build_flags['batch'])
-            design_units = set(["%s.%s" % (source.library, x['name']) \
-                    for x in source.getDesignUnits()])
-            self._units_built += list(design_units)
+            self._units_built += list(source.getDesignUnitsDotted())
             for record in self._sortBuildMessages(records):
                 if record['error_type'] == 'E':
                     _logger.debug(str(record))

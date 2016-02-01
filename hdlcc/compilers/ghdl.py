@@ -93,88 +93,38 @@ class GHDL(BaseCompiler):
             self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
             raise exceptions.SanityCheckError(str(exc))
 
-    def _importSource(self, source):
-        workdir = os.path.join(self._target_folder)
-        cmd = ['ghdl', '-i',
-                '-P%s' % self._target_folder,
-                '--work=%s' % source.library,
-                '--workdir=%s' % workdir]
+    def _getGhdlArgs(self, source, flags=None):
+        "Return the GHDL arguments that are common to most calls"
+        cmd = ['-P%s' % self._target_folder,
+               '--work=%s' % source.library,
+               '--workdir=%s' % self._target_folder]
+        if flags:
+            cmd += flags
         cmd += [source.filename]
-        self._logger.debug(" ".join(cmd))
-        try:
-            stdout = list(subprocess.check_output(cmd, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
+        return cmd
 
-        return stdout
+    def _importSource(self, source):
+        "Runs GHDL with import source switch"
+        cmd = ['ghdl', '-i'] + self._getGhdlArgs(source)
+        return self._subprocessRunner(cmd)
 
     def _analyzeSource(self, source, flags=None):
-        workdir = os.path.join(self._target_folder)
-        cmd = ['ghdl', '-a',
-                '-P%s' % self._target_folder,
-                '--work=%s' % source.library,
-                '--workdir=%s' % workdir]
-        cmd += flags
-        cmd += [source.filename]
-
-        self._logger.debug(" ".join(cmd))
-
-        try:
-            stdout = list(subprocess.check_output(cmd, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
-
-        return stdout
+        "Runs GHDL with analyze source switch"
+        return ['ghdl', '-a'] + self._getGhdlArgs(source, flags)
 
     def _checkSyntax(self, source, flags=None):
-        workdir = os.path.join(self._target_folder)
-        cmd = ['ghdl', '-s',
-                '-P%s' % self._target_folder,
-                '--work=%s' % source.library,
-                '--workdir=%s' % workdir]
-        cmd += flags
-        cmd += [source.filename]
-
-        self._logger.debug(" ".join(cmd))
-
-        try:
-            stdout = list(subprocess.check_output(cmd, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
-
-        return stdout
-
-    def _elaborateSource(self, source, flags=None): # pragma: no cover
-        workdir = os.path.join(self._target_folder)
-
-        stdout = []
-
-        for unit in source.getDesignUnits():
-            if unit['type'] != 'entity':
-                continue
-            cmd = ['ghdl', '-e',
-                    '--work=%s' % source.library,
-                    '--workdir=%s' % workdir]
-            cmd += flags
-            cmd += [unit['name']]
-
-            self._logger.debug(" ".join(cmd))
-
-            try:
-                stdout += list(subprocess.check_output(cmd, \
-                        stderr=subprocess.STDOUT).split("\n"))
-            except subprocess.CalledProcessError as exc:
-                stdout += list(exc.output.split("\n"))
-
-        return stdout
-
+        "Runs GHDL with syntax check switch"
+        return ['ghdl', '-s'] + self._getGhdlArgs(source, flags)
 
     def _buildSource(self, source, flags=None):
-        return self._analyzeSource(source, flags) + self._checkSyntax(source, flags)
-        #  self._elaborateSource(source, flags)
+        stdout = []
+        for cmd in (self._analyzeSource(source, flags),
+                    self._checkSyntax(source, flags)):
+            self._logger.debug(" ".join(cmd))
+
+            stdout += self._subprocessRunner(cmd)
+
+        return stdout
 
     def _createLibrary(self, source):
         workdir = os.path.join(self._target_folder)
