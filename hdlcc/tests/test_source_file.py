@@ -63,31 +63,30 @@ with such.A('VHDL source file object') as it:
         def setup():
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
-            it._code = \
-"""library ieee;
-use ieee.std_logic_1164.all;
-USE IEEE.STD_LOGIC_ARITH.ALL;
-
-library work;
-use work.package_with_constants;
-
-entity clock_divider is
-    generic (
-        DIVIDER : integer := 10
-    );
-    port (
-        reset : in std_logic;
-        clk_input : in  std_logic;
-        clk_output : out std_logic
-    );
-end clock_divider;
-
-architecture clock_divider of clock_divider is
-
-begin
-
-end clock_divider;
-""".splitlines()
+            it._code = [
+                "library ieee;",
+                "use ieee.std_logic_1164.all;",
+                "USE IEEE.STD_LOGIC_ARITH.ALL;",
+                "",
+                "library work;",
+                "use work.package_with_constants;",
+                "",
+                "entity clock_divider is",
+                "    generic (",
+                "        DIVIDER : integer := 10",
+                "    );",
+                "    port (",
+                "        reset : in std_logic;",
+                "        clk_input : in  std_logic;",
+                "        clk_output : out std_logic",
+                "    );",
+                "end clock_divider;",
+                "",
+                "architecture clock_divider of clock_divider is",
+                "",
+                "begin",
+                "",
+                "end clock_divider;"]
 
             _writeListToFile(_FILENAME, it._code)
 
@@ -180,7 +179,28 @@ end clock_divider;
     with it.having('a package code'):
         @it.has_setup
         def setup():
-            open(_FILENAME, 'w').write('\n'.join(_VHD_SAMPLE_PACKAGE))
+            it._code = [
+                "library ieee;",
+                "use ieee.std_logic_1164.all;",
+                "use ieee.std_logic_arith.all;",
+                "use ieee.std_logic_unsigned.all;",
+                "",
+                "library basic_library;",
+                "",
+                "package package_with_constants is",
+                "",
+                "    constant SOME_INTEGER_CONSTANT : integer := 10;",
+                "    constant SOME_STRING_CONSTANT  : string := \"Hello\";",
+                "",
+                "    constant SOME_STRING : string := basic_library.very_common_pkg.VIM_HDL_VERSION;",
+                "end;",
+                "",
+                "package body package_with_constants is",
+                "",
+                "end package body;",
+            ]
+
+            _writeListToFile(_FILENAME, it._code)
             it._source_mtime = os.path.getmtime(_FILENAME)
 
         @it.should('parse a file without errors')

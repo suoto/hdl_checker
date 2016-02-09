@@ -17,11 +17,11 @@
 import os
 import re
 import subprocess
-from hdlcc.compilers import BaseCompiler
+from hdlcc.builders import BaseBuilder
 from hdlcc import exceptions
 
-class XVHDL(BaseCompiler):
-    """Implementation of the xvhdl compiler"""
+class XVHDL(BaseBuilder):
+    '''Builder implementation of the xvhdl compiler'''
 
     # Implementation of abstract class properties
     __builder_name__ = 'xvhdl'

@@ -24,7 +24,7 @@ except ImportError:
     import pickle
 
 import hdlcc.exceptions
-from hdlcc.compilers import * # pylint: disable=wildcard-import
+from hdlcc.builders import * # pylint: disable=wildcard-import
 from hdlcc.config_parser import readConfigFile
 from hdlcc.source_file import VhdlSourceFile
 from hdlcc.static_check import vhdStaticCheck
@@ -57,6 +57,7 @@ class ProjectBuilder(object):
 
     @staticmethod
     def _getCacheFilename(project_file):
+        "Returns the cache file name for a given project file"
         return os.path.join(os.path.dirname(project_file), \
             '.' + os.path.basename(project_file))
 
@@ -66,10 +67,7 @@ class ProjectBuilder(object):
         cache_fname = ProjectBuilder._getCacheFilename(project_file)
 
         if os.path.exists(cache_fname):
-            try:
-                os.remove(cache_fname)
-            except OSError:
-                pass
+            os.remove(cache_fname)
 
     def __getstate__(self):
         "Pickle dump implementation"
@@ -90,7 +88,7 @@ class ProjectBuilder(object):
         self._lock = threading.Lock()
         self.__dict__.update(state)
 
-    def handleUiInfo(self, message):
+    def handleUiInfo(self, message): # pylint: disable=no-self-use
         """Method that should be overriden to handle info messages from
         HDL Code Checker to the user"""
         print '[info]' + str(message)
@@ -215,8 +213,8 @@ class ProjectBuilder(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], x['line_number'], x['error_number']))
 
-    def _getMessagesFromCompiler(self, path, *args, **kwargs):
-        """Wrapper around _getMessagesFromCompilerInner to handle the
+    def _getMessagesFromBuilder(self, path, *args, **kwargs):
+        """Wrapper around _getMessagesFromBuilderInner to handle the
         project state properly"""
 
         try:
@@ -244,7 +242,7 @@ class ProjectBuilder(object):
         if dependencies.issubset(set(self._units_built)):
             self._logger.debug("Dependencies for source '%s' are met", \
                     str(source))
-            records = self._getMessagesFromCompilerInner(path, *args, **kwargs)
+            records = self._getMessagesFromBuilderInner(path, *args, **kwargs)
             self.saveCache()
             return records
 
@@ -254,11 +252,11 @@ class ProjectBuilder(object):
 
         else:
             with self._lock:
-                return self._getMessagesFromCompilerInner(path, *args, **kwargs)
+                return self._getMessagesFromBuilderInner(path, *args, **kwargs)
 
-    def _getMessagesFromCompilerInner(self, path, batch_mode=False):
-        """Builds a given source file handling rebuild of units reported by the
-        compiler"""
+    def _getMessagesFromBuilderInner(self, path, batch_mode=False):
+        '''Builds a given source file handling rebuild of units reported
+        by the compiler'''
         if not self._project_file['valid']:
             self._logger.warning("Project file is invalid, not building")
             return []
@@ -290,9 +288,9 @@ class ProjectBuilder(object):
                               source, ", ".join(rebuild_units))
             for rebuild_unit in rebuild_units:
                 for rebuild_source in self._findSourceByDesignUnit(rebuild_unit):
-                    self._getMessagesFromCompilerInner(rebuild_source.abspath,
+                    self._getMessagesFromBuilderInner(rebuild_source.abspath,
                                                        batch_mode=True)
-            return self._getMessagesFromCompilerInner(path)
+            return self._getMessagesFromBuilderInner(path)
 
         return self._sortBuildMessages(records)
 
@@ -396,16 +394,6 @@ class ProjectBuilder(object):
         cache_fname = self._getCacheFilename(self._project_file['filename'])
         pickle.dump(self, open(cache_fname, 'w'))
 
-    def cleanCache(self):
-        "Remove the cached project data and clean all libraries as well"
-        cache_fname = self._getCacheFilename(self._project_file['filename'])
-
-        try:
-            os.remove(cache_fname)
-        except OSError:
-            self._logger.debug("Cache filename '%s' not found", cache_fname)
-        self._project_file['timestamp'] = 0
-
     def getCompilationOrder(self):
         "Returns the build order osed by the buildByDependency method"
         self._units_built = []
@@ -443,11 +431,11 @@ class ProjectBuilder(object):
         pool = ThreadPool()
         static_check = pool.apply_async(vhdStaticCheck, \
                 args=(open(path, 'r').read().split('\n'), ))
-        compiler_check = pool.apply_async(self._getMessagesFromCompiler,
+        builder_check = pool.apply_async(self._getMessagesFromBuilder,
             args=[path, ] + list(args))
 
         records += static_check.get()
-        records += compiler_check.get()
+        records += builder_check.get()
 
         pool.terminate()
         pool.join()

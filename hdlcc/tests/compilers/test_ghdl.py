@@ -18,9 +18,9 @@ import logging
 import os
 
 if os.environ.get('BUILDER', None) == 'msim':
-    from hdlcc.compilers import MSim as Compiler
+    from hdlcc.builders import MSim as Builder
 else:
-    from hdlcc.compilers import GHDL as Compiler
+    from hdlcc.builders import GHDL as Builder
 
 from hdlcc.source_file import VhdlSourceFile
 
@@ -48,13 +48,13 @@ begin
 end clock_divider;
 """.splitlines()
 
-with such.A('Compiler compiler object') as it:
+with such.A('Builder object') as it:
     it._ok_file = 'some_file.vhd'
     it._error_file = 'some_file_with_error.vhd'
     with it.having('its binary executable'):
         @it.has_setup
         def setup():
-            it.builder = Compiler('_ghdl_build')
+            it.builder = Builder('_ghdl_build')
         @it.has_teardown
         def teardown():
             os.remove(it._ok_file)
@@ -81,7 +81,7 @@ with such.A('Compiler compiler object') as it:
             records, rebuilds = it.builder.build(source)
             it.assertTrue(('E', '1') in \
                     [(x['error_type'], x['line_number']) for x in records],
-                    'Compiler failed to report an error at the first line')
+                    'Builder failed to report an error at the first line')
             for record in records:
                 _logger.info(record)
 

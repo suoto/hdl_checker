@@ -17,11 +17,11 @@
 import os
 import re
 import subprocess
-from hdlcc.compilers import BaseCompiler
+from hdlcc.builders import BaseBuilder
 from hdlcc import exceptions
 
-class GHDL(BaseCompiler):
-    """Implementation of the GHDL compiler"""
+class GHDL(BaseBuilder):
+    '''Builder implementation of the GHDL compiler'''
 
     # Implementation of abstract class properties
     __builder_name__ = 'ghdl'

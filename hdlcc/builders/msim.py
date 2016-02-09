@@ -17,12 +17,12 @@
 import os
 import re
 import subprocess
-from hdlcc.compilers import BaseCompiler
+from hdlcc.builders import BaseBuilder
 from hdlcc.utils import shell
 from hdlcc import exceptions
 
-class MSim(BaseCompiler):
-    """Implementation of the ModelSim compiler"""
+class MSim(BaseBuilder):
+    '''Builder implementation of the ModelSim compiler'''
 
     # Implementation of abstract class properties
     __builder_name__ = 'msim'
@@ -125,7 +125,6 @@ class MSim(BaseCompiler):
             raise exceptions.SanityCheckError(str(exc))
 
     def _getUnitsToRebuild(self, line):
-        "Finds units that the compilers is telling us to rebuild"
         rebuilds = []
         if '(vcom-13)' in line:
             for match in self._BuilderRebuildUnitsScanner.finditer(line):

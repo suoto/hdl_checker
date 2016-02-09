@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring
+# pylint: disable=function-redefined, missing-docstring, protected-access
 
 import os
 import logging
@@ -30,25 +30,29 @@ if _BUILDER == 'msim':
 else:
     _PRJ_FILENAME = 'dependencies/vim-hdl-examples/ghdl.prj'
 
+from multiprocessing import Queue
+
 class StandaloneProjectBuilder(ProjectBuilder):
-    _ui_logger = logging.getLogger('UI')
+    _msg_queue = Queue()
     def handleUiInfo(self, message):
-        self._ui_logger.info(message)
+        self._msg_queue.put(('info', message))
 
     def handleUiWarning(self, message):
-        self._ui_logger.warning(message)
+        self._msg_queue.put(('warning', message))
 
     def handleUiError(self, message):
-        self._ui_logger.error(message)
+        self._msg_queue.put(('error', message))
 
 with such.A('hdlcc test using HDL Code Checker-examples') as it:
 
     @it.has_setup
     def setup():
         it.project = StandaloneProjectBuilder()
+        it.assertTrue(it.project._msg_queue.empty())
 
     @it.has_teardown
     def teardown():
+        it.assertTrue(it.project._msg_queue.empty())
         del it.project
 
     with it.having('a valid project file'):
@@ -56,20 +60,24 @@ with such.A('hdlcc test using HDL Code Checker-examples') as it:
         @it.should('add a project file')
         def test(case):
             it.project.setProjectFile(_PRJ_FILENAME)
+            it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('read project file and build by dependency')
         def test(case):
             it.project.setup()
+            it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('mark the project file as valid')
         def test(case):
             it.assertTrue(it.project._project_file['valid'])
+            it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get messages by path')
         def test(case):
             records = it.project.getMessagesByPath(\
                 os.path.expanduser('dependencies/vim-hdl-examples/another_library/foo.vhd'))
             it.assertNotEqual(len(records), 0)
+            it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('recover from cache')
         def test(case):
@@ -93,6 +101,44 @@ with such.A('hdlcc test using HDL Code Checker-examples') as it:
                     break
 
             it.assertTrue(found, "File not found error not found")
+
+        @it.should("clean up generated files")
+        def test(case):
+            cache_fname = StandaloneProjectBuilder._getCacheFilename(_PRJ_FILENAME)
+            it.assertTrue(os.path.exists(cache_fname),
+                          "Cache file '%s' not found" % cache_fname)
+
+            cache_folder = it.project.builder._target_folder
+
+            it.assertTrue(os.path.exists(cache_folder),
+                          "Cache folder '%s' not found" % cache_folder)
+
+            # Do this twice to check that the project builder doesn't
+            # fails if we try to clean up more than once
+            for _ in range(2):
+                StandaloneProjectBuilder.clean(_PRJ_FILENAME)
+
+                it.assertFalse(os.path.exists(cache_fname),
+                               "Cache file '%s' still exists" % cache_fname)
+
+                #  it.assertFalse(os.path.exists(cache_folder),
+                #                 "Cache folder '%s' still exists" % cache_folder)
+
+
+
+            #  expected_msg = 'Path "%s" not found in project file' % test_path
+            #  if not os.path.exists(test_path):
+            #      open(test_path, 'w').close()
+            #  records = it.project.getMessagesByPath(\
+            #      os.path.expanduser(test_path))
+
+            #  found = False
+            #  for record in records:
+            #      if record['error_type'] == 'W' and record['error_message'] == expected_msg:
+            #          found = True
+            #          break
+
+            #  it.assertTrue(found, "File not found error not found")
 
 #          with it.having('an invalid project file'):
 #              @it.should('not raise exception when running setup')

@@ -12,12 +12,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"Fallback compiler for cases where no compiler is found"
+"Fallback builder for cases where no builder is found"
 
-from hdlcc.compilers import BaseCompiler
+from hdlcc.builders import BaseBuilder
 
-class Fallback(BaseCompiler):
-    "Dummy fallback compiler"
+class Fallback(BaseBuilder):
+    "Dummy fallback builder"
 
     # Implementation of abstract class properties
     __builder_name__ = 'fallback'

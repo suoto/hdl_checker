@@ -12,7 +12,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"Base class that implements the base compiler flow"
+"Base class that implements the base builder flow"
 
 import logging
 import os
@@ -23,8 +23,8 @@ from threading import Lock
 
 from hdlcc.config import Config
 
-class BaseCompiler(object):
-    "Class that implements the base compiler flow"
+class BaseBuilder(object):
+    "Class that implements the base builder flow"
 
     __metaclass__ = abc.ABCMeta
 
@@ -71,11 +71,11 @@ class BaseCompiler(object):
         elements identifying its fields"""
 
     def _getUnitsToRebuild(self, line):
-        "Finds units that the compilers is telling us to rebuild"
+        "Finds units that the builders is telling us to rebuild"
         raise NotImplementedError
 
     def _subprocessRunner(self, cmd_with_args):
-        "Finds units that the compilers is telling us to rebuild"
+        "Runs a shell command and handles stdout catching"
         self._logger.debug(" ".join(cmd_with_args))
 
         try:
@@ -181,10 +181,10 @@ class BaseCompiler(object):
 
         return records, rebuilds
 
-from hdlcc.compilers.msim import MSim
-from hdlcc.compilers.xvhdl import XVHDL
-from hdlcc.compilers.fallback import Fallback
-from hdlcc.compilers.ghdl import GHDL
+from hdlcc.builders.msim import MSim
+from hdlcc.builders.xvhdl import XVHDL
+from hdlcc.builders.fallback import Fallback
+from hdlcc.builders.ghdl import GHDL
 
 __all__ = ['MSim', 'XVHDL', 'Fallback', 'GHDL']
 
