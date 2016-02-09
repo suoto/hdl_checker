@@ -14,9 +14,11 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "HDL Code Checker project builder class"
 
-import logging
+import abc
 import os
 import threading
+import logging
+
 from multiprocessing.pool import ThreadPool
 try:
     import cPickle as pickle # pragma: no cover
@@ -27,7 +29,7 @@ import hdlcc.exceptions
 from hdlcc.builders import * # pylint: disable=wildcard-import
 from hdlcc.config_parser import readConfigFile
 from hdlcc.source_file import VhdlSourceFile
-from hdlcc.static_check import vhdStaticCheck
+from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
 
@@ -35,6 +37,8 @@ _logger = logging.getLogger('build messages')
 class ProjectBuilder(object):
     "HDL Code Checker project builder class"
     MAX_BUILD_STEPS = 20
+
+    __metaclass__ = abc.ABCMeta
 
     def __init__(self):
         self.builder = None
@@ -88,22 +92,25 @@ class ProjectBuilder(object):
         self._lock = threading.Lock()
         self.__dict__.update(state)
 
-    def handleUiInfo(self, message): # pylint: disable=no-self-use
+    @abc.abstractmethod
+    def _handleUiInfo(self, message):
         """Method that should be overriden to handle info messages from
         HDL Code Checker to the user"""
-        print '[info]' + str(message)
 
-    def handleUiWarning(self, message):
+    @abc.abstractmethod
+    def _handleUiWarning(self, message):
         """Method that should be overriden to handle warning messages
         from HDL Code Checker to the user"""
-        print '[warning]' + str(message)
 
-    def handleUiError(self, message):
+    @abc.abstractmethod
+    def _handleUiError(self, message):
         """Method that should be overriden to handle errors messages
         from HDL Code Checker to the user"""
-        print '[error]' + str(message)
 
     def setup(self, blocking=True):
+        if self._lock.locked():
+            self._handleUiWarning("Setup thread is already running")
+            return
         if blocking:
             self._runSetup()
         else:
@@ -120,7 +127,7 @@ class ProjectBuilder(object):
                     'text' : "HDL Code Checker disabled due to exception from builder "
                              "sanity check: " + str(exception)}
                 self._logger.exception(msg['text'])
-                self.handleUiInfo(msg)
+                self._handleUiInfo(msg)
 
             self.buildByDependency()
             self.saveCache()
@@ -135,7 +142,6 @@ class ProjectBuilder(object):
         for source in self.sources.values():
             if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
-        assert sources, "Design unit %s not found" % design_unit
         return sources
 
     def _translateSourceDependencies(self, source):
@@ -208,14 +214,14 @@ class ProjectBuilder(object):
 
                 raise StopIteration()
 
-    def _sortBuildMessages(self, records):
+    def _sortBuildMessages(self, records): # pylint: disable=no-self-use
         "Sorts a given set of build records"
         return sorted(records, key=lambda x: \
                 (x['error_type'], x['line_number'], x['error_number']))
 
-    def _getMessagesFromBuilder(self, path, *args, **kwargs):
-        """Wrapper around _getMessagesFromBuilderInner to handle the
-        project state properly"""
+    def _getMessagesAvailable(self, path, *args, **kwargs):
+        '''Checks if the builder can be called via self._getBuilderMessages
+        or return info/messages identifying why it couldn't be done'''
 
         try:
             source = self.sources[os.path.abspath(path)]
@@ -242,19 +248,19 @@ class ProjectBuilder(object):
         if dependencies.issubset(set(self._units_built)):
             self._logger.debug("Dependencies for source '%s' are met", \
                     str(source))
-            records = self._getMessagesFromBuilderInner(path, *args, **kwargs)
+            records = self._getBuilderMessages(path, *args, **kwargs)
             self.saveCache()
             return records
 
         elif self._lock.locked():
-            self.handleUiWarning("Project setup is still running...")
+            self._handleUiWarning("Project setup is still running...")
             return []
 
         else:
             with self._lock:
-                return self._getMessagesFromBuilderInner(path, *args, **kwargs)
+                return self._getBuilderMessages(path, *args, **kwargs)
 
-    def _getMessagesFromBuilderInner(self, path, batch_mode=False):
+    def _getBuilderMessages(self, path, batch_mode=False):
         '''Builds a given source file handling rebuild of units reported
         by the compiler'''
         if not self._project_file['valid']:
@@ -288,9 +294,9 @@ class ProjectBuilder(object):
                               source, ", ".join(rebuild_units))
             for rebuild_unit in rebuild_units:
                 for rebuild_source in self._findSourceByDesignUnit(rebuild_unit):
-                    self._getMessagesFromBuilderInner(rebuild_source.abspath,
+                    self._getBuilderMessages(rebuild_source.abspath,
                                                        batch_mode=True)
-            return self._getMessagesFromBuilderInner(path)
+            return self._getBuilderMessages(path)
 
         return self._sortBuildMessages(records)
 
@@ -418,21 +424,22 @@ class ProjectBuilder(object):
                 elif record['error_type'] == 'W':
                     _logger.debug(str(record))
                     warnings += 1
-                else:
+                else: # pragma: no cover
                     _logger.fatal(str(record))
                     assert 0, 'Invalid record: %s' % str(record)
             built += 1
         self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
                 built, errors, warnings)
 
+
     def getMessagesByPath(self, path, *args, **kwargs):
         records = []
 
         pool = ThreadPool()
-        static_check = pool.apply_async(vhdStaticCheck, \
+        static_check = pool.apply_async(getStaticMessages, \
                 args=(open(path, 'r').read().split('\n'), ))
-        builder_check = pool.apply_async(self._getMessagesFromBuilder,
-            args=[path, ] + list(args))
+        builder_check = pool.apply_async(self._getMessagesAvailable, \
+                args=[path, ] + list(args))
 
         records += static_check.get()
         records += builder_check.get()

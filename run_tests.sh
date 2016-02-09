@@ -2,9 +2,9 @@
 
 set -x
 
-git clean -fd
+git clean -fdx
 # git submodule update
-git submodule foreach git clean -fd
+git submodule foreach git clean -fdx
 coverage run -m nose2 "$@"
 coverage combine
 coverage html

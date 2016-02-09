@@ -8,10 +8,9 @@ before_script:
     - "cd ~/ghdl"
     - "if [ ! -f ghdl.tar.gz ]; then wget http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz -O ghdl.tar.gz; fi"
     - "tar zxvf ghdl.tar.gz"
-    - "export PATH=$PWD/bin:$PATH"
     - "cd -"
-    - "ghdl --version"
-    - "ghdl --help"
+    - "git clean -fdx"
+    - "git submodule foreach git clean -fdx"
 
 # command to install dependencies
 install: "pip install -r requirements.txt"

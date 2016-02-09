@@ -164,7 +164,7 @@ def _getCommentTags(vbuffer):
             result += [message]
     return result
 
-def vhdStaticCheck(vbuffer=None):
+def getStaticMessages(vbuffer=None):
     "VHDL static checking"
     objects = _getObjectsFromText(vbuffer)
 
@@ -187,12 +187,12 @@ def vhdStaticCheck(vbuffer=None):
         result.append(message)
     return result + _getCommentTags(vbuffer)
 
-def standalone():
+def standalone(): # pragma: no cover
     import sys
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     for arg in sys.argv[1:]:
         print arg
-        for message in vhdStaticCheck(open(arg, 'r').read().split('\n')):
+        for message in getStaticMessages(open(arg, 'r').read().split('\n')):
             print message
         print "="*10
 

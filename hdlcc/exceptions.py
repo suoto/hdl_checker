@@ -12,20 +12,29 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+'Exceptions raised by hdlcc'
 
 class VimHdlBaseException(Exception):
-    pass
+    'Base class for exceptions raise by hdlcc'
 
 class SanityCheckError(VimHdlBaseException):
-    def __init__(self, s):
-        self._s = s
+    'Exception raised when a builder fails to execute its sanity check'
+
+    def __init__(self, msg):
+        self._msg = msg
+        super(SanityCheckError, self).__init__()
 
     def __str__(self):
-        return "Sanity check failed with message '%s'" % self._s
+        return "Sanity check failed with message '%s'" % self._msg
 
-class UnknownConfigFileExtension(VimHdlBaseException):
-    def __init__(self, s):
-        self._s = s
+class UnknownParameterError(VimHdlBaseException):
+    '''Exception raised when an unknown parameter is found in a
+    configuration file'''
+
+    def __init__(self, parameter):
+        self._parameter = parameter
+        super(UnknownParameterError, self).__init__()
 
     def __str__(self):
-        return "Unknown config file extension: %s" % self.s
+        return "Unknown parameter '%s'" % self._parameter
+

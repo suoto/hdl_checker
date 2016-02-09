@@ -13,14 +13,18 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=function-redefined, missing-docstring, protected-access
+
 from nose2.tools import such
 import logging
 import os
 
 if os.environ.get('BUILDER', None) == 'msim':
     from hdlcc.builders import MSim as Builder
+    _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
 else:
     from hdlcc.builders import GHDL as Builder
+    _PATH = os.path.expanduser("~/ghdl/bin")
 
 from hdlcc.source_file import VhdlSourceFile
 
@@ -54,9 +58,13 @@ with such.A('Builder object') as it:
     with it.having('its binary executable'):
         @it.has_setup
         def setup():
+            it.original_path = os.environ['PATH']
+            os.environ['PATH'] += ':' + _PATH
             it.builder = Builder('_ghdl_build')
+
         @it.has_teardown
         def teardown():
+            os.environ['PATH'] = it.original_path
             os.remove(it._ok_file)
             os.remove(it._error_file)
 

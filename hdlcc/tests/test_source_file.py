@@ -13,49 +13,23 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=function-redefined, missing-docstring, protected-access
+
 import sys
 import os
-import time
 import logging
 from nose2.tools import such
-
-# pylint: disable=function-redefined, missing-docstring
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), \
         '..', 'python'))
 
 from hdlcc.source_file import VhdlSourceFile
 
+from hdlcc.tests.utils import writeListToFile
+
 _logger = logging.getLogger(__name__)
 
-_VHD_SAMPLE_PACKAGE = """
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.std_logic_arith.all;
-use ieee.std_logic_unsigned.all;
-
-library basic_library;
-
-package package_with_constants is
-
-    constant SOME_INTEGER_CONSTANT : integer := 10;
-    constant SOME_STRING_CONSTANT  : string := "Hello";
-
-    constant SOME_STRING : string := basic_library.very_common_pkg.VIM_HDL_VERSION;
-end;
-
-package body package_with_constants is
-
-end package body;
-""".splitlines()
-
 _FILENAME = 'source.vhd'
-
-def _writeListToFile(filename, _list):
-    "Well... writes '_list' to 'filename'"
-    open(filename, 'w').write('\n'.join([str(x) for x in _list]))
-    os.popen("touch %s" % filename, 'r').read()
-    time.sleep(0.3)
 
 with such.A('VHDL source file object') as it:
     with it.having('an entity code'):
@@ -88,7 +62,7 @@ with such.A('VHDL source file object') as it:
                 "",
                 "end clock_divider;"]
 
-            _writeListToFile(_FILENAME, it._code)
+            writeListToFile(_FILENAME, it._code)
 
         @it.should('parse a file without errors')
         def test(case):
@@ -97,7 +71,7 @@ with such.A('VHDL source file object') as it:
         @it.should('detect a file change')
         def test(case):
             code = list(it._code)
-            _writeListToFile(_FILENAME, code)
+            writeListToFile(_FILENAME, code)
             it.assertTrue(it.source.changed(), "Source change not detected")
 
         @it.should('return its entities')
@@ -129,7 +103,7 @@ with such.A('VHDL source file object') as it:
 
             code.insert(0, 'library some_library;')
             code.insert(1, '    use some_library.some_package;')
-            _writeListToFile(_FILENAME, code)
+            writeListToFile(_FILENAME, code)
 
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
@@ -145,7 +119,7 @@ with such.A('VHDL source file object') as it:
         def test(case):
             code = list(it._code)
             code.insert(0, '    use work.another_package;')
-            _writeListToFile(_FILENAME, code)
+            writeListToFile(_FILENAME, code)
 
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
@@ -161,7 +135,7 @@ with such.A('VHDL source file object') as it:
         def test(case):
             code = list(it._code)
             code.insert(0, 'library remove_me;')
-            _writeListToFile(_FILENAME, code)
+            writeListToFile(_FILENAME, code)
 
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
@@ -200,7 +174,7 @@ with such.A('VHDL source file object') as it:
                 "end package body;",
             ]
 
-            _writeListToFile(_FILENAME, it._code)
+            writeListToFile(_FILENAME, it._code)
             it._source_mtime = os.path.getmtime(_FILENAME)
 
         @it.should('parse a file without errors')
