@@ -16,6 +16,7 @@
 
 import abc
 import os
+import os.path as p
 import threading
 import logging
 
@@ -26,9 +27,8 @@ except ImportError:
     import pickle
 
 import hdlcc.exceptions
-from hdlcc.builders import * # pylint: disable=wildcard-import
-from hdlcc.config_parser import readConfigFile
-from hdlcc.source_file import VhdlSourceFile
+import hdlcc.builders
+from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
@@ -40,37 +40,45 @@ class ProjectBuilder(object):
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self):
+    def __init__(self, project_file=None):
         self.builder = None
-        self.sources = {}
         self._logger = logging.getLogger(__name__)
-
-        self._project_file = {'filename'  : None,
-                              'timestamp' : 0,
-                              'valid'     : False,
-                              'cache'     : None}
-
-        self._build_flags = {'batch'  : set(),
-                             'single' : set(),
-                             'global' : set()}
 
         self.halt = False
         self._units_built = []
 
-        self._lock = threading.Lock()
+        self._config = ConfigParser(project_file)
+        parsed_builder = self._config.getBuilder()
+
+        # Check if the builder selected is implemented and create the
+        # builder attribute
+        self.builder = None
+        try:
+            if parsed_builder == 'msim':
+                self.builder = hdlcc.builders.MSim(self._config.getTargetDir())
+            elif parsed_builder == 'xvhdl':
+                self.builder = hdlcc.builders.XVHDL(self._config.getTargetDir())
+            elif parsed_builder == 'ghdl':
+                self.builder = hdlcc.builders.GHDL(self._config.getTargetDir())
+        except hdlcc.exceptions.SanityCheckError:
+            self._logger.warning("Builder '%s' sanity check failed", parsed_builder)
+
+        if self.builder is None:
+            self._logger.info("Using Fallback builder")
+            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
     @staticmethod
     def _getCacheFilename(project_file):
         "Returns the cache file name for a given project file"
-        return os.path.join(os.path.dirname(project_file), \
-            '.' + os.path.basename(project_file))
+        return p.join(p.dirname(project_file), \
+            '.' + p.basename(project_file))
 
     @staticmethod
     def clean(project_file):
         "Clean up generated files for a clean build"
         cache_fname = ProjectBuilder._getCacheFilename(project_file)
 
-        if os.path.exists(cache_fname):
+        if p.exists(cache_fname):
             os.remove(cache_fname)
 
     def __getstate__(self):
@@ -79,7 +87,6 @@ class ProjectBuilder(object):
         # stream objects. In its place, save the logger name
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
-        del state['_lock']
         return state
 
     def __setstate__(self, state):
@@ -89,7 +96,6 @@ class ProjectBuilder(object):
         self._logger = logging.getLogger(state['_logger'])
         self._logger.setLevel(logging.INFO)
         del state['_logger']
-        self._lock = threading.Lock()
         self.__dict__.update(state)
 
     @abc.abstractmethod
@@ -107,31 +113,6 @@ class ProjectBuilder(object):
         """Method that should be overriden to handle errors messages
         from HDL Code Checker to the user"""
 
-    def setup(self, blocking=True):
-        if self._lock.locked():
-            self._handleUiWarning("Setup thread is already running")
-            return
-        if blocking:
-            self._runSetup()
-        else:
-            threading.Thread(target=self._runSetup).start()
-
-    def _runSetup(self):
-        "Read configuration file and build project in background"
-        with self._lock:
-            try:
-                self.readConfigFile()
-            except hdlcc.exceptions.SanityCheckError as exception:
-                msg = {
-                    'type' : 'error',
-                    'text' : "HDL Code Checker disabled due to exception from builder "
-                             "sanity check: " + str(exception)}
-                self._logger.exception(msg['text'])
-                self._handleUiInfo(msg)
-
-            self.buildByDependency()
-            self.saveCache()
-
     def _postUnpicklingSanityCheck(self):
         "Sanity checks to ensure the state after unpickling is still valid"
         self.builder.checkEnvironment()
@@ -139,7 +120,8 @@ class ProjectBuilder(object):
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
         sources = []
-        for source in self.sources.values():
+        #  for source in self.sources.values():
+        for source in self._config.getSources():
             if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
         return sources
@@ -168,7 +150,7 @@ class ProjectBuilder(object):
                 self._logger.info("Halt requested, stopping")
                 raise StopIteration()
             empty_step = True
-            for source in self.sources.values():
+            for source in self._config.getSources():
                 dependencies = self._getSourceDependenciesSet(source)
 
                 missing_dependencies = dependencies - set(self._units_built)
@@ -191,8 +173,8 @@ class ProjectBuilder(object):
                 sources_not_built = False
 
                 for missing_path in \
-                        list(set(self.sources.keys()) - set(sources_built)):
-                    source = self.sources[missing_path]
+                        list(set(self._config.getSourcesPaths()) - set(sources_built)):
+                    source = self._config.getSourceByPath(missing_path)
                     dependencies = self._getSourceDependenciesSet(source)
                     missing_dependencies = dependencies - set(self._units_built)
                     if missing_dependencies:
@@ -224,7 +206,7 @@ class ProjectBuilder(object):
         or return info/messages identifying why it couldn't be done'''
 
         try:
-            source = self.sources[os.path.abspath(path)]
+            source = self._config.getSourceByPath(path)
         except KeyError:
             msg = {
                 'checker'        : '',
@@ -234,10 +216,10 @@ class ProjectBuilder(object):
                 'error_number'   : '',
                 'error_type'     : 'W',
                 'error_message'  : 'Path "%s" not found in project file' %
-                                   os.path.abspath(path)}
-            if self._lock.locked():
-                msg['error_message'] += ' (setup it still active, try again ' \
-                        'after it finishes)'
+                                   p.abspath(path)}
+            #  if self._setup_thread.isAlive():
+            #      msg['error_message'] += ' (setup it still active, try again ' \
+            #              'after it finishes)'
             return [msg]
 
         dependencies = self._getSourceDependenciesSet(source)
@@ -252,22 +234,21 @@ class ProjectBuilder(object):
             self.saveCache()
             return records
 
-        elif self._lock.locked():
-            self._handleUiWarning("Project setup is still running...")
-            return []
+        #  elif self._setup_thread.isAlive():
+        #      self._handleUiWarning("Project setup is still running...")
+        #      return []
 
         else:
-            with self._lock:
-                return self._getBuilderMessages(path, *args, **kwargs)
+            return self._getBuilderMessages(path, *args, **kwargs)
 
     def _getBuilderMessages(self, path, batch_mode=False):
         '''Builds a given source file handling rebuild of units reported
         by the compiler'''
-        if not self._project_file['valid']:
-            self._logger.warning("Project file is invalid, not building")
-            return []
+        #  if not self._project_file['valid']:
+        #      self._logger.warning("Project file is invalid, not building")
+        #      return []
 
-        if os.path.abspath(path) not in self.sources.keys():
+        if not self._config.hasSource(path):
             return [{
                 'checker'        : 'hdl-code-checker',
                 'line_number'    : None,
@@ -279,15 +260,17 @@ class ProjectBuilder(object):
                                    " file" % path,
             }]
 
-        flags = self._build_flags['batch'] if batch_mode else \
-                self._build_flags['single']
+        #  flags = self._build_flags['batch'] if batch_mode else \
+        #          self._build_flags['single']
 
-        records, rebuilds = self.builder.build(
-            self.sources[os.path.abspath(path)], forced=True,
-            flags=flags)
+        flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
+                self._config.getSingleBuildFlagsByPath(path)
+
+        records, rebuilds = self.builder.build(self._config.getSourceByPath(path),
+                                               forced=True, flags=flags)
 
         if rebuilds:
-            source = self.sources[os.path.abspath(path)]
+            source = self._config.getSourceByPath(path)
             rebuild_units = ["%s.%s" % (x[0], x[1]) for x in rebuilds]
 
             self._logger.info("Building '%s' triggers rebuild of units: %s",
@@ -295,127 +278,30 @@ class ProjectBuilder(object):
             for rebuild_unit in rebuild_units:
                 for rebuild_source in self._findSourceByDesignUnit(rebuild_unit):
                     self._getBuilderMessages(rebuild_source.abspath,
-                                                       batch_mode=True)
+                                             batch_mode=True)
             return self._getBuilderMessages(path)
 
         return self._sortBuildMessages(records)
 
-    def readConfigFile(self):
-        "Reads the configuration given by self._project_file['filename']"
-
-        cache_fname = self._getCacheFilename(self._project_file['filename'])
-
-        self._logger.info("Reading configuration file: '%s'", \
-                str(self._project_file['filename']))
-
-        if os.path.exists(cache_fname):
-            try:
-                obj = pickle.load(open(cache_fname, 'r'))
-                self.__dict__.update(obj.__dict__)
-                # Environment may have change since we last saved the file,
-                # we must recheck
-                try:
-                    self._postUnpicklingSanityCheck()
-                except hdlcc.exceptions.VimHdlBaseException:
-                    self._logger.exception("Sanity check error")
-                    self._project_file['valid'] = False
-            except (EOFError, IOError):
-                self._logger.warning("Unable to unpickle cached filename")
-
-        if not os.path.exists(self._project_file['filename']):
-            self._project_file['valid'] = False
-            return
-        #  If the library file hasn't changed, we're up to date an return
-        if os.path.getmtime(self._project_file['filename']) <= \
-                self._project_file['timestamp']:
-            return
-
-        self._logger.info("Updating config file")
-
-        self._project_file['timestamp'] = os.path.getmtime(self._project_file['filename'])
-
-        target_dir, builder_name, builder_flags, source_list = \
-                readConfigFile(self._project_file['filename'])
-
-        self._logger.info("Builder info:")
-        self._logger.info(" - Target dir:    %s", target_dir)
-        self._logger.info(" - Builder name:  %s", builder_name)
-        self._logger.info(" - Builder flags (global): %s", \
-                builder_flags['global'])
-        self._logger.info(" - Builder flags (batch): %s", \
-                builder_flags['batch'])
-        self._logger.info(" - Builder flags (single): %s", \
-                builder_flags['single'])
-
-        self._build_flags = builder_flags.copy()
-
-        # Check if the builder selected is implemented and create the
-        # builder attribute
-        if builder_name == 'msim':
-            try:
-                self.builder = MSim(target_dir)
-            except hdlcc.exceptions.SanityCheckError:
-                self._logger.warning("Builder '%s' sanity check failed", builder_name)
-        elif builder_name == 'xvhdl':
-            try:
-                self.builder = XVHDL(target_dir)
-            except hdlcc.exceptions.SanityCheckError:
-                self._logger.warning("Builder '%s' sanity check failed", builder_name)
-        elif builder_name == 'ghdl':
-            try:
-                self.builder = GHDL(target_dir)
-            except hdlcc.exceptions.SanityCheckError:
-                self._logger.warning("Builder '%s' sanity check failed", builder_name)
-
-        if self.builder is None:
-            self._logger.info("Using Fallback builder")
-            self.builder = Fallback(target_dir)
-
-        # Remove from our sources the files that are no longes listed
-        # in the configuration file.
-        # TODO: Check feasibility to tell the builder to remove compiled
-        # files so the removed file is actually removed from the library
-        for source in set(self.sources.keys()) - \
-                set([os.path.abspath(x[0]) for x in source_list]):
-            self._logger.debug("Removing %s from library", source)
-            self.sources.pop(source)
-
-        # Iterate over the sections to get sources and build flags.
-        # Take care to don't recreate a library
-        for source, library, flags in source_list:
-            if os.path.abspath(source) in self.sources.keys():
-                _source = self.sources[os.path.abspath(source)]
-            else:
-                _source = VhdlSourceFile(source, library)
-            _source.flags = self._build_flags['global'].copy()
-            if flags:
-                _source.flags.update(flags)
-
-            self.sources[_source.abspath] = _source
-
-        self._project_file['valid'] = True
-
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
-        cache_fname = self._getCacheFilename(self._project_file['filename'])
+        cache_fname = self._getCacheFilename(self._config.filename)
         pickle.dump(self, open(cache_fname, 'w'))
 
     def getCompilationOrder(self):
-        "Returns the build order osed by the buildByDependency method"
+        "Returns the build order needed by the buildByDependency method"
         self._units_built = []
         return self._getBuildSteps()
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        if not self._project_file['valid']:
-            self._logger.warning("Project file is invalid, not building")
         built = 0
         errors = 0
         warnings = 0
         self._units_built = []
         for source in self._getBuildSteps():
             records, _ = self.builder.build(source, \
-                    flags=self._build_flags['batch'])
+                    self._config.getBatchBuildFlagsByPath(source.filename))
             self._units_built += list(source.getDesignUnitsDotted())
             for record in self._sortBuildMessages(records):
                 if record['error_type'] == 'E':
@@ -447,14 +333,8 @@ class ProjectBuilder(object):
         pool.terminate()
         pool.join()
 
+        #  records = getStaticMessages(open(path, 'r').read().split('\n')) + \
+        #            self._getMessagesAvailable(path, *args)
         return self._sortBuildMessages(records)
-
-
-    def setProjectFile(self, project_file):
-        self._project_file = {'filename'  : os.path.abspath(project_file),
-                              'timestamp' : 0,
-                              'valid'     : True if os.path.exists(project_file)
-                                            else False,
-                              'cache'     : None}
 
 

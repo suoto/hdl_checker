@@ -49,5 +49,6 @@ def _setupStreamHandler(stream):
 
     logging.root.handlers = [stream_handler]
 
-_setupStreamHandler(sys.stdout)
+if os.environ['USER'] == 'souto':
+    _setupStreamHandler(sys.stdout)
 

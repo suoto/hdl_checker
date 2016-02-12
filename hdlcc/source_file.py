@@ -38,10 +38,10 @@ class VhdlSourceFile(object):
     # an exception for this)
     _semaphore = threading.BoundedSemaphore(_MAX_OPEN_FILES)
 
-    def __init__(self, filename, library='work'):
+    def __init__(self, filename, library='work', flags=set()):
         self.filename = os.path.normpath(filename)
         self.library = library
-        self.flags = set()
+        self.flags = flags
         self._design_units = []
         self._deps = []
         self._mtime = 0
@@ -60,8 +60,8 @@ class VhdlSourceFile(object):
         self._lock = threading.Lock()
 
     def __repr__(self):
-        return "VhdlSourceFile('%s', library='%s')" % \
-                (self.abspath, self.library)
+        return "VhdlSourceFile('%s', library='%s', flags=%s)" % \
+                (self.abspath, self.library, self.flags)
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
