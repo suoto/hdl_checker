@@ -17,7 +17,6 @@
 import abc
 import os
 import os.path as p
-import threading
 import logging
 
 from multiprocessing.pool import ThreadPool
@@ -44,9 +43,9 @@ class ProjectBuilder(object):
         self.builder = None
         self._logger = logging.getLogger(__name__)
 
-        self.halt = False
         self._units_built = []
 
+        self.project_file = project_file
         self._config = ConfigParser(project_file)
         parsed_builder = self._config.getBuilder()
 
@@ -66,6 +65,8 @@ class ProjectBuilder(object):
         if self.builder is None:
             self._logger.info("Using Fallback builder")
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+
+        self.buildByDependency()
 
     @staticmethod
     def _getCacheFilename(project_file):
@@ -146,9 +147,6 @@ class ProjectBuilder(object):
         "Yields source objects that can be built given the units already built"
         sources_built = []
         for step in range(self.MAX_BUILD_STEPS):
-            if self.halt:
-                self._logger.info("Halt requested, stopping")
-                raise StopIteration()
             empty_step = True
             for source in self._config.getSources():
                 dependencies = self._getSourceDependenciesSet(source)
@@ -336,5 +334,6 @@ class ProjectBuilder(object):
         #  records = getStaticMessages(open(path, 'r').read().split('\n')) + \
         #            self._getMessagesAvailable(path, *args)
         return self._sortBuildMessages(records)
+
 
 
