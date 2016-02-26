@@ -15,7 +15,9 @@ before_script:
 # command to install dependencies
 install: "pip install -r requirements.txt"
 # command to run tests
-script: coverage run -m nose2 --log-capture -vv
+script:
+  - "./run_tests.py -vv --log-capture"
+  - "cat tests.log"
 after_success:
   - "coverage combine"
   - "coverage html"

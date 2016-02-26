@@ -29,7 +29,8 @@ _logger = logging.getLogger(__name__)
 _BUILDER = os.environ.get('BUILDER', 'ghdl')
 if _BUILDER == 'msim':
     _PRJ_FILENAME = 'dependencies/vim-hdl-examples/project.prj'
-    _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
+    #  _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
+    _PATH = "/opt/altera/15.1/modelsim_ase/bin/"
 else:
     _PRJ_FILENAME = 'dependencies/vim-hdl-examples/ghdl.prj'
     _PATH = p.expanduser("~/ghdl/bin")

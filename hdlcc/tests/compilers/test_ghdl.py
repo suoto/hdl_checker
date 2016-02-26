@@ -21,7 +21,8 @@ import os
 
 if os.environ.get('BUILDER', None) == 'msim':
     from hdlcc.builders import MSim as Builder
-    _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
+    _PATH = "/opt/altera/15.1/modelsim_ase/bin/"
+    #  _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
 else:
     from hdlcc.builders import GHDL as Builder
     _PATH = os.path.expanduser("~/ghdl/bin")

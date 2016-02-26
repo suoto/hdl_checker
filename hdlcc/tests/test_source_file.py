@@ -64,6 +64,11 @@ with such.A('VHDL source file object') as it:
 
             writeListToFile(_FILENAME, it._code)
 
+        @it.has_teardown
+        def teardown():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
+
         @it.should('parse a file without errors')
         def test(case):
             it.source = VhdlSourceFile(_FILENAME)
