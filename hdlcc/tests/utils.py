@@ -20,5 +20,5 @@ def writeListToFile(filename, _list):
     "Well... writes '_list' to 'filename'"
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
     os.popen("touch %s" % filename, 'r').read()
-    time.sleep(0.3)
+    time.sleep(0.7)
 

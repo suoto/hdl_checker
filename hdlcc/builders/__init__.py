@@ -173,7 +173,7 @@ class BaseBuilder(object):
                 cached_info['compile_time'] = 0
 
             end = time.time()
-            self._logger.debug("Compiling took %.2fs", (end - start))
+            self._logger.debug("Compilation took %.2fs", (end - start))
         else:
             self._logger.debug("Nothing to do for %s", source)
             records = cached_info['records']

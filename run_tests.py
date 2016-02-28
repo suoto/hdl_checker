@@ -16,7 +16,7 @@
 "Script should be called within Vim to launch tests"
 
 import os
-from sys import argv
+from sys import argv, path, stdout
 import logging
 import nose2
 import coverage
@@ -40,20 +40,45 @@ def clear():
         print cmd
         print os.popen(cmd).read()
 
+def debug():
+    path.insert(0, './dependencies/rainbow_logging_handler/')
+    from rainbow_logging_handler import RainbowLoggingHandler
+    stream_handler = RainbowLoggingHandler(
+        stdout,
+        #  Customizing each column's color
+        # pylint: disable=bad-whitespace
+        color_asctime          = ('dim white',  'black'),
+        color_name             = ('dim white',  'black'),
+        color_funcName         = ('green',      'black'),
+        color_lineno           = ('dim white',  'black'),
+        color_pathname         = ('black',      'red'),
+        color_module           = ('yellow',     None),
+        color_message_debug    = ('color_59',   None),
+        color_message_info     = (None,         None),
+        color_message_warning  = ('color_226',  None),
+        color_message_error    = ('red',        None),
+        color_message_critical = ('bold white', 'red'))
+        # pylint: enable=bad-whitespace
+
+    logging.root.addHandler(stream_handler)
+
+
 def main():
+    if '--clear' in argv[1:]:
+        clear()
+        argv.pop(argv.index('--clear'))
+
+    if '--debug' in argv[1:]:
+        debug()
+        argv.pop(argv.index('--debug'))
+
     file_handler = logging.FileHandler("tests.log")
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
     logging.root.addHandler(file_handler)
     logging.root.setLevel(logging.DEBUG)
 
-    if '--clear' in argv[1:]:
-        clear()
-        argv.pop(argv.index('--clear'))
-
-    test(nose2_argv=argv[1:])
+    test(nose2_argv=argv)
 
 if __name__ == '__main__':
     main()
-
-

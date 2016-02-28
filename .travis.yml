@@ -9,14 +9,11 @@ before_script:
     - "if [ ! -f ghdl.tar.gz ]; then wget http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz -O ghdl.tar.gz; fi"
     - "tar zxvf ghdl.tar.gz"
     - "cd -"
-    - "git clean -fdx"
-    - "git submodule foreach git clean -fdx"
-
 # command to install dependencies
 install: "pip install -r requirements.txt"
 # command to run tests
 script:
-  - "./run_tests.py -vv --log-capture"
+  - "./run_tests.py -vv --log-capture --clear"
   - "cat tests.log"
 after_success:
   - "coverage combine"

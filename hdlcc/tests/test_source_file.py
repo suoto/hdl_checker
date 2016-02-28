@@ -70,17 +70,17 @@ with such.A('VHDL source file object') as it:
                 os.remove(_FILENAME)
 
         @it.should('parse a file without errors')
-        def test(case):
+        def test():
             it.source = VhdlSourceFile(_FILENAME)
 
         @it.should('detect a file change')
-        def test(case):
+        def test():
             code = list(it._code)
             writeListToFile(_FILENAME, code)
             it.assertTrue(it.source.changed(), "Source change not detected")
 
         @it.should('return its entities')
-        def test(case):
+        def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
@@ -88,7 +88,7 @@ with such.A('VHDL source file object') as it:
                                 design_units)
 
         @it.should('return its dependencies')
-        def test(case):
+        def test():
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
@@ -99,11 +99,11 @@ with such.A('VHDL source file object') as it:
                 dependencies)
 
         @it.should('return source modification time')
-        def test(case):
+        def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
         @it.should('return updated dependencies')
-        def test(case):
+        def test():
             code = list(it._code)
 
             code.insert(0, 'library some_library;')
@@ -121,7 +121,7 @@ with such.A('VHDL source file object') as it:
                 dependencies)
 
         @it.should('handle implicit libraries')
-        def test(case):
+        def test():
             code = list(it._code)
             code.insert(0, '    use work.another_package;')
             writeListToFile(_FILENAME, code)
@@ -137,7 +137,7 @@ with such.A('VHDL source file object') as it:
                 dependencies)
 
         @it.should('handle libraries without packages')
-        def test(case):
+        def test():
             code = list(it._code)
             code.insert(0, 'library remove_me;')
             writeListToFile(_FILENAME, code)
@@ -171,7 +171,8 @@ with such.A('VHDL source file object') as it:
                 "    constant SOME_INTEGER_CONSTANT : integer := 10;",
                 "    constant SOME_STRING_CONSTANT  : string := \"Hello\";",
                 "",
-                "    constant SOME_STRING : string := basic_library.very_common_pkg.VIM_HDL_VERSION;",
+                "    constant SOME_STRING : string := " \
+                "basic_library.very_common_pkg.VIM_HDL_VERSION;",
                 "end;",
                 "",
                 "package body package_with_constants is",
@@ -182,12 +183,17 @@ with such.A('VHDL source file object') as it:
             writeListToFile(_FILENAME, it._code)
             it._source_mtime = os.path.getmtime(_FILENAME)
 
+        @it.has_teardown
+        def teardown():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
+
         @it.should('parse a file without errors')
-        def test(case):
+        def test():
             it.source = VhdlSourceFile(_FILENAME)
 
         @it.should('return the names of the packages found')
-        def test(case):
+        def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
@@ -196,7 +202,7 @@ with such.A('VHDL source file object') as it:
                 design_units)
 
         @it.should('return its dependencies')
-        def test(case):
+        def test():
             dependencies = it.source.getDependencies()
             _logger.info("Dependencies: %s", dependencies)
             it.assertNotEqual(dependencies, None, "No dependencies found")
@@ -210,16 +216,15 @@ with such.A('VHDL source file object') as it:
 
 
         @it.should('return source modification time')
-        def test(case):
+        def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-        #  @it.should('detect a file change')
-        #  def test(case):
-        #      with open(_FILENAME, 'w') as source_fd:
-        #          source_fd.write('\n'.join(_VHD_SAMPLE_PACKAGE))
-        #          source_fd.write('\n')
-        #          source_fd.flush()
-        #      it.assertTrue(it.source.changed(), "Source change not detected")
+        @it.should('detect a file change')
+        def test():
+            _logger.info("Writing to file to detect the source change")
+            writeListToFile(_FILENAME, ["-- Testing\n", ] + it._code)
+            it.assertTrue(it.source.changed(), "Source change not detected")
+            _logger.info("Finihsed!")
 
 it.createTests(globals())
 

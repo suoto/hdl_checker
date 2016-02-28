@@ -19,7 +19,9 @@ import os
 import os.path as p
 import logging
 
+import threading
 from multiprocessing.pool import ThreadPool
+
 try:
     import cPickle as pickle # pragma: no cover
 except ImportError:
@@ -40,13 +42,14 @@ class ProjectBuilder(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, project_file=None):
-        self.builder = None
         self._logger = logging.getLogger(__name__)
+        self._lock = threading.Lock()
 
         self._units_built = []
 
         self.project_file = project_file
         self._config = ConfigParser(project_file)
+
         parsed_builder = self._config.getBuilder()
 
         # Check if the builder selected is implemented and create the
@@ -153,14 +156,16 @@ class ProjectBuilder(object):
 
                 missing_dependencies = dependencies - set(self._units_built)
 
-                # If there are missing dependencies skip this file for now
-                if missing_dependencies or source.abspath in sources_built:
+                # Skip current file if it has missing dependencies or if it was
+                # already built
+                if missing_dependencies:
                     self._logger.debug("Skipping %s for now because it has "
                                        "missing dependencies: %s", source,
                                        list(missing_dependencies))
                     continue
 
-                self._logger.debug("All dependencies for %s are met", str(source))
+                if source.abspath in sources_built:
+                    continue
 
                 self._units_built += list(source.getDesignUnitsDotted())
                 sources_built += [source.abspath]
@@ -283,8 +288,8 @@ class ProjectBuilder(object):
 
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
-        cache_fname = self._getCacheFilename(self._config.filename)
-        pickle.dump(self, open(cache_fname, 'w'))
+        #  cache_fname = self._getCacheFilename(self._config.filename)
+        #  pickle.dump(self, open(cache_fname, 'w'))
 
     def getCompilationOrder(self):
         "Returns the build order needed by the buildByDependency method"
@@ -293,28 +298,28 @@ class ProjectBuilder(object):
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        built = 0
-        errors = 0
-        warnings = 0
-        self._units_built = []
-        for source in self._getBuildSteps():
-            records, _ = self.builder.build(source, \
-                    self._config.getBatchBuildFlagsByPath(source.filename))
-            self._units_built += list(source.getDesignUnitsDotted())
-            for record in self._sortBuildMessages(records):
-                if record['error_type'] == 'E':
-                    _logger.debug(str(record))
-                    errors += 1
-                elif record['error_type'] == 'W':
-                    _logger.debug(str(record))
-                    warnings += 1
-                else: # pragma: no cover
-                    _logger.fatal(str(record))
-                    assert 0, 'Invalid record: %s' % str(record)
-            built += 1
-        self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
-                built, errors, warnings)
-
+        with self._lock:
+            built = 0
+            errors = 0
+            warnings = 0
+            self._units_built = []
+            for source in self._getBuildSteps():
+                records, _ = self.builder.build(source, \
+                        self._config.getBatchBuildFlagsByPath(source.filename))
+                self._units_built += list(source.getDesignUnitsDotted())
+                for record in self._sortBuildMessages(records):
+                    if record['error_type'] == 'E':
+                        _logger.debug(str(record))
+                        errors += 1
+                    elif record['error_type'] == 'W':
+                        _logger.debug(str(record))
+                        warnings += 1
+                    else: # pragma: no cover
+                        _logger.fatal(str(record))
+                        assert 0, 'Invalid record: %s' % str(record)
+                built += 1
+            self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
+                    built, errors, warnings)
 
     def getMessagesByPath(self, path, *args, **kwargs):
         records = []
