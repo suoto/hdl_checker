@@ -305,7 +305,7 @@ class ProjectBuilder(object):
             self._units_built = []
             for source in self._getBuildSteps():
                 records, _ = self.builder.build(source, \
-                        self._config.getBatchBuildFlagsByPath(source.filename))
+                        flags=self._config.getBatchBuildFlagsByPath(source.filename))
                 self._units_built += list(source.getDesignUnitsDotted())
                 for record in self._sortBuildMessages(records):
                     if record['error_type'] == 'E':

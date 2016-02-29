@@ -219,8 +219,12 @@ with such.A('VHDL source file object') as it:
         def test():
             _logger.info("Writing to file to detect the source change")
             writeListToFile(_FILENAME, ["-- Testing\n", ] + it._code)
-            it.assertTrue(it.source.changed(), "Source change not detected")
-            _logger.info("Finihsed!")
+            try:
+                it.assertTrue(it.source.changed(), "Source change not detected")
+                _logger.info("Finihsed with success")
+            except:
+                _logger.exception("Error!")
+                raise
 
 it.createTests(globals())
 

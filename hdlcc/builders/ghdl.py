@@ -120,8 +120,6 @@ class GHDL(BaseBuilder):
         stdout = []
         for cmd in (self._analyzeSource(source, flags),
                     self._checkSyntax(source, flags)):
-            self._logger.debug(" ".join(cmd))
-
             stdout += self._subprocessRunner(cmd)
 
         return stdout

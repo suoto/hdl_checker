@@ -24,8 +24,6 @@ from hdlcc.source_file import VhdlSourceFile
 _RE_LEADING_AND_TRAILING_WHITESPACES = re.compile(r"^\s*|\s*$")
 _RE_MULTIPLE_WHITESPACES = re.compile(r"\s+")
 
-_logger = logging.getLogger(__name__)
-
 def _extractSet(entry):
     '''Extract a set by splitting a string at whitespaces, removing
     empty values caused by leading/trailing/multiple whitespaces'''
@@ -103,6 +101,7 @@ class ConfigParser(object):
     def _parseIfNeeded(self):
         "Parses the configuration file"
         if self._shouldParse():
+            self._logger.debug("Parsing is required")
             self._updateTimestamp()
             for _line in open(self.filename, 'r').readlines():
                 line = _COMMENTS.sub("", _line)
@@ -125,6 +124,8 @@ class ConfigParser(object):
 
     def _handleParsedParameter(self, parameter, value):
         "Handles a parsed line that sets a parameter"
+        self._logger.debug("Found parameter '%s' with value '%s'",
+                           parameter, value)
         if parameter in self._single_value_parms:
             self._parms[parameter] = value
         elif parameter in self._list_parms:
@@ -136,6 +137,10 @@ class ConfigParser(object):
     # without deleting and recreating the objects
     def _handleParsedSource(self, language, library, path, flags):
         "Handles a parsed line that adds a source"
+
+        self._logger.debug("Found source with path '%s', "
+                           "library: '%s', language: '%s', flags: '%s'",
+                           path, library, language, flags)
 
         if str.lower(language) != 'vhdl':
             self._logger.warning("Unsupported language: %s", language)

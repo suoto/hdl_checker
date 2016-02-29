@@ -21,6 +21,7 @@ import logging
 import time
 import argparse
 from prettytable import PrettyTable
+from sys import stdout, path
 try:
     import argcomplete
     _HAS_ARGCOMPLETE = True
@@ -47,13 +48,13 @@ from hdlcc.project_builder import ProjectBuilder
 
 class StandaloneProjectBuilder(ProjectBuilder):
     _ui_logger = logging.getLogger('UI')
-    def handleUiInfo(self, message):
+    def _handleUiInfo(self, message):
         self._ui_logger.info(message)
 
-    def handleUiWarning(self, message):
+    def _handleUiWarning(self, message):
         self._ui_logger.warning(message)
 
-    def handleUiError(self, message):
+    def _handleUiError(self, message):
         self._ui_logger.error(message)
 
 def _fileExtentensionCompleter(extension):
@@ -127,7 +128,7 @@ def parseArguments():
         args.sources = [source for sublist in args.sources for source in sublist]
 
     Config.log_level = args.log_level
-    Config.setupBuild()
+    #  Config.setupBuild()
 
     return args
 
@@ -166,9 +167,8 @@ def main(args):
         StandaloneProjectBuilder.clean(args.project_file)
 
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
-        project = StandaloneProjectBuilder()
-        project.setProjectFile(args.project_file)
-        project.readConfigFile()
+        project = StandaloneProjectBuilder(args.project_file)
+        #  project.readConfigFile()
 
     if args.debug_print_sources:
         sources = PrettyTable(['Filename', 'Library', 'Flags'])
@@ -185,21 +185,18 @@ def main(args):
                 flags=' '.join(source.flags))
             assert not set(['-93', '-2008']).issubset(source.flags)
 
-    if args.build:
-        if not args.sources:
-            project.buildByDependency()
-        else:
-            for source in args.sources:
-                try:
-                    _logger.info("Building source '%s'", source)
-                    for record in project.getMessagesByPath(source):
-                        print "[{error_type}-{error_number}] @ " \
-                              "({line_number},{column}): {error_message}"\
-                                .format(**record)
-                except RuntimeError as exception:
-                    _logger.error("Unable to build '%s': '%s'", source,
-                                  str(exception))
-                    continue
+    if args.build and args.sources:
+        for source in args.sources:
+            try:
+                _logger.info("Building source '%s'", source)
+                for record in project.getMessagesByPath(source):
+                    print "[{error_type}-{error_number}] @ " \
+                          "({line_number},{column}): {error_message}"\
+                            .format(**record)
+            except RuntimeError as exception:
+                _logger.error("Unable to build '%s': '%s'", source,
+                              str(exception))
+                continue
 
     if args.debug_parse_source_file:
         for source in args.sources:
@@ -212,17 +209,40 @@ def main(args):
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
         project.saveCache()
 
+def debug():
+    path.insert(0, '/home/asouto/dev/hdlcc/dependencies/rainbow_logging_handler/')
+    from rainbow_logging_handler import RainbowLoggingHandler
+    stream_handler = RainbowLoggingHandler(
+        stdout,
+        #  Customizing each column's color
+        # pylint: disable=bad-whitespace
+        color_asctime          = ('dim white',  'black'),
+        color_name             = ('dim white',  'black'),
+        color_funcName         = ('green',      'black'),
+        color_lineno           = ('dim white',  'black'),
+        color_pathname         = ('black',      'red'),
+        color_module           = ('yellow',     None),
+        color_message_debug    = ('color_59',   None),
+        color_message_info     = (None,         None),
+        color_message_warning  = ('color_226',  None),
+        color_message_error    = ('red',        None),
+        color_message_critical = ('bold white', 'red'))
+        # pylint: enable=bad-whitespace
+
+    logging.root.addHandler(stream_handler)
+    logging.root.setLevel(logging.DEBUG)
+
 
 if __name__ == '__main__':
+    debug()
+    _logger = logging.getLogger(__name__)
     start = time.time()
     runner_args = parseArguments()
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
-    _logger = logging.getLogger(__name__)
     if runner_args.debug_profiling:
         profile.run('main(runner_args)', runner_args.debug_profiling)
     else:
         main(runner_args)
     end = time.time()
     _logger.info("Process took %.2fs", (end - start))
-
 
