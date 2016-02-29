@@ -68,28 +68,20 @@ class VhdlSourceFile(object):
 
     def _parseIfChanged(self):
         "Parses this source file if it has changed"
-        if self._lock.locked():
-            unlocked_request = False
-        else:
-            unlocked_request = True
-            self._lock.acquire()
-        try:
-            if self.changed():
-                _logger.debug("Parsing %s", str(self))
-                self._mtime = self.getmtime()
-                self._doParse()
-            else:
-                _logger.debug("Source %s is up to date", str(self))
-        except OSError: # pragma: no cover
-            _logger.warning("Couldn't parse '%s' at this moment", self)
-        finally:
-            if unlocked_request:
-                self._lock.release()
+        with self._lock:
+            try:
+                if self._changed():
+                    _logger.debug("Parsing %s", str(self))
+                    self._mtime = self.getmtime()
+                    self._doParse()
+                else:
+                    _logger.debug("Source %s is up to date", str(self))
+            except OSError: # pragma: no cover
+                _logger.warning("Couldn't parse '%s' at this moment", self)
 
-    def changed(self):
+    def _changed(self):
         """Checks if the file changed based on the modification time provided
         by os.path.getmtime"""
-
         return self.getmtime() > self._mtime
 
     def _getSourceContent(self):
@@ -169,8 +161,7 @@ class VhdlSourceFile(object):
         """Returns a list of dictionaries with the design units defined.
         The dict defines the name (as defined in the source file) and
         the type (package, entity, etc)"""
-        with self._lock:
-            self._parseIfChanged()
+        self._parseIfChanged()
         return self._design_units
 
     def getDesignUnitsDotted(self):
@@ -183,8 +174,7 @@ class VhdlSourceFile(object):
     def getDependencies(self):
         """Returns a list of dictionaries with the design units this
         source file depends on. Dict defines library and unit"""
-        with self._lock:
-            self._parseIfChanged()
+        self._parseIfChanged()
         return self._deps
 
     def getmtime(self):

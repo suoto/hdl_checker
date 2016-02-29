@@ -69,11 +69,6 @@ with such.A('VHDL source file object') as it:
         def test():
             it.source = VhdlSourceFile(_FILENAME)
 
-        @it.should('detect a file change')
-        def test():
-            code = list(it._code)
-            writeListToFile(_FILENAME, code)
-            it.assertTrue(it.source.changed(), "Source change not detected")
 
         @it.should('return its entities')
         def test():
@@ -214,17 +209,6 @@ with such.A('VHDL source file object') as it:
         @it.should('return source modification time')
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
-
-        @it.should('detect a file change')
-        def test():
-            _logger.info("Writing to file to detect the source change")
-            writeListToFile(_FILENAME, ["-- Testing\n", ] + it._code)
-            try:
-                it.assertTrue(it.source.changed(), "Source change not detected")
-                _logger.info("Finihsed with success")
-            except:
-                _logger.exception("Error!")
-                raise
 
 it.createTests(globals())
 

@@ -12,13 +12,22 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"Commom things for tests"
 
 import os
 import time
+import logging
+
+_logger = logging.getLogger(__name__)
 
 def writeListToFile(filename, _list):
     "Well... writes '_list' to 'filename'"
+    _logger.info("Writing to %s", filename)
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
+    mtime = os.path.getmtime(filename)
+    time.sleep(0.01)
     os.popen("touch %s" % filename, 'r').read()
-    time.sleep(0.7)
+    while os.path.getmtime(filename) == mtime:
+        _logger.debug("Waiting...")
+        time.sleep(0.1)
 
