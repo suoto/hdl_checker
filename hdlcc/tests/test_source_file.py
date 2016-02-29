@@ -15,13 +15,9 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import sys
 import os
 import logging
 from nose2.tools import such
-
-sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), \
-        '..', 'python'))
 
 from hdlcc.source_file import VhdlSourceFile
 
