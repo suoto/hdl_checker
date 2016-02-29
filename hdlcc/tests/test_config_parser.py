@@ -19,6 +19,7 @@ import os.path as p
 import logging
 
 from nose2.tools import such
+from nose2.tools.params import params
 
 import hdlcc
 from hdlcc.tests.utils import writeListToFile
@@ -95,6 +96,17 @@ with such.A('config parser object') as it:
 
             it.assertItemsEqual(parser_sources, expected_sources)
 
+        @it.should('tell correctly if a path is on the project file')
+        @params(('./dependencies/vim-hdl-examples/basic_library/clock_divider.vhd',
+                 True),
+                (p.abspath('./dependencies/vim-hdl-examples/basic_library/'
+                           'clock_divider.vhd',),
+                 True),
+                ('hello', False))
+        def test(case, path, result):
+            _logger.info("Running %s", case)
+            it.assertEqual(it.parser.hasSource(path), result)
+
     with it.having('a project file with some non-standard stuff'):
         @it.should('raise UnknownParameterError exception when an unknown parameter '
                    'is found')
@@ -131,18 +143,40 @@ with such.A('config parser object') as it:
             parser = hdlcc.config_parser.ConfigParser(project_filename)
             it.assertEquals(parser.getTargetDir(), p.abspath('.msim'))
 
-        #  @it.should('raise UnknownParameterError exception when an unknown parameter '
-        #             'is found')
-        #  def test():
-        #      project_filename = 'foo.prj'
+    with it.having('no project file'):
+        @it.should('create the object without error')
+        def test():
+            it.parser = hdlcc.config_parser.ConfigParser()
+            it.assertIsNotNone(it.parser)
 
-        #      try:
-        #          parser = hdlcc.config_parser.ConfigParser(project_filename)
-        #      except:
-        #          pass
+        @it.should('return fallback as selected builder')
+        def test():
+            it.assertEqual(it.parser.getBuilder(), 'fallback')
 
-        #      print parser
+        @it.should('return .fallback as target directory')
+        def test():
+            it.assertEqual(it.parser.getTargetDir(), '.fallback')
 
+        @it.should('return empty single build flags for any path')
+        @params('./dependencies/vim-hdl-examples/basic_library/clock_divider.vhd',
+                'hello')
+        def test(case, path):
+            _logger.info("Running %s", case)
+            it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), set())
+
+        @it.should('return empty batch build flags for any path')
+        @params('./dependencies/vim-hdl-examples/basic_library/clock_divider.vhd',
+                'hello')
+        def test(case, path):
+            _logger.info("Running %s", case)
+            it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), set())
+
+        @it.should('say every path is on the project file')
+        @params('./dependencies/vim-hdl-examples/basic_library/clock_divider.vhd',
+                'hello')
+        def test(case, path):
+            _logger.info("Running %s", case)
+            it.assertTrue(it.parser.hasSource(path))
 
 it.createTests(globals())
 

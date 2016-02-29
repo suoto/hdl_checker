@@ -14,11 +14,12 @@ install: "pip install -r requirements.txt"
 # command to run tests
 script:
   - "./run_tests.py -vv --log-capture --clear"
-  - "cat tests.log"
 after_success:
+  - "rm -f dependencies/hdl_lib/osvvm_lib/CoveragePkg.vhd"
   - "coverage combine"
-  - "coverage html"
   - "codecov"
+after_failure:
+  - "cat tests.log"
 cache:
   directories:
   - ~/ghdl/

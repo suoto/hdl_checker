@@ -54,21 +54,22 @@ class ConfigParser(object):
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
     def __init__(self, filename=None):
-        if filename is not None:
-            self.filename = p.abspath(filename)
-        else:
-            self.filename = '/tmp/hdlcc.prj'
-            open(self.filename, 'w').close()
-
-            self._logger.warning("No configuration file found, using '%s'",
-                                 self.filename)
-
-        self._logger.info("Creating config parser for filename '%s'", self.filename)
-
         self._parms = {
             'batch_build_flags' : set(),
             'single_build_flags' : set(),
             'global_build_flags' : set()}
+
+        if filename is not None:
+            self.filename = p.abspath(filename)
+            self._logger.info("Creating config parser for filename '%s'",
+                              self.filename)
+        else:
+            self.filename = None
+            self._parms['builder'] = 'fallback'
+            self._parms['target_dir'] = '.fallback'
+
+            self._logger.warning("No configuration file given, using dummy")
+
 
         self._sources = {}
         self._timestamp = 0
@@ -91,6 +92,8 @@ class ConfigParser(object):
 
     def _shouldParse(self):
         "Checks if we should parse the configuration file"
+        if self.filename is None:
+            return False
         return p.getmtime(self.filename) > self._timestamp
 
     def _updateTimestamp(self):
@@ -164,6 +167,8 @@ class ConfigParser(object):
     def getSingleBuildFlagsByPath(self, path):
         "Return a set of flags configured to build a single source"
         self._parseIfNeeded()
+        if self.filename is None:
+            return set()
         return self._sources[p.abspath(path)].flags | \
                self._parms['single_build_flags']  | \
                self._parms['global_build_flags']
@@ -171,6 +176,8 @@ class ConfigParser(object):
     def getBatchBuildFlagsByPath(self, path):
         "Return a set of flags configured to build a single source"
         self._parseIfNeeded()
+        if self.filename is None:
+            return set()
         return self._sources[p.abspath(path)].flags | \
                self._parms['batch_build_flags']   | \
                self._parms['global_build_flags']
@@ -192,6 +199,8 @@ class ConfigParser(object):
 
     def hasSource(self, path):
         self._parseIfNeeded()
+        if self.filename is None:
+            return True
         return p.abspath(path) in self._sources.keys()
 
 

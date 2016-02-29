@@ -27,12 +27,13 @@ def test(nose2_argv):
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
 
-    nose2.discover(exit=False, argv=nose2_argv)
-
-    cov.stop()
-    cov.save()
-    cov.combine()
-    cov.html_report()
+    try:
+        nose2.discover(exit=False, argv=nose2_argv)
+    finally:
+        cov.stop()
+        cov.save()
+        #  cov.combine()
+        #  cov.html_report()
 
 def clear():
     for cmd in ('git clean -fdx',

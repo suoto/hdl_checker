@@ -70,27 +70,25 @@ with such.A('Builder object') as it:
             os.remove(it._error_file)
 
         @it.should('pass environment check')
-        def test(case):
+        def test():
             it.builder.checkEnvironment()
 
         @it.should('compile some source')
-        def test(case):
+        def test():
             open(it._ok_file, 'w').write('\n'.join(_VHD_SAMPLE_ENTITY))
             source = VhdlSourceFile(it._ok_file)
-            records, rebuilds = it.builder.build(source)
-            for record in records:
-                it.assertTrue(record['error_type'] != 'E',
-                              'This source should not generate errors. '
-                              'Error record: ' + str(record))
+            records, _ = it.builder.build(source)
+            it.assertNotIn('E', [x['error_type'] for x in records],
+                           'This source should not generate errors.')
 
         @it.should('catch an error')
-        def test(case):
+        def test():
             open(it._error_file, 'w').write('\n'.join(['hello\n'] + _VHD_SAMPLE_ENTITY))
             source = VhdlSourceFile(it._error_file)
-            records, rebuilds = it.builder.build(source)
-            it.assertTrue(('E', '1') in \
-                    [(x['error_type'], x['line_number']) for x in records],
-                    'Builder failed to report an error at the first line')
+            records, _ = it.builder.build(source)
+            it.assertIn(('E', '1'),
+                        [(x['error_type'], x['line_number']) for x in records],
+                        'Builder failed to report an error at the first line')
             for record in records:
                 _logger.info(record)
 
