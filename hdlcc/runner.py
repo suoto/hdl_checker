@@ -23,23 +23,26 @@ import time
 import argparse
 from prettytable import PrettyTable
 from sys import stdout, path
-try:
-    import argcomplete
-    _HAS_ARGCOMPLETE = True
-except ImportError:
-    _HAS_ARGCOMPLETE = False
 
 try:
     import cProfile as profile
 except ImportError:
     import profile
 
-def _pathSetup():
-    import sys
+try:
+    import argcomplete
+    _HAS_ARGCOMPLETE = True
+except ImportError: # pragma: no cover
+    _HAS_ARGCOMPLETE = False
+
+_logger = logging.getLogger(__name__)
+
+def _pathSetup(): # pragma: no cover
+    "Insert hdlcc module into Python path"
     path_to_this_file = p.realpath(__file__).split(p.sep)[:-2]
     hdlcc_path = p.sep.join(path_to_this_file)
-    if hdlcc_path not in sys.path:
-        sys.path.insert(0, hdlcc_path)
+    if hdlcc_path not in path:
+        path.insert(0, hdlcc_path)
 
 if __name__ == '__main__':
     _pathSetup()
@@ -58,7 +61,7 @@ class StandaloneProjectBuilder(ProjectBuilder):
     def _handleUiError(self, message):
         self._ui_logger.error(message)
 
-def _fileExtentensionCompleter(extension):
+def _fileExtentensionCompleter(extension): # pragma: no cover
     def _completer(**kwargs):
         prefix = kwargs['prefix']
         if prefix == '':
@@ -105,7 +108,7 @@ def parseArguments():
                         built (lists sources, libraries, build flags and so on""")
 
 
-    if _HAS_ARGCOMPLETE:
+    if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
@@ -114,13 +117,11 @@ def parseArguments():
 
     args.log_level = logging.FATAL
     if args.verbose:
-        if len(args.verbose) == 0:
-            args.log_level = logging.FATAL
-        elif len(args.verbose) == 1:
+        if len(args.verbose) == 1:
             args.log_level = logging.WARNING
         elif len(args.verbose) == 2:
             args.log_level = logging.INFO
-        elif len(args.verbose) >= 3:
+        else:
             args.log_level = logging.DEBUG
 
     # Planify source list if supplied
@@ -155,11 +156,9 @@ def runStandaloneStaticCheck(fname):
     for record in getStaticMessages(open(fname, 'r').read().split('\n')):
         print record
 
-def main(args):
+def runner(args):
     "Main runner command processing"
 
-    # FIXME: Find a better way to insert a header to the log file
-    _logger.info("#"*(197 - 32))
     _logger.info("Creating project object")
 
     if args.clean:
@@ -233,18 +232,22 @@ def setupLogging():
         stream_handler = logging.StreamHandler(stdout)
 
     logging.root.addHandler(stream_handler)
-    logging.root.setLevel(logging.DEBUG)
+    logging.root.setLevel(logging.WARNING)
 
-if __name__ == '__main__':
+def main():
     setupLogging()
-    _logger = logging.getLogger(__name__)
     start = time.time()
     runner_args = parseArguments()
+    logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
     if runner_args.debug_profiling:
-        profile.run('main(runner_args)', runner_args.debug_profiling)
+        globals()['runner_args'] = runner_args
+        profile.run('runner(runner_args)', runner_args.debug_profiling)
     else:
-        main(runner_args)
+        runner(runner_args)
     end = time.time()
     _logger.info("Process took %.2fs", (end - start))
+
+if __name__ == '__main__':
+    main()
 

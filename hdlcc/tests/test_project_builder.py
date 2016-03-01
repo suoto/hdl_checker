@@ -27,17 +27,17 @@ from hdlcc.tests.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-_BUILDER = os.environ.get('BUILDER', 'ghdl')
+BUILDER = os.environ.get('BUILDER', 'ghdl')
 
 _PROJECT_BASE_PATH = p.expanduser('./dependencies/hdl_lib')
 
-if _BUILDER == 'msim':
-    _PRJ_FILENAME = p.join(_PROJECT_BASE_PATH, 'msim.prj')
+if BUILDER == 'msim':
     _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
     #  _PATH = "/opt/altera/15.1/modelsim_ase/bin/"
 else:
-    _PRJ_FILENAME = p.join(_PROJECT_BASE_PATH, 'ghdl.prj')
     _PATH = p.expanduser("~/ghdl/bin")
+
+_PRJ_FILENAME = p.join(_PROJECT_BASE_PATH, BUILDER + '.prj')
 
 from multiprocessing import Queue
 

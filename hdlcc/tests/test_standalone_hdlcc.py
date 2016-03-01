@@ -50,6 +50,8 @@ def shell(cmd):
     if exc:
         raise exc
 
+    return stdout
+
 with such.A('hdlcc standalone tool') as it:
     @it.has_setup
     def setup():
@@ -75,10 +77,16 @@ with such.A('hdlcc standalone tool') as it:
             @it.should("run debug arguments")
             @params(('--debug-print-sources', ),
                     ('--debug-print-compile-order', ),
+
+                    ('--build', '-s',
+                     './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),
+
                     ('--debug-parse-source-file', '-s',
                      './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),
+
                     ('--debug-run-static-check', '-s',
                      './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),)
+
             def test(case, *args):
                 _logger.info("Running '%s'", case)
                 cmd = ['coverage', 'run',
@@ -87,6 +95,33 @@ with such.A('hdlcc standalone tool') as it:
                     cmd.append(arg)
 
                 shell(cmd)
+
+
+            @it.should("save profiling info if requested")
+            def test():
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj',
+                       '--debug-profiling', 'output.stats']
+
+                if p.exists('output.stats'):
+                    os.remove('output.stats')
+
+                shell(cmd)
+
+                it.assertTrue(p.exists('output.stats'))
+
+            @it.should("control debugging level")
+            def test():
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj', '-cb']
+
+                it.assertEqual(shell(cmd), [''])
+
+                previous = None
+                for level in range(1, 5):
+                    stdout = shell(cmd + ['-' + 'v'*level])
+                    it.assertTrue(len(stdout) >= previous)
+                    previous = len(stdout)
 
         with it.having('an invalid environment'):
             pass

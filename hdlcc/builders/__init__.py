@@ -18,7 +18,7 @@ import logging
 import os
 import abc
 import time
-import subprocess
+import subprocess as subp
 from threading import Lock
 
 from hdlcc.config import Config
@@ -82,10 +82,13 @@ class BaseBuilder(object):
         self._logger.debug(" ".join(cmd_with_args))
 
         try:
-            stdout = list(subprocess.check_output(cmd_with_args, \
-                    stderr=subprocess.STDOUT).split("\n"))
-        except subprocess.CalledProcessError as exc:
+            stdout = list(subp.check_output(cmd_with_args, \
+                    stderr=subp.STDOUT).split("\n"))
+        except subp.CalledProcessError as exc:
             stdout = list(exc.output.split("\n"))
+
+        for line in stdout:
+            self._logger.debug("> " + str(line))
 
         return stdout
 
