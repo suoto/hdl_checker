@@ -1,4 +1,9 @@
-# HDL Code Checker [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc) [![codecov.io](https://codecov.io/github/suoto/hdlcc/coverage.svg?branch=master)](https://codecov.io/github/suoto/hdlcc?branch=master) [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
+# HDL Code Checker
+
+[![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
+[![codecov.io](https://codecov.io/github/suoto/hdlcc/coverage.svg?branch=master)](https://codecov.io/github/suoto/hdlcc?branch=master)
+[![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
+[![Code Health](https://landscape.io/github/suoto/hdlcc/master/landscape.svg?style=flat)](https://landscape.io/github/suoto/hdlcc/master)
 
 `hdlcc` provides a Python API between a VHDL project and some HDL compilers to
 catch errors and warnings the compilers generate that can be used to populate
