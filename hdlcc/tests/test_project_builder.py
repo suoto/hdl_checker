@@ -17,6 +17,7 @@
 
 import os
 import os.path as p
+import time
 import logging
 
 from nose2.tools import such
@@ -81,12 +82,60 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
                 os.environ['PATH'] = it.original_path
                 del it.project
 
-            @it.should('build project by dependency')
+            @it.should('build project by dependency in background')
             def test():
                 _logger.info("Creating project builder object")
                 it.project = StandaloneProjectBuilder()
                 _logger.info("Checking if msg queue is empty")
                 it.assertTrue(it.project._msg_queue.empty())
+                it.assertFalse(it.project.finishedBuilding())
+
+            @it.should('notify if a build is already running')
+            def test():
+                it.project.buildByDependency()
+                while it.project._msg_queue.empty():
+                    time.sleep(0.1)
+                messages = []
+                while not it.project._msg_queue.empty():
+                    messages.append(it.project._msg_queue.get())
+
+                try:
+                    it.assertIn(('info', 'Build thread is already running'),
+                                messages)
+                except:
+                    it.project.waitForBuild()
+                    raise
+
+            @it.should('warn when trying to build a source before the build '
+                       'thread completes')
+            def test():
+                filename = p.join(_PROJECT_BASE_PATH,
+                                  'memory/testbench/async_fifo_tb.vhd')
+
+                it.assertTrue(it.project._msg_queue.empty())
+
+                it.project.getMessagesByPath(filename)
+
+                while it.project._msg_queue.empty():
+                    time.sleep(0.1)
+
+                messages = []
+                while not it.project._msg_queue.empty():
+                    messages.append(it.project._msg_queue.get())
+
+                try:
+                    it.assertIn(('warning', "Project hasn't finished building, "
+                                            "try again after it finishes."),
+                                messages)
+                except:
+                    it.project.waitForBuild()
+                    raise
+
+                it.project.waitForBuild()
+
+            @it.should('wait until build has finished')
+            def test():
+                it.project.waitForBuild()
 
             @it.should('get messages by path')
             def test():

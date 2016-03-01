@@ -44,6 +44,7 @@ class ProjectBuilder(object):
     def __init__(self, project_file=None):
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
+        self._build_thread = threading.Thread(target=self._buildByDependency)
 
         self._units_built = []
 
@@ -211,19 +212,20 @@ class ProjectBuilder(object):
         try:
             source = self._config.getSourceByPath(path)
         except KeyError:
-            msg = {
-                'checker'        : '',
+            return [{
+                'checker'        : 'hdlcc',
                 'line_number'    : '',
                 'column'         : '',
                 'filename'       : '',
                 'error_number'   : '',
                 'error_type'     : 'W',
                 'error_message'  : 'Path "%s" not found in project file' %
-                                   p.abspath(path)}
-            #  if self._setup_thread.isAlive():
-            #      msg['error_message'] += ' (setup it still active, try again ' \
-            #              'after it finishes)'
-            return [msg]
+                                   p.abspath(path)}]
+
+        if self._build_thread.isAlive():
+            self._handleUiWarning("Project hasn't finished building, try again "
+                                  "after it finishes.")
+            return []
 
         dependencies = self._getSourceDependenciesSet(source)
 
@@ -237,34 +239,12 @@ class ProjectBuilder(object):
             self.saveCache()
             return records
 
-        #  elif self._setup_thread.isAlive():
-        #      self._handleUiWarning("Project setup is still running...")
-        #      return []
-
         else:
             return self._getBuilderMessages(path, *args, **kwargs)
 
     def _getBuilderMessages(self, path, batch_mode=False):
         '''Builds a given source file handling rebuild of units reported
         by the compiler'''
-        #  if not self._project_file['valid']:
-        #      self._logger.warning("Project file is invalid, not building")
-        #      return []
-
-        if not self._config.hasSource(path):
-            return [{
-                'checker'        : 'hdl-code-checker',
-                'line_number'    : None,
-                'column'         : None,
-                'filename'       : path,
-                'error_number'   : None,
-                'error_type'     : 'W',
-                'error_message'  : "Source '%s' not found on the configuration"
-                                   " file" % path,
-            }]
-
-        #  flags = self._build_flags['batch'] if batch_mode else \
-        #          self._build_flags['single']
 
         flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
                 self._config.getSingleBuildFlagsByPath(path)
@@ -292,11 +272,28 @@ class ProjectBuilder(object):
         #  pickle.dump(self, open(cache_fname, 'w'))
 
     def getCompilationOrder(self):
-        "Returns the build order needed by the buildByDependency method"
+        "Returns the build order needed by the _buildByDependency method"
         self._units_built = []
         return self._getBuildSteps()
 
     def buildByDependency(self):
+        "Build the project by checking source file dependencies"
+        if self._build_thread.isAlive():
+            self._handleUiInfo("Build thread is already running")
+            return
+        self._build_thread = threading.Thread(target=self._buildByDependency)
+        self._build_thread.start()
+
+    def finishedBuilding(self):
+        "Returns whether a background build has finished running"
+        return not self._build_thread.isAlive()
+
+    def waitForBuild(self):
+        "Waits until the background build finishes"
+        with self._lock:
+            self._logger.info("Build has finished")
+
+    def _buildByDependency(self):
         "Build the project by checking source file dependencies"
         with self._lock:
             built = 0

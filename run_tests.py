@@ -32,8 +32,9 @@ def test(nose2_argv):
     finally:
         cov.stop()
         cov.save()
-        #  cov.combine()
-        #  cov.html_report()
+        if os.environ['USER'] != 'travis':
+            cov.combine()
+            cov.html_report()
 
 def clear():
     for cmd in ('git clean -fdx',
