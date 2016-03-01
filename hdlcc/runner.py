@@ -44,8 +44,8 @@ def _pathSetup():
 if __name__ == '__main__':
     _pathSetup()
 
-from hdlcc.config import Config
-from hdlcc.project_builder import ProjectBuilder
+from config import Config
+from project_builder import ProjectBuilder
 
 class StandaloneProjectBuilder(ProjectBuilder):
     _ui_logger = logging.getLogger('UI')

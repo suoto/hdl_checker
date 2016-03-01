@@ -49,26 +49,34 @@ class ProjectBuilder(object):
         self._units_built = []
 
         self.project_file = project_file
-        self._config = ConfigParser(project_file)
 
-        parsed_builder = self._config.getBuilder()
+        cache = self.recoverCache(project_file)
 
-        # Check if the builder selected is implemented and create the
-        # builder attribute
-        self.builder = None
-        try:
-            if parsed_builder == 'msim':
-                self.builder = hdlcc.builders.MSim(self._config.getTargetDir())
-            elif parsed_builder == 'xvhdl':
-                self.builder = hdlcc.builders.XVHDL(self._config.getTargetDir())
-            elif parsed_builder == 'ghdl':
-                self.builder = hdlcc.builders.GHDL(self._config.getTargetDir())
-        except hdlcc.exceptions.SanityCheckError:
-            self._logger.warning("Builder '%s' sanity check failed", parsed_builder)
+        if cache is None:
+            # No cache file or unable to recover from cache file
 
-        if self.builder is None:
-            self._logger.info("Using Fallback builder")
-            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+            self._config = ConfigParser(project_file)
+
+            parsed_builder = self._config.getBuilder()
+
+            # Check if the builder selected is implemented and create the
+            # builder attribute
+            self.builder = None
+            try:
+                if parsed_builder == 'msim':
+                    self.builder = hdlcc.builders.MSim(self._config.getTargetDir())
+                elif parsed_builder == 'xvhdl':
+                    self.builder = hdlcc.builders.XVHDL(self._config.getTargetDir())
+                elif parsed_builder == 'ghdl':
+                    self.builder = hdlcc.builders.GHDL(self._config.getTargetDir())
+            except hdlcc.exceptions.SanityCheckError:
+                self._logger.warning("Builder '%s' sanity check failed", parsed_builder)
+
+            if self.builder is None:
+                self._logger.info("Using Fallback builder")
+                self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+        else:
+            self.__dict__.update(cache.__dict__)
 
         self.buildByDependency()
 
@@ -82,7 +90,6 @@ class ProjectBuilder(object):
     def clean(project_file):
         "Clean up generated files for a clean build"
         cache_fname = ProjectBuilder._getCacheFilename(project_file)
-
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
@@ -91,16 +98,22 @@ class ProjectBuilder(object):
         # Remove the _logger attribute because we can't pickle file or
         # stream objects. In its place, save the logger name
         state = self.__dict__.copy()
-        state['_logger'] = self._logger.name
+        state['_logger'] = {'name' : self._logger.name,
+                            'level' : self._logger.level}
+        del state['_lock']
+        del state['_build_thread']
+
         return state
 
     def __setstate__(self, state):
         "Pickle load implementation"
         # Get a logger with the name given in state['_logger'] (see
         # __getstate__) and update our dictionary with the pickled info
-        self._logger = logging.getLogger(state['_logger'])
-        self._logger.setLevel(logging.INFO)
+        self._logger = logging.getLogger(state['_logger']['name'])
+        self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
+        self._lock = threading.Lock()
+        self._build_thread = threading.Thread(target=self._buildByDependency)
         self.__dict__.update(state)
 
     @abc.abstractmethod
@@ -269,8 +282,21 @@ class ProjectBuilder(object):
 
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
-        #  cache_fname = self._getCacheFilename(self._config.filename)
-        #  pickle.dump(self, open(cache_fname, 'w'))
+        cache_fname = self._getCacheFilename(self._config.filename)
+        pickle.dump(self, open(cache_fname, 'w'), 0)
+
+    def recoverCache(self, project_file):
+        cache_fname = self._getCacheFilename(project_file)
+        cache = None
+        if p.exists(cache_fname):
+            try:
+                cache = pickle.load(open(cache_fname, 'r'))
+                recovered = True
+                print "Recovered cache from '%s'" % cache_fname
+            except pickle.UnpicklingError:
+                print "Unable to recover from '%s'" % cache_fname
+
+        return cache
 
     def getCompilationOrder(self):
         "Returns the build order needed by the _buildByDependency method"
@@ -279,11 +305,11 @@ class ProjectBuilder(object):
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        if self._build_thread.isAlive():
+        if not self._build_thread.isAlive():
+            self._build_thread = threading.Thread(target=self._buildByDependency)
+            self._build_thread.start()
+        else:
             self._handleUiInfo("Build thread is already running")
-            return
-        self._build_thread = threading.Thread(target=self._buildByDependency)
-        self._build_thread.start()
 
     def finishedBuilding(self):
         "Returns whether a background build has finished running"
@@ -291,6 +317,8 @@ class ProjectBuilder(object):
 
     def waitForBuild(self):
         "Waits until the background build finishes"
+        if self._build_thread.isAlive():
+            self._build_thread.join()
         with self._lock:
             self._logger.info("Build has finished")
 

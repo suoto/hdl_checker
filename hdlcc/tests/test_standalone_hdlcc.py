@@ -28,17 +28,27 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = './hdlcc.py'
+HDLCC_LOCATION = './hdlcc/runner.py'
 
 def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
     logging"""
 
     _logger.debug(cmd)
-    for line in subp.check_output(cmd, ).split("\n"):
+    exc = None
+    try:
+        stdout = list(subp.check_output(
+            cmd, stderr=subp.STDOUT).split("\n"))
+    except subp.CalledProcessError as exc:
+        stdout = list(exc.output.split("\n"))
+
+    for line in stdout:
         if re.match(r"^\s*$", line):
             continue
         _logger.debug(line)
+
+    if exc:
+        raise exc
 
 with such.A('hdlcc standalone tool') as it:
     @it.has_setup
@@ -51,13 +61,14 @@ with such.A('hdlcc standalone tool') as it:
 
             @it.should("print the tool's help")
             def test():
-                cmd = [HDLCC_LOCATION, '-h']
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, '-h']
                 shell(cmd)
 
             @it.should("build a project")
             def test():
-                cmd = [HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj',
-                       '-b']
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj', '-b']
 
                 shell(cmd)
 
@@ -70,7 +81,8 @@ with such.A('hdlcc standalone tool') as it:
                      './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),)
             def test(case, *args):
                 _logger.info("Running '%s'", case)
-                cmd = [HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj']
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj']
                 for arg in args:
                     cmd.append(arg)
 

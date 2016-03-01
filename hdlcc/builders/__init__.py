@@ -28,14 +28,15 @@ class BaseBuilder(object):
 
     __metaclass__ = abc.ABCMeta
 
-    # Shell accesses must be atomic
-    _lock = Lock()
 
     @abc.abstractproperty
     def __builder_name__(self):
         "Defines the builder identification"
 
     def __init__(self, target_folder):
+        # Shell accesses must be atomic
+        self._lock = Lock()
+
         self._logger = logging.getLogger(__name__ + '.' + self.__builder_name__)
         self._target_folder = os.path.abspath(os.path.expanduser(target_folder))
 
@@ -52,11 +53,13 @@ class BaseBuilder(object):
     def __getstate__(self):
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
+        del state['_lock']
         return state
 
     def __setstate__(self, state):
         self._logger = logging.getLogger(state['_logger'])
         del state['_logger']
+        self._lock = Lock()
         self.__dict__.update(state)
 
     @abc.abstractmethod
