@@ -42,7 +42,7 @@ def clear():
         print cmd
         print os.popen(cmd).read()
 
-def debug():
+def setupLogging():
     path.insert(0, './dependencies/rainbow_logging_handler/')
     from rainbow_logging_handler import RainbowLoggingHandler
     stream_handler = RainbowLoggingHandler(
@@ -71,7 +71,7 @@ def main():
         argv.pop(argv.index('--clear'))
 
     if '--debug' in argv[1:]:
-        debug()
+        setupLogging()
         argv.pop(argv.index('--debug'))
 
     file_handler = logging.FileHandler("tests.log")

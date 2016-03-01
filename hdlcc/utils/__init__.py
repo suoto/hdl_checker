@@ -21,7 +21,7 @@ def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
     logging"""
 
-    _logger.debug(cmd)
+    _logger.debug(' '.join(cmd))
     for l in subprocess.check_output(cmd, shell=True).split("\n"):
         if re.match(r"^\s*$", l):
             continue

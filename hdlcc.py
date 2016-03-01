@@ -17,6 +17,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import os.path as p
 import logging
 import time
 import argparse
@@ -35,8 +36,8 @@ except ImportError:
 
 def _pathSetup():
     import sys
-    path_to_this_file = os.path.realpath(__file__).split(os.path.sep)[:-2]
-    hdlcc_path = os.path.sep.join(path_to_this_file)
+    path_to_this_file = p.realpath(__file__).split(p.sep)[:-2]
+    hdlcc_path = p.sep.join(path_to_this_file)
     if hdlcc_path not in sys.path:
         sys.path.insert(0, hdlcc_path)
 
@@ -67,12 +68,11 @@ def _fileExtentensionCompleter(extension):
         for line in os.listdir(prefix):
             if line.lower().endswith('.' + extension):
                 result.append(line)
-            elif os.path.isdir(line):
+            elif p.isdir(line):
                 result.append("./" + line)
 
         return result
     return _completer
-
 
 def parseArguments():
     parser = argparse.ArgumentParser()
@@ -150,9 +150,9 @@ def runStandaloneSourceFileParse(fname):
 
 def runStandaloneStaticCheck(fname):
     """Standalone source_file.VhdlSourceFile run"""
-    from hdlcc.static_check import vhdStaticCheck
+    from hdlcc.static_check import getStaticMessages
 
-    for record in vhdStaticCheck(open(fname, 'r').read().split('\n')):
+    for record in getStaticMessages(open(fname, 'r').read().split('\n')):
         print record
 
 def main(args):
@@ -168,13 +168,13 @@ def main(args):
 
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
         project = StandaloneProjectBuilder(args.project_file)
-        #  project.readConfigFile()
+        project.waitForBuild()
 
     if args.debug_print_sources:
         sources = PrettyTable(['Filename', 'Library', 'Flags'])
         sources.align['Filename'] = 'l'
         sources.sortby = 'Library'
-        for source in project.sources.values():
+        for source in project.getSources():
             sources.add_row([source.filename, source.library, " ".join(source.flags)])
         print sources
 
@@ -209,32 +209,34 @@ def main(args):
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
         project.saveCache()
 
-def debug():
-    path.insert(0, '/home/asouto/dev/hdlcc/dependencies/rainbow_logging_handler/')
-    from rainbow_logging_handler import RainbowLoggingHandler
-    stream_handler = RainbowLoggingHandler(
-        stdout,
-        #  Customizing each column's color
-        # pylint: disable=bad-whitespace
-        color_asctime          = ('dim white',  'black'),
-        color_name             = ('dim white',  'black'),
-        color_funcName         = ('green',      'black'),
-        color_lineno           = ('dim white',  'black'),
-        color_pathname         = ('black',      'red'),
-        color_module           = ('yellow',     None),
-        color_message_debug    = ('color_59',   None),
-        color_message_info     = (None,         None),
-        color_message_warning  = ('color_226',  None),
-        color_message_error    = ('red',        None),
-        color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
+def setupLogging():
+    path.insert(0, p.abspath('dependencies/rainbow_logging_handler/'))
+    try:
+        from rainbow_logging_handler import RainbowLoggingHandler
+        stream_handler = RainbowLoggingHandler(
+            stdout,
+            #  Customizing each column's color
+            # pylint: disable=bad-whitespace
+            color_asctime          = ('dim white',  'black'),
+            color_name             = ('dim white',  'black'),
+            color_funcName         = ('green',      'black'),
+            color_lineno           = ('dim white',  'black'),
+            color_pathname         = ('black',      'red'),
+            color_module           = ('yellow',     None),
+            color_message_debug    = ('color_59',   None),
+            color_message_info     = (None,         None),
+            color_message_warning  = ('color_226',  None),
+            color_message_error    = ('red',        None),
+            color_message_critical = ('bold white', 'red'))
+            # pylint: enable=bad-whitespace
+    except ImportError: # pragma: no cover
+        stream_handler = logging.StreamHandler(stdout)
 
     logging.root.addHandler(stream_handler)
     logging.root.setLevel(logging.DEBUG)
 
-
 if __name__ == '__main__':
-    debug()
+    setupLogging()
     _logger = logging.getLogger(__name__)
     start = time.time()
     runner_args = parseArguments()

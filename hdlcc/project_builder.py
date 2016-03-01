@@ -227,20 +227,21 @@ class ProjectBuilder(object):
                                   "after it finishes.")
             return []
 
-        dependencies = self._getSourceDependenciesSet(source)
+        with self._lock:
+            dependencies = self._getSourceDependenciesSet(source)
 
-        self._logger.debug("Source '%s' depends on %s", str(source), \
-                ", ".join(["'%s'" % str(x) for x in dependencies]))
+            self._logger.debug("Source '%s' depends on %s", str(source), \
+                    ", ".join(["'%s'" % str(x) for x in dependencies]))
 
-        if dependencies.issubset(set(self._units_built)):
-            self._logger.debug("Dependencies for source '%s' are met", \
-                    str(source))
-            records = self._getBuilderMessages(path, *args, **kwargs)
-            self.saveCache()
-            return records
+            if dependencies.issubset(set(self._units_built)):
+                self._logger.debug("Dependencies for source '%s' are met", \
+                        str(source))
+                records = self._getBuilderMessages(path, *args, **kwargs)
+                self.saveCache()
+                return records
 
-        else:
-            return self._getBuilderMessages(path, *args, **kwargs)
+            else:
+                return self._getBuilderMessages(path, *args, **kwargs)
 
     def _getBuilderMessages(self, path, batch_mode=False):
         '''Builds a given source file handling rebuild of units reported
@@ -333,9 +334,9 @@ class ProjectBuilder(object):
         pool.terminate()
         pool.join()
 
-        #  records = getStaticMessages(open(path, 'r').read().split('\n')) + \
-        #            self._getMessagesAvailable(path, *args)
         return self._sortBuildMessages(records)
 
-
+    def getSources(self):
+        "Returns a list of VhdlSourceFile objects parsed"
+        return self._config.getSources()
 

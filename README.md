@@ -109,15 +109,13 @@ requesting help.
             self._ui_logger.error(message)
     ```
 
-1. Create a project object, select the configuration file and launch the first
- build
+1. Create a project object passing the configuration file as a parameter (for
+ static checks only, no configuration file is needed). This triggers the
+ project to be built in background
 
     ```python
-    project = StandaloneProjectBuilder()
-    project.setProjectFile('path/to/config/file')
-    project.readConfigFile()
-    project.buildByDependency()
-
+    project = StandaloneProjectBuilder('path/to/config/file')
+    project.waitForBuild()
     ```
 
 1. You can now build a single file and get records that describe the messages it
@@ -129,6 +127,17 @@ requesting help.
               "({line_number},{column}): {error_message}"\
                 .format(**record)
     ```
+
+ That should return something like
+
+    ```
+    [E-None] @ (83,30): no declaration for "integer_vector"
+    [E-None] @ (83,30): no declaration for "integer_vector"
+    [W-0] @ (29,14): constant 'ADDR_WIDTH' is never used
+    ```
+
+ (The example above uses GHDL to build 
+[suoto/hdl_lib/code/memory/testbench/async_fifo_tb.vhd][async_fifo_tb])
 
 ---
 
@@ -208,3 +217,4 @@ or used by this software.
 [Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [issue_tracker]: https://github.com/suoto/hdlcc/issues
+[async_fifo_tb]: https://github.com/suoto/hdl_lib/blob/master/memory/testbench/async_fifo_tb.vhd
