@@ -1,27 +1,53 @@
+# This file is part of HDL Code Checker.
+#
+# HDL Code Checker is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# HDL Code Checker is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 language: python
 python:
   - "2.7"
 
+# This should work but it doesn't!
+# addons:
+#   apt:
+#     packages:
+#       - libgd2-xpm
+#       - ia32-libs
+#       - ia32-libs-multiarch
+# Alternative to the above, but forces the usage of previous infrastructure,
+# which is painfuly low in comparison to the container based architecture
+sudo: required
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch
 before_script:
     - "git submodule update"
-    - "mkdir -p ~/ghdl"
-    - "cd ~/ghdl"
-    - "if [ ! -f ghdl.tar.gz ]; then wget http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz -O ghdl.tar.gz; fi"
-    - "if [ ! -f modelsim.run ]; then wget http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-linux.run -O modelsim.run; fi"
-    - "tar zxvf ghdl.tar.gz"
-    - "cd -"
+    - "mkdir -p ~/cache"
+    - "./scripts/setup_msim.sh"
+    - "./scripts/setup_ghdl.sh"
 # command to install dependencies
 install: "pip install -r requirements.txt"
 # command to run tests
-script:
-  - "./run_tests.py -vv --log-capture --clear"
+script: "./scripts/travis.sh -vv --log-capture"
 after_failure:
   - "cat tests.log"
 after_success:
   - "rm -f dependencies/hdl_lib/osvvm_lib/CoveragePkg.vhd"
   - "coverage combine"
+  - "coverage report"
   - "codecov"
 cache:
+  pip: true
   directories:
-  - ~/ghdl/
+    - ~/cache/
+    # - ~/builders/
 

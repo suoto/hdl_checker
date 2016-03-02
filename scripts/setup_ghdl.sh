@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # This file is part of HDL Code Checker.
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
@@ -13,28 +14,26 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import re
-import logging
-import subprocess as subp
+set -x
+set +e
 
-_logger = logging.getLogger(__name__)
+URL=http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz
+CACHE_DIR="${HOME}/cache/"
+GHDL_TAR_GZ="${CACHE_DIR}/ghdl.tar.gz"
+INSTALLATION_DIR="${HOME}/builders/ghdl/"
 
-def shell(cmd, env=None):
-    """Dummy wrapper for running shell commands, checking the return value and
-    logging"""
+mkdir -p ${CACHE_DIR}
+mkdir -p ${INSTALLATION_DIR}
+# CWD=$(pwd)
 
-    if env is not None:
-        subp_env = env
-    else:
-        subp_env = os.environ
+if [ ! -f "${GHDL_TAR_GZ}" ]; then
+  wget ${URL} -O ${GHDL_TAR_GZ}
+fi
 
-    if type(cmd) is str:
-        _logger.warning(cmd)
-    else:
-        _logger.warning(' '.join(cmd))
+if [ ! -d "${INSTALLATION_DIR}/bin" ]; then
+  mkdir -p ${INSTALLATION_DIR}
+  tar zxvf ${GHDL_TAR_GZ} --directory ${INSTALLATION_DIR}
+fi
 
-    for line in subp.check_output(cmd, shell=True, env=subp_env).split("\n"):
-        if re.match(r"^\s*$", line):
-            continue
-        _logger.warning(line)
+${INSTALLATION_DIR}/bin/ghdl --version
+

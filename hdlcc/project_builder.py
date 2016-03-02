@@ -56,25 +56,10 @@ class ProjectBuilder(object):
             # No cache file or unable to recover from cache file
 
             self._config = ConfigParser(project_file)
+            builder_name = self._config.getBuilder()
+            builder_class = hdlcc.builders.getBuilderByName(builder_name)
+            self.builder = builder_class(self._config.getTargetDir())
 
-            parsed_builder = self._config.getBuilder()
-
-            # Check if the builder selected is implemented and create the
-            # builder attribute
-            self.builder = None
-            try:
-                if parsed_builder == 'msim':
-                    self.builder = hdlcc.builders.MSim(self._config.getTargetDir())
-                elif parsed_builder == 'xvhdl':
-                    self.builder = hdlcc.builders.XVHDL(self._config.getTargetDir())
-                elif parsed_builder == 'ghdl':
-                    self.builder = hdlcc.builders.GHDL(self._config.getTargetDir())
-            except hdlcc.exceptions.SanityCheckError:
-                self._logger.warning("Builder '%s' sanity check failed", parsed_builder)
-
-            if self.builder is None:
-                self._logger.info("Using Fallback builder")
-                self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
         else:
             self.__dict__.update(cache.__dict__)
 

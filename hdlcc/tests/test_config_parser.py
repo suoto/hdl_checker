@@ -15,6 +15,7 @@
 
 # pylint: disable=function-redefined, missing-docstring
 
+import os
 import os.path as p
 import logging
 
@@ -28,10 +29,22 @@ _logger = logging.getLogger(__name__)
 
 with such.A('config parser object') as it:
 
+    @it.has_setup
+    def setup():
+        it.project_filename = 'test.prj'
+        if p.exists(it.project_filename):
+            os.remove(it.project_filename)
+
+    @it.has_teardown
+    def teardown():
+        if p.exists(it.project_filename):
+            os.remove(it.project_filename)
+        del it.project_filename
+        del it.parser
+
     with it.having('a standard project file'):
         @it.has_setup
         def setup():
-            it.project_filename = 'test.prj'
             config_content = [
                 r'batch_build_flags = -b0 -b1',
                 r'single_build_flags = -s0 -s1',
@@ -50,7 +63,6 @@ with such.A('config parser object') as it:
 
         @it.has_teardown
         def teardown():
-            del it.project_filename
             del it.parser
 
         @it.should('extract builder')

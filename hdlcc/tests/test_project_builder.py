@@ -22,26 +22,21 @@ import logging
 
 from nose2.tools import such
 
-from hdlcc import ProjectBuilder
+import hdlcc
 from hdlcc.tests.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-BUILDER = os.environ.get('BUILDER', 'ghdl')
+BUILDER_NAME = os.environ.get('BUILDER_NAME', 'ghdl')
+BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/ghdl/bin/"))
 
-_PROJECT_BASE_PATH = p.expanduser('./dependencies/hdl_lib')
+HDL_LIB_PATH = p.expanduser('./dependencies/hdl_lib')
 
-if BUILDER == 'msim':
-    _PATH = "/home/souto/modelsim/modeltech/linux_x86_64/"
-    #  _PATH = "/opt/altera/15.1/modelsim_ase/bin/"
-else:
-    _PATH = p.expanduser("~/ghdl/bin")
-
-_PRJ_FILENAME = p.join(_PROJECT_BASE_PATH, BUILDER + '.prj')
+_PRJ_FILENAME = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
 
 from multiprocessing import Queue
 
-class StandaloneProjectBuilder(ProjectBuilder):
+class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
     "Class for testing ProjectBuilder"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
@@ -60,13 +55,17 @@ class StandaloneProjectBuilder(ProjectBuilder):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
-with such.A('hdlcc test using vim-hdl-examples') as it:
+with such.A('hdlcc test using hdl_lib') as it:
 
     @it.has_setup
     def setup():
-        for line in os.popen('cd "%s" && '
-                             'git clean -fdx' % _PROJECT_BASE_PATH).read():
-            _logger.info(line)
+        StandaloneProjectBuilder.clean(_PRJ_FILENAME)
+
+    @it.has_teardown
+    def teardown():
+        StandaloneProjectBuilder.clean(_PRJ_FILENAME)
+        if p.exists('remove_me'):
+            os.removedirs('remove_me')
 
     with it.having('a valid project file'):
 
@@ -74,12 +73,28 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
 
             @it.has_setup
             def setup():
-                it.original_path = os.environ['PATH']
-                os.environ['PATH'] += ':' + _PATH
+
+                it.builder_env = os.environ.copy()
+                it.builder_env['PATH'] = \
+                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+
+                _logger.info("Builder env path: %s", it.builder_env['PATH'])
+
+                builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
+
+                if os.environ.get('TRAVIS', '') == 'true':
+                    with it.assertRaises(hdlcc.exceptions.SanityCheckError):
+                        builder('remove_me')
+
+                it.original_env = os.environ.copy()
+                os.environ = it.builder_env.copy()
+
+                builder('remove_me')
 
             @it.has_teardown
             def teardown():
-                os.environ['PATH'] = it.original_path
+                hdlcc.ProjectBuilder.clean(_PRJ_FILENAME)
+                os.environ = it.original_env.copy()
                 del it.project
 
             @it.should('build project by dependency in background')
@@ -109,14 +124,16 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
             @it.should('warn when trying to build a source before the build '
                        'thread completes')
             def test():
-                filename = p.join(_PROJECT_BASE_PATH,
+                filename = p.join(HDL_LIB_PATH,
                                   'memory/testbench/async_fifo_tb.vhd')
 
                 it.assertTrue(it.project._msg_queue.empty())
 
                 it.project.getMessagesByPath(filename)
 
-                while it.project._msg_queue.empty():
+                for _ in range(10):
+                    if it.project._msg_queue.empty():
+                        break
                     time.sleep(0.1)
 
                 messages = []
@@ -139,7 +156,7 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
 
             @it.should('get messages by path')
             def test():
-                filename = p.join(_PROJECT_BASE_PATH,
+                filename = p.join(HDL_LIB_PATH,
                                   'memory/testbench/async_fifo_tb.vhd')
 
                 it.assertTrue(it.project._msg_queue.empty())
@@ -161,7 +178,7 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
 
             @it.should('get updated messages')
             def test():
-                filename = p.join(_PROJECT_BASE_PATH,
+                filename = p.join(HDL_LIB_PATH,
                                   'memory/testbench/async_fifo_tb.vhd')
                 it.assertTrue(it.project._msg_queue.empty())
 
@@ -193,7 +210,7 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
 
             @it.should('get messages by path of a different source')
             def test():
-                filename = p.join(_PROJECT_BASE_PATH, 'memory/async_fifo.vhd')
+                filename = p.join(HDL_LIB_PATH, 'memory/async_fifo.vhd')
 
                 it.assertTrue(it.project._msg_queue.empty())
 
@@ -203,12 +220,15 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
 
                 it.assertTrue(it.project._msg_queue.empty())
 
-            @it.should('get updated messages of a differenct source')
+            @it.should('get updated messages of a different source')
             def test():
-                filename = p.join(_PROJECT_BASE_PATH, 'memory/async_fifo.vhd')
+                filename = p.join(HDL_LIB_PATH, 'memory/async_fifo.vhd')
                 it.assertTrue(it.project._msg_queue.empty())
 
                 code = open(filename, 'r').read().split('\n')
+
+                _logger.info("Commenting line 28 should yield an error")
+                _logger.info(repr(code[28]))
 
                 code[28] = '-- ' + code[28]
 
@@ -217,7 +237,7 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
                 records = it.project.getMessagesByPath(filename)
 
                 try:
-                    it.assertTrue(len(records) != 0)
+                    it.assertNotEquals(records, [])
                 finally:
                     # Remove the comment we added
                     code[28] = code[28][3:]
@@ -294,8 +314,8 @@ with such.A('hdlcc test using vim-hdl-examples') as it:
         #  with it.having('an invalid environment'):
         #      @it.has_setup
         #      def setup():
-        #          it.assertTrue(_PATH not in os.environ['PATH'].split(':'), \
-        #              "'%s' should not be on os.environ['PATH']" % _PATH)
+        #          it.assertTrue(BUILDER_PATH not in os.environ['PATH'].split(':'), \
+        #              "'%s' should not be on os.environ['PATH']" % BUILDER_PATH)
 
         #          it.project = StandaloneProjectBuilder()
         #          it.assertTrue(it.project._msg_queue.empty())

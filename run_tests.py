@@ -32,9 +32,6 @@ def test(nose2_argv):
     finally:
         cov.stop()
         cov.save()
-        if os.environ['USER'] != 'travis':
-            cov.combine()
-            cov.html_report()
 
 def clear():
     for cmd in ('git clean -fdx',
@@ -63,6 +60,7 @@ def setupLogging():
         # pylint: enable=bad-whitespace
 
     logging.root.addHandler(stream_handler)
+    logging.getLogger('nose2').setLevel(logging.INFO)
 
 
 def main():

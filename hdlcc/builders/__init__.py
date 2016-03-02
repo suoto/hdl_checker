@@ -21,7 +21,30 @@ import time
 import subprocess as subp
 from threading import Lock
 
+import hdlcc.exceptions
 from hdlcc.config import Config
+
+_logger = logging.getLogger(__name__)
+
+def getBuilderByName(name):
+    # Check if the builder selected is implemented and create the
+    # builder attribute
+    builder = None
+    try:
+        if name == 'msim':
+            builder = MSim
+        elif name == 'xvhdl':
+            builder = XVHDL
+        elif name == 'ghdl':
+            builder = GHDL
+    except hdlcc.exceptions.SanityCheckError:
+        _logger.warning("Builder '%s' sanity check failed", name)
+
+    if builder is None:
+        _logger.info("Using Fallback builder")
+        builder = Fallback
+
+    return builder
 
 class BaseBuilder(object):
     "Class that implements the base builder flow"
@@ -77,13 +100,18 @@ class BaseBuilder(object):
         "Finds units that the builders is telling us to rebuild"
         raise NotImplementedError
 
-    def _subprocessRunner(self, cmd_with_args):
+    def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
         "Runs a shell command and handles stdout catching"
+        if env is not None:
+            subp_env = env
+        else:
+            subp_env = os.environ
+
         self._logger.debug(" ".join(cmd_with_args))
 
         try:
             stdout = list(subp.check_output(cmd_with_args, \
-                    stderr=subp.STDOUT).split("\n"))
+                    stderr=subp.STDOUT, shell=shell, env=subp_env).split("\n"))
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.split("\n"))
 

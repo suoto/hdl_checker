@@ -79,18 +79,20 @@ class GHDL(BaseBuilder):
         return [record]
 
     def checkEnvironment(self):
+        stdout = None
         try:
-            version = subprocess.check_output(['ghdl', '--version'], \
-                stderr=subprocess.STDOUT)
+            stdout = self._subprocessRunner(['ghdl', '--version'])
             self._version = \
                     re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
-                    version)[0]
+                    stdout[0])[0]
             self._logger.info("GHDL version string: '%s'. " + \
                     "Version number is '%s'", \
-                    version[:-1], self._version)
+                    stdout[:-1], self._version)
         except Exception as exc:
             import traceback
             self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
+            if stdout:
+                self._logger.warning("stdout return:\n%s", stdout)
             raise exceptions.SanityCheckError(str(exc))
 
     def _getGhdlArgs(self, source, flags=None):

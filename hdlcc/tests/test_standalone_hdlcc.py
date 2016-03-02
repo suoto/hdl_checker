@@ -28,7 +28,12 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = './hdlcc/runner.py'
+HDLCC_LOCATION = "./hdlcc/runner.py"
+BUILDER_NAME = os.environ.get("BUILDER_NAME", "ghdl")
+BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
+
+_BUILDER_ENV = os.environ.copy()
+_BUILDER_ENV["PATH"] = os.pathsep.join([BUILDER_PATH, _BUILDER_ENV["PATH"]])
 
 def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
@@ -36,61 +41,80 @@ def shell(cmd):
 
     _logger.debug(cmd)
     exc = None
+    stdout = []
     try:
-        stdout = list(subp.check_output(
-            cmd, stderr=subp.STDOUT).split("\n"))
+        stdout += list(subp.check_output(
+            cmd, stderr=subp.STDOUT, env=_BUILDER_ENV).split("\n"))
     except subp.CalledProcessError as exc:
-        stdout = list(exc.output.split("\n"))
+        stdout += list(exc.output.split("\n"))
 
     for line in stdout:
         if re.match(r"^\s*$", line):
             continue
-        _logger.debug(line)
+        if exc:
+            _logger.fatal(line)
+        else:
+            _logger.debug(line)
+
 
     if exc:
+        _logger.warning("os.path: %s", os.environ["PATH"])
+        _logger.warning("_BUILDER_ENV path: %s", _BUILDER_ENV["PATH"])
+
         raise exc
 
     return stdout
 
-with such.A('hdlcc standalone tool') as it:
+with such.A("hdlcc standalone tool") as it:
     @it.has_setup
     def setup():
         it.assertTrue(p.exists(HDLCC_LOCATION))
 
-    with it.having('a valid project file'):
+    @it.has_teardown
+    def teardown():
+        cmd = ["coverage", "run",
+               HDLCC_LOCATION,
+               "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+               "--clean"]
 
-        with it.having('a valid environment'):
+        shell(cmd)
+
+    with it.having("a valid project file"):
+
+        with it.having("a valid environment"):
 
             @it.should("print the tool's help")
             def test():
-                cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, '-h']
+                cmd = ["coverage", "run",
+                       HDLCC_LOCATION, "-h"]
                 shell(cmd)
 
             @it.should("build a project")
             def test():
-                cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj', '-b']
+                cmd = ["coverage", "run",
+                       HDLCC_LOCATION,
+                       "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       "--build"]
 
                 shell(cmd)
 
             @it.should("run debug arguments")
-            @params(('--debug-print-sources', ),
-                    ('--debug-print-compile-order', ),
+            @params(("--debug-print-sources", ),
+                    ("--debug-print-compile-order", ),
 
-                    ('--build', '-s',
-                     './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),
+                    ("--build", "-s",
+                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
 
-                    ('--debug-parse-source-file', '-s',
-                     './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),
+                    ("--debug-parse-source-file", "-s",
+                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
 
-                    ('--debug-run-static-check', '-s',
-                     './dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd'),)
+                    ("--debug-run-static-check", "-s",
+                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),)
 
             def test(case, *args):
                 _logger.info("Running '%s'", case)
-                cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj']
+                cmd = ["coverage", "run",
+                       HDLCC_LOCATION, "dependencies/hdl_lib/" + BUILDER_NAME + ".prj"]
                 for arg in args:
                     cmd.append(arg)
 
@@ -99,32 +123,35 @@ with such.A('hdlcc standalone tool') as it:
 
             @it.should("save profiling info if requested")
             def test():
-                cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj',
-                       '--debug-profiling', 'output.stats']
+                cmd = ["coverage", "run",
+                       HDLCC_LOCATION, "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       "--debug-profiling", "output.stats"]
 
-                if p.exists('output.stats'):
-                    os.remove('output.stats')
+                if p.exists("output.stats"):
+                    os.remove("output.stats")
 
                 shell(cmd)
 
-                it.assertTrue(p.exists('output.stats'))
+                it.assertTrue(p.exists("output.stats"))
+                os.remove("output.stats")
 
             @it.should("control debugging level")
             def test():
-                cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, 'dependencies/hdl_lib/ghdl.prj', '-cb']
+                cmd = ["coverage", "run",
+                       HDLCC_LOCATION,
+                       "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       "--clean", "--build"]
 
-                it.assertEqual(shell(cmd), [''])
+                it.assertEqual(shell(cmd), [""])
 
                 previous = None
                 for level in range(1, 5):
-                    stdout = shell(cmd + ['-' + 'v'*level])
+                    stdout = shell(cmd + ["-" + "v"*level])
                     it.assertTrue(len(stdout) >= previous)
                     previous = len(stdout)
 
-        with it.having('an invalid environment'):
-            pass
+        #  with it.having("an invalid environment"):
+        #      pass
 
 it.createTests(globals())
 
