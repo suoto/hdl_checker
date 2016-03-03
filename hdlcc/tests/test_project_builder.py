@@ -85,7 +85,8 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
-                if os.environ.get('TRAVIS', '') == 'true':
+                if os.environ.get('TRAVIS', '') == 'true' and \
+                        BUILDER_NAME is not None:
                     with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                         builder('remove_me')
 
@@ -101,10 +102,13 @@ with such.A('hdlcc test using hdl_lib') as it:
                 del it.project
 
             @it.should('build project by dependency in background')
-            def test():
+            def test(case):
                 _logger.info("Creating project builder object")
                 it.project = StandaloneProjectBuilder()
                 _logger.info("Checking if msg queue is empty")
+                if _PRJ_FILENAME is None:
+                    _logger.warning("Skipping '%s'", case)
+                    return
                 it.assertTrue(it.project._msg_queue.empty())
                 it.assertFalse(it.project.finishedBuilding())
 

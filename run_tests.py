@@ -16,7 +16,7 @@
 "Script should be called within Vim to launch tests"
 
 import os
-from sys import argv, path, stdout
+import sys
 import logging
 import nose2
 import coverage
@@ -28,10 +28,12 @@ def test(nose2_argv):
     cov.start()
 
     try:
-        nose2.discover(exit=False, argv=nose2_argv)
+        result = nose2.discover(exit=False, argv=nose2_argv)
     finally:
         cov.stop()
         cov.save()
+
+    return result
 
 def clear():
     for cmd in ('git clean -fdx',
@@ -40,10 +42,10 @@ def clear():
         print os.popen(cmd).read()
 
 def setupLogging():
-    path.insert(0, './dependencies/rainbow_logging_handler/')
+    sys.path.insert(0, './dependencies/rainbow_logging_handler/')
     from rainbow_logging_handler import RainbowLoggingHandler
     stream_handler = RainbowLoggingHandler(
-        stdout,
+        sys.stdout,
         #  Customizing each column's color
         # pylint: disable=bad-whitespace
         color_asctime          = ('dim white',  'black'),
@@ -64,13 +66,13 @@ def setupLogging():
 
 
 def main():
-    if '--clear' in argv[1:]:
+    if '--clear' in sys.argv[1:]:
         clear()
-        argv.pop(argv.index('--clear'))
+        sys.argv.pop(sys.argv.index('--clear'))
 
-    if '--debug' in argv[1:]:
+    if '--debug' in sys.argv[1:]:
         setupLogging()
-        argv.pop(argv.index('--debug'))
+        sys.argv.pop(sys.argv.index('--debug'))
 
     file_handler = logging.FileHandler("tests.log")
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
@@ -78,7 +80,11 @@ def main():
     logging.root.addHandler(file_handler)
     logging.root.setLevel(logging.DEBUG)
 
-    test(nose2_argv=argv)
+    return test(nose2_argv=sys.argv)
 
 if __name__ == '__main__':
-    main()
+    if main().result.wasSuccessful():
+        sys.exit(0)
+    else:
+        sys.exit(1)
+
