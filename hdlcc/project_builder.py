@@ -74,6 +74,9 @@ class ProjectBuilder(object):
     @staticmethod
     def clean(project_file):
         "Clean up generated files for a clean build"
+        if project_file is None:
+            _logger.debug("Project file is None, can't clean")
+            return
         cache_fname = ProjectBuilder._getCacheFilename(project_file)
         if p.exists(cache_fname):
             os.remove(cache_fname)
@@ -271,6 +274,9 @@ class ProjectBuilder(object):
         pickle.dump(self, open(cache_fname, 'w'), 0)
 
     def recoverCache(self, project_file):
+        if project_file is None:
+            self._logger.debug("Can't recover cache from None")
+            return
         cache_fname = self._getCacheFilename(project_file)
         cache = None
         if p.exists(cache_fname):

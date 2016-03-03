@@ -3,6 +3,8 @@
 set -x
 set +e
 
+./run_tests.py $*
+
 export BUILDER_NAME=msim
 export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 export MODEL_TECH=${BUILDER_PATH}

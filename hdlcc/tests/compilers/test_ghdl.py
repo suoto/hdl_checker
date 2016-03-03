@@ -20,7 +20,7 @@ import logging
 import os
 import os.path as p
 
-BUILDER_NAME = os.environ.get('BUILDER_NAME', 'ghdl')
+BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
 
 _BUILDER_ENV = os.environ.copy()

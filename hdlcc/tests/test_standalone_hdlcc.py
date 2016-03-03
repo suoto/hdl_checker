@@ -29,7 +29,7 @@ from nose2.tools.params import params
 _logger = logging.getLogger(__name__)
 
 HDLCC_LOCATION = "./hdlcc/runner.py"
-BUILDER_NAME = os.environ.get("BUILDER_NAME", "ghdl")
+BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
 
 _BUILDER_ENV = os.environ.copy()
@@ -153,5 +153,6 @@ with such.A("hdlcc standalone tool") as it:
         #  with it.having("an invalid environment"):
         #      pass
 
-it.createTests(globals())
+if BUILDER_NAME is not None:
+    it.createTests(globals())
 

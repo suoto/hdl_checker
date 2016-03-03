@@ -27,12 +27,15 @@ from hdlcc.tests.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-BUILDER_NAME = os.environ.get('BUILDER_NAME', 'ghdl')
+BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/ghdl/bin/"))
 
 HDL_LIB_PATH = p.expanduser('./dependencies/hdl_lib')
 
-_PRJ_FILENAME = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
+if BUILDER_NAME is not None:
+    _PRJ_FILENAME = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
+else:
+    _PRJ_FILENAME = None
 
 from multiprocessing import Queue
 
@@ -106,7 +109,10 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertFalse(it.project.finishedBuilding())
 
             @it.should('notify if a build is already running')
-            def test():
+            def test(case):
+                if _PRJ_FILENAME is None:
+                    _logger.warning("Skipping '%s'", case)
+                    return
                 it.project.buildByDependency()
                 while it.project._msg_queue.empty():
                     time.sleep(0.1)
@@ -123,7 +129,10 @@ with such.A('hdlcc test using hdl_lib') as it:
 
             @it.should('warn when trying to build a source before the build '
                        'thread completes')
-            def test():
+            def test(case):
+                if _PRJ_FILENAME is None:
+                    _logger.warning("Skipping '%s'", case)
+                    return
                 filename = p.join(HDL_LIB_PATH,
                                   'memory/testbench/async_fifo_tb.vhd')
 
@@ -209,7 +218,10 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertTrue(it.project._msg_queue.empty())
 
             @it.should('get messages by path of a different source')
-            def test():
+            def test(case):
+                if _PRJ_FILENAME is None:
+                    _logger.warning("Skipping '%s'", case)
+                    return
                 filename = p.join(HDL_LIB_PATH, 'memory/async_fifo.vhd')
 
                 it.assertTrue(it.project._msg_queue.empty())
