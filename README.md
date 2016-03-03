@@ -1,7 +1,7 @@
 # HDL Code Checker
 
 [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
-[![Coverage Status](https://coveralls.io/repos/github/suoto/hdlcc/badge.svg?branch=testing_coveralls)](https://coveralls.io/github/suoto/hdlcc?branch=testing_coveralls)
+[![Coverage Status](https://coveralls.io/repos/github/suoto/hdlcc/badge.svg?branch=master)](https://coveralls.io/github/suoto/hdlcc?branch=master)
 [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
 [![Code Health](https://landscape.io/github/suoto/hdlcc/master/landscape.svg?style=flat)](https://landscape.io/github/suoto/hdlcc/master)
 
