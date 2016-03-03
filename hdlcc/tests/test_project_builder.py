@@ -85,7 +85,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
-                if os.environ.get('TRAVIS', '') == 'true' and \
+                if os.environ.get('CI', '') == 'true' and \
                         BUILDER_NAME is not None:
                     with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                         builder('remove_me')

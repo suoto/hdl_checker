@@ -1,0 +1,86 @@
+# Notes:
+#   - Minimal appveyor.yml file is an empty file. All sections are optional.
+#   - Indent each level of configuration with 2 spaces. Do not use tabs!
+#   - All section names are case-sensitive.
+#   - Section names should be unique on each level.
+
+---
+# ---------------------------------#
+#       general configuration      #
+# ---------------------------------#
+
+# version format
+version: 0.{build}
+
+# branches to build
+branches:
+  # whitelist
+  only:
+    - integrate_with_appveyor_ci
+
+  # blacklist
+  except:
+    - gh-pages
+
+# Do not build on tags (GitHub only)
+skip_tags: true
+
+# ---------------------------------#
+#    environment configuration    #
+# ---------------------------------#
+
+# Operating system (build VM template)
+os: Windows Server 2012
+
+# clone directory
+clone_folder: c:\projects\myproject
+
+# fetch repository as zip archive
+shallow_clone: false
+
+# set clone depth
+clone_depth: 5
+
+# environment variables
+environment:
+  MODELSIM_URL: "http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe"
+  CACHE_PATH: "%LOCALAPPDATA%\\cache"
+  BUILDERS: "%LOCALAPPDATA%\\builders"
+  matrix:
+    - BUILDER_NAME: msim
+      INSTALL_DIR: "%LOCALAPPDATA%"
+      BUILDER_PATH: '%INSTALL_DIR%\modelsim_ase\win32aloem\'
+
+# build cache to preserve files/folders between builds
+cache:
+  - '%CACHE_PATH%'
+
+# scripts that run after cloning repository
+install:
+  - appveyor AddMessage "Starting path is %CD%" -Category Information
+  - git submodule update --init --recursive
+  - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
+                                            { 'C:\Python27-x64' }
+  - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
+  - set PATH=%python%;%python%\Scripts;%PATH%
+  - python get-pip.py
+  - pip install -r requirements.txt
+  - mkdir "%CACHE_PATH%"
+  - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
+  # - if not exist "%CACHE_PATH%\\modelsim.exe"
+  #     appveyor AddMessage "Downloading %BUILDER_NAME%"
+  # - if not exist "%CACHE_PATH%\\modelsim.exe"
+  #     curl -fsS -o "%CACHE_PATH%\\modelsim.exe" "%MODELSIM_URL%"
+  # - appveyor AddMessage "Installing %BUILDER_NAME% to %INSTALL_DIR%"
+  # - "%CACHE_PATH%\\modelsim.exe --mode unattended
+  #                               --modelsim_edition modelsim_ase
+  #                               --installdir %INSTALL_DIR%"
+  # - set PATH=%BUILDER_PATH%;%PATH%
+  # - vcom.exe -version
+  # - vcom -version
+  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv --log-capture
+      --debug"
+
+# We won't build or run tests from here
+build: off
+test: off
