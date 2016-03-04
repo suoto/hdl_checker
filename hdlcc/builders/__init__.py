@@ -114,6 +114,12 @@ class BaseBuilder(object):
                     stderr=subp.STDOUT, shell=shell, env=subp_env).split("\n"))
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.split("\n"))
+            import traceback
+            self._logger.warning("Traceback:\n%s",
+                                 traceback.format_exc())
+            self._logger.warning("subprocess runner path:")
+            for path in subp_env['PATH'].split(os.pathsep):
+                self._logger.warning(" - %s", path)
 
         for line in stdout:
             self._logger.debug("> " + str(line))

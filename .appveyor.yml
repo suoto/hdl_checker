@@ -43,13 +43,14 @@ clone_depth: 5
 
 # environment variables
 environment:
-  MODELSIM_URL: "http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe"
+  MODELSIM_URL: "http://download.altera.com/akdlm/software/acdsinst/15.1/185/
+                 ib_installers/ModelSimSetup-15.1.0.185-windows.exe"
   CACHE_PATH: "%LOCALAPPDATA%\\cache"
   BUILDERS: "%LOCALAPPDATA%\\builders"
   matrix:
     - BUILDER_NAME: msim
-      INSTALL_DIR: "%LOCALAPPDATA%"
-      BUILDER_PATH: '%INSTALL_DIR%\modelsim_ase\win32aloem\'
+      BUILDER_PATH: '%LOCALAPPDATA%\modelsim_ase\win32aloem'
+      arch: 32
 
 # build cache to preserve files/folders between builds
 cache:
@@ -61,7 +62,10 @@ install:
   - git submodule update --init --recursive
   - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
                                             { 'C:\Python27-x64' }
+
+  - appveyor AddMessage "Python selected is %python%"
   - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
+  - echo "MODELSIM_URL = %MODELSIM_URL%"
   - set PATH=%python%;%python%\Scripts;%PATH%
   - python get-pip.py
   - pip install -r requirements.txt
@@ -71,15 +75,16 @@ install:
   #     appveyor AddMessage "Downloading %BUILDER_NAME%"
   # - if not exist "%CACHE_PATH%\\modelsim.exe"
   #     curl -fsS -o "%CACHE_PATH%\\modelsim.exe" "%MODELSIM_URL%"
-  # - appveyor AddMessage "Installing %BUILDER_NAME% to %INSTALL_DIR%"
+  # - appveyor AddMessage "Installing %BUILDER_NAME% to %LOCALAPPDATA%"
   # - "%CACHE_PATH%\\modelsim.exe --mode unattended
   #                               --modelsim_edition modelsim_ase
-  #                               --installdir %INSTALL_DIR%"
-  # - set PATH=%BUILDER_PATH%;%PATH%
-  # - vcom.exe -version
-  # - vcom -version
-  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv --log-capture
-      --debug"
+  #                               --installdir %LOCALAPPDATA%"
+  # - dir "%BUILDER_PATH%"
+  # - echo "%BUILDER_PATH%\\vcom -version"
+  # - "%BUILDER_PATH%\\vcom -version"
+
+  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv --log-capture -F
+      --debug hdlcc.tests.test_source_file"
 
 # We won't build or run tests from here
 build: off

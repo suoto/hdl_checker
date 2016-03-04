@@ -5,9 +5,8 @@ set +e
 
 RESULT=0
 
-
-./run_tests.py $*
-RESULT=$(($? || ${RESULT}))
+# ./run_tests.py $*
+# RESULT=$(($? || ${RESULT}))
 
 
 export BUILDER_NAME=msim
@@ -17,8 +16,11 @@ export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 RESULT=$(($? || ${RESULT}))
 
 export BUILDER_NAME=ghdl
-export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-# export BUILDER_PATH=${HOME}/.local/bin/ghdl
+if [ "${TRAVIS}" == "true" ]; then
+  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+else
+  export BUILDER_PATH=${HOME}/.local/bin/ghdl
+fi
 ./run_tests.py $*
 RESULT=$(($? || ${RESULT}))
 

@@ -42,7 +42,9 @@ def clear():
         print os.popen(cmd).read()
 
 def setupLogging():
-    sys.path.insert(0, './dependencies/rainbow_logging_handler/')
+    sys.path.insert(0, os.path.join('dependencies',
+                                    'rainbow_logging_handler'))
+
     from rainbow_logging_handler import RainbowLoggingHandler
     stream_handler = RainbowLoggingHandler(
         sys.stdout,

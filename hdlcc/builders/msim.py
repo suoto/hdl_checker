@@ -16,7 +16,6 @@
 
 import os
 import re
-import subprocess as subp
 from hdlcc.builders import BaseBuilder
 from hdlcc.utils import shell
 from hdlcc import exceptions
@@ -111,7 +110,7 @@ class MSim(BaseBuilder):
 
     def checkEnvironment(self):
         try:
-            stdout = self._subprocessRunner(['vcom', '-version'])
+            stdout = self._subprocessRunner(['vcom.exe', '-version'])
             self._version = \
                     re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                     stdout[0])[0]
@@ -121,6 +120,9 @@ class MSim(BaseBuilder):
         except Exception as exc:
             import traceback
             self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
+            self._logger.warning("Path:")
+            for path in os.environ['PATH'].split(os.pathsep):
+                self._logger.warning(" - %s", path)
             raise exceptions.SanityCheckError(str(exc))
 
     def _getUnitsToRebuild(self, line):
