@@ -15,6 +15,7 @@
 "ModelSim builder implementation"
 
 import os
+import os.path as p
 import re
 from hdlcc.builders import BaseBuilder
 from hdlcc.utils import shell
@@ -50,7 +51,7 @@ class MSim(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(MSim, self).__init__(target_folder)
-        self._modelsim_ini = os.path.join(self._target_folder, 'modelsim.ini')
+        self._modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         # FIXME: Built-in libraries should not be statically defined
         # like this. Review this at some point
@@ -110,7 +111,7 @@ class MSim(BaseBuilder):
 
     def checkEnvironment(self):
         try:
-            stdout = self._subprocessRunner(['vcom.exe', '-version'])
+            stdout = self._subprocessRunner(['vcom', '-version'])
             self._version = \
                     re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                     stdout[0])[0]
@@ -136,8 +137,8 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, source, flags=None):
-        cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-work', \
-                os.path.join(self._target_folder, source.library)]
+        cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
+               '-work', p.join(self._target_folder, source.library)]
         if flags:
             cmd += flags
         cmd += [source.filename]
@@ -145,9 +146,9 @@ class MSim(BaseBuilder):
         return self._subprocessRunner(cmd)
 
     def _createLibrary(self, source):
-        if os.path.exists(os.path.join(self._target_folder, source.library)):
+        if p.exists(p.join(self._target_folder, source.library)):
             return
-        if os.path.exists(self._modelsim_ini):
+        if p.exists(self._modelsim_ini):
             self._mapLibrary(source.library)
         else:
             self._addLibraryToIni(source.library)
@@ -156,23 +157,28 @@ class MSim(BaseBuilder):
         "Adds a library to a non-existent ModelSim init file"
         self._logger.info("Library %s not found, creating", library)
 
-        self._subprocessRunner(
-            ['cd {target_folder} && vlib {vlib_args} {library}'.format(
-                target_folder=self._target_folder,
-                library=os.path.join(self._target_folder, library),
-                vlib_args=" ".join(self._vlib_args))],
-            shell=True)
+        cwd = p.abspath(os.curdir)
+        self._logger.info("Current dir is %s, changing to %s",
+                          cwd, self._target_folder)
+        os.chdir(self._target_folder)
+        if cwd == os.curdir:
+            self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
+            assert 0
 
-        self._subprocessRunner(
-            ['cd {target_folder} && vmap {library} {library_path}'.format(
-                target_folder=self._target_folder,
-                library=library,
-                library_path=os.path.join(self._target_folder, library)),],
-            shell=True)
+        self._subprocessRunner(['vlib', ] + self._vlib_args +
+                               [p.join(self._target_folder, library), ])
+
+        self._subprocessRunner(['vmap', library, ] +
+                               [p.join(self._target_folder, library)])
+
+        self._logger.info("Current dir is %s, changing to %s",
+                          os.curdir, cwd)
+        os.chdir(cwd)
+
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
-        if not os.path.exists(os.path.join(self._target_folder, library)):
+        if not p.exists(p.join(self._target_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
             return
         shell('vdel -modelsimini {modelsimini} -lib {library} -all'.format(
@@ -184,9 +190,9 @@ class MSim(BaseBuilder):
 
         shell('vlib {vlib_args} {library}'.format(
             vlib_args=" ".join(self._vlib_args),
-            library=os.path.join(self._target_folder, library)))
+            library=p.join(self._target_folder, library)))
         shell('vmap -modelsimini {modelsimini} {library} {library_path}'.format(
             modelsimini=self._modelsim_ini,
             library=library,
-            library_path=os.path.join(self._target_folder, library)))
+            library_path=p.join(self._target_folder, library)))
 

@@ -26,7 +26,7 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = os.path.join("hdlcc", "runner.py")
+HDLCC_LOCATION = p.join("hdlcc", "runner.py")
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
 
@@ -34,7 +34,10 @@ _BUILDER_ENV = os.environ.copy()
 _BUILDER_ENV["PATH"] = p.expandvars(os.pathsep.join([BUILDER_PATH, \
                                     _BUILDER_ENV["PATH"]]))
 
-PROJECT_FILE = os.path.join("dependencies", "hdl_lib", BUILDER_NAME + ".prj")
+if BUILDER_NAME is not None:
+    PROJECT_FILE = p.join("dependencies", "hdl_lib", BUILDER_NAME + ".prj")
+else:
+    PROJECT_FILE = None
 
 
 def shell(cmd):
@@ -60,9 +63,6 @@ def shell(cmd):
 
 
     if exc:
-        _logger.warning("os.path: %s", os.environ["PATH"])
-        _logger.warning("_BUILDER_ENV path: %s", _BUILDER_ENV["PATH"])
-
         raise exc
 
     return stdout

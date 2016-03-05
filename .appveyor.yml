@@ -33,7 +33,7 @@ skip_tags: true
 os: Windows Server 2012
 
 # clone directory
-clone_folder: c:\projects\myproject
+clone_folder: c:\projects\hdlcc
 
 # fetch repository as zip archive
 shallow_clone: false
@@ -43,18 +43,21 @@ clone_depth: 5
 
 # environment variables
 environment:
-  MODELSIM_URL: "http://download.altera.com/akdlm/software/acdsinst/15.1/185/
-                 ib_installers/ModelSimSetup-15.1.0.185-windows.exe"
   CACHE_PATH: "%LOCALAPPDATA%\\cache"
-  BUILDERS: "%LOCALAPPDATA%\\builders"
   matrix:
+    # - BUILDER_NAME: ghdl
+    #   INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
+    #   arch: 32
+    #   URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
+    #   # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
       BUILDER_PATH: '%LOCALAPPDATA%\modelsim_ase\win32aloem'
       arch: 32
+      URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
 
 # build cache to preserve files/folders between builds
-cache:
-  - '%CACHE_PATH%'
+# cache:
+#   - '%CACHE_PATH%'
 
 # scripts that run after cloning repository
 install:
@@ -64,27 +67,23 @@ install:
                                             { 'C:\Python27-x64' }
 
   - appveyor AddMessage "Python selected is %python%"
-  - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
-  - echo "MODELSIM_URL = %MODELSIM_URL%"
+  # - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
   - set PATH=%python%;%python%\Scripts;%PATH%
-  - python get-pip.py
+  # - python get-pip.py
   - pip install -r requirements.txt
-  - mkdir "%CACHE_PATH%"
+  - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
   - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
-  # - if not exist "%CACHE_PATH%\\modelsim.exe"
-  #     appveyor AddMessage "Downloading %BUILDER_NAME%"
-  # - if not exist "%CACHE_PATH%\\modelsim.exe"
-  #     curl -fsS -o "%CACHE_PATH%\\modelsim.exe" "%MODELSIM_URL%"
-  # - appveyor AddMessage "Installing %BUILDER_NAME% to %LOCALAPPDATA%"
-  # - "%CACHE_PATH%\\modelsim.exe --mode unattended
-  #                               --modelsim_edition modelsim_ase
-  #                               --installdir %LOCALAPPDATA%"
-  # - dir "%BUILDER_PATH%"
-  # - echo "%BUILDER_PATH%\\vcom -version"
-  # - "%BUILDER_PATH%\\vcom -version"
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv --log-capture -F
-      --debug hdlcc.tests.test_source_file"
+  - if "%BUILDER_NAME%" == "msim"
+      call %APPVEYOR_BUILD_FOLDER%\\scripts\\setup_msim.bat
+
+  - if "%BUILDER_NAME%" == "ghdl"
+      call %APPVEYOR_BUILD_FOLDER%\\scripts\\setup_ghdl.bat
+
+  - if "%BUILDER_NAME%" == "msim"
+      %BUILDER_PATH%\\vcom -version
+
+  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -B -F"
 
 # We won't build or run tests from here
 build: off

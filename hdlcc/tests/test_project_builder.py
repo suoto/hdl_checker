@@ -31,11 +31,10 @@ BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDL_LIB_PATH = os.path.join("dependencies", "hdl_lib")
+HDL_LIB_PATH = p.join("dependencies", "hdl_lib")
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
-    PROJECT_FILE = os.path.join(HDL_LIB_PATH, BUILDER_NAME + ".prj")
 else:
     PROJECT_FILE = None
 
@@ -64,6 +63,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
     @it.has_setup
     def setup():
+        it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
     @it.has_teardown
@@ -78,10 +78,19 @@ with such.A('hdlcc test using hdl_lib') as it:
 
             @it.has_setup
             def setup():
+                hdlcc.ProjectBuilder.clean(PROJECT_FILE)
 
                 it.builder_env = os.environ.copy()
-                it.builder_env['PATH'] = \
-                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+
+                if os.name == 'posix':
+                    it.builder_env['PATH'] = \
+                            os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+                elif os.name == 'nt':
+                    os.putenv('PATH',
+                              os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
+
+                #  os.putenv('path',
+                #            os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
 
                 _logger.info("Builder env path:")
                 for path in it.builder_env['PATH'].split(os.pathsep):
