@@ -61,6 +61,8 @@ class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
 
 with such.A('hdlcc test using hdl_lib') as it:
 
+    it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
+
     @it.has_setup
     def setup():
         it.assertIn(os.name, ('nt', 'posix'))
@@ -69,8 +71,8 @@ with such.A('hdlcc test using hdl_lib') as it:
     @it.has_teardown
     def teardown():
         StandaloneProjectBuilder.clean(PROJECT_FILE)
-        if p.exists('remove_me'):
-            os.removedirs('remove_me')
+        if p.exists(it.DUMMY_PROJECT_FILE):
+            os.removedirs(it.DUMMY_PROJECT_FILE)
 
     with it.having('a valid project file'):
 
@@ -83,14 +85,11 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.builder_env = os.environ.copy()
 
                 if os.name == 'posix':
-                it.builder_env['PATH'] = \
+                    it.builder_env['PATH'] = \
                         os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
                 elif os.name == 'nt':
                     os.putenv('PATH',
                               os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-
-                #  os.putenv('path',
-                #            os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
 
                 _logger.info("Builder env path:")
                 for path in it.builder_env['PATH'].split(os.pathsep):
@@ -104,13 +103,13 @@ with such.A('hdlcc test using hdl_lib') as it:
                         hdlcc.exceptions.SanityCheckError,
                         "Builder creation should fail befure configuring its "
                         "path!"):
-                        builder('remove_me')
+                        builder(it.DUMMY_PROJECT_FILE)
 
                 it.original_env = os.environ.copy()
                 os.environ = it.builder_env.copy()
 
                 try:
-                builder('remove_me')
+                    builder(it.DUMMY_PROJECT_FILE)
                 except hdlcc.exceptions.SanityCheckError:
                     it.fail("Builder creation failed even after configuring "
                             "the builder path")
