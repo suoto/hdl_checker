@@ -27,7 +27,9 @@ def writeListToFile(filename, _list):
     mtime = os.path.getmtime(filename)
     time.sleep(0.01)
     os.popen("touch %s" % filename, 'r').read()
-    while os.path.getmtime(filename) == mtime:
-        _logger.debug("Waiting...")
+    for i in range(10):
+        if os.path.getmtime(filename) != mtime:
+            break
+        _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
 

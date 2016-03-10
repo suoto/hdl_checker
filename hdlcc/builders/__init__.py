@@ -114,6 +114,26 @@ class BaseBuilder(object):
                     stderr=subp.STDOUT, shell=shell, env=subp_env).split("\n"))
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.split("\n"))
+            import traceback
+            self._logger.warning("Exception has error code %d. Traceback:",
+                                 exc.returncode)
+
+            for line in traceback.format_exc().split('\n'):
+                self._logger.warning(line)
+            self._logger.warning("Traceback:\n%s",
+                                 traceback.format_exc())
+
+            # We'll check if the return code means a command not found.
+            # In this case, we'll print the configured PATH for debugging
+            # purposes
+            if os.name == 'posix' and exc.returncode == 127:
+                self._logger.debug("subprocess runner path:")
+                for path in subp_env['PATH'].split(os.pathsep):
+                    self._logger.debug(" - %s", path)
+            elif os.name == 'nt' and exc.returncode == 2:
+                self._logger.debug("subprocess runner path:")
+                for path in subp_env['PATH'].split(os.pathsep):
+                    self._logger.debug(" - %s", path)
 
         for line in stdout:
             self._logger.debug("> " + str(line))
@@ -152,7 +172,6 @@ class BaseBuilder(object):
         if exc_lines: # pragma: no cover
             for exc_line in exc_lines:
                 self._logger.critical(exc_line)
-            assert 0
         return records, rebuilds
 
     @abc.abstractmethod

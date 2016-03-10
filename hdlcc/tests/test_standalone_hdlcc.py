@@ -17,23 +17,28 @@
 
 import os
 import os.path as p
-import time
 import logging
 import re
 import subprocess as subp
-import re
 
 from nose2.tools import such
 from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = "./hdlcc/runner.py"
+HDLCC_LOCATION = p.join("hdlcc", "runner.py")
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
 
 _BUILDER_ENV = os.environ.copy()
-_BUILDER_ENV["PATH"] = os.pathsep.join([BUILDER_PATH, _BUILDER_ENV["PATH"]])
+_BUILDER_ENV["PATH"] = p.expandvars(os.pathsep.join([BUILDER_PATH, \
+                                    _BUILDER_ENV["PATH"]]))
+
+if BUILDER_NAME is not None:
+    PROJECT_FILE = p.join("dependencies", "hdl_lib", BUILDER_NAME + ".prj")
+else:
+    PROJECT_FILE = None
+
 
 def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
@@ -73,8 +78,7 @@ with such.A("hdlcc standalone tool") as it:
     @it.has_teardown
     def teardown():
         cmd = ["coverage", "run",
-               HDLCC_LOCATION,
-               "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+               HDLCC_LOCATION, PROJECT_FILE,
                "--clean"]
 
         shell(cmd)
@@ -92,8 +96,7 @@ with such.A("hdlcc standalone tool") as it:
             @it.should("build a project")
             def test():
                 cmd = ["coverage", "run",
-                       HDLCC_LOCATION,
-                       "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       HDLCC_LOCATION, PROJECT_FILE,
                        "--build"]
 
                 shell(cmd)
@@ -114,7 +117,7 @@ with such.A("hdlcc standalone tool") as it:
             def test(case, *args):
                 _logger.info("Running '%s'", case)
                 cmd = ["coverage", "run",
-                       HDLCC_LOCATION, "dependencies/hdl_lib/" + BUILDER_NAME + ".prj"]
+                       HDLCC_LOCATION, PROJECT_FILE]
                 for arg in args:
                     cmd.append(arg)
 
@@ -124,7 +127,7 @@ with such.A("hdlcc standalone tool") as it:
             @it.should("save profiling info if requested")
             def test():
                 cmd = ["coverage", "run",
-                       HDLCC_LOCATION, "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       HDLCC_LOCATION, PROJECT_FILE,
                        "--debug-profiling", "output.stats"]
 
                 if p.exists("output.stats"):
@@ -138,8 +141,7 @@ with such.A("hdlcc standalone tool") as it:
             @it.should("control debugging level")
             def test():
                 cmd = ["coverage", "run",
-                       HDLCC_LOCATION,
-                       "dependencies/hdl_lib/" + BUILDER_NAME + ".prj",
+                       HDLCC_LOCATION, PROJECT_FILE,
                        "--clean", "--build"]
 
                 it.assertEqual(shell(cmd), [""])

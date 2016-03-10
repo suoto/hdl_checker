@@ -6,3 +6,5 @@ testfixtures
 coverage
 codecov
 coveralls
+colorama
+logutils

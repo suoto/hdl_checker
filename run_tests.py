@@ -42,9 +42,11 @@ def clear():
         print os.popen(cmd).read()
 
 def setupLogging():
-    sys.path.insert(0, './dependencies/rainbow_logging_handler/')
+    sys.path.insert(0, os.path.join('dependencies',
+                                    'rainbow_logging_handler'))
+
     from rainbow_logging_handler import RainbowLoggingHandler
-    stream_handler = RainbowLoggingHandler(
+    rainbow_stream_handler = RainbowLoggingHandler(
         sys.stdout,
         #  Customizing each column's color
         # pylint: disable=bad-whitespace
@@ -61,9 +63,12 @@ def setupLogging():
         color_message_critical = ('bold white', 'red'))
         # pylint: enable=bad-whitespace
 
-    logging.root.addHandler(stream_handler)
-    logging.getLogger('nose2').setLevel(logging.INFO)
+    #  stream_handler = logging.StreamHandler(sys.stdout)
+    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
+    #  stream_handler.setFormatter(logging.Formatter(log_format))
 
+    logging.root.addHandler(rainbow_stream_handler)
+    #  logging.root.addHandler(stream_handler)
 
 def main():
     if '--clear' in sys.argv[1:]:
@@ -74,6 +79,7 @@ def main():
         setupLogging()
         sys.argv.pop(sys.argv.index('--debug'))
 
+    logging.getLogger('nose2').setLevel(logging.INFO)
     file_handler = logging.FileHandler("tests.log")
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
@@ -83,8 +89,17 @@ def main():
     return test(nose2_argv=sys.argv)
 
 if __name__ == '__main__':
-    if main().result.wasSuccessful():
+    tests = main()
+
+    if os.environ.get('CI', None) is not None:
+        sys.stdout.write("=== LOG START ===\n" + \
+                         open('tests.log', 'r').read() + \
+                         "=== LOG END ===\n")
+        sys.stdout.flush()
+
+    if tests.result.wasSuccessful():
         sys.exit(0)
     else:
         sys.exit(1)
+
 

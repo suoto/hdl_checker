@@ -17,6 +17,7 @@
 
 import os
 import os.path as p
+import shutil as shell
 import logging
 
 from nose2.tools import such
@@ -39,6 +40,9 @@ with such.A('config parser object') as it:
     def teardown():
         if p.exists(it.project_filename):
             os.remove(it.project_filename)
+        if p.exists('.build'):
+            shell.rmtree('.build')
+
         del it.project_filename
         del it.parser
 
@@ -51,10 +55,18 @@ with such.A('config parser object') as it:
                 r'global_build_flags = -g0 -g1',
                 r'builder = msim',
                 r'target_dir = .build',
-                r'vhdl work ./dependencies/vim-hdl-examples/another_library/foo.vhd -f0',
-                r'vhdl work ' + p.abspath('./dependencies/vim-hdl-examples/'
-                                          'basic_library/clock_divider.vhd') + ' -f1',
-                'verilog work ./dependencies/vim-hdl-examples/another_library/foo.v',
+                r'vhdl work ' + p.join('dependencies',
+                                       'vim-hdl-examples',
+                                       'another_library',
+                                       'foo.vhd') + ' -f0',
+                r'vhdl work ' + p.abspath(p.join('dependencies',
+                                                 'vim-hdl-examples',
+                                                 'basic_library',
+                                                 'clock_divider.vhd')) + ' -f1',
+                r'verilog work ' + p.join('dependencies',
+                                          'vim-hdl-examples',
+                                          'another_library',
+                                          'foo.v')
             ]
 
             writeListToFile(it.project_filename, config_content)
@@ -77,25 +89,30 @@ with such.A('config parser object') as it:
         @it.should('extract build flags for single build')
         def test():
             it.assertItemsEqual(
-                it.parser.getSingleBuildFlagsByPath('./dependencies/vim-hdl-examples/'
-                                                    'another_library/foo.vhd'),
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join('dependencies', 'vim-hdl-examples',
+                           'another_library',
+                           'foo.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser.getSingleBuildFlagsByPath('./dependencies/vim-hdl-examples/'
-                                                    'basic_library/clock_divider.vhd'),
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join('dependencies', 'vim-hdl-examples', 'basic_library',
+                           'clock_divider.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
         @it.should('extract build flags for batch builds')
         def test():
             it.assertItemsEqual(
-                it.parser.getBatchBuildFlagsByPath('./dependencies/vim-hdl-examples/'
-                                                   'another_library/foo.vhd'),
+                it.parser.getBatchBuildFlagsByPath(
+                    p.join('dependencies', 'vim-hdl-examples', 'another_library',
+                           'foo.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser.getBatchBuildFlagsByPath('./dependencies/vim-hdl-examples/'
-                                                   'basic_library/clock_divider.vhd'),
+                it.parser.getBatchBuildFlagsByPath(
+                    p.join('dependencies', 'vim-hdl-examples', 'basic_library',
+                           'clock_divider.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
         @it.should('only include VHDL sources')
