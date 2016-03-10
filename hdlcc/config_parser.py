@@ -107,8 +107,17 @@ class ConfigParser(object):
                 line = _COMMENTS.sub("", _line)
                 self._parseLine(line)
 
+            # If after parsing we haven't found the configured target
+            # dir, we'll use the builder name
             if 'target_dir' not in self._parms.keys():
                 self._parms['target_dir'] = "." + self._parms['builder']
+
+            # If the configured target dir is not absolute, we assume it
+            # should be relative to the folder where the configuration
+            # file resides
+            if not p.isabs(self._parms['target_dir']):
+                self._parms['target_dir'] = p.join(p.dirname(self.filename),
+                                                   self._parms['target_dir'])
 
             self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
 

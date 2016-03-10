@@ -18,7 +18,6 @@ import os
 import os.path as p
 import re
 from hdlcc.builders import BaseBuilder
-from hdlcc.utils import shell
 from hdlcc import exceptions
 
 class MSim(BaseBuilder):
@@ -121,9 +120,6 @@ class MSim(BaseBuilder):
         except Exception as exc:
             import traceback
             self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
-            self._logger.warning("Path:")
-            for path in os.environ['PATH'].split(os.pathsep):
-                self._logger.warning(" - %s", path)
             raise exceptions.SanityCheckError(str(exc))
 
     def _getUnitsToRebuild(self, line):
@@ -146,12 +142,17 @@ class MSim(BaseBuilder):
         return self._subprocessRunner(cmd)
 
     def _createLibrary(self, source):
-        if p.exists(p.join(self._target_folder, source.library)):
-            return
-        if p.exists(self._modelsim_ini):
-            self._mapLibrary(source.library)
-        else:
-            self._addLibraryToIni(source.library)
+        try:
+            if p.exists(p.join(self._target_folder, source.library)):
+                return
+            if p.exists(self._modelsim_ini):
+                self._mapLibrary(source.library)
+            else:
+                self._addLibraryToIni(source.library)
+        except:
+            self._logger.debug("Current dir when exception was raised: %s",
+                               p.abspath(os.curdir))
+            raise
 
     def _addLibraryToIni(self, library):
         "Adds a library to a non-existent ModelSim init file"
@@ -181,18 +182,18 @@ class MSim(BaseBuilder):
         if not p.exists(p.join(self._target_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
             return
-        shell('vdel -modelsimini {modelsimini} -lib {library} -all'.format(
-            modelsimini=self._modelsim_ini, library=library))
+        return self._subprocessRunner(
+            ['vdel', '-modelsimini', self._modelsim_ini, '-lib', library,
+             '-all'])
 
     def _mapLibrary(self, library):
         "Adds a library to an existing ModelSim init file"
         self._logger.info("modelsim.ini found, adding %s", library)
 
-        shell('vlib {vlib_args} {library}'.format(
-            vlib_args=" ".join(self._vlib_args),
-            library=p.join(self._target_folder, library)))
-        shell('vmap -modelsimini {modelsimini} {library} {library_path}'.format(
-            modelsimini=self._modelsim_ini,
-            library=library,
-            library_path=p.join(self._target_folder, library)))
+        self._subprocessRunner(['vlib', ] + self._vlib_args +
+                               [p.join(self._target_folder, library)])
+
+        self._subprocessRunner(['vmap', '-modelsimini', self._modelsim_ini,
+                                library, p.join(self._target_folder, library)])
+
 
