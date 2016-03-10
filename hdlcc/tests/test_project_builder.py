@@ -99,10 +99,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 if os.environ.get('CI', '') == 'true' and \
                         BUILDER_NAME is not None:
-                    with it.assertRaises(
-                        hdlcc.exceptions.SanityCheckError,
-                        "Builder creation should fail befure configuring its "
-                        "path!"):
+                    with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                         builder(it.DUMMY_PROJECT_FILE)
 
                 it.original_env = os.environ.copy()

@@ -91,7 +91,7 @@ def main():
 if __name__ == '__main__':
     tests = main()
 
-    if os.environ.get('CI', None) is not None:
+    if os.environ.get('CI', None) is not None and os.name == 'nt':
         sys.stdout.write("=== LOG START ===\n" + \
                          open('tests.log', 'r').read() + \
                          "=== LOG END ===\n")
@@ -101,5 +101,4 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         sys.exit(1)
-
 
