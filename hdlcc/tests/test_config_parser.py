@@ -172,6 +172,26 @@ with such.A('config parser object') as it:
             parser = hdlcc.config_parser.ConfigParser(project_filename)
             it.assertEquals(parser.getTargetDir(), p.abspath('.msim'))
 
+        @it.should('report target dir relative to project path')
+        def test():
+            if not p.exists('temp'):
+                os.mkdir('temp')
+            project_filename = p.join('temp', 'test.prj')
+            config_content = [
+                r'batch_build_flags = -batch0 -batch1',
+                r'single_build_flags = -single0 -single1',
+                r'global_build_flags = -global0 -global1',
+                r'target_dir = .build',
+                r'builder = msim',
+                r'vhdl work ./dependencies/vim-hdl-examples/another_library/foo.vhd',
+            ]
+
+            writeListToFile(project_filename, config_content)
+
+            parser = hdlcc.config_parser.ConfigParser(project_filename)
+            it.assertEquals(parser.getTargetDir(),
+                            p.abspath(p.join('temp', '.build')))
+
     with it.having('no project file'):
         @it.should('create the object without error')
         def test():

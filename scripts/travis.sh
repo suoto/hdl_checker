@@ -16,6 +16,8 @@
 
 ARGS=
 
+CLEAN=0
+
 while [ -n "$1" ]; do
   if [ "$1" == "ghdl" ]; then
     GHDL=1
@@ -23,6 +25,10 @@ while [ -n "$1" ]; do
     MSIM=1
   elif [ "$1" == "fb" ]; then
     FALLBACK=1
+  elif [ "$1" == "clean" ]; then
+    CLEAN=1
+  elif [ "$1" == "standalone" ]; then
+    STANDALONE=1
   else
     ARGS+=" $1"
   fi
@@ -30,21 +36,29 @@ while [ -n "$1" ]; do
   shift
 done
 
-if [ -z "${GHDL}${MSIM}${FALLBACK}" ]; then
+if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}" ]; then
   GHDL=1
   MSIM=1
   FALLBACK=1
+  STANDALONE=1
 fi
 
-git clean -fdx && git submodule foreach --recursive git clean -fdx
+if [ "${CLEAN}" == "1" ]; then
+  git clean -fdx && git submodule foreach --recursive git clean -fdx
+fi
 
 set -x
 set +e
 
 RESULT=0
 
+if [ -n "${STANDALONE}" ]; then
+  ./run_tests.py $ARGS hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
+  RESULT=$(($? || ${RESULT}))
+fi
+
 if [ -n "${FALLBACK}" ]; then
-  ./run_tests.py $ARGS
+  ./run_tests.py $ARGS hdlcc.tests.test_project_builder hdlcc.tests.test_standalone_hdlcc
   RESULT=$(($? || ${RESULT}))
 fi
 
@@ -61,10 +75,10 @@ if [ -n "${GHDL}" ]; then
   if [ "${TRAVIS}" == "true" ]; then
     export BUILDER_PATH=${HOME}/builders/ghdl/bin/
   else
-    if [ -d "${HOME}/builders/ghdl/bin/" ]; then
-      export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-    else
+    if [ -f "${HOME}/.local/bin/ghdl" ]; then
       export BUILDER_PATH=${HOME}/.local/bin/ghdl
+    else
+      export BUILDER_PATH=${HOME}/builders/ghdl/bin/
     fi
   fi
 

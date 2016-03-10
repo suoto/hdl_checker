@@ -42,6 +42,7 @@ class ProjectBuilder(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, project_file=None):
+        self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
         self._build_thread = threading.Thread(target=self._buildByDependency)
@@ -339,13 +340,18 @@ class ProjectBuilder(object):
                     built, errors, warnings)
 
     def getMessagesByPath(self, path, *args, **kwargs):
+        if not p.isabs(path):
+            abspath = p.join(self._start_dir, path)
+        else:
+            abspath = path
+
         records = []
 
         pool = ThreadPool()
         static_check = pool.apply_async(getStaticMessages, \
-                args=(open(path, 'r').read().split('\n'), ))
+                args=(open(abspath, 'r').read().split('\n'), ))
         builder_check = pool.apply_async(self._getMessagesAvailable, \
-                args=[path, ] + list(args))
+                args=[abspath, ] + list(args))
 
         records += static_check.get()
         records += builder_check.get()
