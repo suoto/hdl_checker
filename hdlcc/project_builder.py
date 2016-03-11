@@ -45,24 +45,13 @@ class ProjectBuilder(object):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
-        self._build_thread = threading.Thread(target=self._buildByDependency)
+        self._background_thread = threading.Thread(target=self._buildByDependency)
 
         self._units_built = []
 
         self.project_file = project_file
-
-        cache = self.recoverCache(project_file)
-
-        if cache is None:
-            # No cache file or unable to recover from cache file
-
-            self._config = ConfigParser(project_file)
-            builder_name = self._config.getBuilder()
-            builder_class = hdlcc.builders.getBuilderByName(builder_name)
-            self.builder = builder_class(self._config.getTargetDir())
-
-        else:
-            self.__dict__.update(cache.__dict__)
+        self._config = None
+        self.builder = None
 
         self.buildByDependency()
 
@@ -90,7 +79,7 @@ class ProjectBuilder(object):
         state['_logger'] = {'name' : self._logger.name,
                             'level' : self._logger.level}
         del state['_lock']
-        del state['_build_thread']
+        del state['_background_thread']
 
         return state
 
@@ -102,7 +91,7 @@ class ProjectBuilder(object):
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
         self._lock = threading.Lock()
-        self._build_thread = threading.Thread(target=self._buildByDependency)
+        self._background_thread = threading.Thread(target=self._buildByDependency)
         self.__dict__.update(state)
 
     @abc.abstractmethod
@@ -211,9 +200,19 @@ class ProjectBuilder(object):
         '''Checks if the builder can be called via self._getBuilderMessages
         or return info/messages identifying why it couldn't be done'''
 
-        try:
-            source = self._config.getSourceByPath(path)
-        except KeyError:
+        if self._background_thread.isAlive():
+            self._handleUiWarning("Project hasn't finished building, try again "
+                                  "after it finishes.")
+            return []
+
+        source = None
+        if self._config is not None:
+            try:
+                source = self._config.getSourceByPath(path)
+            except KeyError:
+                pass
+
+        if source is None:
             return [{
                 'checker'        : 'hdlcc',
                 'line_number'    : '',
@@ -223,11 +222,6 @@ class ProjectBuilder(object):
                 'error_type'     : 'W',
                 'error_message'  : 'Path "%s" not found in project file' %
                                    p.abspath(path)}]
-
-        if self._build_thread.isAlive():
-            self._handleUiWarning("Project hasn't finished building, try again "
-                                  "after it finishes.")
-            return []
 
         with self._lock:
             dependencies = self._getSourceDependenciesSet(source)
@@ -274,18 +268,20 @@ class ProjectBuilder(object):
         cache_fname = self._getCacheFilename(self._config.filename)
         pickle.dump(self, open(cache_fname, 'w'), 0)
 
-    def recoverCache(self, project_file):
-        if project_file is None:
+    def _recoverCache(self):
+        '''Tries to recover cached info for the given project_file.
+        If something goes wrong, assume the cache is invalid and return
+        nothing. Otherwise, return the cached object'''
+        if self.project_file is None:
             self._logger.debug("Can't recover cache from None")
             return
-        cache_fname = self._getCacheFilename(project_file)
+        cache_fname = self._getCacheFilename(self.project_file)
         cache = None
         if p.exists(cache_fname):
             try:
                 cache = pickle.load(open(cache_fname, 'r'))
-                recovered = True
                 print "Recovered cache from '%s'" % cache_fname
-            except pickle.UnpicklingError:
+            except (pickle.UnpicklingError, ImportError):
                 print "Unable to recover from '%s'" % cache_fname
 
         return cache
@@ -297,26 +293,49 @@ class ProjectBuilder(object):
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        if not self._build_thread.isAlive():
-            self._build_thread = threading.Thread(target=self._buildByDependency)
-            self._build_thread.start()
+        if not self._background_thread.isAlive():
+            self._background_thread = threading.Thread(target=self._buildByDependency)
+            self._background_thread.start()
         else:
             self._handleUiInfo("Build thread is already running")
 
     def finishedBuilding(self):
         "Returns whether a background build has finished running"
-        return not self._build_thread.isAlive()
+        return not self._background_thread.isAlive()
 
     def waitForBuild(self):
         "Waits until the background build finishes"
-        if self._build_thread.isAlive():
-            self._build_thread.join()
+        if self._background_thread.isAlive():
+            self._background_thread.join()
         with self._lock:
             self._logger.info("Build has finished")
+
+    def _updateEnvironmentIfNeeded(self):
+        '''Updates or creates the environment, which includes checking
+        if the configuration file should be parsed and creating the
+        appropriate builder objects'''
+
+        # If we have run before and we don't need to parse it, just
+        # return early
+        if not (self._config is None or self._config.shouldParse()):
+            return
+
+        cache = self._recoverCache()
+
+        if cache is None:
+            # No cache file or unable to recover from cache file
+            self._config = ConfigParser(self.project_file)
+            builder_name = self._config.getBuilder()
+            builder_class = hdlcc.builders.getBuilderByName(builder_name)
+            self.builder = builder_class(self._config.getTargetDir())
+
+        else:
+            self.__dict__.update(cache.__dict__)
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"
         with self._lock:
+            self._updateEnvironmentIfNeeded()
             built = 0
             errors = 0
             warnings = 0
@@ -340,6 +359,9 @@ class ProjectBuilder(object):
                     built, errors, warnings)
 
     def getMessagesByPath(self, path, *args, **kwargs):
+        '''Returns the messages for the given path, including messages
+        from the import configured builder (if available) and static
+        checks'''
         if not p.isabs(path):
             abspath = p.join(self._start_dir, path)
         else:
@@ -351,7 +373,7 @@ class ProjectBuilder(object):
         static_check = pool.apply_async(getStaticMessages, \
                 args=(open(abspath, 'r').read().split('\n'), ))
         builder_check = pool.apply_async(self._getMessagesAvailable, \
-                args=[abspath, ] + list(args))
+                args=[abspath, ] + list(args), kwds=kwargs)
 
         records += static_check.get()
         records += builder_check.get()

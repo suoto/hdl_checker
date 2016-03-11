@@ -88,7 +88,7 @@ class ConfigParser(object):
 
         return "\n".join(_repr)
 
-    def _shouldParse(self):
+    def shouldParse(self):
         "Checks if we should parse the configuration file"
         if self.filename is None:
             return False
@@ -100,7 +100,7 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         "Parses the configuration file"
-        if self._shouldParse():
+        if self.shouldParse():
             self._logger.debug("Parsing is required")
             self._updateTimestamp()
             for _line in open(self.filename, 'r').readlines():
