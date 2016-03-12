@@ -255,6 +255,9 @@ with such.A('hdlcc test using hdl_lib') as it:
 
             @it.should('get updated messages of a different source')
             def test():
+                if BUILDER_NAME is None:
+                    return
+
                 filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
                 it.assertTrue(it.project._msg_queue.empty())
 

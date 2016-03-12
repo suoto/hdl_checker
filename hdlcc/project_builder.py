@@ -205,6 +205,9 @@ class ProjectBuilder(object):
                                   "after it finishes.")
             return []
 
+        if self._config.filename is None:
+            return []
+
         source = None
         if self._config is not None:
             try:
