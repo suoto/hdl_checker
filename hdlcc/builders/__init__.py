@@ -29,18 +29,13 @@ _logger = logging.getLogger(__name__)
 def getBuilderByName(name):
     # Check if the builder selected is implemented and create the
     # builder attribute
-    builder = None
-    try:
-        if name == 'msim':
-            builder = MSim
-        elif name == 'xvhdl':
-            builder = XVHDL
-        elif name == 'ghdl':
-            builder = GHDL
-    except hdlcc.exceptions.SanityCheckError:
-        _logger.warning("Builder '%s' sanity check failed", name)
-
-    if builder is None:
+    if name == 'msim':
+        builder = MSim
+    elif name == 'xvhdl':
+        builder = XVHDL
+    elif name == 'ghdl':
+        builder = GHDL
+    else:
         _logger.info("Using Fallback builder")
         builder = Fallback
 
@@ -50,7 +45,6 @@ class BaseBuilder(object):
     "Class that implements the base builder flow"
 
     __metaclass__ = abc.ABCMeta
-
 
     @abc.abstractproperty
     def __builder_name__(self):

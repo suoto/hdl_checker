@@ -330,7 +330,12 @@ class ProjectBuilder(object):
             self._config = ConfigParser(self.project_file)
             builder_name = self._config.getBuilder()
             builder_class = hdlcc.builders.getBuilderByName(builder_name)
-            self.builder = builder_class(self._config.getTargetDir())
+            try:
+                self.builder = builder_class(self._config.getTargetDir())
+            except hdlcc.exceptions.SanityCheckError:
+                self._handleUiError("Failed to create builder '%s'" % \
+                    builder_class.__builder_name__)
+                self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
         else:
             self.__dict__.update(cache.__dict__)

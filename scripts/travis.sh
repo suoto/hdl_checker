@@ -72,7 +72,7 @@ fi
 
 if [ -n "${GHDL}" ]; then
   export BUILDER_NAME=ghdl
-  if [ "${TRAVIS}" == "true" ]; then
+  if [ "${CI}" == "true" ]; then
     export BUILDER_PATH=${HOME}/builders/ghdl/bin/
   else
     if [ -f "${HOME}/.local/bin/ghdl" ]; then
