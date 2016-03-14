@@ -74,8 +74,6 @@ class VhdlSourceFile(object):
                     _logger.debug("Parsing %s", str(self))
                     self._mtime = self.getmtime()
                     self._doParse()
-                else:
-                    _logger.debug("Source %s is up to date", str(self))
             except OSError: # pragma: no cover
                 _logger.warning("Couldn't parse '%s' at this moment", self)
 

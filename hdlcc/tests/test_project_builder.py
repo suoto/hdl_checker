@@ -31,7 +31,7 @@ BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDL_LIB_PATH = p.join("dependencies", "hdl_lib")
+HDL_LIB_PATH = p.join(".ci", "hdl_lib")
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
@@ -118,7 +118,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                 del it.project
 
             @it.should('build project by dependency in background')
-            def test(case):
+            def test_001(case):
                 _logger.info("Creating project builder object")
                 it.project = StandaloneProjectBuilder()
                 _logger.info("Checking if msg queue is empty")
@@ -129,7 +129,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertFalse(it.project.finishedBuilding())
 
             @it.should('notify if a build is already running')
-            def test(case):
+            def test_002(case):
                 if PROJECT_FILE is None:
                     _logger.warning("Skipping '%s'", case)
                     return
@@ -149,7 +149,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
             @it.should('warn when trying to build a source before the build '
                        'thread completes')
-            def test(case):
+            def test_003(case):
                 if PROJECT_FILE is None:
                     _logger.warning("Skipping '%s'", case)
                     return
@@ -180,11 +180,11 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.project.waitForBuild()
 
             @it.should('wait until build has finished')
-            def test():
+            def test_004():
                 it.project.waitForBuild()
 
             @it.should('get messages by path')
-            def test():
+            def test_005():
                 filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
                                   'async_fifo_tb.vhd')
 
@@ -206,7 +206,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertTrue(it.project._msg_queue.empty())
 
             @it.should('get updated messages')
-            def test():
+            def test_006():
                 filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
                                   'async_fifo_tb.vhd')
 
@@ -239,7 +239,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertTrue(it.project._msg_queue.empty())
 
             @it.should('get messages by path of a different source')
-            def test(case):
+            def test_007(case):
                 if PROJECT_FILE is None:
                     _logger.warning("Skipping '%s'", case)
                     return
@@ -254,7 +254,10 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.assertTrue(it.project._msg_queue.empty())
 
             @it.should('get updated messages of a different source')
-            def test():
+            def test_008():
+                if BUILDER_NAME is None:
+                    return
+
                 filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
                 it.assertTrue(it.project._msg_queue.empty())
 
@@ -278,12 +281,72 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 it.assertTrue(it.project._msg_queue.empty())
 
-        #      @it.should('recover from cache')
-        #      def test():
-        #          it.project = StandaloneProjectBuilder()
+            @it.should('rebuild sources when needed')
+            def test_009():
+                if BUILDER_NAME is None:
+                    return
+                if BUILDER_NAME == 'ghdl':
+                    _logger.fatal("GHDL doesn't implements this yet")
+                    return
+
+                # Count how many messages each source has
+
+                source_msgs = {}
+
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+
+                    _logger.info("Getting messages for '%s'", filename)
+                    source_msgs[filename] = \
+                        it.project.getMessagesByPath(filename)
+
+                _logger.info("Changing common_pkg to force rebuilding "
+                             "synchronizer and another one I don't recall "
+                             "right now")
+                common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
+                                    'common_pkg.vhd')
+
+                code = open(common_pkg, 'r').read().split('\n')
+
+                writeListToFile(common_pkg,
+                                code[:9] + \
+                                ["    constant TESTING : integer := 4;"] + \
+                                code[9:])
+
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+
+                    if source_msgs[filename]:
+                        _logger.info("Source %s had the following messages:\n%s",
+                                     filename,
+                                     "\n".join([str(x) for x in
+                                                source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
+
+                _logger.info("Restoring previous content")
+                writeListToFile(common_pkg, code)
+
+                #  try:
+                #      it.assertNotEquals(records, [])
+                #  finally:
+                #      # Remove the comment we added
+                #      code[28] = code[28][3:]
+                #      writeListToFile(filename, code)
+
+                #  it.assertTrue(it.project._msg_queue.empty())
 
         #      @it.should("warn when a source wasn't found in the project file")
-        #      def test():
+        #      def test_010():
         #          test_path = p.abspath('file_outside_the_prj_file.vhd')
         #          expected_msg = 'Path "%s" not found in project file' % test_path
         #          if not p.exists(test_path):
@@ -301,7 +364,7 @@ with such.A('hdlcc test using hdl_lib') as it:
         #          it.assertTrue(found, "File not found error not found")
 
         #      @it.should("find source containing a given design unit")
-        #      def test():
+        #      def test_011():
         #          sources = it.project._findSourceByDesignUnit("another_library.foo")
         #          it.assertTrue(len(sources) == 1, "Should find a single source "
         #                                           "but found %d" % len(sources))
@@ -314,16 +377,16 @@ with such.A('hdlcc test using hdl_lib') as it:
         #              "Source file library '%s' is not 'another_library" % source.library)
 
         #          it.assertEqual(source.filename, \
-        #              p.abspath("dependencies/vim-hdl-examples/"
+        #              p.abspath(".ci/vim-hdl-examples/"
         #                        "another_library/foo.vhd"))
 
         #      @it.should("fail to find source containing a non-existing design unit")
-        #      def test():
+        #      def test_012():
         #          sources = it.project._findSourceByDesignUnit("foo_bar.foo")
         #          it.assertTrue(len(sources) == 0, "Should not find any source!")
 
         #      @it.should("clean up generated files")
-        #      def test():
+        #      def test_013():
         #          #  cache_fname = StandaloneProjectBuilder._getCacheFilename(PROJECT_FILE)
         #          #  it.assertTrue(p.exists(cache_fname),
         #          #                "Cache file '%s' not found" % cache_fname)
