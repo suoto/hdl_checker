@@ -50,6 +50,7 @@ class ProjectBuilder(object):
         self._units_built = []
 
         self.project_file = project_file
+
         self._config = None
         self.builder = None
 
@@ -226,6 +227,7 @@ class ProjectBuilder(object):
                 'error_message'  : 'Path "%s" not found in project file' %
                                    p.abspath(path)}]
 
+
         with self._lock:
             dependencies = self._getSourceDependenciesSet(source)
 
@@ -312,7 +314,6 @@ class ProjectBuilder(object):
             self._background_thread.join()
         with self._lock:
             self._logger.info("Build has finished")
-
     def _updateEnvironmentIfNeeded(self):
         '''Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the

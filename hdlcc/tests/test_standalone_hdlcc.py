@@ -65,7 +65,6 @@ def shell(cmd):
     if exc:
         _logger.warning("os.path: %s", os.environ["PATH"])
         _logger.warning("_BUILDER_ENV path: %s", _BUILDER_ENV["PATH"])
-
         raise exc
 
     return stdout
