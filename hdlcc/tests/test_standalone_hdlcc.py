@@ -35,7 +35,7 @@ _BUILDER_ENV["PATH"] = p.expandvars(os.pathsep.join([BUILDER_PATH, \
                                     _BUILDER_ENV["PATH"]]))
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join("dependencies", "hdl_lib", BUILDER_NAME + ".prj")
+    PROJECT_FILE = p.join(".ci", "hdl_lib", BUILDER_NAME + ".prj")
 else:
     PROJECT_FILE = None
 
@@ -106,13 +106,13 @@ with such.A("hdlcc standalone tool") as it:
                     ("--debug-print-compile-order", ),
 
                     ("--build", "-s",
-                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
+                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
 
                     ("--debug-parse-source-file", "-s",
-                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
+                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
 
                     ("--debug-run-static-check", "-s",
-                     "./dependencies/hdl_lib/memory/testbench/async_fifo_tb.vhd"),)
+                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),)
 
             def test(case, *args):
                 _logger.info("Running '%s'", case)
