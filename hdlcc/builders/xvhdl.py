@@ -43,10 +43,6 @@ class XVHDL(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
-        # FIXME: Built-in libraries should not be statically defined
-        # like this. Review this at some point
-        self.builtin_libraries = ['ieee', 'std', 'unisim', 'xilinxcorelib', \
-                'synplify', 'synopsis', 'maxii', 'family_support']
         self._xvhdlini = '.xvhdl.init'
         self._built_libs = []
 
@@ -96,6 +92,12 @@ class XVHDL(BaseBuilder):
         except Exception as exc:
             self._logger.warning("Sanity check failed")
             raise exceptions.SanityCheckError(str(exc))
+
+    def getBuiltinLIbraries(self):
+        # FIXME: Built-in libraries should not be statically defined
+        # like this. Review this at some point
+        return ['ieee', 'std', 'unisim', 'xilinxcorelib', 'synplify',
+                'synopsis', 'maxii', 'family_support']
 
     def _createLibrary(self, source):
         if source.library in self._built_libs:

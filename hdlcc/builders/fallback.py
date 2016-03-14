@@ -41,3 +41,6 @@ class Fallback(BaseBuilder):
     def _createLibrary(self, source):
         pass
 
+    def getBuiltinLibraries(self):
+        return []
+

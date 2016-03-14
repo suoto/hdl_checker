@@ -127,7 +127,7 @@ class ProjectBuilder(object):
         """Translate raw dependency list parsed from a given source to the
         project name space"""
         for dependency in source.getDependencies():
-            if dependency['library'] in self.builder.builtin_libraries or \
+            if dependency['library'] in self.builder.getBuiltinLibraries() or \
                dependency['unit'] == 'all' or \
                (dependency['library'] == source.library and \
                 dependency['unit'] in [x['name'] for x in source.getDesignUnits()]):

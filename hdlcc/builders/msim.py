@@ -44,6 +44,11 @@ class MSim(BaseBuilder):
     _BuilderRebuildUnitsScanner = re.compile(
         r"Recompile\s*([^\s]+)\s+because\s+[^\s]+\s+has changed")
 
+    _BuilderLibraryScanner = re.compile(
+        r"^\"(?P<library_name>\w+)\""
+        r"\s+maps to directory\s*"
+        r"(?P<library_path>.*)\.$", re.I)
+
     def _shouldIgnoreLine(self, line):
         return self._BuilderStdoutIgnoreLines.match(line)
 
@@ -51,11 +56,6 @@ class MSim(BaseBuilder):
         self._version = ''
         super(MSim, self).__init__(target_folder)
         self._modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
-
-        # FIXME: Built-in libraries should not be statically defined
-        # like this. Review this at some point
-        self.builtin_libraries = ['ieee', 'std', 'unisim', 'xilinxcorelib', \
-                'synplify', 'synopsis', 'maxii', 'family_support']
 
         # Use vlib with '-type directory' switch to get a more consistent
         # folder organization. The vlib command has 3 variants:
@@ -67,6 +67,8 @@ class MSim(BaseBuilder):
         else:
             self._vlib_args = []
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
+        self._builtin_libraries = []
+        self._parseBuiltinLibraries()
 
     def _makeMessageRecords(self, line):
         line_number = None
@@ -121,6 +123,14 @@ class MSim(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
             raise exceptions.SanityCheckError(str(exc))
+
+    def _parseBuiltinLibraries(self):
+        for line in self._subprocessRunner(['vmap', ]):
+            for match in self._BuilderLibraryScanner.finditer(line):
+                self._builtin_libraries.append(match.groupdict()['library_name'])
+
+    def getBuiltinLibraries(self):
+        return self._builtin_libraries
 
     def _getUnitsToRebuild(self, line):
         rebuilds = []

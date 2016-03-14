@@ -34,20 +34,19 @@ class GHDL(BaseBuilder):
         r"((?P<is_warning>warning:)\s*|\s*)"
         r"(?P<error_message>.*)", re.I)
 
-    def __init__(self, target_folder):
-        self._version = ''
-        super(GHDL, self).__init__(target_folder)
-
-        # FIXME: Built-in libraries should not be statically defined
-        # like this. Review this at some point
-        self.builtin_libraries = ['ieee', 'std', ]
-        #  'unisim', 'xilinxcorelib', \
-        #          'synplify', 'synopsis', 'maxii', 'family_support']
+    _BuilderLibraryPathScanner = re.compile(
+        r"^library directory:\s*(?P<library_path>.*)\s*")
 
     _BuilderStdoutIgnoreLines = re.compile('|'.join([
         r"^\s*$",
         r"ghdl: compilation error",
     ]))
+
+    def __init__(self, target_folder):
+        self._version = ''
+        super(GHDL, self).__init__(target_folder)
+        self._builtin_libraries = []
+        self._parseBuiltinLibraries()
 
     def _shouldIgnoreLine(self, line):
         if self._BuilderStdoutIgnoreLines.match(line):
@@ -94,6 +93,23 @@ class GHDL(BaseBuilder):
             if stdout:
                 self._logger.warning("stdout return:\n%s", stdout)
             raise exceptions.SanityCheckError(str(exc))
+
+    def getBuiltinLibraries(self):
+        return self._builtin_libraries
+
+    def _parseBuiltinLibraries(self):
+        library_name_scan = None
+        for line in self._subprocessRunner(['ghdl', '--dispconfig']):
+            library_path_match = self._BuilderLibraryPathScanner.search(line)
+            if library_path_match:
+                library_path = library_path_match.groupdict()['library_path']
+                library_name_scan = re.compile( \
+                    r"^\s*" + library_path +
+                    r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
+
+            if library_name_scan is not None:
+                for match in library_name_scan.finditer(line):
+                    self._builtin_libraries.append(match.groupdict()['library_name'])
 
     def _getGhdlArgs(self, source, flags=None):
         "Return the GHDL arguments that are common to most calls"
