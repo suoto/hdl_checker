@@ -42,6 +42,12 @@ class GHDL(BaseBuilder):
         r"ghdl: compilation error",
     ]))
 
+    _BuilderRebuildUnitsScanner = re.compile(
+        r'(entity "(?P<unit_name>\w+)" is obsoleted by package "\w+"'
+        r'|'
+        r'file (?P<rebuild_path>.*)\s+has changed and must be reanalysed)',
+        flags=re.I)
+
     def __init__(self, target_folder):
         self._version = ''
         super(GHDL, self).__init__(target_folder)
@@ -147,4 +153,25 @@ class GHDL(BaseBuilder):
         if not os.path.exists(workdir):
             os.mkdir(workdir)
         self._importSource(source)
+
+    def _getUnitsToRebuild(self, line):
+        rebuilds = []
+
+        for match in self._BuilderRebuildUnitsScanner.finditer(line):
+            if not match:
+                continue
+            mdict = match.groupdict()
+            # When GHDL reports some unit needs to be rebuilt, it does
+            # by either
+            #  1. Giving the path to the file that needs to be rebuilt
+            #     when sources are from different libraries
+            #  2. Reporting which design unit has been affected by a
+            #     given change.
+            if 'rebuild_path' in mdict and mdict['rebuild_path'] is not None:
+                rebuilds.append(mdict)
+            else:
+                rebuilds.append({'library_name' : 'work',
+                                 'unit_name' : mdict['unit_name']})
+
+        return rebuilds
 

@@ -45,6 +45,8 @@ fi
 
 if [ "${CLEAN}" == "1" ]; then
   git clean -fdx && git submodule foreach --recursive git clean -fdx
+  cd .ci/hdl_lib && git reset HEAD --hard
+  cd -
 fi
 
 set -x

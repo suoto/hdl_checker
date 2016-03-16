@@ -99,8 +99,6 @@ class BaseBuilder(object):
 
             for line in traceback.format_exc().split('\n'):
                 self._logger.warning(line)
-            self._logger.warning("Traceback:\n%s",
-                                 traceback.format_exc())
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging
@@ -115,7 +113,9 @@ class BaseBuilder(object):
                     self._logger.debug(" - %s", path)
 
         for line in stdout:
-            self._logger.debug("> " + str(line))
+            if line == '' or line.isspace():
+                continue
+            self._logger.debug("> " + repr(line))
 
         return stdout
 
@@ -142,10 +142,14 @@ class BaseBuilder(object):
                 if record['error_type'] not in ('W', 'E'): # pragma: no cover
                     exc_lines += [line]
 
-                records += [record]
+                if record not in records:
+                    records += [record]
 
             try:
-                rebuilds += self._getUnitsToRebuild(line)
+                for rebuild in self._getUnitsToRebuild(line):
+                    if rebuild not in rebuilds:
+                        rebuilds += [rebuild]
+
             except NotImplementedError:
                 pass
         if exc_lines: # pragma: no cover
@@ -193,8 +197,9 @@ class BaseBuilder(object):
                         self._buildAndParse(source, flags=tuple(build_flags))
 
             for rebuild in rebuilds:
-                if rebuild[0] == 'work':
-                    rebuild[0] = source.library
+                if 'library_name' in rebuild:
+                    if rebuild['library_name'] == 'work':
+                        rebuild['library_name'] = source.library
 
             cached_info['records'] = records
             cached_info['rebuilds'] = rebuilds

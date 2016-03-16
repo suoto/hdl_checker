@@ -160,7 +160,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 it.project.getMessagesByPath(filename)
 
-                for _ in range(10):
+                for _ in range(50):
                     if it.project._msg_queue.empty():
                         break
                     time.sleep(0.1)
@@ -281,16 +281,12 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 it.assertTrue(it.project._msg_queue.empty())
 
-            @it.should('rebuild sources when needed')
+            @it.should('rebuild sources when needed within the same library')
             def test_009():
                 if BUILDER_NAME is None:
                     return
-                if BUILDER_NAME == 'ghdl':
-                    _logger.fatal("GHDL doesn't implements this yet")
-                    return
 
                 # Count how many messages each source has
-
                 source_msgs = {}
 
                 for filename in (
@@ -336,76 +332,76 @@ with such.A('hdlcc test using hdl_lib') as it:
                 _logger.info("Restoring previous content")
                 writeListToFile(common_pkg, code)
 
-                #  try:
-                #      it.assertNotEquals(records, [])
-                #  finally:
-                #      # Remove the comment we added
-                #      code[28] = code[28][3:]
-                #      writeListToFile(filename, code)
+            @it.should('rebuild sources when needed for different libraries')
+            def test_010():
+                if BUILDER_NAME is None:
+                    return
 
-                #  it.assertTrue(it.project._msg_queue.empty())
+                # Count how many messages each source has
+                source_msgs = {}
 
-        #      @it.should("warn when a source wasn't found in the project file")
-        #      def test_010():
-        #          test_path = p.abspath('file_outside_the_prj_file.vhd')
-        #          expected_msg = 'Path "%s" not found in project file' % test_path
-        #          if not p.exists(test_path):
-        #              open(test_path, 'w').close()
-        #          records = it.project.getMessagesByPath(\
-        #              p.expanduser(test_path))
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
 
-        #          found = False
-        #          for record in records:
-        #              if record['error_type'] == 'W' and \
-        #                      record['error_message'] == expected_msg:
-        #                  found = True
-        #                  break
+                    _logger.info("Getting messages for '%s'", filename)
+                    source_msgs[filename] = \
+                        it.project.getMessagesByPath(filename)
 
-        #          it.assertTrue(found, "File not found error not found")
+                _logger.info("Changing common_pkg to force rebuilding "
+                             "synchronizer and another one I don't recall "
+                             "right now")
+                common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
+                                    'common_pkg.vhd')
 
-        #      @it.should("find source containing a given design unit")
-        #      def test_011():
-        #          sources = it.project._findSourceByDesignUnit("another_library.foo")
-        #          it.assertTrue(len(sources) == 1, "Should find a single source "
-        #                                           "but found %d" % len(sources))
-        #          source = sources.pop()
-        #          it.assertIsInstance(source, hdlcc.source_file.VhdlSourceFile, \
-        #              "Source file returned is not an instance of "
-        #              "hdlcc.source_file.VhdlSourceFile")
+                code = open(common_pkg, 'r').read().split('\n')
 
-        #          it.assertEqual(source.library, "another_library", \
-        #              "Source file library '%s' is not 'another_library" % source.library)
+                writeListToFile(common_pkg,
+                                code[:9] + \
+                                ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                                code[9:])
 
-        #          it.assertEqual(source.filename, \
-        #              p.abspath(".ci/vim-hdl-examples/"
-        #                        "another_library/foo.vhd"))
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
 
-        #      @it.should("fail to find source containing a non-existing design unit")
-        #      def test_012():
-        #          sources = it.project._findSourceByDesignUnit("foo_bar.foo")
-        #          it.assertTrue(len(sources) == 0, "Should not find any source!")
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
 
-        #      @it.should("clean up generated files")
-        #      def test_013():
-        #          #  cache_fname = StandaloneProjectBuilder._getCacheFilename(PROJECT_FILE)
-        #          #  it.assertTrue(p.exists(cache_fname),
-        #          #                "Cache file '%s' not found" % cache_fname)
+                    if source_msgs[filename]:
+                        _logger.info("Source %s had the following messages:\n%s",
+                                     filename,
+                                     "\n".join([str(x) for x in
+                                                source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
 
-        #          #  cache_folder = it.project.builder._target_folder
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
 
-        #          #  it.assertTrue(p.exists(cache_folder),
-        #          #                "Cache folder '%s' not found" % cache_folder)
+                _logger.info("Restoring previous content")
+                writeListToFile(common_pkg, code)
 
-        #          # Do this twice to check that the project builder doesn't
-        #          # fails if we try to clean up more than once
-        #          for _ in range(2):
-        #              StandaloneProjectBuilder.clean(PROJECT_FILE)
+            @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
+                       "a design unit can't be found")
+            def test_011():
+                if BUILDER_NAME is None:
+                    return
 
-        #              #  it.assertFalse(p.exists(cache_fname),
-        #              #                 "Cache file '%s' still exists" % cache_fname)
+                with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
+                    it.project._findSourceByDesignUnit('some_lib.some_unit')
+                    _logger.info("Raised exception: %s", str(exc))
 
-        #              #  #  it.assertFalse(p.exists(cache_folder),
-        #              #  #                 "Cache folder '%s' still exists" % cache_folder)
+                try:
+                    sources = it.project._findSourceByDesignUnit('memory.async_fifo')
+                    for source in sources:
+                        it.assertTrue(
+                            p.exists(source.filename),
+                            "Couldn't find source with path '%s'" % source.filename)
+                except hdlcc.exceptions.DesignUnitNotFoundError:
+                    it.fail("Shouldn't raise exception for a unit that is "
+                            "supposed to be found")
 
 it.createTests(globals())
 

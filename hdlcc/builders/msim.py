@@ -42,7 +42,9 @@ class MSim(BaseBuilder):
         r".*VHDL Compiler exiting\s*$"]))
 
     _BuilderRebuildUnitsScanner = re.compile(
-        r"Recompile\s*([^\s]+)\s+because\s+[^\s]+\s+has changed")
+        #  r"Recompile\s*([^\s]+)\s+because\s+[^\s]+\s+has changed")
+        r"Recompile\s*(?P<library_name>\w+)\.(?P<unit_name>\w+)\s+because"
+        r"\s+[^\s]+\s+has changed")
 
     _BuilderLibraryScanner = re.compile(
         r"^\"(?P<library_name>\w+)\""
@@ -138,7 +140,7 @@ class MSim(BaseBuilder):
             for match in self._BuilderRebuildUnitsScanner.finditer(line):
                 if not match:
                     continue
-                rebuilds.append(match.group(match.lastindex).split('.'))
+                rebuilds.append(match.groupdict())
 
         return rebuilds
 
