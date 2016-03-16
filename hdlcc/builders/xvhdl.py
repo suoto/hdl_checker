@@ -15,6 +15,7 @@
 "Xilinx xhvdl builder implementation"
 
 import os
+import os.path as p
 import re
 import subprocess
 from hdlcc.builders import BaseBuilder
@@ -93,7 +94,7 @@ class XVHDL(BaseBuilder):
             self._logger.warning("Sanity check failed")
             raise exceptions.SanityCheckError(str(exc))
 
-    def getBuiltinLIbraries(self):
+    def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
         # like this. Review this at some point
         return ['ieee', 'std', 'unisim', 'xilinxcorelib', 'synplify',
@@ -105,14 +106,14 @@ class XVHDL(BaseBuilder):
 
         self._built_libs += [source.library]
         open(self._xvhdlini, 'w').write('\n'.join(\
-                ["%s=%s" % (x, os.path.join(self._target_folder, x)) \
+                ["%s=%s" % (x, p.join(self._target_folder, x)) \
                 for x in self._built_libs]))
 
     def _buildSource(self, source, flags=None):
         cmd = ['xvhdl',
                '--nolog',
                '--verbose', '0',
-               '--initfile', self._xvhdlini,
+               '--initfile', p.abspath(self._xvhdlini),
                '--work', source.library]
         cmd += flags
         cmd += [source.filename]

@@ -23,6 +23,8 @@ while [ -n "$1" ]; do
     GHDL=1
   elif [ "$1" == "msim" ]; then
     MSIM=1
+  elif [ "$1" == "xvhdl" ]; then
+    XVHDL=1
   elif [ "$1" == "fb" ]; then
     FALLBACK=1
   elif [ "$1" == "clean" ]; then
@@ -36,7 +38,7 @@ while [ -n "$1" ]; do
   shift
 done
 
-if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}" ]; then
+if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   GHDL=1
   MSIM=1
   FALLBACK=1
@@ -67,6 +69,14 @@ fi
 if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim
   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
+
+  ./run_tests.py $ARGS
+  RESULT=$(($? || ${RESULT}))
+fi
+
+if [ -n "${XVHDL}" ]; then
+  export BUILDER_NAME=xvhdl
+  export BUILDER_PATH=/opt/Xilinx/Vivado/2015.4/bin
 
   ./run_tests.py $ARGS
   RESULT=$(($? || ${RESULT}))

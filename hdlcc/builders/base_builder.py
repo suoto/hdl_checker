@@ -98,7 +98,7 @@ class BaseBuilder(object):
                                  exc.returncode)
 
             for line in traceback.format_exc().split('\n'):
-                self._logger.warning(line)
+                self._logger.debug(line)
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging
