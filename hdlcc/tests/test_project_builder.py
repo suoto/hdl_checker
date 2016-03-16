@@ -160,7 +160,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 it.project.getMessagesByPath(filename)
 
-                for _ in range(10):
+                for _ in range(50):
                     if it.project._msg_queue.empty():
                         break
                     time.sleep(0.1)

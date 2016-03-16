@@ -37,6 +37,8 @@ _logger = logging.getLogger('build messages')
 # pylint: disable=too-many-instance-attributes,abstract-class-not-used
 class ProjectBuilder(object):
     "HDL Code Checker project builder class"
+
+    GET_MESSAGES_WITH_THREADS = True
     MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -389,8 +391,7 @@ class ProjectBuilder(object):
         else:
             abspath = path
 
-        USE_THREADS = False
-        if USE_THREADS:
+        if self.GET_MESSAGES_WITH_THREADS:
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \
