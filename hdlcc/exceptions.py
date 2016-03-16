@@ -38,3 +38,15 @@ class UnknownParameterError(VimHdlBaseException):
     def __str__(self):
         return "Unknown parameter '%s'" % self._parameter
 
+class DesignUnitNotFoundError(VimHdlBaseException):
+    '''Exception raised when project_builder.ProjectBuilder can't find
+    the source file that defines the given design unit'''
+
+    def __init__(self, design_unit):
+        self._design_unit = design_unit
+        super(DesignUnitNotFoundError, self).__init__()
+
+    def __str__(self):
+        return "No source file defining design unit '%s' found" % \
+                    self._design_unit
+

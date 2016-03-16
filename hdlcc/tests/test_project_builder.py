@@ -281,16 +281,12 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 it.assertTrue(it.project._msg_queue.empty())
 
-            @it.should('rebuild sources when needed')
+            @it.should('rebuild sources when needed within the same library')
             def test_009():
                 if BUILDER_NAME is None:
                     return
-                if BUILDER_NAME == 'ghdl':
-                    _logger.fatal("GHDL doesn't implements this yet")
-                    return
 
                 # Count how many messages each source has
-
                 source_msgs = {}
 
                 for filename in (
@@ -320,6 +316,57 @@ with such.A('hdlcc test using hdl_lib') as it:
                 for filename in (
                         p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
                         p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+
+                    if source_msgs[filename]:
+                        _logger.info("Source %s had the following messages:\n%s",
+                                     filename,
+                                     "\n".join([str(x) for x in
+                                                source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
+
+                _logger.info("Restoring previous content")
+                writeListToFile(common_pkg, code)
+
+            @it.should('rebuild sources when needed for different libraries')
+            def test_010():
+                if BUILDER_NAME is None:
+                    return
+
+                # Count how many messages each source has
+                source_msgs = {}
+
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
+
+                    _logger.info("Getting messages for '%s'", filename)
+                    source_msgs[filename] = \
+                        it.project.getMessagesByPath(filename)
+
+                _logger.info("Changing common_pkg to force rebuilding "
+                             "synchronizer and another one I don't recall "
+                             "right now")
+                common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
+                                    'common_pkg.vhd')
+
+                code = open(common_pkg, 'r').read().split('\n')
+
+                writeListToFile(common_pkg,
+                                code[:9] + \
+                                ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                                code[9:])
+
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+
+                for filename in (
+                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
 
                     if source_msgs[filename]:
                         _logger.info("Source %s had the following messages:\n%s",

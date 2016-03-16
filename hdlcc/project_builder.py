@@ -121,6 +121,8 @@ class ProjectBuilder(object):
         for source in self._config.getSources():
             if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
+        if not sources:
+            raise hdlcc.exceptions.DesignUnitNotFoundError(design_unit)
         return sources
 
     def _translateSourceDependencies(self, source):
@@ -248,6 +250,9 @@ class ProjectBuilder(object):
         '''Builds a given source file handling rebuild of units reported
         by the compiler'''
 
+        self._logger.debug("Building '%s', batch_mode = %s",
+                           str(path), batch_mode)
+
         flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
                 self._config.getSingleBuildFlagsByPath(path)
 
@@ -256,14 +261,21 @@ class ProjectBuilder(object):
 
         if rebuilds:
             source = self._config.getSourceByPath(path)
-            rebuild_units = ["%s.%s" % (x[0], x[1]) for x in rebuilds]
+            self._logger.info("Building '%s' triggers rebuilding: %s",
+                              source, ", ".join([str(x) for x in rebuilds]))
 
-            self._logger.info("Building '%s' triggers rebuild of units: %s",
-                              source, ", ".join(rebuild_units))
-            for rebuild_unit in rebuild_units:
-                for rebuild_source in self._findSourceByDesignUnit(rebuild_unit):
-                    self._getBuilderMessages(rebuild_source.abspath,
+            for rebuild in rebuilds:
+                self._logger.debug("Rebuild hint: '%s'", rebuild)
+                if 'rebuild_path' in rebuild:
+                    self._getBuilderMessages(rebuild['rebuild_path'],
                                              batch_mode=True)
+                else:
+                    design_unit = '%s.%s' % (rebuild['library_name'],
+                                             rebuild['unit_name'])
+                    for rebuild_source in \
+                            self._findSourceByDesignUnit(design_unit):
+                        self._getBuilderMessages(rebuild_source.abspath,
+                                                 batch_mode=True)
             return self._getBuilderMessages(path)
 
         return self._sortBuildMessages(records)
@@ -299,7 +311,9 @@ class ProjectBuilder(object):
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
         if not self._background_thread.isAlive():
-            self._background_thread = threading.Thread(target=self._buildByDependency)
+            self._background_thread = \
+                    threading.Thread(target=self._buildByDependency,
+                                     name='_buildByDependency')
             self._background_thread.start()
         else:
             self._handleUiInfo("Build thread is already running")
@@ -361,8 +375,7 @@ class ProjectBuilder(object):
                         _logger.debug(str(record))
                         warnings += 1
                     else: # pragma: no cover
-                        _logger.fatal(str(record))
-                        assert 0, 'Invalid record: %s' % str(record)
+                        _logger.error("Invalid record: %s", str(record))
                 built += 1
             self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
                     built, errors, warnings)
@@ -376,19 +389,23 @@ class ProjectBuilder(object):
         else:
             abspath = path
 
-        records = []
+        USE_THREADS = False
+        if USE_THREADS:
+            records = []
+            pool = ThreadPool()
+            static_check = pool.apply_async(getStaticMessages, \
+                    args=(open(abspath, 'r').read().split('\n'), ))
+            builder_check = pool.apply_async(self._getMessagesAvailable, \
+                    args=[abspath, ] + list(args), kwds=kwargs)
 
-        pool = ThreadPool()
-        static_check = pool.apply_async(getStaticMessages, \
-                args=(open(abspath, 'r').read().split('\n'), ))
-        builder_check = pool.apply_async(self._getMessagesAvailable, \
-                args=[abspath, ] + list(args), kwds=kwargs)
+            records += static_check.get()
+            records += builder_check.get()
 
-        records += static_check.get()
-        records += builder_check.get()
-
-        pool.terminate()
-        pool.join()
+            pool.terminate()
+            pool.join()
+        else:
+            records = getStaticMessages(open(abspath, 'r').read().split('\n'))
+            records += self._getMessagesAvailable(abspath, list(args), **kwargs)
 
         return self._sortBuildMessages(records)
 
