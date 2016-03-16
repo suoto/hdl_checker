@@ -383,76 +383,25 @@ with such.A('hdlcc test using hdl_lib') as it:
                 _logger.info("Restoring previous content")
                 writeListToFile(common_pkg, code)
 
-                #  try:
-                #      it.assertNotEquals(records, [])
-                #  finally:
-                #      # Remove the comment we added
-                #      code[28] = code[28][3:]
-                #      writeListToFile(filename, code)
+            @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
+                       "a design unit can't be found")
+            def test_011():
+                if BUILDER_NAME is None:
+                    return
 
-                #  it.assertTrue(it.project._msg_queue.empty())
+                with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
+                    it.project._findSourceByDesignUnit('some_lib.some_unit')
+                    _logger.info("Raised exception: %s", str(exc))
 
-        #      @it.should("warn when a source wasn't found in the project file")
-        #      def test_010():
-        #          test_path = p.abspath('file_outside_the_prj_file.vhd')
-        #          expected_msg = 'Path "%s" not found in project file' % test_path
-        #          if not p.exists(test_path):
-        #              open(test_path, 'w').close()
-        #          records = it.project.getMessagesByPath(\
-        #              p.expanduser(test_path))
-
-        #          found = False
-        #          for record in records:
-        #              if record['error_type'] == 'W' and \
-        #                      record['error_message'] == expected_msg:
-        #                  found = True
-        #                  break
-
-        #          it.assertTrue(found, "File not found error not found")
-
-        #      @it.should("find source containing a given design unit")
-        #      def test_011():
-        #          sources = it.project._findSourceByDesignUnit("another_library.foo")
-        #          it.assertTrue(len(sources) == 1, "Should find a single source "
-        #                                           "but found %d" % len(sources))
-        #          source = sources.pop()
-        #          it.assertIsInstance(source, hdlcc.source_file.VhdlSourceFile, \
-        #              "Source file returned is not an instance of "
-        #              "hdlcc.source_file.VhdlSourceFile")
-
-        #          it.assertEqual(source.library, "another_library", \
-        #              "Source file library '%s' is not 'another_library" % source.library)
-
-        #          it.assertEqual(source.filename, \
-        #              p.abspath(".ci/vim-hdl-examples/"
-        #                        "another_library/foo.vhd"))
-
-        #      @it.should("fail to find source containing a non-existing design unit")
-        #      def test_012():
-        #          sources = it.project._findSourceByDesignUnit("foo_bar.foo")
-        #          it.assertTrue(len(sources) == 0, "Should not find any source!")
-
-        #      @it.should("clean up generated files")
-        #      def test_013():
-        #          #  cache_fname = StandaloneProjectBuilder._getCacheFilename(PROJECT_FILE)
-        #          #  it.assertTrue(p.exists(cache_fname),
-        #          #                "Cache file '%s' not found" % cache_fname)
-
-        #          #  cache_folder = it.project.builder._target_folder
-
-        #          #  it.assertTrue(p.exists(cache_folder),
-        #          #                "Cache folder '%s' not found" % cache_folder)
-
-        #          # Do this twice to check that the project builder doesn't
-        #          # fails if we try to clean up more than once
-        #          for _ in range(2):
-        #              StandaloneProjectBuilder.clean(PROJECT_FILE)
-
-        #              #  it.assertFalse(p.exists(cache_fname),
-        #              #                 "Cache file '%s' still exists" % cache_fname)
-
-        #              #  #  it.assertFalse(p.exists(cache_folder),
-        #              #  #                 "Cache folder '%s' still exists" % cache_folder)
+                try:
+                    sources = it.project._findSourceByDesignUnit('memory.async_fifo')
+                    for source in sources:
+                        it.assertTrue(
+                            p.exists(source.filename),
+                            "Couldn't find source with path '%s'" % source.filename)
+                except hdlcc.exceptions.DesignUnitNotFoundError:
+                    it.fail("Shouldn't raise exception for a unit that is "
+                            "supposed to be found")
 
 it.createTests(globals())
 
