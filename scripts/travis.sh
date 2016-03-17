@@ -25,7 +25,7 @@ while [ -n "$1" ]; do
     MSIM=1
   elif [ "$1" == "xvhdl" ]; then
     XVHDL=1
-  elif [ "$1" == "fb" ]; then
+  elif [ "$1" == "fallback" ]; then
     FALLBACK=1
   elif [ "$1" == "clean" ]; then
     CLEAN=1
@@ -77,6 +77,9 @@ fi
 if [ -n "${XVHDL}" ]; then
   export BUILDER_NAME=xvhdl
   export BUILDER_PATH=/opt/Xilinx/Vivado/2015.4/bin
+  if [ ! -d "${BUILDER_PATH}" ]; then
+    export BUILDER_PATH=${HOME}/Xilinx/Vivado/2015.2/bin
+  fi
 
   ./run_tests.py $ARGS
   RESULT=$(($? || ${RESULT}))

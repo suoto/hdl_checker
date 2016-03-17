@@ -113,18 +113,13 @@ class MSim(BaseBuilder):
         }]
 
     def checkEnvironment(self):
-        try:
-            stdout = self._subprocessRunner(['vcom', '-version'])
-            self._version = \
-                    re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
-                    stdout[0])[0]
-            self._logger.info("vcom version string: '%s'. " + \
-                    "Version number is '%s'", \
-                    stdout[:-1], self._version)
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
-            raise exceptions.SanityCheckError(str(exc))
+        stdout = self._subprocessRunner(['vcom', '-version'])
+        self._version = \
+                re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
+                stdout[0])[0]
+        self._logger.info("vcom version string: '%s'. " + \
+                "Version number is '%s'", \
+                stdout[:-1], self._version)
 
     def _parseBuiltinLibraries(self):
         for line in self._subprocessRunner(['vmap', ]):

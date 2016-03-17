@@ -300,7 +300,8 @@ class ProjectBuilder(object):
             try:
                 cache = pickle.load(open(cache_fname, 'r'))
                 print "Recovered cache from '%s'" % cache_fname
-            except (pickle.UnpicklingError, ImportError):
+            except (hdlcc.exceptions.SanityCheckError,
+                    pickle.UnpicklingError, ImportError):
                 print "Unable to recover from '%s'" % cache_fname
 
         return cache

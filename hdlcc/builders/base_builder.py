@@ -22,6 +22,7 @@ import time
 import subprocess as subp
 from threading import Lock
 
+import hdlcc.exceptions
 from hdlcc.config import Config
 
 class BaseBuilder(object):
@@ -46,7 +47,13 @@ class BaseBuilder(object):
         except OSError: # pragma: no cover
             self._logger.info("%s already exists", self._target_folder)
 
-        self.checkEnvironment()
+        try:
+            self.checkEnvironment()
+        except Exception as exc:
+            import traceback
+            self._logger.warning("Sanity check failed:\n%s",
+                                 traceback.format_exc())
+            raise hdlcc.exceptions.SanityCheckError(str(exc))
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -154,7 +161,7 @@ class BaseBuilder(object):
                 pass
         if exc_lines: # pragma: no cover
             for exc_line in exc_lines:
-                self._logger.critical(exc_line)
+                self._logger.error(exc_line)
         return records, rebuilds
 
     @abc.abstractmethod

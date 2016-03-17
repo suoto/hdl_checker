@@ -84,21 +84,13 @@ class GHDL(BaseBuilder):
         return [record]
 
     def checkEnvironment(self):
-        stdout = None
-        try:
-            stdout = self._subprocessRunner(['ghdl', '--version'])
-            self._version = \
-                    re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
-                    stdout[0])[0]
-            self._logger.info("GHDL version string: '%s'. " + \
-                    "Version number is '%s'", \
-                    stdout[:-1], self._version)
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s", traceback.format_exc())
-            if stdout:
-                self._logger.warning("stdout return:\n%s", stdout)
-            raise exceptions.SanityCheckError(str(exc))
+        stdout = self._subprocessRunner(['ghdl', '--version'])
+        self._version = \
+                re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
+                stdout[0])[0]
+        self._logger.info("GHDL version string: '%s'. " + \
+                "Version number is '%s'", \
+                stdout[:-1], self._version)
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -161,7 +153,7 @@ class GHDL(BaseBuilder):
             if not match:
                 continue
             mdict = match.groupdict()
-            # When GHDL reports some unit needs to be rebuilt, it does
+            # When compilers reports units out of date, they do this
             # by either
             #  1. Giving the path to the file that needs to be rebuilt
             #     when sources are from different libraries

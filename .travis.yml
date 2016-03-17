@@ -20,8 +20,8 @@ python:
 env:
   - BUILDER=msim
   - BUILDER=ghdl
+  - BUILDER=fallback standalone
   # - BUILDER=xvhdl
-  #   FULL_INSTALLER=1
 
 # This should work but it doesn't!
 # addons:
