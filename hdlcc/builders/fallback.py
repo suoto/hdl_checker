@@ -14,7 +14,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Fallback builder for cases where no builder is found"
 
-from hdlcc.builders import BaseBuilder
+from hdlcc.builders.base_builder import BaseBuilder
 
 class Fallback(BaseBuilder):
     "Dummy fallback builder"

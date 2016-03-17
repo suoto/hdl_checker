@@ -14,11 +14,9 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Xilinx xhvdl builder implementation"
 
-import os
+import os.path as p
 import re
-import subprocess
-from hdlcc.builders import BaseBuilder
-from hdlcc import exceptions
+from .base_builder import BaseBuilder
 
 class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''
@@ -33,6 +31,11 @@ class XVHDL(BaseBuilder):
         r"(?P<error_message>[^\[]+)\s*\["
         r"(?P<filename>[^:]+):"
         r"(?P<line_number>\d+)", flags=re.I)
+
+    _BuilderRebuildUnitsScanner = re.compile(
+        r"ERROR:\s*\[[^\]]*\]\s*"
+        r".*(?P<library_name>\w+){sep}"
+        r"(?P<unit_name>\w+)\.vdb\s+needs.*".format(sep=p.sep), flags=re.I)
 
     def _shouldIgnoreLine(self, line):
         if re.match(r"^\s*$", line):
@@ -80,20 +83,14 @@ class XVHDL(BaseBuilder):
         }]
 
     def checkEnvironment(self):
-        try:
-            version = subprocess.check_output(\
-                ['xvhdl', '--nolog', '--version'], \
-                stderr=subprocess.STDOUT)
-            self._version = \
-                    re.findall(r"^Vivado Simulator\s+([\d\.]+)", version)[0]
-            self._logger.info("xvhdl version string: '%s'. " + \
-                    "Version number is '%s'", \
-                    version[:-1], self._version)
-        except Exception as exc:
-            self._logger.warning("Sanity check failed")
-            raise exceptions.SanityCheckError(str(exc))
+        stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
+        self._version = \
+                re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
+        self._logger.info("xvhdl version string: '%s'. " + \
+                "Version number is '%s'", \
+                stdout[:-1], self._version)
 
-    def getBuiltinLIbraries(self):
+    def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
         # like this. Review this at some point
         return ['ieee', 'std', 'unisim', 'xilinxcorelib', 'synplify',
@@ -105,16 +102,36 @@ class XVHDL(BaseBuilder):
 
         self._built_libs += [source.library]
         open(self._xvhdlini, 'w').write('\n'.join(\
-                ["%s=%s" % (x, os.path.join(self._target_folder, x)) \
+                ["%s=%s" % (x, p.join(self._target_folder, x)) \
                 for x in self._built_libs]))
 
     def _buildSource(self, source, flags=None):
         cmd = ['xvhdl',
                '--nolog',
                '--verbose', '0',
-               '--initfile', self._xvhdlini,
+               '--initfile', p.abspath(self._xvhdlini),
                '--work', source.library]
         cmd += flags
         cmd += [source.filename]
         return self._subprocessRunner(cmd)
 
+    def _getUnitsToRebuild(self, line):
+        rebuilds = []
+
+        for match in self._BuilderRebuildUnitsScanner.finditer(line):
+            if not match:
+                continue
+            mdict = match.groupdict()
+            # When compilers reports units out of date, they do this
+            # by either
+            #  1. Giving the path to the file that needs to be rebuilt
+            #     when sources are from different libraries
+            #  2. Reporting which design unit has been affected by a
+            #     given change.
+            if 'rebuild_path' in mdict and mdict['rebuild_path'] is not None:
+                rebuilds.append(mdict)
+            else:
+                rebuilds.append({'library_name' : 'work',
+                                 'unit_name' : mdict['unit_name']})
+
+        return rebuilds
