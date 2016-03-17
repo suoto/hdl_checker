@@ -16,9 +16,7 @@
 
 import os
 import re
-import subprocess
-from hdlcc.builders import BaseBuilder
-from hdlcc import exceptions
+from .base_builder import BaseBuilder
 
 class GHDL(BaseBuilder):
     '''Builder implementation of the GHDL compiler'''
@@ -96,6 +94,7 @@ class GHDL(BaseBuilder):
         return self._builtin_libraries
 
     def _parseBuiltinLibraries(self):
+        "Discovers libraries that exist regardless before we do anything"
         library_name_scan = None
         for line in self._subprocessRunner(['ghdl', '--dispconfig']):
             library_path_match = self._BuilderLibraryPathScanner.search(line)

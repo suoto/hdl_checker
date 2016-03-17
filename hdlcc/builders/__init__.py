@@ -16,7 +16,6 @@
 
 import logging
 
-from .base_builder import BaseBuilder
 from .fallback import Fallback
 from .ghdl import GHDL
 from .msim import MSim

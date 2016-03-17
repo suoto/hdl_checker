@@ -16,9 +16,7 @@
 
 import os.path as p
 import re
-import subprocess
-from hdlcc.builders import BaseBuilder
-from hdlcc import exceptions
+from .base_builder import BaseBuilder
 
 class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''

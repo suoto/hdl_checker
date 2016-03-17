@@ -51,6 +51,7 @@ from config import Config
 from project_builder import ProjectBuilder
 
 class StandaloneProjectBuilder(ProjectBuilder):
+    "Implementation of standalone hdlcc.ProjectBuilder to run via shell"
     _ui_logger = logging.getLogger('UI')
     def _handleUiInfo(self, message):
         self._ui_logger.info(message)
@@ -212,10 +213,10 @@ def setupLogging():
     path.insert(0, p.abspath('dependencies/rainbow_logging_handler/'))
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
+        # pylint: disable=bad-whitespace
         stream_handler = RainbowLoggingHandler(
             stdout,
             #  Customizing each column's color
-            # pylint: disable=bad-whitespace
             color_asctime          = ('dim white',  'black'),
             color_name             = ('dim white',  'black'),
             color_funcName         = ('green',      'black'),
@@ -227,7 +228,7 @@ def setupLogging():
             color_message_warning  = ('color_226',  None),
             color_message_error    = ('red',        None),
             color_message_critical = ('bold white', 'red'))
-            # pylint: enable=bad-whitespace
+        # pylint: enable=bad-whitespace
     except ImportError: # pragma: no cover
         stream_handler = logging.StreamHandler(stdout)
 

@@ -17,8 +17,7 @@
 import os
 import os.path as p
 import re
-from hdlcc.builders import BaseBuilder
-from hdlcc import exceptions
+from .base_builder import BaseBuilder
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
@@ -122,6 +121,7 @@ class MSim(BaseBuilder):
                 stdout[:-1], self._version)
 
     def _parseBuiltinLibraries(self):
+        "Discovers libraries that exist regardless before we do anything"
         for line in self._subprocessRunner(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 self._builtin_libraries.append(match.groupdict()['library_name'])

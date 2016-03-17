@@ -38,10 +38,13 @@ class VhdlSourceFile(object):
     # an exception for this)
     _semaphore = threading.BoundedSemaphore(_MAX_OPEN_FILES)
 
-    def __init__(self, filename, library='work', flags=set()):
+    def __init__(self, filename, library='work', flags=None):
         self.filename = os.path.normpath(filename)
         self.library = library
-        self.flags = flags
+        if flags is None:
+            self.flags = set()
+        else:
+            self.flags = flags
         self._design_units = []
         self._deps = []
         self._mtime = 0
@@ -118,6 +121,7 @@ class VhdlSourceFile(object):
         return dependencies
 
     def _getParseInfo(self):
+        "Parses the source file to find design units and dependencies"
         design_units = []
         libraries = ['work']
 
@@ -141,7 +145,8 @@ class VhdlSourceFile(object):
         return design_units, self._getDependencies(libraries)
 
     def _doParse(self):
-        "Parses the source file to find design units and dependencies"
+        """Finds design units and dependencies then translate some design
+        units into information useful in the conext of the project"""
         design_units, dependencies = self._getParseInfo()
 
         self._design_units = []
