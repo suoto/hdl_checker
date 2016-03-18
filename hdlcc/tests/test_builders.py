@@ -53,7 +53,32 @@ begin
 end clock_divider;
 """.splitlines()
 
-with such.A('Builder object') as it:
+_ERRORS = {
+    'ghdl' : {'line_number'   : '1',
+              'error_number'  : None,
+              'error_message' : "entity, architecture, package or "
+                                "configuration keyword expected",
+              'column'        : '1',
+              'error_type'    : 'E',
+              'filename'      : 'some_file_with_error.vhd',
+              'checker'       : 'ghdl'},
+    'msim' : {'line_number'   : '1',
+              'error_number'  : None,
+              'error_message' : "near \"hello\": syntax error",
+              'column'        : None,
+              'error_type'    : 'E',
+              'filename'      : 'some_file_with_error.vhd',
+              'checker'       : 'msim'},
+    'xvhdl' : {'line_number'   : '1',
+               'error_number'  : 'VRFC 10-1412',
+               'error_message' : 'syntax error near hello ',
+               'column'        : '',
+               'error_type'    : 'E',
+               'filename'      : 'some_file_with_error.vhd',
+               'checker'       : 'xvhdl'},
+    }
+
+with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
     it._ok_file = 'some_file.vhd'
     it._error_file = 'some_file_with_error.vhd'
     with it.having('its binary executable'):
@@ -61,7 +86,8 @@ with such.A('Builder object') as it:
         def setup():
             it.original_env = os.environ.copy()
             os.environ = _BUILDER_ENV.copy()
-            it.builder = hdlcc.builders.GHDL('_ghdl_build')
+            cls = hdlcc.builders.getBuilderByName(BUILDER_NAME)
+            it.builder = cls('._%s' % BUILDER_NAME)
 
         @it.has_teardown
         def teardown():
@@ -73,7 +99,7 @@ with such.A('Builder object') as it:
         def test():
             it.builder.checkEnvironment()
 
-        @it.should('compile some source')
+        @it.should('compile some source without errors')
         def test():
             open(it._ok_file, 'w').write('\n'.join(_VHD_SAMPLE_ENTITY))
             source = VhdlSourceFile(it._ok_file)
@@ -86,12 +112,26 @@ with such.A('Builder object') as it:
             open(it._error_file, 'w').write('\n'.join(['hello\n'] + _VHD_SAMPLE_ENTITY))
             source = VhdlSourceFile(it._error_file)
             records, _ = it.builder.build(source)
-            it.assertIn(('E', '1'),
-                        [(x['error_type'], x['line_number']) for x in records],
-                        'Builder failed to report an error at the first line')
+
             for record in records:
                 _logger.info(record)
 
-if BUILDER_NAME == 'ghdl':
+            ref = _ERRORS[BUILDER_NAME]
+
+            # We check everything except the filename. XVHDL returns
+            # an absolute path but we should work based on relative
+            # paths. Any conversion needed should be handled by the
+            # editor client
+            for item in ('line_number', 'error_number', 'error_message',
+                         'column', 'error_type', 'checker'):
+                it.assertIn(ref[item], [x[item] for x in records])
+
+            it.assertIn(
+                True,
+                [p.samefile(ref['filename'], x['filename']) for x in records],
+                "Mention to file '%s' not found in '%s'" % \
+                        (ref['filename'], [x['filename'] for x in records]))
+
+if BUILDER_NAME is not None:
     it.createTests(globals())
 
