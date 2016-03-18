@@ -76,11 +76,10 @@ fi
 
 if [ -n "${XVHDL}" ]; then
   export BUILDER_NAME=xvhdl
-  export BUILDER_PATH=${HOME}/dev/xvhdl/bin
-  # export BUILDER_PATH=/opt/Xilinx/Vivado/2015.4/bin
-  # if [ ! -d "${BUILDER_PATH}" ]; then
-  #   export BUILDER_PATH=${HOME}/dev/xvhdl/bin
-  # fi
+  export BUILDER_PATH=${HOME}/builders/xvhdl/bin
+  if [ ! -d "${BUILDER_PATH}" ]; then
+    export BUILDER_PATH=${HOME}/dev/xvhdl/bin
+  fi
 
   ./run_tests.py $ARGS
   RESULT=$(($? || ${RESULT}))
