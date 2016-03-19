@@ -76,7 +76,7 @@ fi
 
 if [ -n "${XVHDL}" ]; then
   export BUILDER_NAME=xvhdl
-  export BUILDER_PATH=/opt/Xilinx/Vivado/2015.4/bin
+  export BUILDER_PATH=${HOME}/builders/xvhdl/bin
   if [ ! -d "${BUILDER_PATH}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi

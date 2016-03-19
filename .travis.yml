@@ -21,7 +21,7 @@ env:
   - BUILDER=msim
   - BUILDER=ghdl
   - BUILDER=fallback standalone
-  # - BUILDER=xvhdl
+  - BUILDER=xvhdl
 
 # This should work but it doesn't!
 # addons:
