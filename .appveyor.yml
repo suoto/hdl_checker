@@ -83,7 +83,7 @@ install:
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -B -F"
+  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F --log-capture"
 
 # We won't build or run tests from here
 build: off

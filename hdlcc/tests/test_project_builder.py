@@ -17,6 +17,7 @@
 
 import os
 import os.path as p
+import shutil as shell
 import time
 import logging
 
@@ -72,7 +73,7 @@ with such.A('hdlcc test using hdl_lib') as it:
     def teardown():
         StandaloneProjectBuilder.clean(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
-            os.removedirs(it.DUMMY_PROJECT_FILE)
+            shell.rmtree(it.DUMMY_PROJECT_FILE)
 
     with it.having('a valid project file'):
 
@@ -115,6 +116,14 @@ with such.A('hdlcc test using hdl_lib') as it:
             def teardown():
                 hdlcc.ProjectBuilder.clean(PROJECT_FILE)
                 os.environ = it.original_env.copy()
+                target_dir = it.project._config.getTargetDir()
+                if p.exists(target_dir):
+                    shell.rmtree(target_dir)
+                if p.exists('modelsim.ini'):
+                    _logger.warning("Modelsim ini found at %s",
+                                    p.abspath('modelsim.ini'))
+                    os.remove('modelsim.ini')
+                    shell.rmtree(target_dir)
                 del it.project
 
             @it.should('build project by dependency in background')

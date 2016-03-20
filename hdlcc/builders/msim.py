@@ -68,8 +68,6 @@ class MSim(BaseBuilder):
         else:
             self._vlib_args = []
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
-        self._builtin_libraries = []
-        self._parseBuiltinLibraries()
 
     def _makeMessageRecords(self, line):
         line_number = None

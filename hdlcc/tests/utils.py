@@ -15,8 +15,10 @@
 "Commom things for tests"
 
 import os
+import os.path as p
 import time
 import logging
+import subprocess as subp
 
 _logger = logging.getLogger(__name__)
 
@@ -24,12 +26,19 @@ def writeListToFile(filename, _list):
     "Well... writes '_list' to 'filename'"
     _logger.info("Writing to %s", filename)
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
-    mtime = os.path.getmtime(filename)
+    mtime = p.getmtime(filename)
     time.sleep(0.01)
-    os.popen("touch %s" % filename, 'r').read()
-    for i in range(10):
-        if os.path.getmtime(filename) != mtime:
+
+    if os.name == 'posix':
+        subp.check_call(['touch', filename])
+    else:
+        cmd = 'copy /Y "%s" +,,' % filename
+        _logger.info(cmd)
+        subp.check_call(cmd, shell=True)
+
+    for i in range(3):
+        if p.getmtime(filename) != mtime:
             break
         _logger.debug("Waiting...[%d]", i)
-        time.sleep(0.1)
+        time.sleep(0.5)
 
