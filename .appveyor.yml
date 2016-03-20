@@ -16,7 +16,7 @@ version: 0.{build}
 branches:
   # whitelist
   only:
-    - master
+    - add_windows_support
 
   # blacklist
   except:
