@@ -44,7 +44,7 @@ class BaseBuilder(object):
         self._builtin_libraries = []
 
         if not p.exists(self._target_folder):
-            self._logger.info("Target fold '%s' was created", self._target_folder)
+            self._logger.info("Target folder '%s' was created", self._target_folder)
             os.mkdir(self._target_folder)
         else:
             self._logger.info("%s already exists", self._target_folder)
