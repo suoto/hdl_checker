@@ -18,7 +18,7 @@ python:
   - "2.7"
 
 env:
-  # - BUILDER=msim
+  - BUILDER=msim
   - BUILDER=ghdl
   - BUILDER=fallback standalone
   - BUILDER=xvhdl

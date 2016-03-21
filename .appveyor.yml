@@ -16,7 +16,7 @@ version: 0.{build}
 branches:
   # whitelist
   only:
-    - add_windows_support
+    - master
 
   # blacklist
   except:
@@ -50,23 +50,10 @@ environment:
       arch: 32
       URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
       # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
-    - BUILDER_NAME: ghdl
-      INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
-      arch: 64
-      URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
-      # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
       BUILDER_PATH: "%LOCALAPPDATA%\\modelsim_ase\\win32aloem"
       arch: 32
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
-      MODELTECH: '%LOCALAPPDATA%\modelsim_ase\win32aloem'
-      MSIM_VER: 10.4b
-    - BUILDER_NAME: msim
-      BUILDER_PATH: "%LOCALAPPDATA%\\modelsim_ase\\win32aloem"
-      arch: 64
-      URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
-      MODELTECH: '%LOCALAPPDATA%\modelsim_ase\win32aloem'
-      MSIM_VER: 10.4b
 
 
 # build cache to preserve files/folders between builds
@@ -98,6 +85,13 @@ install:
       %BUILDER_PATH%\\vcom -version
 
   - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F -B --log-capture"
+
+  - del dependencies\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd
+  - coverage combine
+  - coverage report
+  - set COVERALLS_PARALLEL=true
+  - coveralls
+  - codecov
 
 # We won't build or run tests from here
 build: off

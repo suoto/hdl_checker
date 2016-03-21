@@ -34,7 +34,7 @@ class GHDL(BaseBuilder):
 
     _BuilderLibraryPathScanner = re.compile(
         #  r"^library directory:\s*(?P<library_path>.*)\s*")
-        r"^\s*actual prefix:\s*(?P<library_path>.*)\s*")
+        r"^\s*(actual prefix|library directory):\s*(?P<library_path>.*)\s*")
 
     _BuilderStdoutIgnoreLines = re.compile('|'.join([
         r"^\s*$",
@@ -102,9 +102,16 @@ class GHDL(BaseBuilder):
             if library_path_match:
                 library_path = \
                     repr(library_path_match.groupdict()['library_path'])[1:-1]
-                library_name_scan = re.compile( \
-                    r"^\s*" + library_path +
-                    r"\\(?P<vhdl_standard>\w+)\\(?P<library_name>\w+).*")
+
+                # TODO: We should find a better way to parse this
+                if os.name == 'posix':
+                    library_name_scan = re.compile( \
+                        r"^\s*" + library_path +
+                        r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
+                else:
+                    library_name_scan = re.compile( \
+                        r"^\s*" + library_path +
+                        r"\\(?P<vhdl_standard>\w+)\\(?P<library_name>\w+).*")
                 self._logger.info("Library path: %s",
                                   library_path_match.groupdict())
                 self._logger.info("Library name scan: %s",
