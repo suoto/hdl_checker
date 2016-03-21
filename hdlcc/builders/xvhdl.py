@@ -34,8 +34,8 @@ class XVHDL(BaseBuilder):
 
     _BuilderRebuildUnitsScanner = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
-        r".*(?P<library_name>\w+){sep}"
-        r"(?P<unit_name>\w+)\.vdb\s+needs.*".format(sep=p.sep), flags=re.I)
+        r".*(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb\s+needs.*",
+        flags=re.I)
 
     def _shouldIgnoreLine(self, line):
         if re.match(r"^\s*$", line):

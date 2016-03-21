@@ -13,12 +13,9 @@ REM  GNU General Public License for more details.
 REM  You should have received a copy of the GNU General Public License
 REM  along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
+@echo on
 set BUILDER_PATH=%INSTALL_DIR%\\bin
 set GHDL_PREFIX=%INSTALL_DIR%\\lib
-
-echo "INSTALL_DIR : %INSTALL_DIR%"
-echo "BUILDER_PATH : %BUILDER_PATH%"
-echo "GHDL_PREFIX : %GHDL_PREFIX%"
 
 if not exist "%CACHE_PATH%\\ghdl.zip" (
     appveyor AddMessage "Downloading %BUILDER_NAME% from %URL%"
@@ -27,9 +24,7 @@ if not exist "%CACHE_PATH%\\ghdl.zip" (
 )
 
 if not exist "%BUILDER_PATH%" (
-    if not exist "%LOCALAPPDATA%\\ghdl" mkdir "%LOCALAPPDATA%\\ghdl"
     appveyor AddMessage "Installing %BUILDER_NAME% to %LOCALAPPDATA%"
-    echo 7z x "%CACHE_PATH%\\ghdl.zip" -o"%LOCALAPPDATA%" -y
     7z x "%CACHE_PATH%\\ghdl.zip" -o"%LOCALAPPDATA%" -y
 
     if "%INSTALL_DIR%" == "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32" (
@@ -37,26 +32,23 @@ if not exist "%BUILDER_PATH%" (
         cd /d "%INSTALL_DIR%"
         echo "Current dir: %CD%"
 
-        echo ghdl --dispconfig
         ghdl --dispconfig
 
-        echo set_ghdl_path.bat
         call set_ghdl_path.bat
-
-        echo reanalyze_libs.bat
         call reanalyze_libs.bat
 
-        echo ghdl --dispconfig
         ghdl --dispconfig
         cd /d "%APPVEYOR_BUILD_FOLDER%"
     )
 
     if "%INSTALL_DIR%" == "%LOCALAPPDATA%\\ghdl-0.33" (
-        set OLDPATH=%PATH%
-        set PATH=%BUILDER_PATH%;%PATH
+        echo "Current dir: %CD%"
+        cd /d "%INSTALL_DIR%\\bin"
+        echo "Current dir: %CD%"
         ghdl --dispconfig
-        set PATH=%OLDPATH%
+        cd /d "%APPVEYOR_BUILD_FOLDER%"
     )
 
 )
 
+@echo off

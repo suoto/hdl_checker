@@ -41,10 +41,12 @@ class BaseBuilder(object):
         self._logger = logging.getLogger(__name__ + '.' + self.__builder_name__)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
+        self._builtin_libraries = []
 
-        try:
+        if not p.exists(self._target_folder):
+            self._logger.info("Target folder '%s' was created", self._target_folder)
             os.mkdir(self._target_folder)
-        except OSError: # pragma: no cover
+        else:
             self._logger.info("%s already exists", self._target_folder)
 
         try:
@@ -54,6 +56,17 @@ class BaseBuilder(object):
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
             raise hdlcc.exceptions.SanityCheckError(str(exc))
+
+        try:
+            self._parseBuiltinLibraries()
+            if self._builtin_libraries: # pragma: no-cover
+                self._logger.info("Builtin libraries")
+                for lib in self._builtin_libraries:
+                    self._logger.info("-> %s", lib)
+            else: # pragma: no-cover
+                self._logger.info("No builtin libraries found")
+        except NotImplementedError:
+            pass
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -82,6 +95,10 @@ class BaseBuilder(object):
         "Finds units that the builders is telling us to rebuild"
         raise NotImplementedError
 
+    def _parseBuiltinLibraries(self):
+        "Discovers libraries that exist regardless before we do anything"
+        raise NotImplementedError
+
     @abc.abstractmethod
     def getBuiltinLibraries(self):
         "Return a list with the libraries this compiler currently knows"
@@ -97,24 +114,24 @@ class BaseBuilder(object):
 
         try:
             stdout = list(subp.check_output(cmd_with_args, \
-                    stderr=subp.STDOUT, shell=shell, env=subp_env).split("\n"))
+                    stderr=subp.STDOUT, shell=shell, env=subp_env).splitlines())
         except subp.CalledProcessError as exc:
-            stdout = list(exc.output.split("\n"))
+            stdout = list(exc.output.splitlines())
             import traceback
             self._logger.warning("Exception has error code %d. Traceback:",
                                  exc.returncode)
 
-            for line in traceback.format_exc().split('\n'):
+            for line in traceback.format_exc().split('\n'): # pragma: no-cover
                 self._logger.debug(line)
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging
             # purposes
-            if os.name == 'posix' and exc.returncode == 127:
+            if (os.name == 'posix' and exc.returncode == 127) or \
+               (os.name == 'nt' and exc.returncode == 9009): # pragma: no-cover
                 self._logger.debug("subprocess runner path:")
                 for path in subp_env['PATH'].split(os.pathsep):
                     self._logger.debug(" - %s", path)
-            elif os.name == 'nt' and exc.returncode == 2:
                 self._logger.debug("subprocess runner path:")
                 for path in subp_env['PATH'].split(os.pathsep):
                     self._logger.debug(" - %s", path)

@@ -19,6 +19,14 @@ from nose2.tools import such
 import logging
 import os
 import os.path as p
+import shutil as shell
+import time
+
+if not hasattr(p, 'samefile'):
+    def samefile(file1, file2):
+        return os.stat(file1) == os.stat(file2)
+else:
+    samefile = p.samefile
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
@@ -94,6 +102,8 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
             os.environ = it.original_env.copy()
             os.remove(it._ok_file)
             os.remove(it._error_file)
+            if p.exists('._%s' % BUILDER_NAME):
+                shell.rmtree('._%s' % BUILDER_NAME)
 
         @it.should('pass environment check')
         def test():
@@ -110,6 +120,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         @it.should('catch an error')
         def test():
             open(it._error_file, 'w').write('\n'.join(['hello\n'] + _VHD_SAMPLE_ENTITY))
+            time.sleep(1)
             source = VhdlSourceFile(it._error_file)
             records, _ = it.builder.build(source)
 
@@ -128,7 +139,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
             it.assertIn(
                 True,
-                [p.samefile(ref['filename'], x['filename']) for x in records],
+                [samefile(ref['filename'], x['filename']) for x in records],
                 "Mention to file '%s' not found in '%s'" % \
                         (ref['filename'], [x['filename'] for x in records]))
 

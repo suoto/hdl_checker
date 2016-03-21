@@ -17,6 +17,7 @@
 
 import os
 import os.path as p
+import shutil as shell
 import time
 import logging
 
@@ -68,11 +69,14 @@ with such.A('hdlcc test using hdl_lib') as it:
         it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
+        _logger.info("Builder name: %s", BUILDER_NAME)
+        _logger.info("Builder path: %s", BUILDER_PATH)
+
     @it.has_teardown
     def teardown():
         StandaloneProjectBuilder.clean(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
-            os.removedirs(it.DUMMY_PROJECT_FILE)
+            shell.rmtree(it.DUMMY_PROJECT_FILE)
 
     with it.having('a valid project file'):
 
@@ -80,16 +84,14 @@ with such.A('hdlcc test using hdl_lib') as it:
 
             @it.has_setup
             def setup():
+                if p.exists('modelsim.ini'):
+                    _logger.warning("Modelsim ini found at %s",
+                                    p.abspath('modelsim.ini'))
+                    os.remove('modelsim.ini')
+
                 hdlcc.ProjectBuilder.clean(PROJECT_FILE)
 
                 it.builder_env = os.environ.copy()
-
-                if os.name == 'posix':
-                    it.builder_env['PATH'] = \
-                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-                elif os.name == 'nt':
-                    os.putenv('PATH',
-                              os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
 
                 _logger.info("Builder env path:")
                 for path in it.builder_env['PATH'].split(os.pathsep):
@@ -105,6 +107,22 @@ with such.A('hdlcc test using hdl_lib') as it:
                 it.original_env = os.environ.copy()
                 os.environ = it.builder_env.copy()
 
+                if os.name == 'posix':
+                    os.environ['PATH'] = \
+                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+                elif os.name == 'nt':
+                    os.putenv(
+                        'PATH',
+                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
+                    os.environ['PATH'] = \
+                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+
+                it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
+
+                _logger.info("New env path:")
+                for path in os.environ['PATH'].split(os.pathsep):
+                    _logger.info(" >'%s'", path)
+
                 try:
                     builder(it.DUMMY_PROJECT_FILE)
                 except hdlcc.exceptions.SanityCheckError:
@@ -115,6 +133,13 @@ with such.A('hdlcc test using hdl_lib') as it:
             def teardown():
                 hdlcc.ProjectBuilder.clean(PROJECT_FILE)
                 os.environ = it.original_env.copy()
+                target_dir = it.project._config.getTargetDir()
+                if p.exists(target_dir):
+                    shell.rmtree(target_dir)
+                if p.exists('modelsim.ini'):
+                    _logger.warning("Modelsim ini found at %s",
+                                    p.abspath('modelsim.ini'))
+                    os.remove('modelsim.ini')
                 del it.project
 
             @it.should('build project by dependency in background')
@@ -249,7 +274,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
                 records = it.project.getMessagesByPath(filename)
 
-                it.assertTrue(len(records) == 0)
+                it.assertEquals(records, [])
 
                 it.assertTrue(it.project._msg_queue.empty())
 

@@ -42,6 +42,7 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   GHDL=1
   MSIM=1
   FALLBACK=1
+  XVHDL=1
   STANDALONE=1
 fi
 

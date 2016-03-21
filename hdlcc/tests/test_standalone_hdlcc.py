@@ -20,6 +20,7 @@ import os.path as p
 import logging
 import re
 import subprocess as subp
+import shutil
 
 from nose2.tools import such
 from nose2.tools.params import params
@@ -81,6 +82,8 @@ with such.A("hdlcc standalone tool") as it:
                "--clean"]
 
         shell(cmd)
+        if p.exists(p.join(p.dirname(PROJECT_FILE), '.build')):
+            shutil.rmtree(p.join(p.dirname(PROJECT_FILE), '.build'))
 
     with it.having("a valid project file"):
 

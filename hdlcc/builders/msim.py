@@ -68,8 +68,6 @@ class MSim(BaseBuilder):
         else:
             self._vlib_args = []
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
-        self._builtin_libraries = []
-        self._parseBuiltinLibraries()
 
     def _makeMessageRecords(self, line):
         line_number = None
@@ -122,6 +120,7 @@ class MSim(BaseBuilder):
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
+        self._createIniFile()
         for line in self._subprocessRunner(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 self._builtin_libraries.append(match.groupdict()['library_name'])
@@ -152,18 +151,21 @@ class MSim(BaseBuilder):
         try:
             if p.exists(p.join(self._target_folder, source.library)):
                 return
-            if p.exists(self._modelsim_ini):
-                self._mapLibrary(source.library)
-            else:
-                self._addLibraryToIni(source.library)
+            #  if not p.exists(self._modelsim_ini):
+            #      self._createIniFile()
+            self._mapLibrary(source.library)
         except:
             self._logger.debug("Current dir when exception was raised: %s",
                                p.abspath(os.curdir))
             raise
 
-    def _addLibraryToIni(self, library):
+    def _createIniFile(self):
         "Adds a library to a non-existent ModelSim init file"
-        self._logger.info("Library %s not found, creating", library)
+
+        _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
+
+        self._logger.info("modelsim.ini not found at '%s', creating",
+                          p.abspath(_modelsim_ini))
 
         cwd = p.abspath(os.curdir)
         self._logger.info("Current dir is %s, changing to %s",
@@ -173,16 +175,20 @@ class MSim(BaseBuilder):
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
             assert 0
 
-        self._subprocessRunner(['vlib', ] + self._vlib_args +
-                               [p.join(self._target_folder, library), ])
+        if p.exists('modelsim.ini'):
+            self._logger.warning("We shouldn't find a modelsim.ini file at '%s'",
+                                 p.abspath(os.curdir))
+            os.remove('modelsim.ini')
 
-        self._subprocessRunner(['vmap', library, ] +
-                               [p.join(self._target_folder, library)])
+        self._subprocessRunner(['vmap', '-c'])
+        self._logger.warning("After vmap at '%s'", p.abspath(os.curdir))
+
+        for _dir in os.listdir(p.abspath(os.curdir)):
+            self._logger.warning("- '%s'", _dir)
 
         self._logger.info("Current dir is %s, changing to %s",
-                          os.curdir, cwd)
+                          p.abspath(os.curdir), cwd)
         os.chdir(cwd)
-
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"

@@ -134,11 +134,12 @@ with such.A('VHDL source file object') as it:
             writeListToFile(_FILENAME, code)
 
             dependencies = it.source.getDependencies()
-            _logger.info("Dependencies: %s", dependencies)
-            _logger.info("==========")
-            for dep in dependencies:
-                _logger.info(str(dep))
-            _logger.info("==========")
+            if dependencies:
+                _logger.info("Dependencies:")
+                for dep in dependencies:
+                    _logger.info(str(dep))
+            else:
+                _logger.warning("No dependencies found")
             it.assertNotEqual(dependencies, None, "No dependencies found")
             it.assertItemsEqual(
                 [{'unit': 'std_logic_1164', 'library': 'ieee'},

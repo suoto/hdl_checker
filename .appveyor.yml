@@ -45,15 +45,16 @@ clone_depth: 5
 environment:
   CACHE_PATH: "%LOCALAPPDATA%\\cache"
   matrix:
-    # - BUILDER_NAME: ghdl
-    #   INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
-    #   arch: 32
-    #   URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
-    #   # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
+    - BUILDER_NAME: ghdl
+      INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
+      arch: 32
+      URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
+      # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
-      BUILDER_PATH: '%LOCALAPPDATA%\modelsim_ase\win32aloem'
+      BUILDER_PATH: "%LOCALAPPDATA%\\modelsim_ase\\win32aloem"
       arch: 32
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
+
 
 # build cache to preserve files/folders between builds
 # cache:
@@ -83,7 +84,11 @@ install:
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -B -F"
+  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F -B --log-capture"
+
+  - coverage combine
+  - coverage report
+  - codecov
 
 # We won't build or run tests from here
 build: off

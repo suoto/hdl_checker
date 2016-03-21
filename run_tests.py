@@ -86,19 +86,19 @@ def main():
     logging.root.addHandler(file_handler)
     logging.root.setLevel(logging.DEBUG)
 
-    return test(nose2_argv=sys.argv)
+    tests = test(nose2_argv=sys.argv)
+
+    return tests.result.wasSuccessful()
 
 if __name__ == '__main__':
-    tests = main()
-
-    if os.environ.get('CI', None) is not None and os.name == 'nt':
-        sys.stdout.write("=== LOG START ===\n" + \
-                         open('tests.log', 'r').read() + \
-                         "=== LOG END ===\n")
-        sys.stdout.flush()
-
-    if tests.result.wasSuccessful():
+    if main():
         sys.exit(0)
     else:
+        if os.environ.get('CI', None) is not None and os.name == 'nt':
+            sys.stdout.write("\n\n\n\n=== LOG START ===\n" + \
+                             open('tests.log', 'r').read() + \
+                             "=== LOG END ===\n\n\n\n")
+            sys.stdout.flush()
         sys.exit(1)
+
 
