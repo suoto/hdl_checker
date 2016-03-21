@@ -21,10 +21,10 @@ if not exist "%CACHE_PATH%\\modelsim.exe" (
     appveyor AddMessage "Download finished"
 )
 
-if not exist "%CACHE_PATH%\\modelsim.exe" (
-    appveyor AddMessage "Error downloading %BUILDER_NAME% from %URL%" -Category Error
-    exit -1
-)
+REM  if not exist "%CACHE_PATH%\\modelsim.exe" (
+REM      appveyor AddMessage "Error downloading %BUILDER_NAME% from %URL%" -Category Error
+REM      exit -1
+REM  )
 
 if not exist "%BUILDER_PATH%" (
     appveyor AddMessage "Installing %BUILDER_NAME% to %LOCALAPPDATA%"
@@ -32,7 +32,7 @@ if not exist "%BUILDER_PATH%" (
     %CACHE_PATH%\\modelsim.exe --mode unattended --modelsim_edition modelsim_ase --installdir %LOCALAPPDATA%
     appveyor AddMessage "Testing installation"
     echo %BUILDER_PATH%\\vcom -version
-    %BUILDER_PATH%\\vcom -version || exit -1
+    %BUILDER_PATH%\\vcom -version
     appveyor AddMessage "Done here"
 )
 

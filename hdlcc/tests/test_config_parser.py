@@ -137,6 +137,11 @@ with such.A('config parser object') as it:
             it.assertEqual(it.parser.hasSource(path), result)
 
     with it.having('a project file with some non-standard stuff'):
+        @it.has_teardown
+        def teardown():
+            if p.exists('temp'):
+                shell.rmtree('temp')
+
         @it.should('raise UnknownParameterError exception when an unknown parameter '
                    'is found')
         def test():
