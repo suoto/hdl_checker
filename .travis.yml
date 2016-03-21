@@ -51,7 +51,6 @@ script: "./scripts/travis.sh ${BUILDER} -vv --log-capture"
 after_failure:
   - "cat tests.log"
 after_success:
-  - "rm -f dependencies/hdl_lib/osvvm_lib/CoveragePkg.vhd"
   - "coverage combine"
   - "coverage report"
   - "export COVERALLS_PARALLEL=true"

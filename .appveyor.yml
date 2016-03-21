@@ -86,11 +86,8 @@ install:
 
   - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F -B --log-capture"
 
-  - del dependencies\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd
   - coverage combine
   - coverage report
-  - set COVERALLS_PARALLEL=true
-  - coveralls
   - codecov
 
 # We won't build or run tests from here
