@@ -33,7 +33,8 @@ class GHDL(BaseBuilder):
         r"(?P<error_message>.*)", re.I)
 
     _BuilderLibraryPathScanner = re.compile(
-        r"^library directory:\s*(?P<library_path>.*)\s*")
+        #  r"^library directory:\s*(?P<library_path>.*)\s*")
+        r"^\s*actual prefix:\s*(?P<library_path>.*)\s*")
 
     _BuilderStdoutIgnoreLines = re.compile('|'.join([
         r"^\s*$",
@@ -99,10 +100,15 @@ class GHDL(BaseBuilder):
         for line in self._subprocessRunner(['ghdl', '--dispconfig']):
             library_path_match = self._BuilderLibraryPathScanner.search(line)
             if library_path_match:
-                library_path = library_path_match.groupdict()['library_path']
+                library_path = \
+                    repr(library_path_match.groupdict()['library_path'])[1:-1]
                 library_name_scan = re.compile( \
                     r"^\s*" + library_path +
-                    r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
+                    r"\\(?P<vhdl_standard>\w+)\\(?P<library_name>\w+).*")
+                self._logger.info("Library path: %s",
+                                  library_path_match.groupdict())
+                self._logger.info("Library name scan: %s",
+                                  library_name_scan.pattern)
 
             if library_name_scan is not None:
                 for match in library_name_scan.finditer(line):
