@@ -115,7 +115,6 @@ class BaseBuilder(object):
         try:
             stdout = list(subp.check_output(cmd_with_args, \
                     stderr=subp.STDOUT, shell=shell, env=subp_env).splitlines())
-                    #  stderr=subp.STDOUT, shell=shell, env=subp_env).split("\n"))
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             import traceback
@@ -129,7 +128,7 @@ class BaseBuilder(object):
             # In this case, we'll print the configured PATH for debugging
             # purposes
             if (os.name == 'posix' and exc.returncode == 127) or \
-               (os.name == 'nt' and exc.returncode == 9009):
+               (os.name == 'nt' and exc.returncode == 9009): # pragma: no-cover
                 self._logger.debug("subprocess runner path:")
                 for path in subp_env['PATH'].split(os.pathsep):
                     self._logger.debug(" - %s", path)
