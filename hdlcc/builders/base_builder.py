@@ -38,7 +38,7 @@ class BaseBuilder(object):
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__name__ + '.' + self.__builder_name__)
+        self._logger = logging.getLogger(__package__ + '.' + self.__builder_name__)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []
@@ -118,11 +118,11 @@ class BaseBuilder(object):
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             import traceback
-            self._logger.warning("Exception has error code %d. Traceback:",
-                                 exc.returncode)
+            self._logger.info("Exception has error code %d. Traceback:",
+                              exc.returncode)
 
             for line in traceback.format_exc().split('\n'): # pragma: no-cover
-                self._logger.debug(line)
+                self._logger.info(line)
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging
