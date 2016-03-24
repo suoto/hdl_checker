@@ -19,36 +19,36 @@ import logging
 
 __logger__ = logging.getLogger(__name__)
 
-__AREA_SCANNER__ = re.compile('|'.join([
+_GET_SCOPE = re.compile('|'.join([
     r"^\s*entity\s+(?P<entity_name>\w+)\s+is\b",
     r"^\s*architecture\s+(?P<architecture_name>\w+)\s+of\s+(?P<arch_entity>\w+)",
     r"^\s*package\s+(?P<package_name>\w+)\s+is\b",
     r"^\s*package\s+body\s+(?P<package_body_name>\w+)\s+is\b",
-    ]), flags=re.I)
+    ]), flags=re.I).finditer
 
-__NO_AREA_SCANNER__ = re.compile('|'.join([
+_NO_SCOPE_OBJECTS = re.compile('|'.join([
     r"^\s*library\s+(?P<library>[\w\s,]+)",
     r"^\s*attribute\s+(?P<attribute>[\w\s,]+)\s*:",
     ]), flags=re.I)
 
-__ENTITY_SCANNER__ = re.compile('|'.join([
+_ENTITY_OBJECTS = re.compile('|'.join([
     r"^\s*(?P<port>[\w\s,]+)\s*:\s*(in|out|inout|buffer|linkage)\s+\w+",
     r"^\s*(?P<generic>[\w\s,]+)\s*:\s*\w+",
-    ]), flags=re.I)
+    ]), flags=re.I).finditer
 
-__ARCH_SCANNER__ = re.compile('|'.join([
+_ARCH_OBJECTS = re.compile('|'.join([
     r"^\s*constant\s+(?P<constant>[\w\s,]+)\s*:",
     r"^\s*signal\s+(?P<signal>[\w,\s]+)\s*:",
     r"^\s*type\s+(?P<type>\w+)\s*:",
     r"^\s*shared\s+variable\s+(?P<shared_variable>[\w\s,]+)\s*:",
-    ]), flags=re.I)
+    ]), flags=re.I).finditer
 
-__END_OF_SCAN__ = re.compile('|'.join([
+_SHOULD_END_SCAN = re.compile('|'.join([
     r"\bport\s+map",
     r"\bgenerate\b",
     r"\w+\s*:\s*entity",
     r"\bprocess\b",
-    ]))
+    ])).search
 
 def _getObjectsFromText(vbuffer):
     """Returns a dict containing the objects found at the given text
@@ -58,7 +58,7 @@ def _getObjectsFromText(vbuffer):
     area = None
     for _line in vbuffer:
         line = re.sub(r"\s*--.*", "", _line)
-        for match in __AREA_SCANNER__.finditer(line):
+        for match in _GET_SCOPE(line):
             _dict = match.groupdict()
             if _dict['entity_name'] is not None:
                 area = 'entity'
@@ -71,11 +71,11 @@ def _getObjectsFromText(vbuffer):
 
         matches = []
         if area is None:
-            matches += __NO_AREA_SCANNER__.finditer(line)
+            matches += _NO_SCOPE_OBJECTS.finditer(line)
         elif area == 'entity':
-            matches += __ENTITY_SCANNER__.finditer(line)
+            matches += _ENTITY_OBJECTS(line)
         elif area == 'architecture':
-            matches += __ARCH_SCANNER__.finditer(line)
+            matches += _ARCH_OBJECTS(line)
 
         for match in matches:
             for key, value in match.groupdict().items():
@@ -100,15 +100,9 @@ def _getObjectsFromText(vbuffer):
                     objects[text]['end'] = end + submatch.start(submatch.lastindex)
                     objects[text]['type'] = key
         lnum += 1
-        if __END_OF_SCAN__.search(line):
+        if _SHOULD_END_SCAN(line):
             break
 
-    #  if objects:
-    #      __logger__.debug("Objects found:")
-    #      for _name, _object in objects.items():
-    #          __logger__.debug("%s => %s", _name, str(_object))
-    #  else:
-    #      __logger__.debug("No objects found")
     return objects
 
 def _getUnusedObjects(vbuffer, objects):
