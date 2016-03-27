@@ -176,15 +176,15 @@ class MSim(BaseBuilder):
             assert 0
 
         if p.exists('modelsim.ini'):
-            self._logger.warning("We shouldn't find a modelsim.ini file at '%s'",
+            self._logger.info("We shouldn't find a modelsim.ini file at '%s'",
                                  p.abspath(os.curdir))
             os.remove('modelsim.ini')
 
         self._subprocessRunner(['vmap', '-c'])
-        self._logger.warning("After vmap at '%s'", p.abspath(os.curdir))
 
+        self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
         for _dir in os.listdir(p.abspath(os.curdir)):
-            self._logger.warning("- '%s'", _dir)
+            self._logger.debug("- '%s'", _dir)
 
         self._logger.info("Current dir is %s, changing to %s",
                           p.abspath(os.curdir), cwd)
