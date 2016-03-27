@@ -18,14 +18,20 @@ import abc
 import os
 import os.path as p
 import logging
+import sys
+import traceback
+
+try:
+    import json as serializer
+except ImportError:
+    try:
+        import cPickle as serializer
+    except ImportError:
+        import pickle as serializer
 
 import threading
 from multiprocessing.pool import ThreadPool
 
-try:
-    import cPickle as pickle # pragma: no cover
-except ImportError:
-    import pickle
 
 import hdlcc.exceptions
 import hdlcc.builders
@@ -62,7 +68,7 @@ class ProjectBuilder(object):
     def _getCacheFilename(project_file):
         "Returns the cache file name for a given project file"
         return p.join(p.dirname(project_file), \
-            '.' + p.basename(project_file))
+            '.' + p.basename(project_file) + '.json')
 
     @staticmethod
     def clean(project_file):
@@ -74,28 +80,22 @@ class ProjectBuilder(object):
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
-    def __getstate__(self):
-        "Pickle dump implementation"
-        # Remove the _logger attribute because we can't pickle file or
-        # stream objects. In its place, save the logger name
-        state = self.__dict__.copy()
-        state['_logger'] = {'name' : self._logger.name,
-                            'level' : self._logger.level}
-        del state['_lock']
-        del state['_background_thread']
-
-        return state
-
     def __setstate__(self, state):
-        "Pickle load implementation"
-        # Get a logger with the name given in state['_logger'] (see
-        # __getstate__) and update our dictionary with the pickled info
+        "serializer load implementation"
         self._logger = logging.getLogger(state['_logger']['name'])
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
         self._lock = threading.Lock()
         self._background_thread = threading.Thread(target=self._buildByDependency)
-        self.__dict__.update(state)
+
+        self._logger.warn("Recreating config object")
+        self._config = ConfigParser.__new__(ConfigParser, state=state['_config'])
+        self._logger.warn("Done")
+
+        self._logger.warn("Recreating builder object")
+        self.builder = hdlcc.builders.base_builder.BaseBuilder.__new__(
+            hdlcc.builders.base_builder.BaseBuilder, state['builder'])
+        self._logger.warn("Done")
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):
@@ -285,7 +285,15 @@ class ProjectBuilder(object):
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
         cache_fname = self._getCacheFilename(self._config.filename)
-        pickle.dump(self, open(cache_fname, 'w'), 0)
+
+        state = {'_logger': {'name' : self._logger.name,
+                             'level' : self._logger.level},
+                 'builder' : self.builder.__getstate__(),
+                 '_config' : self._config.__getstate__(),
+                }
+
+        serializer.dump(state, open(cache_fname, 'w'),
+                        indent=True)
 
     def _recoverCache(self):
         '''Tries to recover cached info for the given project_file.
@@ -298,11 +306,16 @@ class ProjectBuilder(object):
         cache = None
         if p.exists(cache_fname):
             try:
-                cache = pickle.load(open(cache_fname, 'r'))
-                print "Recovered cache from '%s'" % cache_fname
+                cache = serializer.load(open(cache_fname, 'r'))
+                print "Recovered cache from '%s' using '%s'" % \
+                        (cache_fname, serializer.__package__)
             except (hdlcc.exceptions.SanityCheckError,
-                    pickle.UnpicklingError, ImportError):
-                print "Unable to recover from '%s'" % cache_fname
+                    serializer.UnpicklingError, ImportError):
+                self._handleUiError(
+                    "Unable to recover from '%s' using '%s'\n"
+                    "Traceback:\n%s" % \
+                        (cache_fname, serializer.__package__,
+                         traceback.format_exc()))
 
         return cache
 
@@ -331,6 +344,7 @@ class ProjectBuilder(object):
             self._background_thread.join()
         with self._lock:
             self._logger.info("Build has finished")
+
     def _updateEnvironmentIfNeeded(self):
         '''Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the
@@ -356,7 +370,7 @@ class ProjectBuilder(object):
                 self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
         else:
-            self.__dict__.update(cache.__dict__)
+            self.__setstate__(cache)
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"

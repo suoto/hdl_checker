@@ -54,12 +54,25 @@ class VhdlSourceFile(object):
         threading.Thread(target=self._parseIfChanged).start()
 
     def __getstate__(self):
-        state = self.__dict__.copy()
-        del state['_lock']
+        state = {
+            'filename' : self.filename,
+            'abspath' : self.abspath,
+            'library' : self.library,
+            'flags' : list(self.flags),
+            '_design_units' : self._design_units,
+            '_deps' : self._deps,
+            '_mtime' : self._mtime,
+            }
         return state
 
     def __setstate__(self, state):
-        self.__dict__.update(state)
+        self.filename = state['filename']
+        self.abspath = state['abspath']
+        self.library = state['library']
+        self.flags = set(state['flags'])
+        self._design_units = state['_design_units']
+        self._deps = state['_deps']
+        self._mtime = state['_mtime']
         self._lock = threading.Lock()
 
     def __repr__(self):

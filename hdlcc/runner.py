@@ -47,11 +47,11 @@ def _pathSetup(): # pragma: no cover
 if __name__ == '__main__':
     _pathSetup()
 
-from config import Config
-from project_builder import ProjectBuilder
+import hdlcc
 
-class StandaloneProjectBuilder(ProjectBuilder):
-    "Implementation of standalone hdlcc.ProjectBuilder to run via shell"
+class StandaloneProjectBuilder(hdlcc.project_builder.ProjectBuilder):
+    """Implementation of standalone hdlcc.project_builder.ProjectBuilder
+    to run via shell"""
     _ui_logger = logging.getLogger('UI')
     def _handleUiInfo(self, message):
         self._ui_logger.info(message)
@@ -129,8 +129,8 @@ def parseArguments():
     if args.sources:
         args.sources = [source for sublist in args.sources for source in sublist]
 
-    Config.log_level = args.log_level
-    #  Config.setupBuild()
+    hdlcc.config.Config.log_level = args.log_level
+    #  hdlcc.config.Config.setupBuild()
 
     return args
 
@@ -210,7 +210,9 @@ def runner(args):
         project.saveCache()
 
 def setupLogging():
-    path.insert(0, p.abspath('dependencies/rainbow_logging_handler/'))
+    path_to_this_file = p.sep.join(p.realpath(__file__).split(p.sep)[:-2])
+    path.insert(0, p.sep.join([path_to_this_file, '.ci',
+                               'rainbow_logging_handler']))
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         # pylint: disable=bad-whitespace
