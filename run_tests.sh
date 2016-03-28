@@ -57,13 +57,15 @@ set +e
 
 RESULT=0
 
+TEST_RUNNER="./.ci/scripts/run_tests.py"
+
 if [ -n "${STANDALONE}" ]; then
-  ./run_tests.py $ARGS hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
+  ${TEST_RUNNER} $ARGS hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
   RESULT=$(($? || ${RESULT}))
 fi
 
 if [ -n "${FALLBACK}" ]; then
-  ./run_tests.py $ARGS hdlcc.tests.test_project_builder hdlcc.tests.test_standalone_hdlcc
+  ${TEST_RUNNER} $ARGS hdlcc.tests.test_project_builder hdlcc.tests.test_standalone_hdlcc
   RESULT=$(($? || ${RESULT}))
 fi
 
@@ -71,7 +73,7 @@ if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim
   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 
-  ./run_tests.py $ARGS
+  ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
 fi
 
@@ -82,7 +84,7 @@ if [ -n "${XVHDL}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi
 
-  ./run_tests.py $ARGS
+  ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
 fi
 
@@ -100,7 +102,7 @@ if [ -n "${GHDL}" ]; then
 
   echo "BUILDER_PATH=$BUILDER_PATH"
 
-  ./run_tests.py $ARGS
+  ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
 fi
 

@@ -51,30 +51,6 @@ class ConfigParser(object):
 
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
-    def __new__(cls, *args, **kwargs):
-        state = kwargs.pop('state', None)
-        obj = super(ConfigParser, cls).__new__(cls, *args, **kwargs)
-        if state is None:
-            return obj
-
-        # pylint: disable=protected-access
-        sources = state.pop('_sources')
-        obj.filename = state.pop('filename', None)
-        obj._timestamp = state.pop('_timestamp')
-        obj._parms = {
-            'batch_build_flags' :  set(state['_parms']['batch_build_flags']),
-            'single_build_flags' : set(state['_parms']['single_build_flags']),
-            'global_build_flags' : set(state['_parms']['global_build_flags']),
-            }
-        obj._sources = {}
-        for path, source in sources.iteritems():
-            obj._sources[path] = VhdlSourceFile.__new__(VhdlSourceFile)
-            obj._sources[path].__setstate__(source)
-
-        # pylint: enable=protected-access
-
-        return obj
-
     def __init__(self, filename=None):
         self._parms = {
             'batch_build_flags' : set(),
@@ -111,36 +87,44 @@ class ConfigParser(object):
 
         return "\n".join(_repr)
 
-    def __setstate__(self, state):
-        "Recovers"
-        sources = state.pop('_sources')
-        self.filename = state.pop('filename', None)
-        self._timestamp = state.pop('_timestamp')
-        self._parms = {
-            'batch_build_flags' :  set(state['_parms']['batch_build_flags']),
-            'single_build_flags' : set(state['_parms']['single_build_flags']),
-            'global_build_flags' : set(state['_parms']['global_build_flags']),
-            }
-        self._sources = {}
-        for path, source in sources.iteritems():
-            self._sources[path] = VhdlSourceFile.__new__(VhdlSourceFile)
-            self._sources[path].__setstate__(source)
-
-    def __getstate__(self):
-        #  state = self.__dict__.copy()
+    def getState(self):
         state = {}
         state['filename'] = self.filename
         state['_timestamp'] = self._timestamp
-        state['_parms'] = {
-            'batch_build_flags' :  list(self._parms['batch_build_flags']),
-            'single_build_flags' : list(self._parms['single_build_flags']),
-            'global_build_flags' : list(self._parms['global_build_flags']),
-            }
+
+        state['_parms'] = self._parms.copy()
+
+        state['_parms']['batch_build_flags'] = list(self._parms['batch_build_flags'])
+        state['_parms']['single_build_flags'] = list(self._parms['single_build_flags'])
+        state['_parms']['global_build_flags'] = list(self._parms['global_build_flags'])
+
         state['_sources'] = {}
         for path, source in self._sources.items():
-            state['_sources'][path] = source.__getstate__()
+            state['_sources'][path] = source.getState()
 
         return state
+
+    @classmethod
+    def recoverFromState(cls, state):
+        obj = super(ConfigParser, cls).__new__(cls)
+
+        # pylint: disable=protected-access
+        sources = state.pop('_sources')
+        obj.filename = state.pop('filename', None)
+        obj._timestamp = state.pop('_timestamp')
+
+        obj._parms = state['_parms']
+        obj._parms['batch_build_flags'] = set(state['_parms']['batch_build_flags'])
+        obj._parms['single_build_flags'] = set(state['_parms']['single_build_flags'])
+        obj._parms['global_build_flags'] = set(state['_parms']['global_build_flags'])
+
+        obj._sources = {}
+        for path, src_state in sources.items():
+            obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+
+        # pylint: enable=protected-access
+
+        return obj
 
     def shouldParse(self):
         "Checks if we should parse the configuration file"

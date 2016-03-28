@@ -68,17 +68,21 @@ class BaseBuilder(object):
         except NotImplementedError:
             pass
 
-    def __getstate__(self):
+    @classmethod
+    def recoverFromState(cls, state):
+        obj = super(BaseBuilder, cls).__new__(cls)
+        obj._logger = logging.getLogger(state['_logger'])
+        del state['_logger']
+        obj._lock = Lock()
+        obj.__dict__.update(state)
+
+        return obj
+
+    def getState(self):
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
         del state['_lock']
         return state
-
-    def __setstate__(self, state):
-        self._logger = logging.getLogger(state['_logger'])
-        del state['_logger']
-        self._lock = Lock()
-        self.__dict__.update(state)
 
     @abc.abstractmethod
     def _shouldIgnoreLine(self, line):

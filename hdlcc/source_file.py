@@ -51,9 +51,10 @@ class VhdlSourceFile(object):
 
         self.abspath = os.path.abspath(filename)
         self._lock = threading.Lock()
-        threading.Thread(target=self._parseIfChanged).start()
+        threading.Thread(target=self._parseIfChanged,
+                         name='_parseIfChanged').start()
 
-    def __getstate__(self):
+    def getState(self):
         state = {
             'filename' : self.filename,
             'abspath' : self.abspath,
@@ -65,15 +66,19 @@ class VhdlSourceFile(object):
             }
         return state
 
-    def __setstate__(self, state):
-        self.filename = state['filename']
-        self.abspath = state['abspath']
-        self.library = state['library']
-        self.flags = set(state['flags'])
-        self._design_units = state['_design_units']
-        self._deps = state['_deps']
-        self._mtime = state['_mtime']
-        self._lock = threading.Lock()
+    @classmethod
+    def recoverFromState(cls, state):
+        obj = super(VhdlSourceFile, cls).__new__(cls)
+        obj.filename = state['filename']
+        obj.abspath = state['abspath']
+        obj.library = state['library']
+        obj.flags = set(state['flags'])
+        obj._design_units = state['_design_units']
+        obj._deps = state['_deps']
+        obj._mtime = state['_mtime']
+        obj._lock = threading.Lock()
+
+        return obj
 
     def __repr__(self):
         return "VhdlSourceFile('%s', library='%s', flags=%s)" % \

@@ -27,7 +27,7 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = p.join("hdlcc", "runner.py")
+HDLCC_LOCATION = p.join("scripts", "hdlcc_sa.py")
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
 

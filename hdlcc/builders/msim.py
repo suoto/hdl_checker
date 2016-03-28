@@ -164,6 +164,11 @@ class MSim(BaseBuilder):
 
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
+        if p.exists(_modelsim_ini):
+            self._logger.warning("modelsim.ini already exists at '%s', "
+                                 "returning", _modelsim_ini)
+            return
+
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
@@ -174,11 +179,6 @@ class MSim(BaseBuilder):
         if cwd == os.curdir:
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
             assert 0
-
-        if p.exists('modelsim.ini'):
-            self._logger.warning("We shouldn't find a modelsim.ini file at '%s'",
-                                 p.abspath(os.curdir))
-            os.remove('modelsim.ini')
 
         self._subprocessRunner(['vmap', '-c'])
         self._logger.warning("After vmap at '%s'", p.abspath(os.curdir))

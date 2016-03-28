@@ -14,10 +14,6 @@ version: 0.{build}
 
 # branches to build
 branches:
-  # whitelist
-  only:
-    - master
-
   # blacklist
   except:
     - gh-pages
@@ -76,15 +72,16 @@ install:
   - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
 
   - if "%BUILDER_NAME%" == "msim"
-      call %APPVEYOR_BUILD_FOLDER%\\scripts\\setup_msim.bat
+      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_msim.bat
 
   - if "%BUILDER_NAME%" == "ghdl"
-      call %APPVEYOR_BUILD_FOLDER%\\scripts\\setup_ghdl.bat
+      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_ghdl.bat
 
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F -B --log-capture"
+  - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
+      -vv -F -B --log-capture"
 
   - coverage combine
   - coverage report

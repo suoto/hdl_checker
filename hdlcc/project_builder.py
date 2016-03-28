@@ -18,7 +18,6 @@ import abc
 import os
 import os.path as p
 import logging
-import sys
 import traceback
 
 try:
@@ -53,7 +52,8 @@ class ProjectBuilder(object):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
-        self._background_thread = threading.Thread(target=self._buildByDependency)
+        self._background_thread = threading.Thread(
+            target=self._buildByDependency, name='_buildByDependency')
 
         self._units_built = []
 
@@ -88,14 +88,11 @@ class ProjectBuilder(object):
         self._lock = threading.Lock()
         self._background_thread = threading.Thread(target=self._buildByDependency)
 
-        self._logger.warn("Recreating config object")
-        self._config = ConfigParser.__new__(ConfigParser, state=state['_config'])
-        self._logger.warn("Done")
+        self._config = ConfigParser.recoverFromState(state['_config'])
 
-        self._logger.warn("Recreating builder object")
-        self.builder = hdlcc.builders.base_builder.BaseBuilder.__new__(
-            hdlcc.builders.base_builder.BaseBuilder, state['builder'])
-        self._logger.warn("Done")
+        builder_name = self._config.getBuilder()
+        builder_class = hdlcc.builders.getBuilderByName(builder_name)
+        self.builder = builder_class.recoverFromState(state['builder'])
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):
@@ -183,11 +180,11 @@ class ProjectBuilder(object):
                             "Couldn't build source '%s'. Missing dependencies: %s",
                             str(source),
                             ", ".join([str(x) for x in missing_dependencies]))
-                    else:
-                        self._logger.warning(
-                            "Source %s wasn't built but has no missing "
-                            "dependencies", str(source))
-                        yield source
+                    #  else:
+                    #      self._logger.warning(
+                    #          "Source %s wasn't built but has no missing "
+                    #          "dependencies", str(source))
+                    #      yield source
                 if sources_not_built:
                     self._logger.warning("Some sources were not built")
 
@@ -288,12 +285,15 @@ class ProjectBuilder(object):
 
         state = {'_logger': {'name' : self._logger.name,
                              'level' : self._logger.level},
-                 'builder' : self.builder.__getstate__(),
-                 '_config' : self._config.__getstate__(),
+                 'builder' : self.builder.getState(),
+                 '_config' : self._config.getState(),
                 }
 
-        serializer.dump(state, open(cache_fname, 'w'),
-                        indent=True)
+        if serializer.__name__ == 'json':
+            serializer.dump(state, open(cache_fname, 'w'),
+                            indent=True)
+        else:
+            serializer.dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self):
         '''Tries to recover cached info for the given project_file.
@@ -307,8 +307,8 @@ class ProjectBuilder(object):
         if p.exists(cache_fname):
             try:
                 cache = serializer.load(open(cache_fname, 'r'))
-                print "Recovered cache from '%s' using '%s'" % \
-                        (cache_fname, serializer.__package__)
+                _logger.info("Recovered cache from '%s' using '%s'",
+                             cache_fname, serializer.__package__)
             except (hdlcc.exceptions.SanityCheckError,
                     serializer.UnpicklingError, ImportError):
                 self._handleUiError(

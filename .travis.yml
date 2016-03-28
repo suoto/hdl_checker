@@ -41,13 +41,13 @@ before_install:
 before_script:
   - "git submodule update"
   - "mkdir -p ~/cache"
-  - if [ "${BUILDER}" == "msim" ]  ; then "./scripts/setup_msim.sh"; fi
-  - if [ "${BUILDER}" == "ghdl" ]  ; then "./scripts/setup_ghdl.sh"; fi
-  - if [ "${BUILDER}" == "xvhdl" ] ; then "./scripts/setup_xvhdl.sh"; fi
+  - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
+  - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
+  - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 # command to install dependencies
 install: "pip install -r requirements.txt"
 # command to run tests
-script: "./scripts/travis.sh ${BUILDER} -vv --log-capture"
+script: "./run_tests.sh ${BUILDER} -vv --log-capture"
 after_failure:
   - "cat tests.log"
 after_success:
