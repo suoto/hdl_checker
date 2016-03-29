@@ -125,7 +125,7 @@ fi
 
 coverage combine
 coverage html
-coverage report
+# coverage report
 
 exit "${RESULT}"
 

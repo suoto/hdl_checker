@@ -49,13 +49,7 @@ class BaseBuilder(object):
         else:
             self._logger.info("%s already exists", self._target_folder)
 
-        try:
-            self.checkEnvironment()
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s",
-                                 traceback.format_exc())
-            raise hdlcc.exceptions.SanityCheckError(str(exc))
+        self.checkEnvironment()
 
         try:
             self._parseBuiltinLibraries()
@@ -70,15 +64,19 @@ class BaseBuilder(object):
 
     @classmethod
     def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
+        # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
         obj._logger = logging.getLogger(state['_logger'])
         del state['_logger']
         obj._lock = Lock()
         obj.__dict__.update(state)
+        # pylint: enable=protected-access
 
         return obj
 
     def getState(self):
+        "Gets a dict that describes the current state of this object"
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
         del state['_lock']
@@ -122,8 +120,8 @@ class BaseBuilder(object):
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             import traceback
-            self._logger.warning("Exception has error code %d. Traceback:",
-                                 exc.returncode)
+            self._logger.debug("Command '%s' failed with error code %d",
+                               cmd_with_args, exc.returncode)
 
             for line in traceback.format_exc().split('\n'): # pragma: no-cover
                 self._logger.debug(line)

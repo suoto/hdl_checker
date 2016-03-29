@@ -18,10 +18,13 @@ python:
   - "2.7"
 
 env:
-  - BUILDER=msim
-  - BUILDER=ghdl
-  - BUILDER=fallback standalone
-  - BUILDER=xvhdl
+  global:
+    - GRLIB_VERSION=v1.4.1-b4156
+  matrix:
+    - BUILDER=msim
+    - BUILDER=ghdl
+    - BUILDER=fallback standalone
+    - BUILDER=xvhdl
 
 # This should work but it doesn't!
 # addons:
@@ -42,6 +45,9 @@ before_install:
 
 before_script:
   - "git submodule update"
+  # Download Aeroflex grlib
+  - "git clone https://github.com/suoto/grlib -b ${GRLIB_VERSION} \
+       --single-branch --depth 1 ~/grlib/"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
   - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi

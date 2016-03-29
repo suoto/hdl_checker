@@ -22,15 +22,19 @@ import traceback
 
 try:
     import json as serializer
+    def _dump(*args, **kwargs):
+        "Wrapper for json.dump"
+        return serializer.dump(indent=True, *args, **kwargs)
 except ImportError:
     try:
         import cPickle as serializer
     except ImportError:
         import pickle as serializer
 
+    _dump = serializer.dump # pylint: disable=invalid-name
+
 import threading
 from multiprocessing.pool import ThreadPool
-
 
 import hdlcc.exceptions
 import hdlcc.builders
@@ -68,7 +72,7 @@ class ProjectBuilder(object):
     def _getCacheFilename(project_file):
         "Returns the cache file name for a given project file"
         return p.join(p.dirname(project_file), \
-            '.' + p.basename(project_file) + '.json')
+            '.' + p.basename(project_file))
 
     @staticmethod
     def clean(project_file):
@@ -80,7 +84,7 @@ class ProjectBuilder(object):
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
-    def __setstate__(self, state):
+    def _setState(self, state):
         "serializer load implementation"
         self._logger = logging.getLogger(state['_logger']['name'])
         self._logger.setLevel(state['_logger']['level'])
@@ -91,6 +95,7 @@ class ProjectBuilder(object):
         self._config = ConfigParser.recoverFromState(state['_config'])
 
         builder_name = self._config.getBuilder()
+        self._logger.debug("Recovered builder is '%s'", builder_name)
         builder_class = hdlcc.builders.getBuilderByName(builder_name)
         self.builder = builder_class.recoverFromState(state['builder'])
 
@@ -111,7 +116,14 @@ class ProjectBuilder(object):
 
     def _postUnpicklingSanityCheck(self):
         "Sanity checks to ensure the state after unpickling is still valid"
-        self.builder.checkEnvironment()
+        self._logger.info("Running post recover check")
+        try:
+            self.builder.checkEnvironment()
+        except hdlcc.exceptions.SanityCheckError:
+            self._handleUiError("Failed to create builder '%s'" % \
+                self.builder.__builder_name__)
+            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+        self._logger.info("OK")
 
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
@@ -283,17 +295,15 @@ class ProjectBuilder(object):
         "Dumps project object to a file to recover its state later"
         cache_fname = self._getCacheFilename(self._config.filename)
 
-        state = {'_logger': {'name' : self._logger.name,
+        state = {'serializer' : serializer.__name__,
+                 '_logger': {'name' : self._logger.name,
                              'level' : self._logger.level},
                  'builder' : self.builder.getState(),
                  '_config' : self._config.getState(),
                 }
 
-        if serializer.__name__ == 'json':
-            serializer.dump(state, open(cache_fname, 'w'),
-                            indent=True)
-        else:
-            serializer.dump(state, open(cache_fname, 'w'))
+        self._logger.debug("Saving state to '%s'", cache_fname)
+        _dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self):
         '''Tries to recover cached info for the given project_file.
@@ -303,19 +313,22 @@ class ProjectBuilder(object):
             self._logger.debug("Can't recover cache from None")
             return
         cache_fname = self._getCacheFilename(self.project_file)
+        _logger.info("Trying to recover from '%s'", cache_fname)
         cache = None
         if p.exists(cache_fname):
             try:
                 cache = serializer.load(open(cache_fname, 'r'))
-                _logger.info("Recovered cache from '%s' using '%s'",
-                             cache_fname, serializer.__package__)
-            except (hdlcc.exceptions.SanityCheckError,
-                    serializer.UnpicklingError, ImportError):
+                self._handleUiInfo("Recovered cache from using '%s'" %
+                                   serializer.__package__)
+            except ValueError:# (hdlcc.exceptions.SanityCheckError,
+                    #serializer.UnpicklingError, ImportError):
                 self._handleUiError(
-                    "Unable to recover from '%s' using '%s'\n"
+                    "Unable to recover cache from '%s' using '%s'\n"
                     "Traceback:\n%s" % \
                         (cache_fname, serializer.__package__,
                          traceback.format_exc()))
+        else:
+            _logger.info("File not found")
 
         return cache
 
@@ -362,15 +375,10 @@ class ProjectBuilder(object):
             self._config = ConfigParser(self.project_file)
             builder_name = self._config.getBuilder()
             builder_class = hdlcc.builders.getBuilderByName(builder_name)
-            try:
-                self.builder = builder_class(self._config.getTargetDir())
-            except hdlcc.exceptions.SanityCheckError:
-                self._handleUiError("Failed to create builder '%s'" % \
-                    builder_class.__builder_name__)
-                self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
-
+            self.builder = builder_class(self._config.getTargetDir())
         else:
-            self.__setstate__(cache)
+            self._setState(cache)
+            self._postUnpicklingSanityCheck()
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"
