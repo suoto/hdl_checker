@@ -57,6 +57,23 @@ set +e
 
 RESULT=0
 
+pip uninstall hdlcc -y
+if [ "${CI}" == "true" ]; then
+  pip install .
+else
+  pip install . --user
+fi
+
+RESULT=$(($? || ${RESULT}))
+
+hdlcc -h
+
+RESULT=$(($? || ${RESULT}))
+
+if [ "${RESULT}" != "0" ]; then
+  exit ${RESULT}
+fi
+
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
@@ -108,6 +125,7 @@ fi
 
 coverage combine
 coverage html
+coverage report
 
 exit "${RESULT}"
 

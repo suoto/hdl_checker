@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
+
 # This file is part of HDL Code Checker.
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
@@ -13,24 +15,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"hdlcc installation script"
+"hdlcc main entry point"
 
-from distutils.core import setup
+import sys
 
-# pylint: disable=bad-whitespace
-setup(
-    name             = 'hdlcc',
-    version          = '0.1',
-    description      = 'HDL code checker',
-    author           = 'Andre Souto',
-    author_email     = 'andre820@gmail.com',
-    url              = 'https://github.com/suoto/hdlcc',
-    license          = 'GPLv3',
-    packages         = ['hdlcc', 'hdlcc.builders'],
-    install_requires = ['argcomplete', 'argparse', 'prettytable',],
-    entry_points={
-        'console_scripts' : ['hdlcc=hdlcc.standalone:main']
-    }
-)
-# pylint: enable=bad-whitespace
+from hdlcc.standalone import main
+sys.exit(main())
 

@@ -1,6 +1,8 @@
 [run]
 source = hdlcc
-omit = hdlcc/tests/*
+omit =
+    hdlcc/__main__.py
+    hdlcc/tests/*
 
 branch = True
 parallel = True
