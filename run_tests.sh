@@ -32,6 +32,9 @@ while [ -n "$1" ]; do
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
   else
+    if [ "$1" == "-F" ]; then
+      FAILFAST=1
+    fi
     ARGS+=" $1"
   fi
 
@@ -65,10 +68,12 @@ else
 fi
 
 RESULT=$(($? || ${RESULT}))
+[ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 
 hdlcc -h
 
 RESULT=$(($? || ${RESULT}))
+[ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 
 if [ "${RESULT}" != "0" ]; then
   exit ${RESULT}
@@ -79,11 +84,13 @@ TEST_RUNNER="./.ci/scripts/run_tests.py"
 if [ -n "${STANDALONE}" ]; then
   ${TEST_RUNNER} $ARGS hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
   RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${FALLBACK}" ]; then
   ${TEST_RUNNER} $ARGS hdlcc.tests.test_project_builder hdlcc.tests.test_standalone_hdlcc
   RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${MSIM}" ]; then
@@ -92,6 +99,7 @@ if [ -n "${MSIM}" ]; then
 
   ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${XVHDL}" ]; then
@@ -103,6 +111,7 @@ if [ -n "${XVHDL}" ]; then
 
   ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${GHDL}" ]; then
@@ -121,6 +130,7 @@ if [ -n "${GHDL}" ]; then
 
   ${TEST_RUNNER} $ARGS
   RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 coverage combine
