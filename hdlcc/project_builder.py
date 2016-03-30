@@ -18,14 +18,23 @@ import abc
 import os
 import os.path as p
 import logging
+import traceback
+
+try:
+    import json as serializer
+    def _dump(*args, **kwargs):
+        "Wrapper for json.dump"
+        return serializer.dump(indent=True, *args, **kwargs)
+except ImportError:
+    try:
+        import cPickle as serializer
+    except ImportError:
+        import pickle as serializer
+
+    _dump = serializer.dump # pylint: disable=invalid-name
 
 import threading
 from multiprocessing.pool import ThreadPool
-
-try:
-    import cPickle as pickle # pragma: no cover
-except ImportError:
-    import pickle
 
 import hdlcc.exceptions
 import hdlcc.builders
@@ -47,7 +56,8 @@ class ProjectBuilder(object):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
-        self._background_thread = threading.Thread(target=self._buildByDependency)
+        self._background_thread = threading.Thread(
+            target=self._buildByDependency, name='_buildByDependency')
 
         self._units_built = []
 
@@ -74,28 +84,20 @@ class ProjectBuilder(object):
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
-    def __getstate__(self):
-        "Pickle dump implementation"
-        # Remove the _logger attribute because we can't pickle file or
-        # stream objects. In its place, save the logger name
-        state = self.__dict__.copy()
-        state['_logger'] = {'name' : self._logger.name,
-                            'level' : self._logger.level}
-        del state['_lock']
-        del state['_background_thread']
-
-        return state
-
-    def __setstate__(self, state):
-        "Pickle load implementation"
-        # Get a logger with the name given in state['_logger'] (see
-        # __getstate__) and update our dictionary with the pickled info
+    def _setState(self, state):
+        "serializer load implementation"
         self._logger = logging.getLogger(state['_logger']['name'])
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
         self._lock = threading.Lock()
         self._background_thread = threading.Thread(target=self._buildByDependency)
-        self.__dict__.update(state)
+
+        self._config = ConfigParser.recoverFromState(state['_config'])
+
+        builder_name = self._config.getBuilder()
+        self._logger.debug("Recovered builder is '%s'", builder_name)
+        builder_class = hdlcc.builders.getBuilderByName(builder_name)
+        self.builder = builder_class.recoverFromState(state['builder'])
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):
@@ -112,14 +114,21 @@ class ProjectBuilder(object):
         """Method that should be overriden to handle errors messages
         from HDL Code Checker to the user"""
 
-    def _postUnpicklingSanityCheck(self):
+    def _postCacheRecoveryCheck(self):
         "Sanity checks to ensure the state after unpickling is still valid"
-        self.builder.checkEnvironment()
+        self._logger.debug("Running post recover check")
+        try:
+            self.builder.checkEnvironment()
+        except hdlcc.exceptions.SanityCheckError:
+            _msg = "Failed to create builder '%s'" % \
+                        self.builder.__builder_name__
+            self._logger.warning(_msg)
+            self._handleUiError(_msg)
+            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
         sources = []
-        #  for source in self.sources.values():
         for source in self._config.getSources():
             if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
@@ -183,11 +192,11 @@ class ProjectBuilder(object):
                             "Couldn't build source '%s'. Missing dependencies: %s",
                             str(source),
                             ", ".join([str(x) for x in missing_dependencies]))
-                    else:
-                        self._logger.warning(
-                            "Source %s wasn't built but has no missing "
-                            "dependencies", str(source))
-                        yield source
+                    #  else:
+                    #      self._logger.warning(
+                    #          "Source %s wasn't built but has no missing "
+                    #          "dependencies", str(source))
+                    #      yield source
                 if sources_not_built:
                     self._logger.warning("Some sources were not built")
 
@@ -285,7 +294,16 @@ class ProjectBuilder(object):
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
         cache_fname = self._getCacheFilename(self._config.filename)
-        pickle.dump(self, open(cache_fname, 'w'), 0)
+
+        state = {'serializer' : serializer.__name__,
+                 '_logger': {'name' : self._logger.name,
+                             'level' : self._logger.level},
+                 'builder' : self.builder.getState(),
+                 '_config' : self._config.getState(),
+                }
+
+        self._logger.debug("Saving state to '%s'", cache_fname)
+        _dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self):
         '''Tries to recover cached info for the given project_file.
@@ -295,14 +313,22 @@ class ProjectBuilder(object):
             self._logger.debug("Can't recover cache from None")
             return
         cache_fname = self._getCacheFilename(self.project_file)
+        _logger.info("Trying to recover from '%s'", cache_fname)
         cache = None
         if p.exists(cache_fname):
             try:
-                cache = pickle.load(open(cache_fname, 'r'))
-                print "Recovered cache from '%s'" % cache_fname
-            except (hdlcc.exceptions.SanityCheckError,
-                    pickle.UnpicklingError, ImportError):
-                print "Unable to recover from '%s'" % cache_fname
+                cache = serializer.load(open(cache_fname, 'r'))
+                self._handleUiInfo("Recovered cache from using '%s'" %
+                                   serializer.__package__)
+            except ValueError:# (hdlcc.exceptions.SanityCheckError,
+                    #serializer.UnpicklingError, ImportError):
+                self._handleUiError(
+                    "Unable to recover cache from '%s' using '%s'\n"
+                    "Traceback:\n%s" % \
+                        (cache_fname, serializer.__package__,
+                         traceback.format_exc()))
+        else:
+            _logger.info("File not found")
 
         return cache
 
@@ -331,6 +357,7 @@ class ProjectBuilder(object):
             self._background_thread.join()
         with self._lock:
             self._logger.info("Build has finished")
+
     def _updateEnvironmentIfNeeded(self):
         '''Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the
@@ -348,15 +375,10 @@ class ProjectBuilder(object):
             self._config = ConfigParser(self.project_file)
             builder_name = self._config.getBuilder()
             builder_class = hdlcc.builders.getBuilderByName(builder_name)
-            try:
-                self.builder = builder_class(self._config.getTargetDir())
-            except hdlcc.exceptions.SanityCheckError:
-                self._handleUiError("Failed to create builder '%s'" % \
-                    builder_class.__builder_name__)
-                self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
-
+            self.builder = builder_class(self._config.getTargetDir())
         else:
-            self.__dict__.update(cache.__dict__)
+            self._setState(cache)
+            self._postCacheRecoveryCheck()
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"

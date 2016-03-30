@@ -68,7 +68,6 @@ class ConfigParser(object):
 
             self._logger.warning("No configuration file given, using dummy")
 
-
         self._sources = {}
         self._timestamp = 0
 
@@ -87,6 +86,47 @@ class ConfigParser(object):
                 _repr += ["    - %s = %s" % (str(source), str(attrs))]
 
         return "\n".join(_repr)
+
+    def getState(self):
+        "Gets a dict that describes the current state of this object"
+        state = {}
+        state['filename'] = self.filename
+        state['_timestamp'] = self._timestamp
+
+        state['_parms'] = self._parms.copy()
+
+        state['_parms']['batch_build_flags'] = list(self._parms['batch_build_flags'])
+        state['_parms']['single_build_flags'] = list(self._parms['single_build_flags'])
+        state['_parms']['global_build_flags'] = list(self._parms['global_build_flags'])
+
+        state['_sources'] = {}
+        for path, source in self._sources.items():
+            state['_sources'][path] = source.getState()
+
+        return state
+
+    @classmethod
+    def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
+        obj = super(ConfigParser, cls).__new__(cls)
+
+        # pylint: disable=protected-access
+        sources = state.pop('_sources')
+        obj.filename = state.pop('filename', None)
+        obj._timestamp = state.pop('_timestamp')
+
+        obj._parms = state['_parms']
+        obj._parms['batch_build_flags'] = set(state['_parms']['batch_build_flags'])
+        obj._parms['single_build_flags'] = set(state['_parms']['single_build_flags'])
+        obj._parms['global_build_flags'] = set(state['_parms']['global_build_flags'])
+
+        obj._sources = {}
+        for path, src_state in sources.items():
+            obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+
+        # pylint: enable=protected-access
+
+        return obj
 
     def shouldParse(self):
         "Checks if we should parse the configuration file"
@@ -207,11 +247,12 @@ class ConfigParser(object):
         return self._sources.keys()
 
     def getSourceByPath(self, path):
-        ""
+        "Returns a source object given its path"
         self._parseIfNeeded()
         return self._sources[p.abspath(path)]
 
     def hasSource(self, path):
+        "Checks if a given path exists in the configuration file"
         self._parseIfNeeded()
         if self.filename is None:
             return True

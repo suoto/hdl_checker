@@ -32,13 +32,13 @@ def writeListToFile(filename, _list):
     if os.name == 'posix':
         subp.check_call(['touch', filename])
     else:
-        cmd = 'copy /Y "%s" +,,' % filename
+        cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
         _logger.info(cmd)
         subp.check_call(cmd, shell=True)
 
-    for i in range(3):
+    for i in range(10):
         if p.getmtime(filename) != mtime:
             break
         _logger.debug("Waiting...[%d]", i)
-        time.sleep(0.5)
+        time.sleep(0.1)
 

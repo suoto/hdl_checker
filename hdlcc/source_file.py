@@ -51,16 +51,38 @@ class VhdlSourceFile(object):
 
         self.abspath = os.path.abspath(filename)
         self._lock = threading.Lock()
-        threading.Thread(target=self._parseIfChanged).start()
+        threading.Thread(target=self._parseIfChanged,
+                         name='_parseIfChanged').start()
 
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        del state['_lock']
+    def getState(self):
+        "Gets a dict that describes the current state of this object"
+        state = {
+            'filename' : self.filename,
+            'abspath' : self.abspath,
+            'library' : self.library,
+            'flags' : list(self.flags),
+            '_design_units' : self._design_units,
+            '_deps' : self._deps,
+            '_mtime' : self._mtime,
+            }
         return state
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self._lock = threading.Lock()
+    @classmethod
+    def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
+        # pylint: disable=protected-access
+        obj = super(VhdlSourceFile, cls).__new__(cls)
+        obj.filename = state['filename']
+        obj.abspath = state['abspath']
+        obj.library = state['library']
+        obj.flags = set(state['flags'])
+        obj._design_units = state['_design_units']
+        obj._deps = state['_deps']
+        obj._mtime = state['_mtime']
+        obj._lock = threading.Lock()
+        # pylint: enable=protected-access
+
+        return obj
 
     def __repr__(self):
         return "VhdlSourceFile('%s', library='%s', flags=%s)" % \

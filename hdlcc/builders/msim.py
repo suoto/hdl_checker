@@ -18,6 +18,7 @@ import os
 import os.path as p
 import re
 from .base_builder import BaseBuilder
+from hdlcc.exceptions import SanityCheckError
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
@@ -110,13 +111,19 @@ class MSim(BaseBuilder):
         }]
 
     def checkEnvironment(self):
-        stdout = self._subprocessRunner(['vcom', '-version'])
-        self._version = \
-                re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
-                stdout[0])[0]
-        self._logger.info("vcom version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        try:
+            stdout = self._subprocessRunner(['vcom', '-version'])
+            self._version = \
+                    re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
+                    stdout[0])[0]
+            self._logger.info("vcom version string: '%s'. " + \
+                    "Version number is '%s'", \
+                    stdout[:-1], self._version)
+        except Exception as exc:
+            import traceback
+            self._logger.warning("Sanity check failed:\n%s",
+                                 traceback.format_exc())
+            raise SanityCheckError(str(exc))
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
@@ -164,6 +171,10 @@ class MSim(BaseBuilder):
 
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
+        if p.exists(_modelsim_ini):
+            self._logger.warning("modelsim.ini already exists at '%s', "
+                                 "returning", _modelsim_ini)
+            return
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
@@ -175,10 +186,6 @@ class MSim(BaseBuilder):
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
             assert 0
 
-        if p.exists('modelsim.ini'):
-            self._logger.info("We shouldn't find a modelsim.ini file at '%s'",
-                                 p.abspath(os.curdir))
-            os.remove('modelsim.ini')
 
         self._subprocessRunner(['vmap', '-c'])
 

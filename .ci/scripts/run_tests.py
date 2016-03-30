@@ -16,12 +16,18 @@
 "Script should be called within Vim to launch tests"
 
 import os
+import os.path as p
 import sys
 import logging
 import nose2
 import coverage
 
 _logger = logging.getLogger(__name__)
+
+_CI = os.environ.get("CI", None) is not None
+_APPVEYOR = os.environ.get("APPVEYOR", None) is not None
+_TRAVIS = os.environ.get("TRAVIS", None) is not None
+_LOG = p.abspath(p.expanduser("~/tests.log"))
 
 def test(nose2_argv):
     cov = coverage.Coverage(config_file='.coveragerc')
@@ -70,7 +76,7 @@ def setupLogging():
     logging.root.addHandler(rainbow_stream_handler)
     #  logging.root.addHandler(stream_handler)
 
-def main():
+def run_tests():
     if '--clear' in sys.argv[1:]:
         clear()
         sys.argv.pop(sys.argv.index('--clear'))
@@ -80,25 +86,40 @@ def main():
         sys.argv.pop(sys.argv.index('--debug'))
 
     logging.getLogger('nose2').setLevel(logging.INFO)
-    file_handler = logging.FileHandler("tests.log")
+    file_handler = logging.FileHandler(_LOG)
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
     logging.root.addHandler(file_handler)
     logging.root.setLevel(logging.DEBUG)
 
+    global _logger
+    _logger = logging.getLogger(__name__)
+
+    _logger.info("Environment info:")
+    _logger.info(" - CI:       %s", _CI)
+    _logger.info(" - APPVEYOR: %s", _APPVEYOR)
+    _logger.info(" - TRAVIS:   %s", _TRAVIS)
+    _logger.info(" - LOG:      %s", _LOG)
+
     tests = test(nose2_argv=sys.argv)
 
     return tests.result.wasSuccessful()
 
-if __name__ == '__main__':
-    if main():
-        sys.exit(0)
-    else:
-        if os.environ.get('CI', None) is not None and os.name == 'nt':
-            sys.stdout.write("\n\n\n\n=== LOG START ===\n" + \
-                             open('tests.log', 'r').read() + \
-                             "=== LOG END ===\n\n\n\n")
-            sys.stdout.flush()
-        sys.exit(1)
+def _uploadAppveyorArtifact(path):
+    "Uploads 'path' to Appveyor artifacts"
+    assert _APPVEYOR, "Appveyor artifacts can only be uploaded to Appveyor"
+    cmd = "appveyor PushArtifact \"%s\"" % path
+    print cmd
+    _logger.info(cmd)
+    for line in os.popen(cmd).read().splitlines():
+        print line
+        _logger.info(line)
 
+def main():
+    passed = run_tests()
+
+    return 0 if passed else 1
+
+if __name__ == '__main__':
+    sys.exit(main())
 

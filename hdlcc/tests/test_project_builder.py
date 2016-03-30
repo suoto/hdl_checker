@@ -80,144 +80,171 @@ with such.A('hdlcc test using hdl_lib') as it:
 
     with it.having('a valid project file'):
 
-        with it.having('a valid environment'):
+        @it.has_setup
+        def setup():
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
 
-            @it.has_setup
-            def setup():
-                if p.exists('modelsim.ini'):
-                    _logger.warning("Modelsim ini found at %s",
-                                    p.abspath('modelsim.ini'))
-                    os.remove('modelsim.ini')
+            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
 
-                hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            it.builder_env = os.environ.copy()
 
-                it.builder_env = os.environ.copy()
+            _logger.info("Builder env path:")
+            for path in it.builder_env['PATH'].split(os.pathsep):
+                _logger.info(" >'%s'", path)
 
-                _logger.info("Builder env path:")
-                for path in it.builder_env['PATH'].split(os.pathsep):
-                    _logger.info(" >'%s'", path)
+            builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
-                builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
-
-                if os.environ.get('CI', '') == 'true' and \
-                        BUILDER_NAME is not None:
-                    with it.assertRaises(hdlcc.exceptions.SanityCheckError):
-                        builder(it.DUMMY_PROJECT_FILE)
-
-                it.original_env = os.environ.copy()
-                os.environ = it.builder_env.copy()
-
-                if os.name == 'posix':
-                    os.environ['PATH'] = \
-                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-                elif os.name == 'nt':
-                    os.putenv(
-                        'PATH',
-                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-                    os.environ['PATH'] = \
-                        os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-
-                it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
-
-                _logger.info("New env path:")
-                for path in os.environ['PATH'].split(os.pathsep):
-                    _logger.info(" >'%s'", path)
-
-                try:
+            if os.environ.get('CI', '') == 'true' and \
+                    BUILDER_NAME is not None:
+                with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                     builder(it.DUMMY_PROJECT_FILE)
-                except hdlcc.exceptions.SanityCheckError:
-                    it.fail("Builder creation failed even after configuring "
-                            "the builder path")
 
-            @it.has_teardown
-            def teardown():
-                hdlcc.ProjectBuilder.clean(PROJECT_FILE)
-                os.environ = it.original_env.copy()
-                target_dir = it.project._config.getTargetDir()
-                if p.exists(target_dir):
-                    shell.rmtree(target_dir)
-                if p.exists('modelsim.ini'):
-                    _logger.warning("Modelsim ini found at %s",
-                                    p.abspath('modelsim.ini'))
-                    os.remove('modelsim.ini')
-                del it.project
+            it.original_env = os.environ.copy()
+            os.environ = it.builder_env.copy()
 
-            @it.should('build project by dependency in background')
-            def test_001(case):
-                _logger.info("Creating project builder object")
-                it.project = StandaloneProjectBuilder()
-                _logger.info("Checking if msg queue is empty")
-                if PROJECT_FILE is None:
-                    _logger.warning("Skipping '%s'", case)
-                    return
-                it.assertTrue(it.project._msg_queue.empty())
-                it.assertFalse(it.project.finishedBuilding())
+            if os.name == 'posix':
+                os.environ['PATH'] = \
+                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+            elif os.name == 'nt':
+                os.putenv(
+                    'PATH',
+                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
+                os.environ['PATH'] = \
+                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
 
-            @it.should('notify if a build is already running')
-            def test_002(case):
-                if PROJECT_FILE is None:
-                    _logger.warning("Skipping '%s'", case)
-                    return
-                it.project.buildByDependency()
-                while it.project._msg_queue.empty():
-                    time.sleep(0.1)
-                messages = []
-                while not it.project._msg_queue.empty():
-                    messages.append(it.project._msg_queue.get())
+            it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
 
-                try:
-                    it.assertIn(('info', 'Build thread is already running'),
-                                messages)
-                except:
-                    it.project.waitForBuild()
-                    raise
+            _logger.info("New env path:")
+            for path in os.environ['PATH'].split(os.pathsep):
+                _logger.info(" >'%s'", path)
 
-            @it.should('warn when trying to build a source before the build '
-                       'thread completes')
-            def test_003(case):
-                if PROJECT_FILE is None:
-                    _logger.warning("Skipping '%s'", case)
-                    return
-                filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                  'async_fifo_tb.vhd')
+            try:
+                builder(it.DUMMY_PROJECT_FILE)
+            except hdlcc.exceptions.SanityCheckError:
+                it.fail("Builder creation failed even after configuring "
+                        "the builder path")
 
-                it.assertTrue(it.project._msg_queue.empty())
+        @it.has_teardown
+        def teardown():
+            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            os.environ = it.original_env.copy()
+            target_dir = it.project._config.getTargetDir()
+            if p.exists(target_dir):
+                shell.rmtree(target_dir)
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
+            del it.project
 
-                it.project.getMessagesByPath(filename)
+        @it.should('build project by dependency in background')
+        def test_001(case):
+            _logger.info("Creating project builder object")
+            it.project = StandaloneProjectBuilder()
+            _logger.info("Checking if msg queue is empty")
+            if PROJECT_FILE is None:
+                _logger.warning("Skipping '%s'", case)
+                return
+            it.assertTrue(it.project._msg_queue.empty())
+            it.assertFalse(it.project.finishedBuilding())
 
-                for _ in range(50):
-                    if it.project._msg_queue.empty():
-                        break
-                    time.sleep(0.1)
+        @it.should('notify if a build is already running')
+        def test_002(case):
+            if PROJECT_FILE is None:
+                _logger.warning("Skipping '%s'", case)
+                return
+            it.project.buildByDependency()
+            while it.project._msg_queue.empty():
+                time.sleep(0.1)
+            messages = []
+            while not it.project._msg_queue.empty():
+                messages.append(it.project._msg_queue.get())
 
-                messages = []
-                while not it.project._msg_queue.empty():
-                    messages.append(it.project._msg_queue.get())
-
-                try:
-                    it.assertIn(('warning', "Project hasn't finished building, "
-                                            "try again after it finishes."),
-                                messages)
-                except:
-                    it.project.waitForBuild()
-                    raise
-
+            try:
+                it.assertIn(('info', 'Build thread is already running'),
+                            messages)
+            except:
                 it.project.waitForBuild()
+                raise
 
-            @it.should('wait until build has finished')
-            def test_004():
+        @it.should('warn when trying to build a source before the build '
+                   'thread completes')
+        def test_003(case):
+            if PROJECT_FILE is None:
+                _logger.warning("Skipping '%s'", case)
+                return
+            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
+                              'async_fifo_tb.vhd')
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+            it.project.getMessagesByPath(filename)
+
+            for _ in range(50):
+                if it.project._msg_queue.empty():
+                    break
+                time.sleep(0.1)
+
+            messages = []
+            while not it.project._msg_queue.empty():
+                messages.append(it.project._msg_queue.get())
+
+            try:
+                it.assertIn(('warning', "Project hasn't finished building, "
+                                        "try again after it finishes."),
+                            messages)
+            except:
                 it.project.waitForBuild()
+                raise
 
-            @it.should('get messages by path')
-            def test_005():
-                filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                  'async_fifo_tb.vhd')
+            it.project.waitForBuild()
 
-                it.assertTrue(it.project._msg_queue.empty())
+        @it.should('wait until build has finished')
+        def test_004():
+            it.project.waitForBuild()
 
-                records = it.project.getMessagesByPath(filename)
+        @it.should('get messages by path')
+        def test_005():
+            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
+                              'async_fifo_tb.vhd')
 
-                it.assertIn(
+            it.assertTrue(it.project._msg_queue.empty())
+
+            records = it.project.getMessagesByPath(filename)
+
+            it.assertIn(
+                {'error_subtype' : 'Style',
+                 'line_number'   : 29,
+                 'checker'       : 'HDL Code Checker/static',
+                 'error_message' : "constant 'ADDR_WIDTH' is never used",
+                 'column'        : 14,
+                 'error_type'    : 'W',
+                 'error_number'  : '0',
+                 'filename'      : None},
+                records)
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+        @it.should('get updated messages')
+        def test_006():
+            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
+                              'async_fifo_tb.vhd')
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+            code = open(filename, 'r').read().split('\n')
+
+            code[28] = '-- ' + code[28]
+
+            writeListToFile(filename, code)
+
+            records = it.project.getMessagesByPath(filename)
+
+            try:
+                it.assertNotIn(
                     {'error_subtype' : 'Style',
                      'line_number'   : 29,
                      'checker'       : 'HDL Code Checker/static',
@@ -227,206 +254,177 @@ with such.A('hdlcc test using hdl_lib') as it:
                      'error_number'  : '0',
                      'filename'      : None},
                     records)
-
-                it.assertTrue(it.project._msg_queue.empty())
-
-            @it.should('get updated messages')
-            def test_006():
-                filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                  'async_fifo_tb.vhd')
-
-                it.assertTrue(it.project._msg_queue.empty())
-
-                code = open(filename, 'r').read().split('\n')
-
-                code[28] = '-- ' + code[28]
-
+            finally:
+                # Remove the comment we added
+                code[28] = code[28][3:]
                 writeListToFile(filename, code)
 
-                records = it.project.getMessagesByPath(filename)
+            it.assertTrue(it.project._msg_queue.empty())
 
-                try:
-                    it.assertNotIn(
-                        {'error_subtype' : 'Style',
-                         'line_number'   : 29,
-                         'checker'       : 'HDL Code Checker/static',
-                         'error_message' : "constant 'ADDR_WIDTH' is never used",
-                         'column'        : 14,
-                         'error_type'    : 'W',
-                         'error_number'  : '0',
-                         'filename'      : None},
-                        records)
-                finally:
-                    # Remove the comment we added
-                    code[28] = code[28][3:]
-                    writeListToFile(filename, code)
+        @it.should('get messages by path of a different source')
+        def test_007(case):
+            if PROJECT_FILE is None:
+                _logger.warning("Skipping '%s'", case)
+                return
+            filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
 
-                it.assertTrue(it.project._msg_queue.empty())
+            it.assertTrue(it.project._msg_queue.empty())
 
-            @it.should('get messages by path of a different source')
-            def test_007(case):
-                if PROJECT_FILE is None:
-                    _logger.warning("Skipping '%s'", case)
-                    return
-                filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
+            records = it.project.getMessagesByPath(filename)
 
-                it.assertTrue(it.project._msg_queue.empty())
+            it.assertEquals(records, [])
 
-                records = it.project.getMessagesByPath(filename)
+            it.assertTrue(it.project._msg_queue.empty())
 
-                it.assertEquals(records, [])
+        @it.should('get updated messages of a different source')
+        def test_008():
+            if BUILDER_NAME is None:
+                return
 
-                it.assertTrue(it.project._msg_queue.empty())
+            filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
+            it.assertTrue(it.project._msg_queue.empty())
 
-            @it.should('get updated messages of a different source')
-            def test_008():
-                if BUILDER_NAME is None:
-                    return
+            code = open(filename, 'r').read().split('\n')
 
-                filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
-                it.assertTrue(it.project._msg_queue.empty())
+            _logger.info("Commenting line 28 should yield an error")
+            _logger.info(repr(code[28]))
 
-                code = open(filename, 'r').read().split('\n')
+            code[28] = '-- ' + code[28]
 
-                _logger.info("Commenting line 28 should yield an error")
-                _logger.info(repr(code[28]))
+            writeListToFile(filename, code)
 
-                code[28] = '-- ' + code[28]
+            records = it.project.getMessagesByPath(filename)
 
+            try:
+                it.assertNotEquals(records, [])
+            finally:
+                # Remove the comment we added
+                code[28] = code[28][3:]
                 writeListToFile(filename, code)
 
-                records = it.project.getMessagesByPath(filename)
+            it.assertTrue(it.project._msg_queue.empty())
 
-                try:
-                    it.assertNotEquals(records, [])
-                finally:
-                    # Remove the comment we added
-                    code[28] = code[28][3:]
-                    writeListToFile(filename, code)
+        @it.should('rebuild sources when needed within the same library')
+        def test_009():
+            if BUILDER_NAME is None:
+                return
 
-                it.assertTrue(it.project._msg_queue.empty())
+            # Count how many messages each source has
+            source_msgs = {}
 
-            @it.should('rebuild sources when needed within the same library')
-            def test_009():
-                if BUILDER_NAME is None:
-                    return
+            for filename in (
+                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                    p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
 
-                # Count how many messages each source has
-                source_msgs = {}
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
 
-                for filename in (
-                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                        p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+            _logger.info("Changing common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
+                                'common_pkg.vhd')
 
-                    _logger.info("Getting messages for '%s'", filename)
-                    source_msgs[filename] = \
-                        it.project.getMessagesByPath(filename)
+            code = open(common_pkg, 'r').read().split('\n')
 
-                _logger.info("Changing common_pkg to force rebuilding "
-                             "synchronizer and another one I don't recall "
-                             "right now")
-                common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
-                                    'common_pkg.vhd')
+            writeListToFile(common_pkg,
+                            code[:9] + \
+                            ["    constant TESTING : integer := 4;"] + \
+                            code[9:])
 
-                code = open(common_pkg, 'r').read().split('\n')
+            # The number of messages on all sources should not change
+            it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
 
-                writeListToFile(common_pkg,
-                                code[:9] + \
-                                ["    constant TESTING : integer := 4;"] + \
-                                code[9:])
+            for filename in (
+                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                    p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
 
-                # The number of messages on all sources should not change
-                it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+                if source_msgs[filename]:
+                    _logger.info("Source %s had the following messages:\n%s",
+                                 filename,
+                                 "\n".join([str(x) for x in
+                                            source_msgs[filename]]))
+                else:
+                    _logger.info("Source %s has no previous messages",
+                                 filename)
 
-                for filename in (
-                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                        p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+                it.assertEquals(source_msgs[filename],
+                                it.project.getMessagesByPath(filename))
 
-                    if source_msgs[filename]:
-                        _logger.info("Source %s had the following messages:\n%s",
-                                     filename,
-                                     "\n".join([str(x) for x in
-                                                source_msgs[filename]]))
-                    else:
-                        _logger.info("Source %s has no previous messages",
-                                     filename)
+            _logger.info("Restoring previous content")
+            writeListToFile(common_pkg, code)
 
-                    it.assertEquals(source_msgs[filename],
-                                    it.project.getMessagesByPath(filename))
+        @it.should('rebuild sources when needed for different libraries')
+        def test_010():
+            if BUILDER_NAME is None:
+                return
 
-                _logger.info("Restoring previous content")
-                writeListToFile(common_pkg, code)
+            # Count how many messages each source has
+            source_msgs = {}
 
-            @it.should('rebuild sources when needed for different libraries')
-            def test_010():
-                if BUILDER_NAME is None:
-                    return
+            for filename in (
+                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                    p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
 
-                # Count how many messages each source has
-                source_msgs = {}
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
 
-                for filename in (
-                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
+            _logger.info("Changing common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
+                                'common_pkg.vhd')
 
-                    _logger.info("Getting messages for '%s'", filename)
-                    source_msgs[filename] = \
-                        it.project.getMessagesByPath(filename)
+            code = open(common_pkg, 'r').read().split('\n')
 
-                _logger.info("Changing common_pkg to force rebuilding "
-                             "synchronizer and another one I don't recall "
-                             "right now")
-                common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
-                                    'common_pkg.vhd')
+            writeListToFile(common_pkg,
+                            code[:9] + \
+                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                            code[9:])
 
-                code = open(common_pkg, 'r').read().split('\n')
+            # The number of messages on all sources should not change
+            it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
 
-                writeListToFile(common_pkg,
-                                code[:9] + \
-                                ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-                                code[9:])
+            for filename in (
+                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
+                    p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
 
-                # The number of messages on all sources should not change
-                it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+                if source_msgs[filename]:
+                    _logger.info("Source %s had the following messages:\n%s",
+                                 filename,
+                                 "\n".join([str(x) for x in
+                                            source_msgs[filename]]))
+                else:
+                    _logger.info("Source %s has no previous messages",
+                                 filename)
 
-                for filename in (
-                        p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                        p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
+                it.assertEquals(source_msgs[filename],
+                                it.project.getMessagesByPath(filename))
 
-                    if source_msgs[filename]:
-                        _logger.info("Source %s had the following messages:\n%s",
-                                     filename,
-                                     "\n".join([str(x) for x in
-                                                source_msgs[filename]]))
-                    else:
-                        _logger.info("Source %s has no previous messages",
-                                     filename)
+            _logger.info("Restoring previous content")
+            writeListToFile(common_pkg, code)
 
-                    it.assertEquals(source_msgs[filename],
-                                    it.project.getMessagesByPath(filename))
+        @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
+                   "a design unit can't be found")
+        def test_011():
+            if BUILDER_NAME is None:
+                return
 
-                _logger.info("Restoring previous content")
-                writeListToFile(common_pkg, code)
+            with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
+                it.project._findSourceByDesignUnit('some_lib.some_unit')
+                _logger.info("Raised exception: %s", str(exc))
 
-            @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
-                       "a design unit can't be found")
-            def test_011():
-                if BUILDER_NAME is None:
-                    return
-
-                with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
-                    it.project._findSourceByDesignUnit('some_lib.some_unit')
-                    _logger.info("Raised exception: %s", str(exc))
-
-                try:
-                    sources = it.project._findSourceByDesignUnit('memory.async_fifo')
-                    for source in sources:
-                        it.assertTrue(
-                            p.exists(source.filename),
-                            "Couldn't find source with path '%s'" % source.filename)
-                except hdlcc.exceptions.DesignUnitNotFoundError:
-                    it.fail("Shouldn't raise exception for a unit that is "
-                            "supposed to be found")
+            try:
+                sources = it.project._findSourceByDesignUnit('memory.async_fifo')
+                for source in sources:
+                    it.assertTrue(
+                        p.exists(source.filename),
+                        "Couldn't find source with path '%s'" % source.filename)
+            except hdlcc.exceptions.DesignUnitNotFoundError:
+                it.fail("Shouldn't raise exception for a unit that is "
+                        "supposed to be found")
 
 it.createTests(globals())
 

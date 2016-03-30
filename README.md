@@ -35,15 +35,14 @@ This is mostly up to you. Common methods:
     ```sh
     $ cd your/repo/path
     $ git submodule add https://github.com/suoto/hdlcc your/repo/submodules/path
-    $ git submodule update
+    $ git submodule update --init --recursive
     ```
 
-* Python distutils (under development)
+* Python distutils
 
     ```sh
     $ git clone https://github.com/suoto/hdlcc
-    $ cd hdlcc
-    $ python setup.py install
+    $ pip install hdlcc
     ```
 
 ---
@@ -58,12 +57,11 @@ Besides that, it can be used [standalone](#standalone) or [within Python](#withi
 
 ### Standalone
 
-You can use [hdlcc/hdlcc.py](https://github.com/suoto/hdlcc/blob/master/hdlcc.py)
-as a standalone tool and a source for some usage examples.
+Installing `hdlcc` via pip allows running it as a standalone command.
 
 ```shell
-$ ./hdlcc.py  -h
-usage: hdlcc.py [-h] [--verbose] [--clean] [--build]
+$ hdlcc -h
+usage: hdlcc [-h] [--verbose] [--clean] [--build]
                 [--sources [SOURCES [SOURCES ...]]] [--debug-print-sources]
                 [--debug-print-compile-order] [--debug-parse-source-file]
                 [--debug-run-static-check]
@@ -139,7 +137,7 @@ requesting help.
     [W-0] @ (29,14): constant 'ADDR_WIDTH' is never used
     ```
 
- (The example above uses GHDL to build 
+ (The example above uses GHDL to build
 [suoto/hdl_lib/code/memory/testbench/async_fifo_tb.vhd][async_fifo_tb])
 
 ---

@@ -27,7 +27,7 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = p.join("hdlcc", "runner.py")
+HDLCC_LOCATION = p.join("hdlcc", "standalone.py")
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get("BUILDER_PATH", p.expanduser("~/ghdl/bin/"))
 
@@ -62,11 +62,10 @@ def shell(cmd):
         else:
             _logger.debug(line)
 
-
     if exc:
         _logger.warning("os.path: %s", os.environ["PATH"])
         _logger.warning("_BUILDER_ENV path: %s", _BUILDER_ENV["PATH"])
-        raise exc
+        raise exc   # pylint: disable=raising-bad-type
 
     return stdout
 
@@ -112,6 +111,9 @@ with such.A("hdlcc standalone tool") as it:
 
                     ("--debug-parse-source-file", "-s",
                      "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
+
+                    ("--debug-parse-source-file", "-s",
+                     "./.ci/hdl_lib/memory/ram_inference.vhd"),
 
                     ("--debug-run-static-check", "-s",
                      "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),)

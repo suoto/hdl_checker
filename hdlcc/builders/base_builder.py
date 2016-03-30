@@ -22,7 +22,6 @@ import time
 import subprocess as subp
 from threading import Lock
 
-import hdlcc.exceptions
 from hdlcc.config import Config
 
 class BaseBuilder(object):
@@ -49,13 +48,7 @@ class BaseBuilder(object):
         else:
             self._logger.info("%s already exists", self._target_folder)
 
-        try:
-            self.checkEnvironment()
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s",
-                                 traceback.format_exc())
-            raise hdlcc.exceptions.SanityCheckError(str(exc))
+        self.checkEnvironment()
 
         try:
             self._parseBuiltinLibraries()
@@ -68,17 +61,26 @@ class BaseBuilder(object):
         except NotImplementedError:
             pass
 
-    def __getstate__(self):
+    @classmethod
+    def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
+        # pylint: disable=protected-access
+        obj = super(BaseBuilder, cls).__new__(cls)
+        obj._logger = logging.getLogger(state['_logger'])
+        del state['_logger']
+        obj._lock = Lock()
+        obj.__dict__.update(state)
+        # pylint: enable=protected-access
+
+        return obj
+
+    def getState(self):
+        "Gets a dict that describes the current state of this object"
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
         del state['_lock']
         return state
 
-    def __setstate__(self, state):
-        self._logger = logging.getLogger(state['_logger'])
-        del state['_logger']
-        self._lock = Lock()
-        self.__dict__.update(state)
 
     @abc.abstractmethod
     def _shouldIgnoreLine(self, line):
@@ -118,11 +120,11 @@ class BaseBuilder(object):
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             import traceback
-            self._logger.info("Exception has error code %d. Traceback:",
-                              exc.returncode)
+            self._logger.debug("Command '%s' failed with error code %d",
+                               cmd_with_args, exc.returncode)
 
             for line in traceback.format_exc().split('\n'): # pragma: no-cover
-                self._logger.info(line)
+                self._logger.debug(line)
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging

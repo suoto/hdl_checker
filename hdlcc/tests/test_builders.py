@@ -94,6 +94,8 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         def setup():
             it.original_env = os.environ.copy()
             os.environ = _BUILDER_ENV.copy()
+            if os.name == 'nt':
+                os.putenv('PATH', _BUILDER_ENV['PATH'])
             cls = hdlcc.builders.getBuilderByName(BUILDER_NAME)
             it.builder = cls('._%s' % BUILDER_NAME)
 

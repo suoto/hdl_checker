@@ -22,7 +22,7 @@ import logging
 import time
 import argparse
 from prettytable import PrettyTable
-from sys import stdout, path
+import sys
 
 try:
     import cProfile as profile
@@ -41,17 +41,17 @@ def _pathSetup(): # pragma: no cover
     "Insert hdlcc module into Python path"
     path_to_this_file = p.realpath(__file__).split(p.sep)[:-2]
     hdlcc_path = p.sep.join(path_to_this_file)
-    if hdlcc_path not in path:
-        path.insert(0, hdlcc_path)
+    if hdlcc_path not in sys.path:
+        sys.path.insert(0, hdlcc_path)
 
 if __name__ == '__main__':
     _pathSetup()
 
-from config import Config
-from project_builder import ProjectBuilder
+import hdlcc
 
-class StandaloneProjectBuilder(ProjectBuilder):
-    "Implementation of standalone hdlcc.ProjectBuilder to run via shell"
+class StandaloneProjectBuilder(hdlcc.project_builder.ProjectBuilder):
+    """Implementation of standalone hdlcc.project_builder.ProjectBuilder
+    to run via shell"""
     _ui_logger = logging.getLogger('UI')
     def _handleUiInfo(self, message):
         self._ui_logger.info(message)
@@ -129,8 +129,8 @@ def parseArguments():
     if args.sources:
         args.sources = [source for sublist in args.sources for source in sublist]
 
-    Config.log_level = args.log_level
-    #  Config.setupBuild()
+    hdlcc.config.Config.log_level = args.log_level
+    #  hdlcc.config.Config.setupBuild()
 
     return args
 
@@ -139,13 +139,14 @@ def runStandaloneSourceFileParse(fname):
     from hdlcc.source_file import VhdlSourceFile
     source = VhdlSourceFile(fname)
     print "Source: %s" % source
+
     design_units = source.getDesignUnits()
-    if design_units:
+    if design_units: # pragma: no cover
         print " - Design_units:"
         for unit in design_units:
             print " -- %s" % str(unit)
     dependencies = source.getDependencies()
-    if dependencies:
+    if dependencies: # pragma: no cover
         print " - Dependencies:"
         for dependency in dependencies:
             print " -- %s.%s" % (dependency['library'], dependency['unit'])
@@ -210,12 +211,14 @@ def runner(args):
         project.saveCache()
 
 def setupLogging():
-    path.insert(0, p.abspath('dependencies/rainbow_logging_handler/'))
+    path_to_this_file = p.sep.join(p.realpath(__file__).split(p.sep)[:-2])
+    sys.path.insert(0, p.sep.join([path_to_this_file, '.ci',
+                               'rainbow_logging_handler']))
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         # pylint: disable=bad-whitespace
         stream_handler = RainbowLoggingHandler(
-            stdout,
+            sys.stdout,
             #  Customizing each column's color
             color_asctime          = ('dim white',  'black'),
             color_name             = ('dim white',  'black'),
@@ -230,7 +233,7 @@ def setupLogging():
             color_message_critical = ('bold white', 'red'))
         # pylint: enable=bad-whitespace
     except ImportError: # pragma: no cover
-        stream_handler = logging.StreamHandler(stdout)
+        stream_handler = logging.StreamHandler(sys.stdout)
 
     logging.root.addHandler(stream_handler)
     logging.root.setLevel(logging.WARNING)
@@ -250,5 +253,5 @@ def main():
     _logger.info("Process took %.2fs", (end - start))
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
 

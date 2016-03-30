@@ -17,6 +17,7 @@
 import os
 import re
 from .base_builder import BaseBuilder
+from hdlcc.exceptions import SanityCheckError
 
 class GHDL(BaseBuilder):
     '''Builder implementation of the GHDL compiler'''
@@ -83,13 +84,19 @@ class GHDL(BaseBuilder):
         return [record]
 
     def checkEnvironment(self):
-        stdout = self._subprocessRunner(['ghdl', '--version'])
-        self._version = \
-                re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
-                stdout[0])[0]
-        self._logger.info("GHDL version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        try:
+            stdout = self._subprocessRunner(['ghdl', '--version'])
+            self._version = \
+                    re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
+                    stdout[0])[0]
+            self._logger.info("GHDL version string: '%s'. " + \
+                    "Version number is '%s'", \
+                    stdout[:-1], self._version)
+        except Exception as exc:
+            import traceback
+            self._logger.warning("Sanity check failed:\n%s",
+                                 traceback.format_exc())
+            raise SanityCheckError(str(exc))
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
