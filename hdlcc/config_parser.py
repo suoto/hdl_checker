@@ -88,6 +88,7 @@ class ConfigParser(object):
         return "\n".join(_repr)
 
     def getState(self):
+        "Gets a dict that describes the current state of this object"
         state = {}
         state['filename'] = self.filename
         state['_timestamp'] = self._timestamp
@@ -106,6 +107,7 @@ class ConfigParser(object):
 
     @classmethod
     def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
         obj = super(ConfigParser, cls).__new__(cls)
 
         # pylint: disable=protected-access
@@ -245,11 +247,12 @@ class ConfigParser(object):
         return self._sources.keys()
 
     def getSourceByPath(self, path):
-        ""
+        "Returns a source object given its path"
         self._parseIfNeeded()
         return self._sources[p.abspath(path)]
 
     def hasSource(self, path):
+        "Checks if a given path exists in the configuration file"
         self._parseIfNeeded()
         if self.filename is None:
             return True

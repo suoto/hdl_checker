@@ -55,6 +55,7 @@ class VhdlSourceFile(object):
                          name='_parseIfChanged').start()
 
     def getState(self):
+        "Gets a dict that describes the current state of this object"
         state = {
             'filename' : self.filename,
             'abspath' : self.abspath,
@@ -68,6 +69,8 @@ class VhdlSourceFile(object):
 
     @classmethod
     def recoverFromState(cls, state):
+        "Returns an object of cls based on a given state"
+        # pylint: disable=protected-access
         obj = super(VhdlSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
         obj.abspath = state['abspath']
@@ -77,6 +80,7 @@ class VhdlSourceFile(object):
         obj._deps = state['_deps']
         obj._mtime = state['_mtime']
         obj._lock = threading.Lock()
+        # pylint: enable=protected-access
 
         return obj
 

@@ -245,9 +245,8 @@ def main():
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
     if runner_args.debug_profiling:
-        open(runner_args.debug_profiling, 'w').close()
-        #  globals()['runner_args'] = runner_args
-        #  profile.run('runner(runner_args)', runner_args.debug_profiling)
+        globals()['runner_args'] = runner_args
+        profile.run('runner(runner_args)', runner_args.debug_profiling)
     else:
         runner(runner_args)
     end = time.time()

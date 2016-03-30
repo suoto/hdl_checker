@@ -53,8 +53,8 @@ environment:
 
 
 # build cache to preserve files/folders between builds
-# cache:
-#   - '%CACHE_PATH%'
+cache:
+  - '%CACHE_PATH%'
 
 # scripts that run after cloning repository
 install:
@@ -90,3 +90,12 @@ install:
 # We won't build or run tests from here
 build: off
 test: off
+
+on_failure:
+  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log"
+  - appveyor PushArtifact hdlcc_failure.zip
+  # - appveyor PushArtifact %HOMEPATH%\\*.log
+
+artifacts:
+  - path: "%HOMEPATH%\\*.log"
+    name: Logs

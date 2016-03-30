@@ -175,7 +175,6 @@ class MSim(BaseBuilder):
             self._logger.warning("modelsim.ini already exists at '%s', "
                                  "returning", _modelsim_ini)
             return
-
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
@@ -187,11 +186,12 @@ class MSim(BaseBuilder):
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
             assert 0
 
-        self._subprocessRunner(['vmap', '-c'])
-        self._logger.warning("After vmap at '%s'", p.abspath(os.curdir))
 
+        self._subprocessRunner(['vmap', '-c'])
+
+        self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
         for _dir in os.listdir(p.abspath(os.curdir)):
-            self._logger.warning("- '%s'", _dir)
+            self._logger.debug("- '%s'", _dir)
 
         self._logger.info("Current dir is %s, changing to %s",
                           p.abspath(os.curdir), cwd)

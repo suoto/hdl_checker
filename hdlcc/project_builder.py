@@ -114,21 +114,21 @@ class ProjectBuilder(object):
         """Method that should be overriden to handle errors messages
         from HDL Code Checker to the user"""
 
-    def _postUnpicklingSanityCheck(self):
+    def _postCacheRecoveryCheck(self):
         "Sanity checks to ensure the state after unpickling is still valid"
-        self._logger.info("Running post recover check")
+        self._logger.debug("Running post recover check")
         try:
             self.builder.checkEnvironment()
         except hdlcc.exceptions.SanityCheckError:
-            self._handleUiError("Failed to create builder '%s'" % \
-                self.builder.__builder_name__)
+            _msg = "Failed to create builder '%s'" % \
+                        self.builder.__builder_name__
+            self._logger.warning(_msg)
+            self._handleUiError(_msg)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
-        self._logger.info("OK")
 
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
         sources = []
-        #  for source in self.sources.values():
         for source in self._config.getSources():
             if design_unit in source.getDesignUnitsDotted():
                 sources += [source]
@@ -378,7 +378,7 @@ class ProjectBuilder(object):
             self.builder = builder_class(self._config.getTargetDir())
         else:
             self._setState(cache)
-            self._postUnpicklingSanityCheck()
+            self._postCacheRecoveryCheck()
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"

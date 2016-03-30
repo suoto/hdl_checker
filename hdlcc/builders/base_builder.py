@@ -22,7 +22,6 @@ import time
 import subprocess as subp
 from threading import Lock
 
-import hdlcc.exceptions
 from hdlcc.config import Config
 
 class BaseBuilder(object):
@@ -38,7 +37,7 @@ class BaseBuilder(object):
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__name__ + '.' + self.__builder_name__)
+        self._logger = logging.getLogger(__package__ + '.' + self.__builder_name__)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []
@@ -81,6 +80,7 @@ class BaseBuilder(object):
         state['_logger'] = self._logger.name
         del state['_lock']
         return state
+
 
     @abc.abstractmethod
     def _shouldIgnoreLine(self, line):

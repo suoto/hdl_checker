@@ -291,20 +291,35 @@ with such.A('hdlcc project with persistency') as it:
             _logger.info("Building with changed env")
 
             project = StandaloneProjectBuilder()
+            time.sleep(1)
             project.waitForBuild()
+            time.sleep(1)
             project.saveCache()
+            time.sleep(1)
 
+            _logger.info("Searching UI messages")
+
+            matches, _ = _findMessageStartingWith(project, "Failed to create builder")
+
+            if not matches:
+                it.fail("Project failed to warn that it couldn't recover "
+                        "from cache")
+
+        def _findMessageStartingWith(project, msg_start, msg_level=None):
             messages = []
-            passed = False
+            matches = []
+            if project._msg_queue.empty():
+                _logger.info("Message queue is empty...")
+
             while not project._msg_queue.empty():
-                _, message = project._msg_queue.get()
-                if message.startswith("Failed to create builder"):
-                    passed = True
+                level, message = project._msg_queue.get()
+                _logger.info("Message: [%s] %s", level, message)
+                if msg_level is None or msg_level == level:
+                    if message.startswith(msg_start):
+                        matches += [(level, message)]
                 messages += [message]
 
-            it.assertTrue(passed,
-                          "Project shouldn't have recovered from cache. "
-                          "Messages found:\n%s" % "\n".join(messages))
+            return matches, messages
 
 it.createTests(globals())
 
