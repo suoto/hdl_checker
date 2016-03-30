@@ -114,18 +114,6 @@ class ProjectBuilder(object):
         """Method that should be overriden to handle errors messages
         from HDL Code Checker to the user"""
 
-    def _postCacheRecoveryCheck(self):
-        "Sanity checks to ensure the state after unpickling is still valid"
-        self._logger.debug("Running post recover check")
-        try:
-            self.builder.checkEnvironment()
-        except hdlcc.exceptions.SanityCheckError:
-            _msg = "Failed to create builder '%s'" % \
-                        self.builder.__builder_name__
-            self._logger.warning(_msg)
-            self._handleUiError(_msg)
-            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
-
     def _findSourceByDesignUnit(self, design_unit):
         "Finds the source files that have 'design_unit' defined"
         sources = []
@@ -320,8 +308,9 @@ class ProjectBuilder(object):
                 cache = serializer.load(open(cache_fname, 'r'))
                 self._handleUiInfo("Recovered cache from using '%s'" %
                                    serializer.__package__)
-            except ValueError:# (hdlcc.exceptions.SanityCheckError,
-                    #serializer.UnpicklingError, ImportError):
+                self._setState(cache)
+                self.builder.checkEnvironment()
+            except ValueError:
                 self._handleUiError(
                     "Unable to recover cache from '%s' using '%s'\n"
                     "Traceback:\n%s" % \
@@ -329,8 +318,6 @@ class ProjectBuilder(object):
                          traceback.format_exc()))
         else:
             _logger.info("File not found")
-
-        return cache
 
     def getCompilationOrder(self):
         "Returns the build order needed by the _buildByDependency method"
@@ -358,32 +345,44 @@ class ProjectBuilder(object):
         with self._lock:
             self._logger.info("Build has finished")
 
-    def _updateEnvironmentIfNeeded(self):
+    def _setupEnvIfNeeded(self):
         '''Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the
         appropriate builder objects'''
 
-        # If we have run before and we don't need to parse it, just
-        # return early
-        if not (self._config is None or self._config.shouldParse()):
-            return
+        _logger.debug("Current builder is %s", self.builder)
 
-        cache = self._recoverCache()
+        try:
+            # No builder defined means it's the first time we run, so
+            # try to recover from cache
+            if self.builder is None:
+                self._recoverCache()
 
-        if cache is None:
-            # No cache file or unable to recover from cache file
-            self._config = ConfigParser(self.project_file)
-            builder_name = self._config.getBuilder()
-            builder_class = hdlcc.builders.getBuilderByName(builder_name)
-            self.builder = builder_class(self._config.getTargetDir())
-        else:
-            self._setState(cache)
-            self._postCacheRecoveryCheck()
+            # No configuration defined means we failed to recover it
+            # from the cache
+            if self._config is None:
+                self._config = ConfigParser(self.project_file)
+
+            # If the builder is still undefined we failed to recover
+            # from cache
+            if self.builder is None:
+                builder_name = self._config.getBuilder()
+                builder_class = hdlcc.builders.getBuilderByName(builder_name)
+                self.builder = builder_class(self._config.getTargetDir())
+
+            self._logger.warning("Final builder is '%s'", repr(self.builder))
+            assert self.builder is not None
+
+        except hdlcc.exceptions.SanityCheckError as exc:
+            _msg = "Failed to create builder '%s'" % exc.builder
+            self._logger.warning(_msg)
+            self._handleUiError(_msg)
+            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"
         with self._lock:
-            self._updateEnvironmentIfNeeded()
+            self._setupEnvIfNeeded()
             built = 0
             errors = 0
             warnings = 0

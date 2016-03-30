@@ -123,7 +123,7 @@ class MSim(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
-            raise SanityCheckError(str(exc))
+            raise SanityCheckError(self.__builder_name__, str(exc))
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"

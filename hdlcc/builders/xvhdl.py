@@ -95,7 +95,7 @@ class XVHDL(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
-            raise SanityCheckError(str(exc))
+            raise SanityCheckError(self.__builder_name__, str(exc))
 
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined

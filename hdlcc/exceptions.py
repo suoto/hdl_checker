@@ -20,12 +20,14 @@ class VimHdlBaseException(Exception):
 class SanityCheckError(VimHdlBaseException):
     'Exception raised when a builder fails to execute its sanity check'
 
-    def __init__(self, msg):
+    def __init__(self, builder, msg):
         self._msg = msg
+        self.builder = builder
         super(SanityCheckError, self).__init__()
 
     def __str__(self):
-        return "Sanity check failed with message '%s'" % self._msg
+        return "Failed to create builder '%s' with message '%s'" % \
+                (self.builder, self._msg)
 
 class UnknownParameterError(VimHdlBaseException):
     '''Exception raised when an unknown parameter is found in a
