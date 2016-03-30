@@ -52,9 +52,9 @@ environment:
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
 
 
-# build cache to preserve files/folders between builds
-cache:
-  - '%CACHE_PATH%'
+# # build cache to preserve files/folders between builds
+# cache:
+#   - '%CACHE_PATH%'
 
 # scripts that run after cloning repository
 install:
@@ -85,7 +85,10 @@ install:
 
   - coverage combine
   - coverage report
+  - del ".ci\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd"
   - codecov
+  - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log"
+  - appveyor PushArtifact hdlcc_success.zip
 
 # We won't build or run tests from here
 build: off
@@ -94,8 +97,7 @@ test: off
 on_failure:
   - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log"
   - appveyor PushArtifact hdlcc_failure.zip
-  # - appveyor PushArtifact %HOMEPATH%\\*.log
 
-artifacts:
-  - path: "%HOMEPATH%\\*.log"
-    name: Logs
+# artifacts:
+#   - path: "%HOMEPATH%\\*.log"
+#     name: Logs

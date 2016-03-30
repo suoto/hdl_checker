@@ -118,9 +118,6 @@ def _uploadAppveyorArtifact(path):
 def main():
     passed = run_tests()
 
-    #  if _APPVEYOR:
-    #      _uploadAppveyorArtifact(_LOG)
-
     return 0 if passed else 1
 
 if __name__ == '__main__':

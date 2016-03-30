@@ -134,7 +134,7 @@ with such.A('hdlcc project with persistency') as it:
 
             project.saveCache()
 
-        @it.should('build %dx faster when recovering the info' %
+        @it.should('build at least %dx faster when recovering the info' %
                    CACHE_BUILD_SPEEDUP)
         def test_002():
             start = time.time()
