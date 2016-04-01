@@ -115,16 +115,17 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         def test():
             open(it._ok_file, 'w').write('\n'.join(_VHD_SAMPLE_ENTITY))
             source = VhdlSourceFile(it._ok_file)
-            records, _ = it.builder.build(source)
+            records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
+            it.assertEqual(rebuilds, [])
 
         @it.should('catch an error')
         def test():
             open(it._error_file, 'w').write('\n'.join(['hello\n'] + _VHD_SAMPLE_ENTITY))
             time.sleep(1)
             source = VhdlSourceFile(it._error_file)
-            records, _ = it.builder.build(source)
+            records, rebuilds = it.builder.build(source)
 
             for record in records:
                 _logger.info(record)
@@ -144,6 +145,8 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                 [samefile(ref['filename'], x['filename']) for x in records],
                 "Mention to file '%s' not found in '%s'" % \
                         (ref['filename'], [x['filename'] for x in records]))
+
+            it.assertEqual(rebuilds, [])
 
 if BUILDER_NAME is not None:
     it.createTests(globals())
