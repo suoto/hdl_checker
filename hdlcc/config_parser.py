@@ -21,17 +21,21 @@ import logging
 import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
 
-_RE_LEADING_AND_TRAILING_WHITESPACES = re.compile(r"^\s*|\s*$")
-_RE_MULTIPLE_WHITESPACES = re.compile(r"\s+")
+_splitAtWhitespaces = re.compile(r"\s+").split # pylint: disable=invalid-name
 
 def _extractSet(entry):
-    '''Extract a set by splitting a string at whitespaces, removing
+    '''Extract a list by splitting a string at whitespaces, removing
     empty values caused by leading/trailing/multiple whitespaces'''
-    _entry = _RE_LEADING_AND_TRAILING_WHITESPACES.sub("", entry)
-    if _entry:
-        return set(_RE_MULTIPLE_WHITESPACES.split(_entry))
-    else:
-        return set()
+    entry = str(entry).strip()
+    if not entry:
+        return []
+
+    result = []
+    for value in _splitAtWhitespaces(entry):
+        if value not in result:
+            result += [value]
+
+    return result
 
 _COMMENTS = re.compile(r"(\s*#.*|\n)")
 _SCANNER = re.compile("|".join([
@@ -53,9 +57,9 @@ class ConfigParser(object):
 
     def __init__(self, filename=None):
         self._parms = {
-            'batch_build_flags' : set(),
-            'single_build_flags' : set(),
-            'global_build_flags' : set()}
+            'batch_build_flags' : [],
+            'single_build_flags' : [],
+            'global_build_flags' : []}
 
         if filename is not None:
             self.filename = p.abspath(filename)
@@ -116,9 +120,9 @@ class ConfigParser(object):
         obj._timestamp = state.pop('_timestamp')
 
         obj._parms = state['_parms']
-        obj._parms['batch_build_flags'] = set(state['_parms']['batch_build_flags'])
-        obj._parms['single_build_flags'] = set(state['_parms']['single_build_flags'])
-        obj._parms['global_build_flags'] = set(state['_parms']['global_build_flags'])
+        obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
+        obj._parms['single_build_flags'] = state['_parms']['single_build_flags']
+        obj._parms['global_build_flags'] = state['_parms']['global_build_flags']
 
         obj._sources = {}
         for path, src_state in sources.items():
@@ -219,21 +223,21 @@ class ConfigParser(object):
         return self._parms['target_dir']
 
     def getSingleBuildFlagsByPath(self, path):
-        "Return a set of flags configured to build a single source"
+        "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
-            return set()
-        return self._sources[p.abspath(path)].flags | \
-               self._parms['single_build_flags']  | \
+            return []
+        return self._sources[p.abspath(path)].flags + \
+               self._parms['single_build_flags']  + \
                self._parms['global_build_flags']
 
     def getBatchBuildFlagsByPath(self, path):
-        "Return a set of flags configured to build a single source"
+        "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
-            return set()
-        return self._sources[p.abspath(path)].flags | \
-               self._parms['batch_build_flags']   | \
+            return []
+        return self._sources[p.abspath(path)].flags + \
+               self._parms['batch_build_flags'] + \
                self._parms['global_build_flags']
 
     def getSources(self):

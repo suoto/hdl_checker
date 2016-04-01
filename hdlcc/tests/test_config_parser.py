@@ -136,6 +136,25 @@ with such.A('config parser object') as it:
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.hasSource(path), result)
 
+        @it.should('keep build flags in the same order given by the user')
+        def test():
+            project_filename = 'test.prj'
+            source = '.ci/vim-hdl-examples/another_library/foo.vhd'
+            config_content = [
+                r'batch_build_flags = -a -b1 --some-flag some_value',
+                r'single_build_flags = --zero 0 --some-flag some_value 12',
+                r'builder = msim',
+                r'vhdl work ' + source,
+            ]
+
+            writeListToFile(project_filename, config_content)
+
+            parser = hdlcc.config_parser.ConfigParser(project_filename)
+            it.assertEqual(parser.getBatchBuildFlagsByPath(source),
+                           ['-a', '-b1', '--some-flag', 'some_value'])
+            it.assertEqual(parser.getSingleBuildFlagsByPath(source),
+                           ['--zero', '0', '--some-flag', 'some_value', '12'])
+
     with it.having('a project file with some non-standard stuff'):
         @it.has_teardown
         def teardown():
@@ -216,14 +235,14 @@ with such.A('config parser object') as it:
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), set())
+            it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), [])
 
         @it.should('return empty batch build flags for any path')
         @params('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), set())
+            it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), [])
 
         @it.should('say every path is on the project file')
         @params('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',

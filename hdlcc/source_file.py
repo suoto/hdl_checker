@@ -42,7 +42,7 @@ class VhdlSourceFile(object):
         self.filename = os.path.normpath(filename)
         self.library = library
         if flags is None:
-            self.flags = set()
+            self.flags = []
         else:
             self.flags = flags
         self._design_units = []
@@ -60,7 +60,7 @@ class VhdlSourceFile(object):
             'filename' : self.filename,
             'abspath' : self.abspath,
             'library' : self.library,
-            'flags' : list(self.flags),
+            'flags' : self.flags,
             '_design_units' : self._design_units,
             '_deps' : self._deps,
             '_mtime' : self._mtime,
@@ -75,7 +75,7 @@ class VhdlSourceFile(object):
         obj.filename = state['filename']
         obj.abspath = state['abspath']
         obj.library = state['library']
-        obj.flags = set(state['flags'])
+        obj.flags = state['flags']
         obj._design_units = state['_design_units']
         obj._deps = state['_deps']
         obj._mtime = state['_mtime']

@@ -213,10 +213,8 @@ class BaseBuilder(object):
         if build:
             if flags is None:
                 flags = []
-            # Build a set of unique flags and pass it as tuple
-            build_flags = set()
-            build_flags.update(source.flags)
-            build_flags.update(flags)
+            # Build a list of flags and pass it as tuple
+            build_flags = source.flags + flags
             with self._lock:
                 self._createLibrary(source)
                 records, rebuilds = \
