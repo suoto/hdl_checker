@@ -49,8 +49,8 @@ if __name__ == '__main__':
 
 import hdlcc
 
-class StandaloneProjectBuilder(hdlcc.project_builder.ProjectBuilder):
-    """Implementation of standalone hdlcc.project_builder.ProjectBuilder
+class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
+    """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
     to run via shell"""
     _ui_logger = logging.getLogger('UI')
     def _handleUiInfo(self, message):

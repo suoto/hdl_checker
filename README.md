@@ -93,12 +93,12 @@ Full API docs are not yet available. The example below should get you started, i
 you need more info, check the code or open an issue at the [issue tracker][issue_tracker]
 requesting help.
 
-1. Subclass the ```ProjectBuilder``` class from ```hdlcc.project_builder```
+1. Subclass the ```HdlCodeCheckerBase``` class from ```hdlcc.code_checker_base```
 
     ```python
-    from hdlcc.project_builder import ProjectBuilder
+    from hdlcc.code_checker_base import HdlCodeCheckerBase
 
-    class StandaloneProjectBuilder(ProjectBuilder):
+    class StandaloneProjectBuilder(HdlCodeCheckerBase):
         _ui_logger = logging.getLogger('UI')
         def handleUiInfo(self, message):
             self._ui_logger.info(message)

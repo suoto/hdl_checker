@@ -17,10 +17,15 @@
 
 from distutils.core import setup
 
+import os.path as p
+_VERSION_FILE = p.sep.join(p.abspath(__file__).split(p.sep)[:-1] +
+                           ['hdlcc', 'VERSION'])
+_version = str(open(_VERSION_FILE, 'r').readline()).strip()
+
 # pylint: disable=bad-whitespace
 setup(
     name             = 'hdlcc',
-    version          = '0.1',
+    version          = '{version}-{sha1}'.format(version=_version, sha1=0),
     description      = 'HDL code checker',
     author           = 'Andre Souto',
     author_email     = 'andre820@gmail.com',
@@ -28,6 +33,7 @@ setup(
     license          = 'GPLv3',
     packages         = ['hdlcc', 'hdlcc.builders'],
     install_requires = ['argcomplete', 'argparse', 'prettytable',],
+    data_files = ["hdlcc/VERSION", ],
     entry_points={
         'console_scripts' : ['hdlcc=hdlcc.standalone:main']
     }

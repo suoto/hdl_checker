@@ -44,7 +44,7 @@ from hdlcc.static_check import getStaticMessages
 _logger = logging.getLogger('build messages')
 
 # pylint: disable=too-many-instance-attributes,abstract-class-not-used
-class ProjectBuilder(object):
+class HdlCodeCheckerBase(object):
     "HDL Code Checker project builder class"
 
     GET_MESSAGES_WITH_THREADS = True
@@ -80,7 +80,7 @@ class ProjectBuilder(object):
         if project_file is None:
             _logger.debug("Project file is None, can't clean")
             return
-        cache_fname = ProjectBuilder._getCacheFilename(project_file)
+        cache_fname = HdlCodeCheckerBase._getCacheFilename(project_file)
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
@@ -306,8 +306,8 @@ class ProjectBuilder(object):
         if p.exists(cache_fname):
             try:
                 cache = serializer.load(open(cache_fname, 'r'))
-                self._handleUiInfo("Recovered cache from using '%s'" %
-                                   serializer.__package__)
+                self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
+                                   (cache_fname, serializer.__package__))
                 self._setState(cache)
                 self.builder.checkEnvironment()
             except ValueError:

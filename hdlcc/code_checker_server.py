@@ -12,16 +12,18 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"""hdlcc provides a Python API between a VHDL project and some HDL
-compilers to catch errors and warnings the compilers generate that can
-be used to populate syntax checkers and linters of text editors. It
-takes into account the sources dependencies when building so you don't
-need to provide a source list ordered by hand."""
+"HDL Code Checker server for running on a different process"
 
-__author__ = "Andre Souto (andre820@gmail.com)"
-__license__ = "GPLv3"
-#  __version__ = str(open(_VERSION_FILE, 'r').readline()).strip()
-__status__ = "Development"
-
+import logging
+import multiprocessing
 from hdlcc.code_checker_base import HdlCodeCheckerBase
+
+_logger = logging.getLogger('build messages')
+
+# pylint: disable=too-many-instance-attributes,abstract-class-not-used
+class HdlCodeCheckerSever(multiprocessing.Process):
+    "HDL Code Checker project builder class"
+    def __init__(self, *args, **kwargs):
+        self._code_checker = HdlCodeCheckerBase(*args, **kwargs)
+        self.name = 'HdlCodeCheckerSever.%d' % self._identity
 

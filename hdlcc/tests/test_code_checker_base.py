@@ -41,8 +41,8 @@ else:
 
 from multiprocessing import Queue
 
-class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
-    "Class for testing ProjectBuilder"
+class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
+    "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
     def __init__(self):
@@ -87,7 +87,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
 
             it.builder_env = os.environ.copy()
 
@@ -129,7 +129,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
             os.environ = it.original_env.copy()
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):

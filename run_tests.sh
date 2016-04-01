@@ -88,7 +88,7 @@ if [ -n "${STANDALONE}" ]; then
 fi
 
 if [ -n "${FALLBACK}" ]; then
-  ${TEST_RUNNER} $ARGS hdlcc.tests.test_project_builder hdlcc.tests.test_standalone_hdlcc
+  ${TEST_RUNNER} $ARGS hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone_hdlcc
   RESULT=$(($? || ${RESULT}))
   [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi

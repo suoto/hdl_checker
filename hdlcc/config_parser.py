@@ -22,6 +22,14 @@ import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
 
 _splitAtWhitespaces = re.compile(r"\s+").split # pylint: disable=invalid-name
+_replaceConfigFileComments = re.compile(r"(\s*#.*|\n)")
+_SCANNER = re.compile("|".join([
+    r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
+    r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
+        r"(?P<library>\w+)\s+"                  \
+        r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
+    ]), flags=re.I)
+
 
 def _extractSet(entry):
     '''Extract a list by splitting a string at whitespaces, removing
@@ -36,14 +44,6 @@ def _extractSet(entry):
             result += [value]
 
     return result
-
-_COMMENTS = re.compile(r"(\s*#.*|\n)")
-_SCANNER = re.compile("|".join([
-    r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
-    r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
-        r"(?P<library>\w+)\s+"                  \
-        r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
-    ]), flags=re.I)
 
 class ConfigParser(object):
     "Configuration info provider"
@@ -148,7 +148,7 @@ class ConfigParser(object):
             self._logger.debug("Parsing is required")
             self._updateTimestamp()
             for _line in open(self.filename, 'r').readlines():
-                line = _COMMENTS.sub("", _line)
+                line = _replaceConfigFileComments.sub("", _line)
                 self._parseLine(line)
 
             # If after parsing we haven't found the configured target
