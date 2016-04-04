@@ -45,8 +45,11 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
-    def __init__(self):
-        super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
+    def __init__(self, project_file=None):
+        if project_file is None:
+            super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
+        else:
+            super(StandaloneProjectBuilder, self).__init__(project_file)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(('info', message))
@@ -60,7 +63,26 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
-with such.A('hdlcc test using hdl_lib') as it:
+def _addBuilderToEnv(env):
+    os.environ = env.copy()
+    if os.name == 'posix':
+        os.environ['PATH'] = \
+            os.pathsep.join([BUILDER_PATH, env['PATH']])
+    elif os.name == 'nt':
+        os.putenv(
+            'PATH',
+            os.pathsep.join([BUILDER_PATH, env['PATH']]))
+        os.environ['PATH'] = \
+            os.pathsep.join([BUILDER_PATH, env['PATH']])
+
+    _logger.info("New env path:")
+    for path in os.environ['PATH'].split(os.pathsep):
+        _logger.info(" >'%s'", path)
+
+def _restorePreviousEnv(env):
+    os.environ = env.copy()
+
+with such.A('hdlcc project') as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
@@ -78,7 +100,7 @@ with such.A('hdlcc test using hdl_lib') as it:
         if p.exists(it.DUMMY_PROJECT_FILE):
             shell.rmtree(it.DUMMY_PROJECT_FILE)
 
-    with it.having('a valid project file'):
+    with it.having('hdl_lib as reference and a valid project file'):
 
         @it.has_setup
         def setup():
@@ -103,23 +125,10 @@ with such.A('hdlcc test using hdl_lib') as it:
                     builder(it.DUMMY_PROJECT_FILE)
 
             it.original_env = os.environ.copy()
-            os.environ = it.builder_env.copy()
 
-            if os.name == 'posix':
-                os.environ['PATH'] = \
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-            elif os.name == 'nt':
-                os.putenv(
-                    'PATH',
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-                os.environ['PATH'] = \
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+            _addBuilderToEnv(it.builder_env)
 
             it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
-
-            _logger.info("New env path:")
-            for path in os.environ['PATH'].split(os.pathsep):
-                _logger.info(" >'%s'", path)
 
             try:
                 builder(it.DUMMY_PROJECT_FILE)
@@ -130,7 +139,7 @@ with such.A('hdlcc test using hdl_lib') as it:
         @it.has_teardown
         def teardown():
             hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
-            os.environ = it.original_env.copy()
+            _restorePreviousEnv(it.original_env)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
                 shell.rmtree(target_dir)
@@ -408,7 +417,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
         @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
                    "a design unit can't be found")
-        def test_011():
+        def test_012():
             if BUILDER_NAME is None:
                 return
 
@@ -425,6 +434,51 @@ with such.A('hdlcc test using hdl_lib') as it:
             except hdlcc.exceptions.DesignUnitNotFoundError:
                 it.fail("Shouldn't raise exception for a unit that is "
                         "supposed to be found")
+
+    with it.having('vim-hdl-examples as reference and a valid project file'):
+
+        @it.has_setup
+        def setup():
+            it.original_env = os.environ.copy()
+
+            _addBuilderToEnv(it.builder_env)
+
+            it.vim_hdl_examples_path = p.join(".ci", "vim-hdl-examples")
+            it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
+            it.project = StandaloneProjectBuilder(it.project_file)
+            it.project.waitForBuild()
+            it.assertNotEquals(it.project.builder.__builder_name__, 'fallback')
+
+        @it.has_teardown
+        def teardown():
+            hdlcc.HdlCodeCheckerBase.clean(it.project_file)
+            _restorePreviousEnv(it.original_env)
+
+            target_dir = it.project._config.getTargetDir()
+
+            if p.exists(target_dir):
+                shell.rmtree(target_dir)
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
+            del it.project
+
+
+        @it.should("rebuild sources when needed")
+        def test_001():
+            clk_en_generator = p.join(it.vim_hdl_examples_path,
+                                      "basic_library", "clk_en_generator.vhd")
+
+            very_common_pkg = p.join(it.vim_hdl_examples_path,
+                                     "basic_library", "very_common_pkg.vhd")
+
+            for path in (clk_en_generator,
+                         very_common_pkg,
+                         clk_en_generator):
+                _logger.info("Building '%s'", path)
+                records = it.project.getMessagesByPath(path)
+                it.assertEqual(records, [])
 
 it.createTests(globals())
 
