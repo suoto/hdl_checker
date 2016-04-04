@@ -52,11 +52,11 @@ class BaseBuilder(object):
 
         try:
             self._parseBuiltinLibraries()
-            if self._builtin_libraries: # pragma: no-cover
+            if self._builtin_libraries: # pragma: no cover
                 self._logger.debug("Builtin libraries")
                 for lib in self._builtin_libraries:
                     self._logger.debug("-> %s", lib)
-            else: # pragma: no-cover
+            else: # pragma: no cover
                 self._logger.info("No builtin libraries found")
         except NotImplementedError:
             pass
@@ -123,14 +123,14 @@ class BaseBuilder(object):
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-            for line in traceback.format_exc().split('\n'): # pragma: no-cover
+            for line in traceback.format_exc().split('\n'): # pragma: no cover
                 self._logger.debug(line)
 
             # We'll check if the return code means a command not found.
             # In this case, we'll print the configured PATH for debugging
             # purposes
             if (os.name == 'posix' and exc.returncode == 127) or \
-               (os.name == 'nt' and exc.returncode == 9009): # pragma: no-cover
+               (os.name == 'nt' and exc.returncode == 9009): # pragma: no cover
                 self._logger.debug("subprocess runner path:")
                 for path in subp_env['PATH'].split(os.pathsep):
                     self._logger.debug(" - %s", path)

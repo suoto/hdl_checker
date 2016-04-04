@@ -439,6 +439,8 @@ with such.A('hdlcc project') as it:
 
         @it.has_setup
         def setup():
+            if BUILDER_NAME is None:
+                return
             it.original_env = os.environ.copy()
 
             _addBuilderToEnv(it.builder_env)
@@ -451,6 +453,8 @@ with such.A('hdlcc project') as it:
 
         @it.has_teardown
         def teardown():
+            if BUILDER_NAME is None:
+                return
             hdlcc.HdlCodeCheckerBase.clean(it.project_file)
             _restorePreviousEnv(it.original_env)
 
@@ -467,6 +471,8 @@ with such.A('hdlcc project') as it:
 
         @it.should("rebuild sources when needed")
         def test_001():
+            if BUILDER_NAME is None:
+                return
             clk_en_generator = p.join(it.vim_hdl_examples_path,
                                       "basic_library", "clk_en_generator.vhd")
 

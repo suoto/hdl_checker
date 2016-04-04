@@ -409,7 +409,9 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
-        if self.GET_MESSAGES_WITH_THREADS:
+        # GET_MESSAGES_WITH_THREADS is for debug only, no need to cover
+        # this
+        if self.GET_MESSAGES_WITH_THREADS: # pragma: no cover
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \

@@ -105,7 +105,7 @@ with such.A('hdlcc project with persistency') as it:
 
         @it.should('measure time taken to build a project without any cache')
         def test_001():
-            for _ in range(3):
+            for _ in range(5):
                 start = time.time()
                 project = StandaloneProjectBuilder()
                 parse_time = time.time() - start

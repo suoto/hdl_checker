@@ -26,8 +26,12 @@ class Fallback(BaseBuilder):
         self._version = '<undefined>'
         super(Fallback, self).__init__(target_folder)
 
-    def _makeMessageRecords(self, line):
+    # Since Fallback._buildSource returns nothing,
+    # Fallback._makeMessageRecords is never called
+    # pylint: disable=unused-argument
+    def _makeMessageRecords(self, line): # pragma: no cover
         return []
+    # pylint: enable=unused-argument
 
     def _shouldIgnoreLine(self, line):
         return True
