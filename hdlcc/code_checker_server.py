@@ -14,16 +14,30 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "HDL Code Checker server for running on a different process"
 
+import waitress
+import time
+import json
+import bottle
 import logging
 import multiprocessing
 from hdlcc.code_checker_base import HdlCodeCheckerBase
 
 _logger = logging.getLogger('build messages')
 
-# pylint: disable=too-many-instance-attributes,abstract-class-not-used
 class HdlCodeCheckerSever(multiprocessing.Process):
     "HDL Code Checker project builder class"
     def __init__(self, *args, **kwargs):
         self._code_checker = HdlCodeCheckerBase(*args, **kwargs)
         self.name = 'HdlCodeCheckerSever.%d' % self._identity
+
+app = bottle.Bottle()
+
+
+@app.get('/new/<project_file>')
+def index(project_file):
+    if project_file == 'some_file':
+        time.sleep(1)
+    return bottle.template(json.dumps({'name' : project_file}))
+
+waitress.serve(app, host='localhost', port=50000, threads=2)
 

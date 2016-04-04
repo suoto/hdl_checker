@@ -171,8 +171,6 @@ class MSim(BaseBuilder):
         try:
             if p.exists(p.join(self._target_folder, source.library)):
                 return
-            #  if not p.exists(self._modelsim_ini):
-            #      self._createIniFile()
             self._mapLibrary(source.library)
         except: # pragma: no cover
             self._logger.debug("Current dir when exception was raised: %s",
@@ -181,7 +179,6 @@ class MSim(BaseBuilder):
 
     def _createIniFile(self):
         "Adds a library to a non-existent ModelSim init file"
-
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         if p.exists(_modelsim_ini):
@@ -193,7 +190,7 @@ class MSim(BaseBuilder):
 
         cwd = p.abspath(os.curdir)
         self._logger.debug("Current dir is %s, changing to %s",
-                          cwd, self._target_folder)
+                           cwd, self._target_folder)
         os.chdir(self._target_folder)
         if cwd == os.curdir: # pragma: no cover
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
@@ -207,7 +204,7 @@ class MSim(BaseBuilder):
             self._logger.debug("- '%s'", _dir)
 
         self._logger.debug("Current dir is %s, changing to %s",
-                          p.abspath(os.curdir), cwd)
+                           p.abspath(os.curdir), cwd)
         os.chdir(cwd)
 
     def deleteLibrary(self, library):

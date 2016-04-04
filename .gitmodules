@@ -7,3 +7,12 @@
 [submodule ".ci/vim-hdl-examples"]
 	path = .ci/vim-hdl-examples
 	url = https://github.com/suoto/vim-hdl-examples
+[submodule "dependencies/requests"]
+	path = dependencies/requests
+	url = https://github.com/kennethreitz/requests
+[submodule "dependencies/bottle"]
+	path = dependencies/bottle
+	url = https://github.com/bottlepy/bottle
+[submodule "dependencies/waitress"]
+	path = dependencies/waitress
+	url = https://github.com/Pylons/waitress
