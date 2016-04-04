@@ -63,8 +63,8 @@ class ConfigParser(object):
 
         if filename is not None:
             self.filename = p.abspath(filename)
-            self._logger.info("Creating config parser for filename '%s'",
-                              self.filename)
+            self._logger.debug("Creating config parser for filename '%s'",
+                               self.filename)
         else:
             self.filename = None
             self._parms['builder'] = 'fallback'
@@ -145,7 +145,7 @@ class ConfigParser(object):
     def _parseIfNeeded(self):
         "Parses the configuration file"
         if self.shouldParse():
-            self._logger.debug("Parsing is required")
+            self._logger.info("Parsing '%s'", self.filename)
             self._updateTimestamp()
             for _line in open(self.filename, 'r').readlines():
                 line = _replaceConfigFileComments.sub("", _line)

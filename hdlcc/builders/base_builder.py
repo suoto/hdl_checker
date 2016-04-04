@@ -53,9 +53,9 @@ class BaseBuilder(object):
         try:
             self._parseBuiltinLibraries()
             if self._builtin_libraries: # pragma: no-cover
-                self._logger.info("Builtin libraries")
+                self._logger.debug("Builtin libraries")
                 for lib in self._builtin_libraries:
-                    self._logger.info("-> %s", lib)
+                    self._logger.debug("-> %s", lib)
             else: # pragma: no-cover
                 self._logger.info("No builtin libraries found")
         except NotImplementedError:
@@ -207,8 +207,7 @@ class BaseBuilder(object):
             self._logger.info("Forcing build of %s", str(source))
         elif source.getmtime() > cached_info['compile_time']:
             build = True
-            self._logger.info("Building %s because it's out of date", \
-                    str(source))
+            self._logger.info("Building %s", str(source))
 
         if build:
             if flags is None:

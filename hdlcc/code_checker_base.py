@@ -167,16 +167,13 @@ class HdlCodeCheckerBase(object):
                 yield source
 
             if empty_step:
-                sources_not_built = False
-
                 for missing_path in \
                         list(set(self._config.getSourcesPaths()) - set(sources_built)):
                     source = self._config.getSourceByPath(missing_path)
                     dependencies = self._getSourceDependenciesSet(source)
                     missing_dependencies = dependencies - set(self._units_built)
                     if missing_dependencies:
-                        sources_not_built = True
-                        self._logger.info(
+                        self._logger.warning(
                             "Couldn't build source '%s'. Missing dependencies: %s",
                             str(source),
                             ", ".join([str(x) for x in missing_dependencies]))
@@ -185,11 +182,9 @@ class HdlCodeCheckerBase(object):
                     #          "Source %s wasn't built but has no missing "
                     #          "dependencies", str(source))
                     #      yield source
-                if sources_not_built:
-                    self._logger.warning("Some sources were not built")
 
-                self._logger.info("Breaking at step %d. Units built: %s",
-                                  step, ", ".join(sorted(self._units_built)))
+                self._logger.debug("Breaking at step %d. Units built: %s",
+                                   step, ", ".join(sorted(self._units_built)))
 
                 raise StopIteration()
 
@@ -301,7 +296,7 @@ class HdlCodeCheckerBase(object):
             self._logger.debug("Can't recover cache from None")
             return
         cache_fname = self._getCacheFilename(self.project_file)
-        _logger.info("Trying to recover from '%s'", cache_fname)
+        _logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
         if p.exists(cache_fname):
             try:
@@ -317,7 +312,7 @@ class HdlCodeCheckerBase(object):
                         (cache_fname, serializer.__package__,
                          traceback.format_exc()))
         else:
-            _logger.info("File not found")
+            _logger.debug("File not found")
 
     def getCompilationOrder(self):
         "Returns the build order needed by the _buildByDependency method"
@@ -370,7 +365,8 @@ class HdlCodeCheckerBase(object):
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
                 self.builder = builder_class(self._config.getTargetDir())
 
-            self._logger.warning("Final builder is '%s'", repr(self.builder))
+            self._logger.info("Selected builder is '%s'",
+                              self.builder.__builder_name__)
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:

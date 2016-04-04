@@ -116,9 +116,9 @@ class MSim(BaseBuilder):
             self._version = \
                     re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                     stdout[0])[0]
-            self._logger.info("vcom version string: '%s'. " + \
+            self._logger.debug("vcom version string: '%s'. " + \
                     "Version number is '%s'", \
-                    stdout[:-1], self._version)
+                    stdout, self._version)
         except Exception as exc:
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
@@ -179,7 +179,7 @@ class MSim(BaseBuilder):
                           p.abspath(_modelsim_ini))
 
         cwd = p.abspath(os.curdir)
-        self._logger.info("Current dir is %s, changing to %s",
+        self._logger.debug("Current dir is %s, changing to %s",
                           cwd, self._target_folder)
         os.chdir(self._target_folder)
         if cwd == os.curdir:
@@ -193,7 +193,7 @@ class MSim(BaseBuilder):
         for _dir in os.listdir(p.abspath(os.curdir)):
             self._logger.debug("- '%s'", _dir)
 
-        self._logger.info("Current dir is %s, changing to %s",
+        self._logger.debug("Current dir is %s, changing to %s",
                           p.abspath(os.curdir), cwd)
         os.chdir(cwd)
 
@@ -208,7 +208,7 @@ class MSim(BaseBuilder):
 
     def _mapLibrary(self, library):
         "Adds a library to an existing ModelSim init file"
-        self._logger.info("modelsim.ini found, adding %s", library)
+        self._logger.debug("modelsim.ini found, adding %s", library)
 
         self._subprocessRunner(['vlib', ] + self._vlib_args +
                                [p.join(self._target_folder, library)])

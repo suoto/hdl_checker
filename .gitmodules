@@ -4,3 +4,6 @@
 [submodule ".ci/hdl_lib"]
 	path = .ci/hdl_lib
 	url = https://github.com/suoto/hdl_lib
+[submodule ".ci/vim-hdl-examples"]
+	path = .ci/vim-hdl-examples
+	url = https://github.com/suoto/vim-hdl-examples
