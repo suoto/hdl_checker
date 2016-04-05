@@ -30,14 +30,14 @@ class BaseBuilder(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
-    def __builder_name__(self):
+    def builder_name(self):
         "Defines the builder identification"
 
     def __init__(self, target_folder):
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__package__ + '.' + self.__builder_name__)
+        self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []

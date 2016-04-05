@@ -366,7 +366,7 @@ class HdlCodeCheckerBase(object):
                 self.builder = builder_class(self._config.getTargetDir())
 
             self._logger.info("Selected builder is '%s'",
-                              self.builder.__builder_name__)
+                              self.builder.builder_name)
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:

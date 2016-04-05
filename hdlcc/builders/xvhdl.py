@@ -23,20 +23,20 @@ class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''
 
     # Implementation of abstract class properties
-    __builder_name__ = 'xvhdl'
+    builder_name = 'xvhdl'
 
     # XVHDL specific class properties
-    _BuilderStdoutMessageScanner = re.compile(
+    _stdout_message_scanner = re.compile(
         r"^(?P<error_type>[EW])\w+:\s*"
         r"\[(?P<error_number>[^\]]+)\]\s*"
         r"(?P<error_message>[^\[]+)\s*\["
         r"(?P<filename>[^:]+):"
         r"(?P<line_number>\d+)", flags=re.I)
 
-    _BuilderRebuildUnitsScanner = re.compile(
+    _iter_rebuild_units = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
         r".*(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb\s+needs.*",
-        flags=re.I)
+        flags=re.I).finditer
 
     def _shouldIgnoreLine(self, line):
         if re.match(r"^\s*$", line):
@@ -58,7 +58,7 @@ class XVHDL(BaseBuilder):
         error_type = None
         error_message = None
 
-        scan = self._BuilderStdoutMessageScanner.scanner(line)
+        scan = self._stdout_message_scanner.scanner(line)
 
         while True:
             match = scan.match()
@@ -74,7 +74,7 @@ class XVHDL(BaseBuilder):
             error_message = _dict['error_message']
 
         return [{
-            'checker'        : self.__builder_name__,
+            'checker'        : self.builder_name,
             'line_number'    : line_number,
             'column'         : column,
             'filename'       : filename,
@@ -95,7 +95,7 @@ class XVHDL(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
-            raise SanityCheckError(self.__builder_name__, str(exc))
+            raise SanityCheckError(self.builder_name, str(exc))
 
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
@@ -125,7 +125,7 @@ class XVHDL(BaseBuilder):
     def _getUnitsToRebuild(self, line):
         rebuilds = []
 
-        for match in self._BuilderRebuildUnitsScanner.finditer(line):
+        for match in self._iter_rebuild_units(line):
             if not match:
                 continue
             mdict = match.groupdict()

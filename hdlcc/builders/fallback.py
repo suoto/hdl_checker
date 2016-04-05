@@ -20,7 +20,7 @@ class Fallback(BaseBuilder):
     "Dummy fallback builder"
 
     # Implementation of abstract class properties
-    __builder_name__ = 'fallback'
+    builder_name = 'fallback'
 
     def __init__(self, target_folder):
         self._version = '<undefined>'

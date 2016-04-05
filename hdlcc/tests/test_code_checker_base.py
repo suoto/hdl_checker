@@ -449,7 +449,7 @@ with such.A('hdlcc project') as it:
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
             it.project.waitForBuild()
-            it.assertNotEquals(it.project.builder.__builder_name__, 'fallback')
+            it.assertNotEquals(it.project.builder.builder_name, 'fallback')
 
         @it.has_teardown
         def teardown():

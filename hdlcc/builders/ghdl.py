@@ -23,30 +23,29 @@ class GHDL(BaseBuilder):
     '''Builder implementation of the GHDL compiler'''
 
     # Implementation of abstract class properties
-    __builder_name__ = 'ghdl'
+    builder_name = 'ghdl'
 
     # GHDL specific class properties
-    _BuilderStdoutMessageScanner = re.compile(
+    _stdout_message_parser = re.compile(
         r"^(?P<filename>[^:]+):"
         r"(?P<line_number>\d+):"
         r"(?P<column>\d+):"
         r"((?P<is_warning>warning:)\s*|\s*)"
-        r"(?P<error_message>.*)", re.I)
+        r"(?P<error_message>.*)", re.I).finditer
 
-    _BuilderLibraryPathScanner = re.compile(
-        #  r"^library directory:\s*(?P<library_path>.*)\s*")
-        r"^\s*(actual prefix|library directory):\s*(?P<library_path>.*)\s*")
+    _scan_library_paths = re.compile(
+        r"^\s*(actual prefix|library directory):"
+        r"\s*(?P<library_path>.*)\s*").search
 
-    _BuilderStdoutIgnoreLines = re.compile('|'.join([
+    _should_ignore = re.compile('|'.join([
         r"^\s*$",
-        r"ghdl: compilation error",
-    ]))
+        r"ghdl: compilation error", ])).match
 
-    _BuilderRebuildUnitsScanner = re.compile(
+    _iter_rebuild_units = re.compile(
         r'(entity "(?P<unit_name>\w+)" is obsoleted by package "\w+"'
         r'|'
         r'file (?P<rebuild_path>.*)\s+has changed and must be reanalysed)',
-        flags=re.I)
+        flags=re.I).finditer
 
     def __init__(self, target_folder):
         self._version = ''
@@ -55,13 +54,13 @@ class GHDL(BaseBuilder):
         self._parseBuiltinLibraries()
 
     def _shouldIgnoreLine(self, line):
-        if self._BuilderStdoutIgnoreLines.match(line):
+        if self._should_ignore(line):
             return True
         return False
 
     def _makeMessageRecords(self, line):
         record = {
-            'checker'       : self.__builder_name__,
+            'checker'       : self.builder_name,
             'line_number'   : None,
             'column'        : None,
             'filename'      : None,
@@ -70,7 +69,7 @@ class GHDL(BaseBuilder):
             'error_message' : None,
             }
 
-        for match in self._BuilderStdoutMessageScanner.finditer(line):
+        for match in self._stdout_message_parser(line):
             _dict = match.groupdict()
             for key in record.keys():
                 if key in _dict.keys():
@@ -96,7 +95,7 @@ class GHDL(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
-            raise SanityCheckError(self.__builder_name__, str(exc))
+            raise SanityCheckError(self.builder_name, str(exc))
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -105,7 +104,7 @@ class GHDL(BaseBuilder):
         "Discovers libraries that exist regardless before we do anything"
         library_name_scan = None
         for line in self._subprocessRunner(['ghdl', '--dispconfig']):
-            library_path_match = self._BuilderLibraryPathScanner.search(line)
+            library_path_match = self._scan_library_paths(line)
             if library_path_match:
                 library_path = \
                     repr(library_path_match.groupdict()['library_path'])[1:-1]
@@ -168,7 +167,7 @@ class GHDL(BaseBuilder):
     def _getUnitsToRebuild(self, line):
         rebuilds = []
 
-        for match in self._BuilderRebuildUnitsScanner.finditer(line):
+        for match in self._iter_rebuild_units(line):
             if not match:
                 continue
             mdict = match.groupdict()
