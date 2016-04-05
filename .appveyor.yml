@@ -89,6 +89,7 @@ install:
   - coverage report
   - del ".ci\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd"
   - codecov
+  - dir /B "%HOMEPATH%\\*.log"
   - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log"
   - appveyor PushArtifact hdlcc_success.zip
 

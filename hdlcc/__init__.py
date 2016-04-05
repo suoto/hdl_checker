@@ -20,8 +20,11 @@ need to provide a source list ordered by hand."""
 
 __author__ = "Andre Souto (andre820@gmail.com)"
 __license__ = "GPLv3"
-#  __version__ = str(open(_VERSION_FILE, 'r').readline()).strip()
 __status__ = "Development"
 
 from hdlcc.code_checker_base import HdlCodeCheckerBase
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
