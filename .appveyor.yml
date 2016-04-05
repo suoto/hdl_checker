@@ -80,6 +80,8 @@ install:
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
+  - "pip install -U %APPVEYOR_BUILD_FOLDER%"
+
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
       -vv -F -B --log-capture"
 

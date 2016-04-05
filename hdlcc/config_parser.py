@@ -209,6 +209,9 @@ class ConfigParser(object):
 
         flags_set = _extractSet(flags)
 
+        # TODO: We could use a ThreadPool to create source file objects
+        # without the overhead of creating/destroying threads all the
+        # time
         self._sources[source_path] = \
                 VhdlSourceFile(source_path, library, flags_set)
 

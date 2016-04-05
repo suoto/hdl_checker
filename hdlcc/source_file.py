@@ -38,6 +38,8 @@ class VhdlSourceFile(object):
     # an exception for this)
     _semaphore = threading.BoundedSemaphore(_MAX_OPEN_FILES)
 
+    _USE_THREADS = True
+
     def __init__(self, filename, library='work', flags=None):
         self.filename = os.path.normpath(filename)
         self.library = library
@@ -51,8 +53,11 @@ class VhdlSourceFile(object):
 
         self.abspath = os.path.abspath(filename)
         self._lock = threading.Lock()
-        threading.Thread(target=self._parseIfChanged,
-                         name='_parseIfChanged').start()
+        if self._USE_THREADS:
+            threading.Thread(target=self._parseIfChanged,
+                             name='_parseIfChanged').start()
+        else:
+            self._parseIfChanged()
 
     def getState(self):
         "Gets a dict that describes the current state of this object"

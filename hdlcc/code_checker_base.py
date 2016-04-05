@@ -47,7 +47,7 @@ _logger = logging.getLogger('build messages')
 class HdlCodeCheckerBase(object):
     "HDL Code Checker project builder class"
 
-    GET_MESSAGES_WITH_THREADS = True
+    _USE_THREADS = True
     MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -321,13 +321,16 @@ class HdlCodeCheckerBase(object):
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        if not self._background_thread.isAlive():
-            self._background_thread = \
-                    threading.Thread(target=self._buildByDependency,
-                                     name='_buildByDependency')
-            self._background_thread.start()
-        else:
-            self._handleUiInfo("Build thread is already running")
+        if self._USE_THREADS: # pragma: no cover
+            if not self._background_thread.isAlive():
+                self._background_thread = \
+                        threading.Thread(target=self._buildByDependency,
+                                         name='_buildByDependency')
+                self._background_thread.start()
+            else:
+                self._handleUiInfo("Build thread is already running")
+        else: # pragma: no cover
+            self._buildByDependency()
 
     def finishedBuilding(self):
         "Returns whether a background build has finished running"
@@ -409,9 +412,9 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
-        # GET_MESSAGES_WITH_THREADS is for debug only, no need to cover
+        # _USE_THREADS is for debug only, no need to cover
         # this
-        if self.GET_MESSAGES_WITH_THREADS: # pragma: no cover
+        if self._USE_THREADS: # pragma: no cover
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \

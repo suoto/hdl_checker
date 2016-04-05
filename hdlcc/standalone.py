@@ -15,6 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"HDLCC standalone stuff"
 
 import os
 import os.path as p
@@ -35,19 +36,9 @@ try:
 except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
-_logger = logging.getLogger(__name__)
-
-def _pathSetup(): # pragma: no cover
-    "Insert hdlcc module into Python path"
-    path_to_this_file = p.realpath(__file__).split(p.sep)[:-2]
-    hdlcc_path = p.sep.join(path_to_this_file)
-    if hdlcc_path not in sys.path:
-        sys.path.insert(0, hdlcc_path)
-
-if __name__ == '__main__':
-    _pathSetup()
-
 import hdlcc
+
+_logger = logging.getLogger(__name__)
 
 class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
     """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
@@ -63,7 +54,8 @@ class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
         self._ui_logger.error(message)
 
 def _fileExtentensionCompleter(extension): # pragma: no cover
-    def _completer(**kwargs):
+    "Tab completion for 'extension'"
+    def _completer(**kwargs): # pylint: disable=missing-docstring
         prefix = kwargs['prefix']
         if prefix == '':
             prefix = os.curdir
@@ -79,6 +71,7 @@ def _fileExtentensionCompleter(extension): # pragma: no cover
     return _completer
 
 def parseArguments():
+    "Argument parser for standalone hdlcc"
     parser = argparse.ArgumentParser()
 
     # Options
@@ -211,9 +204,10 @@ def runner(args):
         project.saveCache()
 
 def setupLogging():
+    "Tries to use RainbowLoggingHandler for logging to stdout"
     path_to_this_file = p.sep.join(p.realpath(__file__).split(p.sep)[:-2])
     sys.path.insert(0, p.sep.join([path_to_this_file, '.ci',
-                               'rainbow_logging_handler']))
+                                   'rainbow_logging_handler']))
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         # pylint: disable=bad-whitespace
@@ -239,14 +233,27 @@ def setupLogging():
     logging.root.setLevel(logging.WARNING)
 
 def main():
+    "Main hook for standalone usage"
     setupLogging()
     start = time.time()
     runner_args = parseArguments()
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
     if runner_args.debug_profiling:
-        globals()['runner_args'] = runner_args
-        profile.run('runner(runner_args)', runner_args.debug_profiling)
+        # Profiling results when running with multiple threads gives
+        # poor results (see suoto/hdlcc/issues/16). To circumvent this
+        # we disable using threads at all when profiling (it's ugly,
+        # I know)
+        # pylint: disable=protected-access
+        StandaloneProjectBuilder._USE_THREADS = False
+        hdlcc.source_file.VhdlSourceFile._USE_THREADS = False
+        # pylint: enable=protected-access
+
+        profile.runctx(
+            'runner(runner_args)',
+            globals=globals(),
+            locals={'runner_args' : runner_args},
+            filename=runner_args.debug_profiling, sort=-1)
     else:
         runner(runner_args)
     end = time.time()
