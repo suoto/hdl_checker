@@ -41,10 +41,14 @@ class MSim(BaseBuilder):
         r"^(?!\*\*\s(Error|Warning):).*",
         r".*VHDL Compiler exiting\s*$"]))
 
-    _BuilderRebuildUnitsScanner = re.compile(
-        #  r"Recompile\s*([^\s]+)\s+because\s+[^\s]+\s+has changed")
-        r"Recompile\s*(?P<library_name>\w+)\.(?P<unit_name>\w+)\s+because"
-        r"\s+[^\s]+\s+has changed")
+    _IterRebuildUnits = re.compile(
+        r"(" \
+            r"Recompile\s*(?P<lib_name_0>\w+)\.(?P<unit_name_0>\w+)\s+because" \
+            r"\s+[^\s]+\s+has changed"
+        r"|" \
+            r"^\*\* Warning:.*\(vcom-1127\)\s*Entity\s(?P<lib_name_1>\w+)\." \
+            r"(?P<unit_name_1>\w+).*"
+        r")").finditer
 
     _BuilderLibraryScanner = re.compile(
         r"^\"(?P<library_name>\w+)\""
@@ -116,9 +120,9 @@ class MSim(BaseBuilder):
             self._version = \
                     re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                     stdout[0])[0]
-            self._logger.info("vcom version string: '%s'. " + \
+            self._logger.debug("vcom version string: '%s'. " + \
                     "Version number is '%s'", \
-                    stdout[:-1], self._version)
+                    stdout, self._version)
         except Exception as exc:
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
@@ -137,11 +141,20 @@ class MSim(BaseBuilder):
 
     def _getUnitsToRebuild(self, line):
         rebuilds = []
-        if '(vcom-13)' in line:
-            for match in self._BuilderRebuildUnitsScanner.finditer(line):
-                if not match:
-                    continue
-                rebuilds.append(match.groupdict())
+        for match in self._IterRebuildUnits(line):
+            if not match:
+                continue
+            mdict = match.groupdict()
+            library_name = mdict['lib_name_0'] or mdict['lib_name_1']
+            unit_name = mdict['unit_name_0'] or mdict['unit_name_1']
+            if None not in (library_name, unit_name):
+                rebuilds.append({'library_name' : library_name,
+                                 'unit_name' : unit_name})
+            else: # pragma: no cover
+                _msg = "Something wrong while parsing '%s'. " \
+                        "Match is '%s'" % (line, mdict)
+                self._logger.error(_msg)
+                assert 0, _msg
 
         return rebuilds
 
@@ -161,7 +174,7 @@ class MSim(BaseBuilder):
             #  if not p.exists(self._modelsim_ini):
             #      self._createIniFile()
             self._mapLibrary(source.library)
-        except:
+        except: # pragma: no cover
             self._logger.debug("Current dir when exception was raised: %s",
                                p.abspath(os.curdir))
             raise
@@ -179,10 +192,10 @@ class MSim(BaseBuilder):
                           p.abspath(_modelsim_ini))
 
         cwd = p.abspath(os.curdir)
-        self._logger.info("Current dir is %s, changing to %s",
+        self._logger.debug("Current dir is %s, changing to %s",
                           cwd, self._target_folder)
         os.chdir(self._target_folder)
-        if cwd == os.curdir:
+        if cwd == os.curdir: # pragma: no cover
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
             assert 0
 
@@ -193,7 +206,7 @@ class MSim(BaseBuilder):
         for _dir in os.listdir(p.abspath(os.curdir)):
             self._logger.debug("- '%s'", _dir)
 
-        self._logger.info("Current dir is %s, changing to %s",
+        self._logger.debug("Current dir is %s, changing to %s",
                           p.abspath(os.curdir), cwd)
         os.chdir(cwd)
 
@@ -208,7 +221,7 @@ class MSim(BaseBuilder):
 
     def _mapLibrary(self, library):
         "Adds a library to an existing ModelSim init file"
-        self._logger.info("modelsim.ini found, adding %s", library)
+        self._logger.debug("modelsim.ini found, adding %s", library)
 
         self._subprocessRunner(['vlib', ] + self._vlib_args +
                                [p.join(self._target_folder, library)])
