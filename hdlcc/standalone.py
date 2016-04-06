@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-# PYTHON_ARGCOMPLETE_OK
-
 # This file is part of HDL Code Checker.
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
@@ -40,19 +38,6 @@ import hdlcc
 
 _logger = logging.getLogger(__name__)
 
-class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
-    """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
-    to run via shell"""
-    _ui_logger = logging.getLogger('UI')
-    def _handleUiInfo(self, message):
-        self._ui_logger.info(message)
-
-    def _handleUiWarning(self, message):
-        self._ui_logger.warning(message)
-
-    def _handleUiError(self, message):
-        self._ui_logger.error(message)
-
 def _fileExtentensionCompleter(extension): # pragma: no cover
     "Tab completion for 'extension'"
     def _completer(**kwargs): # pylint: disable=missing-docstring
@@ -72,9 +57,17 @@ def _fileExtentensionCompleter(extension): # pragma: no cover
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
+
+    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):
+        print hdlcc.__version__
+        sys.exit(0)
+
     parser = argparse.ArgumentParser()
 
     # Options
+    parser.add_argument('--version', action='store_true',
+                        help="Shows hdlcc version and exit")
+
     parser.add_argument('--verbose', '-v', action='append_const', const=1,
                         help="""Increases verbose level. Use multiple times to
                                 increase more""")
@@ -107,6 +100,8 @@ def parseArguments():
 
     args = parser.parse_args()
 
+    # PYTHON_ARGCOMPLETE_OK
+
     args.project_file = args.project_file[0]
 
     args.log_level = logging.FATAL
@@ -126,6 +121,19 @@ def parseArguments():
     #  hdlcc.config.Config.setupBuild()
 
     return args
+
+class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
+    """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
+    to run via shell"""
+    _ui_logger = logging.getLogger('UI')
+    def _handleUiInfo(self, message):
+        self._ui_logger.info(message)
+
+    def _handleUiWarning(self, message):
+        self._ui_logger.warning(message)
+
+    def _handleUiError(self, message):
+        self._ui_logger.error(message)
 
 def runStandaloneSourceFileParse(fname):
     """Standalone source_file.VhdlSourceFile run"""
