@@ -28,42 +28,67 @@ from threading import Timer
 _logger = logging.getLogger(__name__)
 
 def _setupPaths():
+    "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
     for path in (
             p.join(hdlcc_base_path, 'dependencies', 'requests'),
             p.join(hdlcc_base_path, 'dependencies', 'waitress'),
             p.join(hdlcc_base_path, 'dependencies', 'bottle')):
+        path = p.abspath(path)
         if path not in sys.path:
+            print "Adding '%s'" % path
             sys.path.insert(0, path)
         else:
-            _logger.warning("Path '%s' was already on sys.path!", path)
+            msg = "WARNING: '%s' was already on sys.path!" % path
+            print msg
+            _logger.warning(msg)
 
-def _setupLogging(stream, level):
+def _setupLogging(stream, level, color=True):
+    "Setup logging according to the command line parameters"
     if type(stream) is str:
-        stream = open(stream, 'a')
+        class Stream(file):
+            """File subclass that allows RainbowLoggingHandler to write
+            with colors"""
+            def isatty(self):
+                return color
+            def write(self, *args, **kwargs):
+                super(Stream, self).write(*args, **kwargs)
+                super(Stream, self).write("\n")
 
-    sys.path.insert(0, p.join('.ci', 'rainbow_logging_handler'))
+        stream = Stream(stream, 'ab', buffering=1)
 
-    from rainbow_logging_handler import RainbowLoggingHandler
-    rainbow_stream_handler = RainbowLoggingHandler(
-        stream,
-        #  Customizing each column's color
-        # pylint: disable=bad-whitespace
-        color_asctime          = ('dim white',  'black'),
-        color_name             = ('dim white',  'black'),
-        color_funcName         = ('green',      'black'),
-        color_lineno           = ('dim white',  'black'),
-        color_pathname         = ('black',      'red'),
-        color_module           = ('yellow',     None),
-        color_message_debug    = ('color_59',   None),
-        color_message_info     = (None,         None),
-        color_message_warning  = ('color_226',  None),
-        color_message_error    = ('red',        None),
-        color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
+    try:
+        path_to_this_file = p.abspath(p.dirname(__name__))
 
-    logging.root.addHandler(rainbow_stream_handler)
-    logging.root.setLevel(level)
+        sys.path.insert(0, p.join(path_to_this_file, '..', '.ci',
+                                  'rainbow_logging_handler'))
+
+        from rainbow_logging_handler import RainbowLoggingHandler
+        rainbow_stream_handler = RainbowLoggingHandler(
+            stream,
+            #  Customizing each column's color
+            # pylint: disable=bad-whitespace
+            color_asctime          = ('dim white',  'black'),
+            color_name             = ('dim white',  'black'),
+            color_funcName         = ('green',      'black'),
+            color_lineno           = ('dim white',  'black'),
+            color_pathname         = ('black',      'red'),
+            color_module           = ('yellow',     None),
+            color_message_debug    = ('color_59',   None),
+            color_message_info     = (None,         None),
+            color_message_warning  = ('color_226',  None),
+            color_message_error    = ('red',        None),
+            color_message_critical = ('bold white', 'red'))
+            # pylint: enable=bad-whitespace
+
+        logging.root.addHandler(rainbow_stream_handler)
+        logging.root.setLevel(level)
+    except ImportError:
+        file_handler = logging.StreamHandler(stream)
+        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
+        file_handler.formatter = logging.Formatter(log_format)
+        logging.root.addHandler(file_handler)
+        logging.root.setLevel(level)
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
@@ -75,6 +100,7 @@ def parseArguments():
     parser.add_argument('--port', action='store',)
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
+    parser.add_argument('--nocolor', action='store_true', default=False)
     parser.add_argument('--parent-pid', action='store', )
 
     try:
@@ -89,11 +115,17 @@ def parseArguments():
     args.port = args.port or 50000
     args.log_level = args.log_level or logging.INFO
     args.log_stream = args.log_stream or sys.stdout
+    args.color = False if args.nocolor else True
+
+    del args.nocolor
 
     return args
 
 def _attachPids(source_pid, target_pid):
+    """Monitors if source_pid is alive. If not, send signal.SIGHUP to
+    target_pid"""
     def _attachWrapper():
+        "PID attachment monitor"
         try:
             os.kill(source_pid, 0)
         except OSError:
@@ -109,9 +141,17 @@ def _attachPids(source_pid, target_pid):
 
 def main():
     args = parseArguments()
+    if os.name == 'posix':
+        sys.stdout = open('/tmp/hdlcc-stdout.log', 'ab', buffering=1)
+        sys.stderr = open('/tmp/hdlcc-stderr.log', 'ab', buffering=1)
+    else:
+        sys.stdout = open('hdlcc-stdout.log', 'ab', buffering=1)
+        sys.stderr = open('hdlcc-stderr.log', 'ab', buffering=1)
     _setupPaths()
     import waitress
-    _setupLogging(args.log_stream, args.log_level)
+    _setupLogging(args.log_stream, args.log_level, args.color)
+    # Call it again to log the paths we added
+    _setupPaths()
     import hdlcc
     from hdlcc.server import handlers
     _logger.info("Starting server. "

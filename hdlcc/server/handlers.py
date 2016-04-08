@@ -14,7 +14,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
-import sys
 import os.path as p
 import bottle
 import logging
@@ -52,7 +51,10 @@ class HdlCodeCheckerSever(HdlCodeCheckerBase):
             yield self._msg_queue.get()
 
 def _getServerByProjectFile(project_file):
-    if p.isabs(project_file) or project_file is None:
+    """Returns the HdlCodeCheckerSever object that corresponds to the
+    given project file. If the object doesn't exists yet it gets created
+    and then returned"""
+    if project_file is None or p.isabs(project_file):
         if project_file not in _hdlcc_objects:
             _logger.debug("Created new project server for '%s'", project_file)
             _hdlcc_objects[project_file] = HdlCodeCheckerSever(project_file)
@@ -111,14 +113,16 @@ def _getMessagesByPath():
 def _getUiMessages():
     "Get messages for a given projec_file/path pair"
     project_file = bottle.request.forms.get('project_file')
-    _logger.debug("Getting UI messages for '%s'", project_file)
 
     server = _getServerByProjectFile(project_file)
 
     ui_messages = list(server.getQueuedMessages())
 
     if not ui_messages:
-        _logger.info("No UI messages")
+        _logger.debug("Project '%s' has no UI messages", project_file)
+    else:
+        _logger.info("Project '%s' UI messages:", project_file)
+
     for msg in ui_messages:
         _logger.info(msg)
 
