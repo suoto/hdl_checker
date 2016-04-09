@@ -27,6 +27,8 @@ while [ -n "$1" ]; do
     XVHDL=1
   elif [ "$1" == "fallback" ]; then
     FALLBACK=1
+  elif [ "$1" == "pip" ]; then
+    PIP=1
   elif [ "$1" == "clean" ]; then
     CLEAN=1
   elif [ "$1" == "standalone" ]; then
@@ -47,6 +49,7 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   FALLBACK=1
   XVHDL=1
   STANDALONE=1
+  PIP=1
 fi
 
 if [ "${CLEAN}" == "1" ]; then
@@ -60,20 +63,21 @@ set +e
 
 RESULT=0
 
-pip uninstall hdlcc -y
-if [ "${CI}" == "true" ]; then
-  pip install .
-else
-  pip install . --user
+if [ -n "${PIP}" ]; then
+  pip uninstall hdlcc -y
+  if [ "${CI}" == "true" ]; then
+    pip install -e .
+  else
+    pip install -e . --user
+  fi
+  RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+
+  hdlcc -h
+  RESULT=$(($? || ${RESULT}))
+  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
-RESULT=$(($? || ${RESULT}))
-[ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
-
-hdlcc -h
-
-RESULT=$(($? || ${RESULT}))
-[ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 
 if [ "${RESULT}" != "0" ]; then
   exit ${RESULT}
@@ -88,7 +92,7 @@ if [ -n "${STANDALONE}" ]; then
 fi
 
 if [ -n "${FALLBACK}" ]; then
-  ${TEST_RUNNER} $ARGS hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone_hdlcc
+  ${TEST_RUNNER} $ARGS hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone
   RESULT=$(($? || ${RESULT}))
   [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
 fi

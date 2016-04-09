@@ -28,10 +28,9 @@ setup(
     license          = 'GPLv3',
     packages         = ['hdlcc', 'hdlcc.builders'],
     install_requires = ['argcomplete', 'argparse', 'prettytable',],
-    data_files       = ["hdlcc/VERSION", ],
     cmdclass         = versioneer.get_cmdclass(),
     entry_points={
-        'console_scripts' : ['hdlcc=hdlcc.standalone:main']
+        'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
     }
 )
 # pylint: enable=bad-whitespace

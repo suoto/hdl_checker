@@ -25,6 +25,8 @@ import argparse
 import signal
 from threading import Timer
 
+_CI = os.environ.get("CI", None) is not None
+
 _logger = logging.getLogger(__name__)
 
 def _setupPaths():
@@ -43,53 +45,6 @@ def _setupPaths():
             print msg
             _logger.warning(msg)
 
-def _setupLogging(stream, level, color=True):
-    "Setup logging according to the command line parameters"
-    if type(stream) is str:
-        class Stream(file):
-            """File subclass that allows RainbowLoggingHandler to write
-            with colors"""
-            def isatty(self):
-                return color
-            def write(self, *args, **kwargs):
-                super(Stream, self).write(*args, **kwargs)
-                super(Stream, self).write("\n")
-
-        stream = Stream(stream, 'ab', buffering=1)
-
-    try:
-        path_to_this_file = p.abspath(p.dirname(__name__))
-
-        sys.path.insert(0, p.join(path_to_this_file, '..', '.ci',
-                                  'rainbow_logging_handler'))
-
-        from rainbow_logging_handler import RainbowLoggingHandler
-        rainbow_stream_handler = RainbowLoggingHandler(
-            stream,
-            #  Customizing each column's color
-            # pylint: disable=bad-whitespace
-            color_asctime          = ('dim white',  'black'),
-            color_name             = ('dim white',  'black'),
-            color_funcName         = ('green',      'black'),
-            color_lineno           = ('dim white',  'black'),
-            color_pathname         = ('black',      'red'),
-            color_module           = ('yellow',     None),
-            color_message_debug    = ('color_59',   None),
-            color_message_info     = (None,         None),
-            color_message_warning  = ('color_226',  None),
-            color_message_error    = ('red',        None),
-            color_message_critical = ('bold white', 'red'))
-            # pylint: enable=bad-whitespace
-
-        logging.root.addHandler(rainbow_stream_handler)
-        logging.root.setLevel(level)
-    except ImportError:
-        file_handler = logging.StreamHandler(stream)
-        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        file_handler.formatter = logging.Formatter(log_format)
-        logging.root.addHandler(file_handler)
-        logging.root.setLevel(level)
-
 def parseArguments():
     "Argument parser for standalone hdlcc"
 
@@ -101,7 +56,10 @@ def parseArguments():
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
     parser.add_argument('--nocolor', action='store_true', default=False)
-    parser.add_argument('--parent-pid', action='store', )
+
+    parser.add_argument('--stdout', action='store')
+    parser.add_argument('--stderr', action='store')
+    parser.add_argument('--coverage', action='store_true')
 
     try:
         import argcomplete
@@ -124,42 +82,53 @@ def parseArguments():
 def _attachPids(source_pid, target_pid):
     """Monitors if source_pid is alive. If not, send signal.SIGHUP to
     target_pid"""
-    def _attachWrapper():
+    def _attachWrapper(): # pragma: no cover
         "PID attachment monitor"
         try:
             os.kill(source_pid, 0)
         except OSError:
             _logger.info("Process '%s' doesn't exists!", source_pid)
             os.kill(target_pid, signal.SIGHUP)
+            return
+        except AttributeError:
+            return
 
         Timer(1, _attachWrapper).start()
 
     _logger.debug("Setting up PID attachment from %s to %s", source_pid,
                   target_pid)
 
-    Timer(3, _attachWrapper).start()
+    Timer(2, _attachWrapper).start()
+
+def _setupPipeRedirection(stdout, stderr):
+    "Redirect stdout and stderr to files"
+    if stdout is not None:
+        sys.stdout = open(stdout, 'ab', buffering=1)
+    if stderr is not None:
+        sys.stderr = open(stderr, 'ab', buffering=1)
 
 def main():
     args = parseArguments()
-    if os.name == 'posix':
-        sys.stdout = open('/tmp/hdlcc-stdout.log', 'ab', buffering=1)
-        sys.stderr = open('/tmp/hdlcc-stderr.log', 'ab', buffering=1)
-    else:
-        sys.stdout = open('hdlcc-stdout.log', 'ab', buffering=1)
-        sys.stderr = open('hdlcc-stderr.log', 'ab', buffering=1)
+
+    _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
+
     import waitress
-    _setupLogging(args.log_stream, args.log_level, args.color)
     # Call it again to log the paths we added
     _setupPaths()
     import hdlcc
-    from hdlcc.server import handlers
+    from hdlcc import handlers
+    from hdlcc.utils import setupLogging
+
+    setupLogging(args.log_stream, args.log_level, args.color)
     _logger.info("Starting server. "
                  "Our PID is %s, our parent is %s. "
                  "Version of hdlcc is '%s'",
                  os.getpid(), os.getppid(), hdlcc.__version__)
     _attachPids(os.getppid(), os.getpid())
-    waitress.serve(handlers.app, host=args.host, port=args.port, threads=20)
+
+    handlers.app.run(host=args.host, port=args.port, threads=20,
+                     server='waitress')
 
 if __name__ == '__main__':
     main()

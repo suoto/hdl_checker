@@ -17,7 +17,6 @@
 import os.path as p
 import bottle
 import logging
-import json
 from multiprocessing import Queue
 
 _logger = logging.getLogger(__name__)
@@ -63,57 +62,58 @@ def _getServerByProjectFile(project_file):
         _logger.error("Paths must be absolute")
         return
 
-@app.post('/open_project_file')
-def _loadProject():
-    "Loads a project file"
-    project_file = bottle.request.forms.get('project_file')
-    response = {'error' : None}
-    if _getServerByProjectFile(project_file) is None:
-        response = {'error' : "Path '%s' is not absolute"}
+def _getProjectDiags(project_file):
+    "Get project specific diagnose"
+    diags = {}
+    if not p.isabs(project_file):
+        diags['error'] = "Path '%s' is not absolute"
 
-    return json.dumps(response)
+    server = _getServerByProjectFile(project_file)
+    if server.builder is not None:
+        diags['builder'] = server.builder.builder_name
+    else:
+        diags['builder'] = '<unknown>'
 
-@app.get('/get_diagnose_info')
-def _getDiagnoseInfo():
+    return diags
+
+@app.post('/get_diagnose_info')
+def getDiagnoseInfo():
     "Collects misc diagnose info for the clients"
     _logger.info("Collecting diagnose info")
     project_file = bottle.request.forms.get('project_file')
-    response = {'error' : None}
-    if not p.isabs(project_file):
-        _logger.warning("Paths must be absolute")
-        response = {'error' : "Path '%s' is not absolute"}
-
-    server = _getServerByProjectFile(project_file)
-    response['builder'] = server.builder.builder_name
+    response = {}
     response['hdlcc version'] = hdlcc.__version__
+
+    if project_file is not None and p.exists(project_file):
+        response.update(_getProjectDiags(project_file))
 
     _logger.info("Diagnose info collected:")
     for key, val in response.items():
         _logger.info(" - %s: %s", key, val)
 
-    return json.dumps(response)
+    return response
 
 @app.post('/get_messages_by_path')
-def _getMessagesByPath():
+def getMessagesByPath():
     "Get messages for a given projec_file/path pair"
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     _logger.debug("Getting messages for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
-    response = {'error' : None}
+    response = {}
     response['messages'] = []
 
     for msg in server.getMessagesByPath(path):
         response['messages'] += [msg]
 
-    return json.dumps(response)
+    return response
 
 @app.post('/get_ui_messages')
-def _getUiMessages():
+def getUiMessages():
     "Get messages for a given projec_file/path pair"
-    project_file = bottle.request.forms.get('project_file')
 
+    project_file = bottle.request.forms.get('project_file')
     server = _getServerByProjectFile(project_file)
 
     ui_messages = list(server.getQueuedMessages())
@@ -126,8 +126,7 @@ def _getUiMessages():
     for msg in ui_messages:
         _logger.info(msg)
 
-    response = {'error' : None,
-                'ui_messages' : ui_messages}
+    response = {'ui_messages' : ui_messages}
 
-    return json.dumps(response)
+    return response
 

@@ -24,7 +24,7 @@ import logging
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.tests.utils import writeListToFile
+from hdlcc.tests.utils import writeListToFile, addToPath, removeFromPath
 
 _logger = logging.getLogger(__name__)
 
@@ -63,25 +63,6 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
-def _addBuilderToEnv(env):
-    os.environ = env.copy()
-    if os.name == 'posix':
-        os.environ['PATH'] = \
-            os.pathsep.join([BUILDER_PATH, env['PATH']])
-    elif os.name == 'nt':
-        os.putenv(
-            'PATH',
-            os.pathsep.join([BUILDER_PATH, env['PATH']]))
-        os.environ['PATH'] = \
-            os.pathsep.join([BUILDER_PATH, env['PATH']])
-
-    _logger.info("New env path:")
-    for path in os.environ['PATH'].split(os.pathsep):
-        _logger.info(" >'%s'", path)
-
-def _restorePreviousEnv(env):
-    os.environ = env.copy()
-
 with such.A('hdlcc project') as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
@@ -111,12 +92,6 @@ with such.A('hdlcc project') as it:
 
             hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
 
-            it.builder_env = os.environ.copy()
-
-            _logger.info("Builder env path:")
-            for path in it.builder_env['PATH'].split(os.pathsep):
-                _logger.info(" >'%s'", path)
-
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
             if os.environ.get('CI', '') == 'true' and \
@@ -126,7 +101,7 @@ with such.A('hdlcc project') as it:
 
             it.original_env = os.environ.copy()
 
-            _addBuilderToEnv(it.builder_env)
+            addToPath(BUILDER_PATH)
 
             it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
 
@@ -139,7 +114,7 @@ with such.A('hdlcc project') as it:
         @it.has_teardown
         def teardown():
             hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
-            _restorePreviousEnv(it.original_env)
+            removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
                 shell.rmtree(target_dir)
@@ -443,7 +418,7 @@ with such.A('hdlcc project') as it:
                 return
             it.original_env = os.environ.copy()
 
-            _addBuilderToEnv(it.builder_env)
+            addToPath(BUILDER_PATH)
 
             it.vim_hdl_examples_path = p.join(".ci", "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
@@ -456,7 +431,7 @@ with such.A('hdlcc project') as it:
             if BUILDER_NAME is None:
                 return
             hdlcc.HdlCodeCheckerBase.clean(it.project_file)
-            _restorePreviousEnv(it.original_env)
+            removeFromPath(BUILDER_PATH)
 
             target_dir = it.project._config.getTargetDir()
 

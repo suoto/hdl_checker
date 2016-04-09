@@ -42,3 +42,16 @@ def writeListToFile(filename, _list):
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
 
+def addToPath(path):
+    path_value = os.pathsep.join([path, os.environ['PATH']])
+    os.environ['PATH'] = path_value
+    if os.name == 'nt':
+        os.putenv('PATH', path_value)
+
+def removeFromPath(path):
+    path_list = os.environ['PATH'].split(os.pathsep)
+    path_list.remove(path)
+    os.environ['PATH'] = os.pathsep.join(path_list)
+    if os.name == 'nt':
+        os.putenv('PATH', os.pathsep.join(path_list))
+
