@@ -18,6 +18,7 @@ import os
 import re
 from .base_builder import BaseBuilder
 from hdlcc.exceptions import SanityCheckError
+import hdlcc.utils as utils
 
 class GHDL(BaseBuilder):
     '''Builder implementation of the GHDL compiler'''
@@ -110,14 +111,15 @@ class GHDL(BaseBuilder):
                     repr(library_path_match.groupdict()['library_path'])[1:-1]
 
                 # TODO: We should find a better way to parse this
-                if os.name == 'posix':
-                    library_name_scan = re.compile( \
-                        r"^\s*" + library_path +
-                        r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
-                else:
+                if utils.onWindows():
                     library_name_scan = re.compile( \
                         r"^\s*" + library_path +
                         r"\\(?P<vhdl_standard>\w+)\\(?P<library_name>\w+).*")
+                else:
+                    library_name_scan = re.compile( \
+                        r"^\s*" + library_path +
+                        r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
+
                 self._logger.info("Library path: %s",
                                   library_path_match.groupdict())
                 self._logger.info("Library name scan: %s",

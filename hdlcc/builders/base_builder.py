@@ -24,7 +24,7 @@ from threading import Lock
 
 from hdlcc.config import Config
 
-class BaseBuilder(object):
+class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     "Class that implements the base builder flow"
 
     __metaclass__ = abc.ABCMeta
@@ -125,18 +125,6 @@ class BaseBuilder(object):
 
             for line in traceback.format_exc().split('\n'): # pragma: no cover
                 self._logger.debug(line)
-
-            # We'll check if the return code means a command not found.
-            # In this case, we'll print the configured PATH for debugging
-            # purposes
-            if (os.name == 'posix' and exc.returncode == 127) or \
-               (os.name == 'nt' and exc.returncode == 9009): # pragma: no cover
-                self._logger.debug("subprocess runner path:")
-                for path in subp_env['PATH'].split(os.pathsep):
-                    self._logger.debug(" - %s", path)
-                self._logger.debug("subprocess runner path:")
-                for path in subp_env['PATH'].split(os.pathsep):
-                    self._logger.debug(" - %s", path)
 
         for line in stdout:
             if line == '' or line.isspace():

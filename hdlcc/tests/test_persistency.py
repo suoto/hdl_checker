@@ -25,6 +25,7 @@ from multiprocessing import Queue
 from nose2.tools import such
 
 import hdlcc
+import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
@@ -63,21 +64,12 @@ with such.A('hdlcc project with persistency') as it:
 
     @it.has_setup
     def setup():
-        it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
 
-        if os.name == 'posix':
-            os.environ['PATH'] = \
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-        elif os.name == 'nt':
-            os.putenv(
-                'PATH',
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-            os.environ['PATH'] = \
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+        utils.addToPath(BUILDER_PATH)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
         _logger.info("Builder path: %s", BUILDER_PATH)
@@ -279,14 +271,8 @@ with such.A('hdlcc project with persistency') as it:
         def test_001():
             _logger.info("Building without cache")
             _buildWithoutCache()
-            _logger.info("Restoring original env")
-
-            if os.name == 'posix':
-                os.environ['PATH'] = it.original_env['PATH']
-            elif os.name == 'nt':
-                os.putenv('PATH', it.original_env['PATH'])
-                os.environ['PATH'] = it.original_env['PATH']
-
+            _logger.info("Restoring original path")
+            utils.removeFromPath(BUILDER_PATH)
 
             _logger.info("Building with changed env")
 

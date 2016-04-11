@@ -14,7 +14,16 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
+import sys
+import os
+import os.path as p
 import logging
+import signal
+import time
+import subprocess as subp
+
+_logger = logging.getLogger(__name__)
+
 
 def setupLogging(stream, level, color=True):
     "Setup logging according to the command line parameters"
@@ -58,4 +67,64 @@ def setupLogging(stream, level, color=True):
         file_handler.formatter = logging.Formatter()
         logging.root.addHandler(file_handler)
         logging.root.setLevel(level)
+
+# From here: http://stackoverflow.com/a/8536476/1672783
+def terminateProcess(pid):
+    "Terminate a process given its PID"
+    if onWindows():
+        import ctypes
+        process_terminate = 1
+        handle = ctypes.windll.kernel32.OpenProcess(
+            process_terminate, False, pid)
+        ctypes.windll.kernel32.TerminateProcess(handle, -1)
+        ctypes.windll.kernel32.CloseHandle(handle)
+    else:
+        os.kill(pid, signal.SIGTERM)
+
+def writeListToFile(filename, _list):
+    "Well... writes '_list' to 'filename'"
+    _logger.info("Writing to %s", filename)
+    open(filename, 'w').write('\n'.join([str(x) for x in _list]))
+    mtime = p.getmtime(filename)
+    time.sleep(0.01)
+
+    if onWindows():
+        cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
+        _logger.info(cmd)
+        subp.check_call(cmd, shell=True)
+    else:
+        subp.check_call(['touch', filename])
+
+    for i in range(10):
+        if p.getmtime(filename) != mtime:
+            break
+        _logger.debug("Waiting...[%d]", i)
+        time.sleep(0.1)
+
+def addToPath(path):
+    "Adds path to the PATH environment variable"
+    path_value = os.pathsep.join([path, os.environ['PATH']])
+    os.environ['PATH'] = path_value
+    if onWindows():
+        os.putenv('PATH', path_value)
+
+def removeFromPath(path):
+    "Removes path to the PATH environment variable"
+    path_list = os.environ['PATH'].split(os.pathsep)
+    path_list.remove(path)
+    os.environ['PATH'] = os.pathsep.join(path_list)
+    if onWindows():
+        os.putenv('PATH', os.pathsep.join(path_list))
+
+def onWindows(): # pylint: disable=missing-docstring
+    return sys.platform == 'win32'
+
+def onMac(): # pylint: disable=missing-docstring
+    return sys.platform == 'darwin'
+
+def onTravis(): # pylint: disable=missing-docstring
+    return 'TRAVIS' in os.environ
+
+def onCI(): # pylint: disable=missing-docstring
+    return 'CI' in os.environ
 

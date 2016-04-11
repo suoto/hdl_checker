@@ -88,7 +88,10 @@ def _attachPids(source_pid, target_pid):
             os.kill(source_pid, 0)
         except OSError:
             _logger.info("Process '%s' doesn't exists!", source_pid)
-            os.kill(target_pid, signal.SIGHUP)
+            if utils.onWindows():
+                os.kill(target_pid, signal.SIGKILL)
+            else:
+                os.kill(target_pid, signal.SIGHUP)
             return
         except AttributeError:
             return
@@ -107,32 +110,20 @@ def _setupPipeRedirection(stdout, stderr):
     if stderr is not None:
         sys.stderr = open(stderr, 'ab', buffering=1)
 
-def possiblyDetachFromTerminal():
-    # If not on windows, detach from controlling terminal to prevent
-    # SIGINT from killing us.
-    if os.name == 'posix':
-        try:
-            os.setsid()
-        # setsid() can fail if the user started ycmd directly from a shell.
-        except OSError:
-            pass
-
 def main():
     args = parseArguments()
 
     _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
-    possiblyDetachFromTerminal()
-
     import waitress
     # Call it again to log the paths we added
     _setupPaths()
     import hdlcc
     from hdlcc import handlers
-    from hdlcc.utils import setupLogging
+    import hdlcc.utils as utils
 
-    setupLogging(args.log_stream, args.log_level, args.color)
+    utils.setupLogging(args.log_stream, args.log_level, args.color)
     _logger.info(
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),

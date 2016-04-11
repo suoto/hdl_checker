@@ -19,12 +19,12 @@ import os.path as p
 import bottle
 import logging
 from multiprocessing import Queue
-import time
 import signal
 
 _logger = logging.getLogger(__name__)
 
 import hdlcc
+import hdlcc.utils as utils
 from hdlcc.code_checker_base import HdlCodeCheckerBase
 
 app = bottle.Bottle() # pylint: disable=invalid-name
@@ -136,15 +136,5 @@ def getUiMessages():
 @app.post('/shutdown')
 def shutdownServer():
     "Get messages for a given projec_file/path pair"
-
-    _logger.info("Shutdown requested. For the record, our PID is %s", os.getpid())
-    #  import sys
-    #  sys.exit(0)
-    if os.name == 'posix':
-        os.kill(os.getpid(), signal.SIGHUP)
-    else:
-        import subprocess as subp
-        cmd = ["taskkill", "/F", "/T", "/PID", str(os.getpid())]
-        _logger.info(cmd)
-        subp.Popen(cmd)
+    utils.terminateProcess(os.getpid())
 

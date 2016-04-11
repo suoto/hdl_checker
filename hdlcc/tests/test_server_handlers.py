@@ -21,10 +21,8 @@ import os
 import os.path as p
 from nose2.tools import such
 import subprocess as subp
-import signal
 import requests
 import time
-import threading
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
@@ -36,7 +34,7 @@ else:
     PROJECT_FILE = None
 
 import hdlcc
-from hdlcc.tests.utils import addToPath, removeFromPath
+from hdlcc.utils import terminateProcess, addToPath, removeFromPath
 
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
@@ -62,50 +60,23 @@ with such.A("hdlcc server handler") as it:
         it._host = '127.0.0.1'
         it._port = '50000'
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
-        cmd = ['coverage', 'run', hdlcc_server_fname,
+        cmd = ['python',
+               '-m', 'coverage', 'run',
+               hdlcc_server_fname,
                '--host', it._host, '--port', it._port,
-               '--attach-to-pid', str(os.getpid()),
+               #  '--attach-to-pid', str(os.getpid()),
+               '--stdout', 'hdlcc-stdout.log',
+               '--stderr', 'hdlcc-stderr.log',
                '--log-level', 'DEBUG',
               ]
 
-        _logger.info("Starting hdlcc server with %s", " ".join(cmd))
+        _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
-        it._stdout_rd_pipe, it._stdout_wr_pipe = os.pipe()
-        it._stderr_rd_pipe, it._stderr_wr_pipe = os.pipe()
-
-        it._server = subp.Popen(cmd, stdout=it._stdout_wr_pipe,
-                                stderr=it._stderr_wr_pipe,
-                                env=os.environ.copy())
-
-        def _stdoutLogger():
-            "Reads stdout pipe of our subp"
-            line = ''
-            while True:
-                char = os.read(it._stdout_rd_pipe, 1)
-                if char == '\n':
-                    _logger.info("%s", str(line))
-                    if line == '<eof>':
-                        break
-                    line = ''
-                else:
-                    line += char
-        def _stderrLogger():
-            "Reads stderr pipe of our subp"
-            line = ''
-            while True:
-                char = os.read(it._stderr_rd_pipe, 1)
-                if char == '\n':
-                    _logger.error("%s", str(line))
-                    if line == '<eof>':
-                        break
-                    line = ''
-                else:
-                    line += char
-        it._stdout_t = threading.Thread(target=_stdoutLogger)
-        it._stderr_t = threading.Thread(target=_stderrLogger)
-
-        it._stdout_t.start()
-        it._stderr_t.start()
+        it._server = subp.Popen(
+            cmd,
+            #  stdout=it._stdout_wr_pipe, stderr=it._stderr_wr_pipe,
+            #  stdout=subp.PIPE, stderr=subp.PIPE,
+            env=os.environ.copy())
 
         time.sleep(2)
 
@@ -119,23 +90,8 @@ with such.A("hdlcc server handler") as it:
 
     @it.has_teardown
     def teardown():
-        time.sleep(1 if os.name == 'posix' else 10)
         _logger.info("Shutting down server")
-
-        # Sending SIGINT results on failing tests on Windows Server 2012
-        # (which is used by Appveyor). Since this is only a test,
-        # hopefully terminating the process like this won't hurt much
-        _logger.info("For the record, our PID is %s", os.getpid())
-        it._server.terminate()
-        #  try:
-        #      requests.post(it._url + '/shutdown', timeout=1)
-        #  except (requests.ConnectionError, requests.Timeout):
-        #      pass
-
-        os.write(it._stdout_wr_pipe, '<eof>\n')
-        os.write(it._stderr_wr_pipe, '<eof>\n')
-        it._stdout_t.join()
-        it._stderr_t.join()
+        terminateProcess(it._server.pid)
         removeFromPath(BUILDER_PATH)
         time.sleep(1)
 
@@ -210,9 +166,10 @@ with such.A("hdlcc server handler") as it:
             {'ui_messages': [['warning', "Project hasn't finished building, "
                                          "try again after it finishes."]]})
 
-        _logger.info("Waiting until build is finished")
-        while True:
+        _logger.info("Waiting for 30s until build is finished")
+        for i in range(30):
             time.sleep(1)
+            _logger.info("Elapsed %ds", i)
             build_messages = requests.post(it._url + '/get_messages_by_path',
                                            timeout=10, data=data)
             ui_messages = requests.post(it._url + '/get_ui_messages',

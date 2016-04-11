@@ -24,7 +24,7 @@ import logging
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.tests.utils import writeListToFile, addToPath, removeFromPath
+from hdlcc.utils import writeListToFile, addToPath, removeFromPath
 
 _logger = logging.getLogger(__name__)
 
@@ -69,7 +69,6 @@ with such.A('hdlcc project') as it:
 
     @it.has_setup
     def setup():
-        it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
