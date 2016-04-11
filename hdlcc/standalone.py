@@ -213,9 +213,6 @@ def runner(args):
 
 def setupLogging():
     "Tries to use RainbowLoggingHandler for logging to stdout"
-    path_to_this_file = p.sep.join(p.realpath(__file__).split(p.sep)[:-2])
-    sys.path.insert(0, p.sep.join([path_to_this_file, '.ci',
-                                   'rainbow_logging_handler']))
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         # pylint: disable=bad-whitespace

@@ -40,6 +40,7 @@ clone_depth: 5
 # environment variables
 environment:
   CACHE_PATH: "%LOCALAPPDATA%\\cache"
+  PYTHONPATH: "%LOCALAPPDATA%\\rainbow_logging_handler"
   matrix:
     - BUILDER_NAME: ghdl
       INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
@@ -60,6 +61,8 @@ environment:
 install:
   - appveyor AddMessage "Starting path is %CD%" -Category Information
   - git submodule update --init --recursive
+  - "git clone https://github.com/suoto/rainbow_logging_handler
+      %LOCALAPPDATA%\\rainbow_logging_handler"
   - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
                                             { 'C:\Python27-x64' }
 
@@ -80,10 +83,10 @@ install:
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
-  - "pip install -U %APPVEYOR_BUILD_FOLDER%"
+  - "pip install -U -e %APPVEYOR_BUILD_FOLDER%"
 
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
-      -vv -F -B --log-capture"
+      -vv -F -B --log-capture %EXTRA_ARGS%"
 
   - coverage combine
   - coverage report

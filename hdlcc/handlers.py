@@ -14,10 +14,13 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
+import os
 import os.path as p
 import bottle
 import logging
 from multiprocessing import Queue
+import time
+import signal
 
 _logger = logging.getLogger(__name__)
 
@@ -129,4 +132,19 @@ def getUiMessages():
     response = {'ui_messages' : ui_messages}
 
     return response
+
+@app.post('/shutdown')
+def shutdownServer():
+    "Get messages for a given projec_file/path pair"
+
+    _logger.info("Shutdown requested. For the record, our PID is %s", os.getpid())
+    #  import sys
+    #  sys.exit(0)
+    if os.name == 'posix':
+        os.kill(os.getpid(), signal.SIGHUP)
+    else:
+        import subprocess as subp
+        cmd = ["taskkill", "/F", "/T", "/PID", str(os.getpid())]
+        _logger.info(cmd)
+        subp.Popen(cmd)
 

@@ -14,8 +14,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
-import sys
-import os.path as p
 import logging
 
 def setupLogging(stream, level, color=True):
@@ -33,11 +31,6 @@ def setupLogging(stream, level, color=True):
         stream = Stream(stream, 'ab', buffering=1)
 
     try:
-        path_to_this_file = p.abspath(p.dirname(__name__))
-
-        sys.path.insert(0, p.join(path_to_this_file, '..', '.ci',
-                                  'rainbow_logging_handler'))
-
         from rainbow_logging_handler import RainbowLoggingHandler
         rainbow_stream_handler = RainbowLoggingHandler(
             stream,

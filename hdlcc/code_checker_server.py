@@ -53,13 +53,13 @@ def parseArguments():
     # Options
     parser.add_argument('--host', action='store',)
     parser.add_argument('--port', action='store',)
+    parser.add_argument('--attach-to-pid', action='store', type=int)
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
     parser.add_argument('--nocolor', action='store_true', default=False)
 
     parser.add_argument('--stdout', action='store')
     parser.add_argument('--stderr', action='store')
-    parser.add_argument('--coverage', action='store_true')
 
     try:
         import argcomplete
@@ -107,11 +107,23 @@ def _setupPipeRedirection(stdout, stderr):
     if stderr is not None:
         sys.stderr = open(stderr, 'ab', buffering=1)
 
+def possiblyDetachFromTerminal():
+    # If not on windows, detach from controlling terminal to prevent
+    # SIGINT from killing us.
+    if os.name == 'posix':
+        try:
+            os.setsid()
+        # setsid() can fail if the user started ycmd directly from a shell.
+        except OSError:
+            pass
+
 def main():
     args = parseArguments()
 
     _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
+
+    possiblyDetachFromTerminal()
 
     import waitress
     # Call it again to log the paths we added
@@ -121,14 +133,18 @@ def main():
     from hdlcc.utils import setupLogging
 
     setupLogging(args.log_stream, args.log_level, args.color)
-    _logger.info("Starting server. "
-                 "Our PID is %s, our parent is %s. "
-                 "Version of hdlcc is '%s'",
-                 os.getpid(), os.getppid(), hdlcc.__version__)
-    _attachPids(os.getppid(), os.getpid())
+    _logger.info(
+        "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
+        os.getpid(),
+        "no parent PID to attach to" if args.attach_to_pid is None else \
+        "our parent is %s." % args.attach_to_pid,
+        hdlcc.__version__)
+
+    if args.attach_to_pid is not None:
+        _attachPids(args.attach_to_pid, os.getpid())
 
     handlers.app.run(host=args.host, port=args.port, threads=20,
-                     server='waitress')
+                     server='waitress', debug=True)
 
 if __name__ == '__main__':
     main()

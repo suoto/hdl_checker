@@ -59,15 +59,13 @@ with such.A("hdlcc server handler") as it:
         hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
                                     'code_checker_server.py')
 
-        it._host = 'localhost'
+        it._host = '127.0.0.1'
         it._port = '50000'
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
         cmd = ['coverage', 'run', hdlcc_server_fname,
-               '--host', 'localhost', '--port', '50000',
-               '--coverage',
-               #  '--log-stream', '/tmp/hdlcc.log',
-               #  '--stdout', '/tmp/hdlcc.log',
-               #  '--stderr', '/tmp/hdlcc.log',
+               '--host', it._host, '--port', it._port,
+               '--attach-to-pid', str(os.getpid()),
+               '--log-level', 'DEBUG',
               ]
 
         _logger.info("Starting hdlcc server with %s", " ".join(cmd))
@@ -79,7 +77,8 @@ with such.A("hdlcc server handler") as it:
                                 stderr=it._stderr_wr_pipe,
                                 env=os.environ.copy())
 
-        def _stdout_reader():
+        def _stdoutLogger():
+            "Reads stdout pipe of our subp"
             line = ''
             while True:
                 char = os.read(it._stdout_rd_pipe, 1)
@@ -90,8 +89,8 @@ with such.A("hdlcc server handler") as it:
                     line = ''
                 else:
                     line += char
-
-        def _stderr_reader():
+        def _stderrLogger():
+            "Reads stderr pipe of our subp"
             line = ''
             while True:
                 char = os.read(it._stderr_rd_pipe, 1)
@@ -102,14 +101,13 @@ with such.A("hdlcc server handler") as it:
                     line = ''
                 else:
                     line += char
-
-        it._stdout_t = threading.Thread(target=_stdout_reader)
-        it._stderr_t = threading.Thread(target=_stderr_reader)
+        it._stdout_t = threading.Thread(target=_stdoutLogger)
+        it._stderr_t = threading.Thread(target=_stderrLogger)
 
         it._stdout_t.start()
         it._stderr_t.start()
 
-        time.sleep(0.3)
+        time.sleep(2)
 
     @it.has_setup
     def setup():
@@ -121,10 +119,19 @@ with such.A("hdlcc server handler") as it:
 
     @it.has_teardown
     def teardown():
-        time.sleep(1)
+        time.sleep(1 if os.name == 'posix' else 10)
         _logger.info("Shutting down server")
-        os.kill(it._server.pid, signal.SIGINT)
-        os.kill(it._server.pid, signal.SIGINT)
+
+        # Sending SIGINT results on failing tests on Windows Server 2012
+        # (which is used by Appveyor). Since this is only a test,
+        # hopefully terminating the process like this won't hurt much
+        _logger.info("For the record, our PID is %s", os.getpid())
+        it._server.terminate()
+        #  try:
+        #      requests.post(it._url + '/shutdown', timeout=1)
+        #  except (requests.ConnectionError, requests.Timeout):
+        #      pass
+
         os.write(it._stdout_wr_pipe, '<eof>\n')
         os.write(it._stderr_wr_pipe, '<eof>\n')
         it._stdout_t.join()
@@ -134,28 +141,31 @@ with such.A("hdlcc server handler") as it:
 
     @it.should("get diagnose info without any project")
     def test():
-        reply = requests.post(it._url + '/get_diagnose_info')
+        reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
         content = reply.json()
         _logger.info(reply.text)
+        it.assertNotIn('unknown', content['hdlcc version'])
         it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
 
     @it.should("get diagnose info with a non existing project file")
     def test():
-        reply = requests.post(it._url + '/get_diagnose_info',
+        reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                               data={'project_file' : 'some_project'})
         content = reply.json()
         _logger.info(reply.text)
+        it.assertNotIn('unknown', content['hdlcc version'])
         it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
 
     @it.should("get diagnose info with an existing project file before it has "
                "parsed the configuration file")
     def test():
-        reply = requests.post(it._url + '/get_diagnose_info',
+        reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                               data={'project_file' : PROJECT_FILE})
         content = reply.json()
         _logger.info(reply.text)
         it.assertIn('hdlcc version', content)
         it.assertNotIn('error', content)
+        it.assertNotIn('unknown', content['hdlcc version'])
         it.assertEquals(
             content,
             {"builder": "<unknown>", "hdlcc version": hdlcc.__version__})
@@ -168,12 +178,17 @@ with such.A("hdlcc server handler") as it:
             'path'         : p.join(HDL_LIB_PATH, 'memory', 'testbench',
                                     'async_fifo_tb.vhd')}
 
-        ui_messages = requests.post(it._url + '/get_ui_messages', data=data)
+        ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                    data=data)
 
         build_messages = requests.post(it._url + '/get_messages_by_path',
-                                       data=data)
+                                       timeout=10, data=data)
 
         _logger.info(build_messages.text)
+        _logger.info("Messages:")
+        for message in build_messages.json()['messages']:
+            _logger.info(message)
+
         it.assertEquals(
             build_messages.json(),
             {u'messages': [
@@ -186,7 +201,8 @@ with such.A("hdlcc server handler") as it:
                  u'filename'      : None,
                  u'line_number'   : 29}]})
 
-        ui_messages = requests.post(it._url + '/get_ui_messages', data=data)
+        ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                    data=data)
 
         _logger.info(ui_messages.text)
         it.assertEquals(
@@ -198,8 +214,9 @@ with such.A("hdlcc server handler") as it:
         while True:
             time.sleep(1)
             build_messages = requests.post(it._url + '/get_messages_by_path',
-                                           data=data)
-            ui_messages = requests.post(it._url + '/get_ui_messages', data=data)
+                                           timeout=10, data=data)
+            ui_messages = requests.post(it._url + '/get_ui_messages',
+                                        timeout=10, data=data)
             _logger.debug("==> %s", ui_messages.json())
             if ui_messages.json()['ui_messages'] == []:
                 _logger.info("Ok, done")
