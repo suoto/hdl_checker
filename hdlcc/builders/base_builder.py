@@ -22,7 +22,7 @@ import time
 import subprocess as subp
 from threading import Lock
 
-from hdlcc.config import Config
+import hdlcc.options as options
 
 class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     "Class that implements the base builder flow"
@@ -216,7 +216,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             cached_info['rebuilds'] = rebuilds
             cached_info['compile_time'] = source.getmtime()
 
-            if not Config.cache_error_messages and \
+            if not options.cache_error_messages and \
                     'E' in [x['error_type'] for x in records]:
                 cached_info['compile_time'] = 0
 

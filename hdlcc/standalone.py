@@ -117,9 +117,6 @@ def parseArguments():
     if args.sources:
         args.sources = [source for sublist in args.sources for source in sublist]
 
-    hdlcc.config.Config.log_level = args.log_level
-    #  hdlcc.config.Config.setupBuild()
-
     return args
 
 class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):

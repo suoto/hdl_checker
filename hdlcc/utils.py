@@ -81,6 +81,10 @@ def terminateProcess(pid):
     else:
         os.kill(pid, signal.SIGTERM)
 
+def interruptProcess(pid):
+    "Send SIGINT to PID"
+    os.kill(pid, signal.SIGINT)
+
 def writeListToFile(filename, _list):
     "Well... writes '_list' to 'filename'"
     _logger.info("Writing to %s", filename)

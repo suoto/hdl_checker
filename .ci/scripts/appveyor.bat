@@ -25,7 +25,7 @@ REM  @set TESTS=hdlcc.tests.test_persistency
 REM  @set TESTS=hdlcc.tests.test_project_builder
 REM  @set TESTS=hdlcc.tests.test_source_file
 REM  @set TESTS=hdlcc.tests.test_standalone
-@set TESTS=hdlcc.tests.test_server_handlers
+REM  @set TESTS=hdlcc.tests.test_server_handlers
 
 
 @set RUNNER_ARGS=-vv --log-capture -F --debug

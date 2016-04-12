@@ -135,7 +135,7 @@ def main():
         _attachPids(args.attach_to_pid, os.getpid())
 
     handlers.app.run(host=args.host, port=args.port, threads=20,
-                     server='waitress', debug=True)
+                     server='waitress')
 
 if __name__ == '__main__':
     main()

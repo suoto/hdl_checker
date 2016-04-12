@@ -34,7 +34,7 @@ else:
     PROJECT_FILE = None
 
 import hdlcc
-from hdlcc.utils import terminateProcess, addToPath, removeFromPath
+import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
@@ -60,8 +60,7 @@ with such.A("hdlcc server handler") as it:
         it._host = '127.0.0.1'
         it._port = '50000'
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
-        cmd = ['python',
-               '-m', 'coverage', 'run',
+        cmd = ['coverage', 'run',
                hdlcc_server_fname,
                '--host', it._host, '--port', it._port,
                #  '--attach-to-pid', str(os.getpid()),
@@ -84,16 +83,27 @@ with such.A("hdlcc server handler") as it:
     def setup():
         _logger.info("Builder name: %s", BUILDER_NAME)
         _logger.info("Builder path: %s", BUILDER_PATH)
-        addToPath(BUILDER_PATH)
+        utils.addToPath(BUILDER_PATH)
         setupPaths()
         startCodeCheckerServer()
 
     @it.has_teardown
     def teardown():
-        _logger.info("Shutting down server")
-        terminateProcess(it._server.pid)
-        removeFromPath(BUILDER_PATH)
-        time.sleep(1)
+        if utils.onWindows():
+            it._server.terminate()
+        else:
+            try:
+                requests.post(it._url + '/shutdown', timeout=10)
+            except requests.ConnectionError:
+                _logger.info("Seems to have worked")
+
+            time.sleep(2)
+            if it._server.poll() is None:
+                _logger.info("Process hasn't finished, terminating it")
+                it._server.terminate()
+
+        utils.removeFromPath(BUILDER_PATH)
+        time.sleep(5)
 
     @it.should("get diagnose info without any project")
     def test():

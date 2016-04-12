@@ -136,5 +136,6 @@ def getUiMessages():
 @app.post('/shutdown')
 def shutdownServer():
     "Get messages for a given projec_file/path pair"
-    utils.terminateProcess(os.getpid())
+    _logger.info("Shutting down server")
+    utils.interruptProcess(os.getpid())
 
