@@ -66,6 +66,7 @@ with such.A("hdlcc server handler") as it:
                #  '--attach-to-pid', str(os.getpid()),
                '--stdout', 'hdlcc-stdout.log',
                '--stderr', 'hdlcc-stderr.log',
+               '--log-stream', 'hdlcc.log',
                '--log-level', 'DEBUG',
               ]
 
@@ -89,18 +90,16 @@ with such.A("hdlcc server handler") as it:
 
     @it.has_teardown
     def teardown():
-        if utils.onWindows():
-            it._server.terminate()
-        else:
-            try:
-                requests.post(it._url + '/shutdown', timeout=10)
-            except requests.ConnectionError:
-                _logger.info("Seems to have worked")
+        it._server.terminate()
+        #  try:
+        #      requests.post(it._url + '/shutdown', timeout=10)
+        #  except requests.ConnectionError:
+        #      _logger.info("Seems to have worked")
 
-            time.sleep(2)
-            if it._server.poll() is None:
-                _logger.info("Process hasn't finished, terminating it")
-                it._server.terminate()
+        #  time.sleep(2)
+        #  if it._server.poll() is None:
+        #      _logger.info("Process hasn't finished, terminating it")
+        #      it._server.terminate()
 
         utils.removeFromPath(BUILDER_PATH)
         time.sleep(5)

@@ -24,10 +24,9 @@ import subprocess as subp
 
 _logger = logging.getLogger(__name__)
 
-
-def setupLogging(stream, level, color=True):
+def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if type(stream) is str: # pragma: no cover
+    if type(stream) is str:
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
@@ -69,7 +68,7 @@ def setupLogging(stream, level, color=True):
         logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
-def terminateProcess(pid):
+def terminateProcess(pid): # pragma: no cover
     "Terminate a process given its PID"
     if onWindows():
         import ctypes
@@ -81,12 +80,12 @@ def terminateProcess(pid):
     else:
         os.kill(pid, signal.SIGTERM)
 
-def interruptProcess(pid):
+def interruptProcess(pid): # pragma: no cover
     "Send SIGINT to PID"
     os.kill(pid, signal.SIGINT)
 
-def writeListToFile(filename, _list):
-    "Well... writes '_list' to 'filename'"
+def writeListToFile(filename, _list): # pragma: no cover
+    "Well... writes '_list' to 'filename'. This is for testing only"
     _logger.info("Writing to %s", filename)
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
     mtime = p.getmtime(filename)
@@ -120,15 +119,17 @@ def removeFromPath(path):
     if onWindows():
         os.putenv('PATH', os.pathsep.join(path_list))
 
-def onWindows(): # pylint: disable=missing-docstring
+# pylint: disable=missing-docstring
+def onWindows():
     return sys.platform == 'win32'
 
-def onMac(): # pylint: disable=missing-docstring
+def onMac(): # pragma: no cover
     return sys.platform == 'darwin'
 
-def onTravis(): # pylint: disable=missing-docstring
+def onTravis(): # pragma: no cover
     return 'TRAVIS' in os.environ
 
-def onCI(): # pylint: disable=missing-docstring
+def onCI(): # pragma: no cover
     return 'CI' in os.environ
+# pylint: enable=missing-docstring
 

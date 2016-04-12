@@ -29,9 +29,6 @@ from hdlcc.code_checker_base import HdlCodeCheckerBase
 
 app = bottle.Bottle() # pylint: disable=invalid-name
 
-#  We'll store a dict to store differents hdlcc objects
-_hdlcc_objects = {} # pylint: disable=invalid-name
-
 class HdlCodeCheckerSever(HdlCodeCheckerBase):
     "HDL Code Checker project builder class"
     def __init__(self, *args, **kwargs):
@@ -133,9 +130,24 @@ def getUiMessages():
 
     return response
 
+def setupSignalHandlers():
+    def signalHandler(sig, _):
+        "Handle to disable hdlcc server"
+        _logger.info("Handling signal %s", repr(sig))
+        import sys
+        sys.exit()
+
+    for sig in [signal.SIGTERM,
+                signal.SIGINT]:
+        signal.signal(sig, signalHandler)
+
 @app.post('/shutdown')
 def shutdownServer():
     "Get messages for a given projec_file/path pair"
     _logger.info("Shutting down server")
-    utils.interruptProcess(os.getpid())
+    utils.terminateProcess(os.getpid())
+
+#  We'll store a dict to store differents hdlcc objects
+_hdlcc_objects = {} # pylint: disable=invalid-name
+setupSignalHandlers()
 
