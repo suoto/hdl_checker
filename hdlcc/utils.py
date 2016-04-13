@@ -34,7 +34,6 @@ def setupLogging(stream, level, color=True): # pragma: no cover
                 return color
             def write(self, *args, **kwargs):
                 super(Stream, self).write(*args, **kwargs)
-                super(Stream, self).write("\n")
 
         stream = Stream(stream, 'ab', buffering=1)
 

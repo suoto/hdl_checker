@@ -147,12 +147,6 @@ def shutdownServer():
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
 
-@app.post('/is_alive')
-def isServerAlive():
-    "Dummy handle only to check if the server is actually running"
-    _logger.fatal("We're alive")
-    return {}
-
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name
 setupSignalHandlers()

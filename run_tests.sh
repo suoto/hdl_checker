@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with hdlcc.  If not, see <http://www.gnu.org/licenses/>.
 
-ARGS=
+ARGS=()
 
 CLEAN=0
 
@@ -37,11 +37,12 @@ while [ -n "$1" ]; do
     if [ "$1" == "-F" ]; then
       FAILFAST=1
     fi
-    ARGS+=" $1"
+    ARGS+=($1)
   fi
 
   shift
 done
+
 
 if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   GHDL=1
@@ -55,7 +56,7 @@ fi
 if [ "${CLEAN}" == "1" ]; then
   git clean -fdx && git submodule foreach --recursive git clean -fdx
   cd .ci/hdl_lib && git reset HEAD --hard
-  cd -
+  cd - || exit
 fi
 
 set -x
@@ -70,12 +71,12 @@ if [ -n "${PIP}" ]; then
   else
     pip install -e . --user
   fi
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
   hdlcc -h
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 
@@ -86,24 +87,24 @@ fi
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
-  ${TEST_RUNNER} $ARGS hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${FALLBACK}" ]; then
-  ${TEST_RUNNER} $ARGS hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim
   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 
-  ${TEST_RUNNER} $ARGS
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  ${TEST_RUNNER} "${ARGS[@]}"
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${XVHDL}" ]; then
@@ -113,9 +114,9 @@ if [ -n "${XVHDL}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi
 
-  ${TEST_RUNNER} $ARGS
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  ${TEST_RUNNER} "${ARGS[@]}"
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${GHDL}" ]; then
@@ -132,9 +133,9 @@ if [ -n "${GHDL}" ]; then
 
   echo "BUILDER_PATH=$BUILDER_PATH"
 
-  ${TEST_RUNNER} $ARGS
-  RESULT=$(($? || ${RESULT}))
-  [ -n "${FAILFAST}" -a "${RESULT}" != "0" ] && exit ${RESULT}
+  ${TEST_RUNNER} "${ARGS[@]}"
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 coverage combine

@@ -5,8 +5,6 @@ engines:
     exclude_fingerprints:
       # Duplication on hdlcc.exceptions
       - 0655784473047c89aa4f852195dfebd1
-      # Shell check complaints about variable splitting
-      - 4684a65ccf27000486237bbfa0586ab3
     config:
       languages:
         - python

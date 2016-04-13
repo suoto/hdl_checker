@@ -117,12 +117,12 @@ def main():
     _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
-    import waitress
     # Call it again to log the paths we added
     _setupPaths()
     import hdlcc
     from hdlcc import handlers
     import hdlcc.utils as utils
+    globals()['utils'] = utils
 
     utils.setupLogging(args.log_stream, args.log_level, args.color)
     _logger.info(
