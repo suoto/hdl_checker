@@ -62,6 +62,17 @@ def _getServerByProjectFile(project_file):
         _logger.error("Paths must be absolute")
         return
 
+def setupSignalHandlers():
+    def signalHandler(sig, _):
+        "Handle to disable hdlcc server"
+        _logger.info("Handling signal %s", repr(sig))
+        import sys
+        sys.exit()
+
+    for sig in [signal.SIGTERM,
+                signal.SIGINT]:
+        signal.signal(sig, signalHandler)
+
 def _getProjectDiags(project_file):
     "Get project specific diagnose"
     diags = {}
@@ -130,22 +141,17 @@ def getUiMessages():
 
     return response
 
-def setupSignalHandlers():
-    def signalHandler(sig, _):
-        "Handle to disable hdlcc server"
-        _logger.info("Handling signal %s", repr(sig))
-        import sys
-        sys.exit()
-
-    for sig in [signal.SIGTERM,
-                signal.SIGINT]:
-        signal.signal(sig, signalHandler)
-
 @app.post('/shutdown')
 def shutdownServer():
     "Get messages for a given projec_file/path pair"
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
+
+@app.post('/is_alive')
+def isServerAlive():
+    "Dummy handle only to check if the server is actually running"
+    _logger.fatal("We're alive")
+    return {}
 
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name

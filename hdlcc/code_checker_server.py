@@ -33,6 +33,7 @@ def _setupPaths():
     "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
     for path in (
+            hdlcc_base_path,
             p.join(hdlcc_base_path, 'dependencies', 'requests'),
             p.join(hdlcc_base_path, 'dependencies', 'waitress'),
             p.join(hdlcc_base_path, 'dependencies', 'bottle')):
@@ -103,7 +104,7 @@ def _attachPids(source_pid, target_pid):
 
     Timer(2, _attachWrapper).start()
 
-def _setupPipeRedirection(stdout, stderr):
+def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     "Redirect stdout and stderr to files"
     if stdout is not None:
         sys.stdout = open(stdout, 'ab', buffering=1)
