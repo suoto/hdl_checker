@@ -71,6 +71,7 @@ install:
   - set PATH=%python%;%python%\Scripts;%PATH%
   # - python get-pip.py
   - pip install -r requirements.txt
+  - pip install git+https://github.com/suoto/rainbow_logging_handler
   - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
   - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
 
@@ -102,7 +103,7 @@ build: off
 test: off
 
 on_failure:
-  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log"
+  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log" "*.log"
   - appveyor PushArtifact hdlcc_failure.zip
 
 # artifacts:

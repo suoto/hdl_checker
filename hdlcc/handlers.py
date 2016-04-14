@@ -58,9 +58,6 @@ def _getServerByProjectFile(project_file):
             _logger.debug("Created new project server for '%s'", project_file)
             _hdlcc_objects[project_file] = HdlCodeCheckerSever(project_file)
         return _hdlcc_objects[project_file]
-    else:
-        _logger.error("Paths must be absolute")
-        return
 
 def setupSignalHandlers():
     def signalHandler(sig, _):
@@ -76,9 +73,6 @@ def setupSignalHandlers():
 def _getProjectDiags(project_file):
     "Get project specific diagnose"
     diags = {}
-    if not p.isabs(project_file):
-        diags['error'] = "Path '%s' is not absolute"
-
     server = _getServerByProjectFile(project_file)
     if server.builder is not None:
         diags['builder'] = server.builder.builder_name
@@ -143,7 +137,7 @@ def getUiMessages():
 
 @app.post('/shutdown')
 def shutdownServer():
-    "Get messages for a given projec_file/path pair"
+    "Terminates the current process to shutdown the server"
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
 

@@ -23,6 +23,11 @@ from nose2.tools import such
 import subprocess as subp
 import requests
 import time
+from multiprocessing import Queue, Process
+
+import hdlcc
+import hdlcc.utils as utils
+
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
@@ -33,160 +38,234 @@ if BUILDER_NAME is not None:
 else:
     PROJECT_FILE = None
 
-import hdlcc
-import hdlcc.utils as utils
-
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
-with such.A("hdlcc server handler") as it:
-    def setupPaths():
-        "Add our dependencies to sys.path"
-        for path in (
-                p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
-                p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
-            ):
-            path = p.abspath(path)
-            if path not in sys.path:
-                _logger.info("Adding '%s'", path)
-                sys.path.insert(0, path)
-            else:
-                _logger.warning("WARNING: '%s' was already on sys.path!", path)
+def doNothing(queue):
+    _logger.debug("I'm ready")
+    queue.get()
+    _logger.debug("Ok, done")
 
-    def startCodeCheckerServer():
-        hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
-                                    'code_checker_server.py')
+with such.A("hdlcc server") as it:
+    with it.having("no PID attachment"):
+        def setupPaths():
+            "Add our dependencies to sys.path"
+            for path in (
+                    p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
+                    p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
+                ):
+                path = p.abspath(path)
+                if path not in sys.path:
+                    _logger.info("Adding '%s'", path)
+                    sys.path.insert(0, path)
+                else:
+                    _logger.warning("WARNING: '%s' was already on sys.path!", path)
 
-        it._host = '127.0.0.1'
-        it._port = '50000'
-        it._url = 'http://{0}:{1}'.format(it._host, it._port)
-        cmd = ['coverage', 'run',
-               hdlcc_server_fname,
-               '--host', it._host, '--port', it._port,
-               #  '--attach-to-pid', str(os.getpid()),
-               '--stdout', 'hdlcc-stdout.log',
-               '--stderr', 'hdlcc-stderr.log',
-               '--log-stream', 'hdlcc.log',
-               '--log-level', 'DEBUG',
-              ]
+        def startCodeCheckerServer():
+            hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
+                                        'code_checker_server.py')
 
-        _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
+            it._host = '127.0.0.1'
+            it._port = '50000'
+            it._url = 'http://{0}:{1}'.format(it._host, it._port)
+            cmd = ['coverage', 'run',
+                   hdlcc_server_fname,
+                   '--host', it._host, '--port', it._port,
+                   '--log-level', 'DEBUG',
+                   '--attach-to-pid', str(os.getpid()),
+                  ]
 
-        it._server = subp.Popen(
-            cmd,
-            #  stdout=it._stdout_wr_pipe, stderr=it._stderr_wr_pipe,
-            #  stdout=subp.PIPE, stderr=subp.PIPE,
-            env=os.environ.copy())
+            # Setup redirection if running on CI server
+            if utils.onCI():
+                cmd += ['--stdout', 'hdlcc-stdout.log',
+                        '--stderr', 'hdlcc-stderr.log',
+                        '--log-stream', 'hdlcc.log',]
 
-        time.sleep(2)
+            _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
-    @it.has_setup
-    def setup():
-        _logger.info("Builder name: %s", BUILDER_NAME)
-        _logger.info("Builder path: %s", BUILDER_PATH)
-        utils.addToPath(BUILDER_PATH)
-        setupPaths()
-        startCodeCheckerServer()
+            it._server = subp.Popen(cmd, env=os.environ.copy())
 
-    @it.has_teardown
-    def teardown():
-        it._server.terminate()
-        #  try:
-        #      requests.post(it._url + '/shutdown', timeout=10)
-        #  except requests.ConnectionError:
-        #      _logger.info("Seems to have worked")
+            time.sleep(2)
 
-        #  time.sleep(2)
-        #  if it._server.poll() is None:
-        #      _logger.info("Process hasn't finished, terminating it")
-        #      it._server.terminate()
+        @it.has_setup
+        def setup():
+            _logger.info("Builder name: %s", BUILDER_NAME)
+            _logger.info("Builder path: %s", BUILDER_PATH)
+            utils.addToPath(BUILDER_PATH)
+            setupPaths()
+            startCodeCheckerServer()
 
-        utils.removeFromPath(BUILDER_PATH)
-        time.sleep(5)
+        @it.has_teardown
+        def teardown():
+            if it._server.poll() is not None:
+                _logger.info("Server was alive, terminating it")
+                it._server.terminate()
+            utils.removeFromPath(BUILDER_PATH)
+            time.sleep(2)
 
-    @it.should("get diagnose info without any project")
-    def test():
-        reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
-        content = reply.json()
-        _logger.info(reply.text)
-        it.assertNotIn('unknown', content['hdlcc version'])
-        it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+        @it.should("get diagnose info without any project")
+        def test():
+            reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
+            content = reply.json()
+            _logger.info(reply.text)
+            it.assertNotIn('unknown', content['hdlcc version'])
+            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
 
-    @it.should("get diagnose info with a non existing project file")
-    def test():
-        reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                              data={'project_file' : 'some_project'})
-        content = reply.json()
-        _logger.info(reply.text)
-        it.assertNotIn('unknown', content['hdlcc version'])
-        it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+        @it.should("get diagnose info with an existing project file before it has "
+                   "parsed the configuration file")
+        def test():
+            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+                                  data={'project_file' : PROJECT_FILE})
+            content = reply.json()
+            _logger.info(reply.text)
+            it.assertIn('hdlcc version', content)
+            it.assertNotIn('error', content)
+            it.assertNotIn('unknown', content['hdlcc version'])
+            it.assertEquals(
+                content,
+                {"builder": "<unknown>", "hdlcc version": hdlcc.__version__})
 
-    @it.should("get diagnose info with an existing project file before it has "
-               "parsed the configuration file")
-    def test():
-        reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                              data={'project_file' : PROJECT_FILE})
-        content = reply.json()
-        _logger.info(reply.text)
-        it.assertIn('hdlcc version', content)
-        it.assertNotIn('error', content)
-        it.assertNotIn('unknown', content['hdlcc version'])
-        it.assertEquals(
-            content,
-            {"builder": "<unknown>", "hdlcc version": hdlcc.__version__})
+        @it.should("get diagnose info with a non existing project file")
+        def test():
+            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+                                  data={'project_file' : 'some_project'})
+            content = reply.json()
+            _logger.info(reply.text)
+            it.assertNotIn('unknown', content['hdlcc version'])
+            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
 
-    @it.should("get UI warning when getting messages before project build "
-               "has finished")
-    def test():
-        data = {
-            'project_file' : PROJECT_FILE,
-            'path'         : p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                    'async_fifo_tb.vhd')}
+        @it.should("get UI warning when getting messages before project build "
+                   "has finished")
+        def test():
+            data = {
+                'project_file' : PROJECT_FILE,
+                'path'         : p.join(HDL_LIB_PATH, 'memory', 'testbench',
+                                        'async_fifo_tb.vhd')}
 
-        ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                    data=data)
+            ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                        data=data)
 
-        build_messages = requests.post(it._url + '/get_messages_by_path',
-                                       timeout=10, data=data)
-
-        _logger.info(build_messages.text)
-        _logger.info("Messages:")
-        for message in build_messages.json()['messages']:
-            _logger.info(message)
-
-        it.assertEquals(
-            build_messages.json(),
-            {u'messages': [
-                {u'checker'       : u'HDL Code Checker/static',
-                 u'column'        : 14,
-                 u'error_message' : u"constant 'ADDR_WIDTH' is never used",
-                 u'error_number'  : u'0',
-                 u'error_subtype' : u'Style',
-                 u'error_type'    : u'W',
-                 u'filename'      : None,
-                 u'line_number'   : 29}]})
-
-        ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                    data=data)
-
-        _logger.info(ui_messages.text)
-        it.assertEquals(
-            ui_messages.json(),
-            {'ui_messages': [['warning', "Project hasn't finished building, "
-                                         "try again after it finishes."]]})
-
-        _logger.info("Waiting for 30s until build is finished")
-        for i in range(30):
-            time.sleep(1)
-            _logger.info("Elapsed %ds", i)
             build_messages = requests.post(it._url + '/get_messages_by_path',
                                            timeout=10, data=data)
-            ui_messages = requests.post(it._url + '/get_ui_messages',
-                                        timeout=10, data=data)
-            _logger.debug("==> %s", ui_messages.json())
-            if ui_messages.json()['ui_messages'] == []:
-                _logger.info("Ok, done")
-                break
+
+            _logger.info(build_messages.text)
+            _logger.info("Messages:")
+            for message in build_messages.json()['messages']:
+                _logger.info(message)
+
+            it.assertEquals(
+                build_messages.json(),
+                {u'messages': [
+                    {u'checker'       : u'HDL Code Checker/static',
+                     u'column'        : 14,
+                     u'error_message' : u"constant 'ADDR_WIDTH' is never used",
+                     u'error_number'  : u'0',
+                     u'error_subtype' : u'Style',
+                     u'error_type'    : u'W',
+                     u'filename'      : None,
+                     u'line_number'   : 29}]})
+
+            ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                        data=data)
+
+            _logger.info(ui_messages.text)
+            it.assertEquals(
+                ui_messages.json(),
+                {'ui_messages': [['warning', "Project hasn't finished building, "
+                                             "try again after it finishes."]]})
+
+            _logger.info("Waiting for 30s until build is finished")
+            for i in range(30):
+                time.sleep(1)
+                _logger.info("Elapsed %ds", i)
+                build_messages = requests.post(it._url + '/get_messages_by_path',
+                                               timeout=10, data=data)
+                ui_messages = requests.post(it._url + '/get_ui_messages',
+                                            timeout=10, data=data)
+                _logger.debug("==> %s", ui_messages.json())
+                if ui_messages.json()['ui_messages'] == []:
+                    _logger.info("Ok, done")
+                    break
+
+        @it.should("shutdown the server when requested")
+        def test():
+            # Ensure the server is active
+            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+                                  data={'project_file' : 'some_project'})
+            it.assertTrue(reply.ok)
+
+            # Send a request to the shutdown addr
+            with it.assertRaises(requests.ConnectionError):
+                reply = requests.post(it._url + '/shutdown', timeout=10)
+
+            # Ensure the server no longer active
+            with it.assertRaises(requests.ConnectionError):
+                reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+                                      data={'project_file' : 'some_project'})
+
+    with it.having("PID attachment"):
+        def startCodeCheckerServerAttachedToPid(pid):
+            hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
+                                        'code_checker_server.py')
+
+            it._url = 'http://{0}:{1}'.format(it._host, it._port)
+            cmd = ['coverage', 'run',
+                   hdlcc_server_fname,
+                   '--log-level', 'DEBUG',
+                   '--attach-to-pid', str(pid),
+                  ]
+
+            # Setup redirection if running on CI server
+            if utils.onCI():
+                cmd += ['--stdout', 'hdlcc-stdout.log',
+                        '--stderr', 'hdlcc-stderr.log',
+                        '--log-stream', 'hdlcc.log',]
+
+            _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
+
+            it._server = subp.Popen(cmd, env=os.environ.copy())
+
+            # Wait until the server is up and replying
+            for i in range(30):
+                _logger.info("Elapsed %ds", i)
+                try:
+                    reply = requests.post('http://127.0.0.1:50000/get_diagnose_info')
+                    if reply.ok:
+                        return
+                except requests.ConnectionError:
+                    pass
+                time.sleep(1)
+
+
+        @it.should("terminate when the parent PID is not running anymore")
+        def test():
+
+            queue = Queue()
+
+            proc = Process(target=doNothing, args=(queue, ))
+            proc.start()
+
+            _logger.info("Started dummy process with PID %d", proc.pid)
+            startCodeCheckerServerAttachedToPid(proc.pid)
+            time.sleep(3)
+            _logger.info("Allowing the dummy process to finish")
+            queue.put(1)
+            proc.join()
+
+            if utils.isProcessRunning(proc.pid):
+                _logger.warning("Dummy process %d was still running", proc.pid)
+                proc.terminate()
+                time.sleep(1)
+                it.assertFalse(utils.isProcessRunning(proc.pid),
+                               "Process %d is still running after terminating "
+                               "it!" % proc.pid)
+
+            time.sleep(1)
+            _logger.info("Server should have died by now")
+
+            with it.assertRaises(requests.ConnectionError):
+                requests.post('http://127.0.0.1:50000/get_diagnose_info', timeout=10)
+
 
 if BUILDER_NAME is not None:
     it.createTests(globals())

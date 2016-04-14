@@ -55,6 +55,7 @@ before_script:
 # command to install dependencies
 install:
   - pip install -r requirements.txt
+  - pip install git+https://github.com/suoto/rainbow_logging_handler
   - pip install -e .
 # command to run tests
 script: "./run_tests.sh ${BUILDER} -vv --log-capture"

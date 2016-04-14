@@ -241,16 +241,24 @@ def main():
     runner_args = parseArguments()
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
-    if runner_args.debug_profiling:
-        # Profiling results when running with multiple threads gives
-        # poor results (see suoto/hdlcc/issues/16). To circumvent this
-        # we disable using threads at all when profiling (it's ugly,
-        # I know)
-        # pylint: disable=protected-access
-        StandaloneProjectBuilder._USE_THREADS = False
-        hdlcc.source_file.VhdlSourceFile._USE_THREADS = False
-        # pylint: enable=protected-access
 
+    # Running hdlcc with threads has two major drawbacks:
+    # 1) Makes interrupting it impossible currently because each source
+    #    file is parsed on is own thread. Since there can be lots of
+    #    sources, interrupting a single thread is not enough. This is
+    #    discussed at https://github.com/suoto/hdlcc/issues/19
+    # 2) When profiling, the result expected is of the inner hdlcc calls
+    #    and with threads we have no info. This is discussed at
+    #    https://github.com/suoto/hdlcc/issues/16
+    # poor results (see suoto/hdlcc/issues/16).
+    # To circumvent this we disable using threads at all when running
+    # via standalone (it's ugly, I know)
+    # pylint: disable=protected-access
+    StandaloneProjectBuilder._USE_THREADS = False
+    hdlcc.source_file.VhdlSourceFile._USE_THREADS = False
+    # pylint: enable=protected-access
+
+    if runner_args.debug_profiling:
         profile.runctx(
             'runner(runner_args)',
             globals=globals(),

@@ -22,10 +22,7 @@ import os
 import os.path as p
 import logging
 import argparse
-import signal
 from threading import Timer
-
-_CI = os.environ.get("CI", None) is not None
 
 _logger = logging.getLogger(__name__)
 
@@ -80,30 +77,6 @@ def parseArguments():
 
     return args
 
-def _attachPids(source_pid, target_pid):
-    """Monitors if source_pid is alive. If not, send signal.SIGHUP to
-    target_pid"""
-    def _attachWrapper(): # pragma: no cover
-        "PID attachment monitor"
-        try:
-            os.kill(source_pid, 0)
-        except OSError:
-            _logger.info("Process '%s' doesn't exists!", source_pid)
-            if utils.onWindows():
-                os.kill(target_pid, signal.SIGKILL)
-            else:
-                os.kill(target_pid, signal.SIGHUP)
-            return
-        except AttributeError:
-            return
-
-        Timer(1, _attachWrapper).start()
-
-    _logger.debug("Setting up PID attachment from %s to %s", source_pid,
-                  target_pid)
-
-    Timer(2, _attachWrapper).start()
-
 def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     "Redirect stdout and stderr to files"
     if stdout is not None:
@@ -111,7 +84,7 @@ def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     if stderr is not None:
         sys.stderr = open(stderr, 'ab', buffering=1)
 
-def main():
+def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
     _setupPipeRedirection(args.stdout, args.stderr)
@@ -121,8 +94,25 @@ def main():
     _setupPaths()
     import hdlcc
     from hdlcc import handlers
-    import hdlcc.utils as utils
-    globals()['utils'] = utils
+    import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+
+    def _attachPids(source_pid, target_pid):
+        "Monitors if source_pid is alive. If not, terminate target_pid"
+        def _watchPidWrapper():
+            "PID attachment monitor"
+            try:
+                if utils.isProcessRunning(source_pid):
+                    Timer(1, _watchPidWrapper).start()
+                else:
+                    _logger.warning("Process %d is not running anymore", source_pid)
+                    utils.terminateProcess(target_pid)
+            except (TypeError, AttributeError):
+                return
+
+        _logger.debug("Setting up PID attachment from %s to %s", source_pid,
+                      target_pid)
+
+        Timer(2, _watchPidWrapper).start()
 
     utils.setupLogging(args.log_stream, args.log_level, args.color)
     _logger.info(

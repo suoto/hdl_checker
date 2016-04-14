@@ -83,6 +83,57 @@ def interruptProcess(pid): # pragma: no cover
     "Send SIGINT to PID"
     os.kill(pid, signal.SIGINT)
 
+def isProcessRunning(pid):
+    "Checks if a process is running given its PID"
+    if onWindows():
+        return _isProcessRunningOnWindows(pid)
+    else:
+        return _isProcessRunningOnPosix(pid)
+
+def _isProcessRunningOnPosix(pid):
+    "Checks if a given PID is runnning under POSIX OSs"
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+def _isProcessRunningOnWindows(pid):
+    """
+    Enumerates active processes as seen under windows Task Manager on Win
+    NT/2k/XP using PSAPI.dll (new api for processes) and using ctypes.Use it as
+    you please.
+
+    Based on information from
+    http://support.microsoft.com/default.aspx?scid=KB;EN-US;Q175030&ID=KB;EN-US;Q175030
+
+    By Eric Koome email ekoome@yahoo.com
+    license GPL
+
+    (adapted from code found at
+    http://code.activestate.com/recipes/305279-getting-process-information-on-windows/)
+    """
+    from ctypes import windll, c_ulong, sizeof, byref
+
+    #PSAPI.DLL
+    psapi = windll.psapi
+
+    arr = c_ulong * 256
+    list_of_pids = arr()
+    cb = sizeof(list_of_pids)
+    cb_needed = c_ulong()
+
+    #Call Enumprocesses to get hold of process id's
+    psapi.EnumProcesses(byref(list_of_pids),
+                        cb,
+                        byref(cb_needed))
+
+    #Number of processes returned
+    number_of_pids = cb_needed.value/sizeof(c_ulong())
+
+    pid_list = [i for i in list_of_pids][:number_of_pids]
+    return int(pid) in pid_list
+
 def writeListToFile(filename, _list): # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     _logger.info("Writing to %s", filename)
