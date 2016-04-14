@@ -66,7 +66,7 @@ RESULT=0
 
 if [ -n "${PIP}" ]; then
   pip uninstall hdlcc -y
-  if [ "${CI}" == "true" ]; then
+  if [ -n "${VIRTUAL_ENV}" ]; then
     pip install -e .
   else
     pip install -e . --user
