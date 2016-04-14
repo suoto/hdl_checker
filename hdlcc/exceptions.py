@@ -25,7 +25,7 @@ class SanityCheckError(VimHdlBaseException):
         self.builder = builder
         super(SanityCheckError, self).__init__()
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return "Failed to create builder '%s' with message '%s'" % \
                 (self.builder, self._msg)
 
@@ -37,18 +37,18 @@ class UnknownParameterError(VimHdlBaseException):
         self._parameter = parameter
         super(UnknownParameterError, self).__init__()
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return "Unknown parameter '%s'" % self._parameter
 
 class DesignUnitNotFoundError(VimHdlBaseException):
-    '''Exception raised when project_builder.ProjectBuilder can't find
+    '''Exception raised when code_checker_base.HdlCodeCheckerBase can't find
     the source file that defines the given design unit'''
 
     def __init__(self, design_unit):
         self._design_unit = design_unit
         super(DesignUnitNotFoundError, self).__init__()
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return "No source file defining design unit '%s' found" % \
                     self._design_unit
 

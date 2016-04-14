@@ -44,10 +44,10 @@ from hdlcc.static_check import getStaticMessages
 _logger = logging.getLogger('build messages')
 
 # pylint: disable=too-many-instance-attributes,abstract-class-not-used
-class ProjectBuilder(object):
+class HdlCodeCheckerBase(object):
     "HDL Code Checker project builder class"
 
-    GET_MESSAGES_WITH_THREADS = True
+    _USE_THREADS = True
     MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -80,7 +80,7 @@ class ProjectBuilder(object):
         if project_file is None:
             _logger.debug("Project file is None, can't clean")
             return
-        cache_fname = ProjectBuilder._getCacheFilename(project_file)
+        cache_fname = HdlCodeCheckerBase._getCacheFilename(project_file)
         if p.exists(cache_fname):
             os.remove(cache_fname)
 
@@ -167,16 +167,13 @@ class ProjectBuilder(object):
                 yield source
 
             if empty_step:
-                sources_not_built = False
-
                 for missing_path in \
                         list(set(self._config.getSourcesPaths()) - set(sources_built)):
                     source = self._config.getSourceByPath(missing_path)
                     dependencies = self._getSourceDependenciesSet(source)
                     missing_dependencies = dependencies - set(self._units_built)
                     if missing_dependencies:
-                        sources_not_built = True
-                        self._logger.info(
+                        self._logger.warning(
                             "Couldn't build source '%s'. Missing dependencies: %s",
                             str(source),
                             ", ".join([str(x) for x in missing_dependencies]))
@@ -185,11 +182,9 @@ class ProjectBuilder(object):
                     #          "Source %s wasn't built but has no missing "
                     #          "dependencies", str(source))
                     #      yield source
-                if sources_not_built:
-                    self._logger.warning("Some sources were not built")
 
-                self._logger.info("Breaking at step %d. Units built: %s",
-                                  step, ", ".join(sorted(self._units_built)))
+                self._logger.debug("Breaking at step %d. Units built: %s",
+                                   step, ", ".join(sorted(self._units_built)))
 
                 raise StopIteration()
 
@@ -301,13 +296,13 @@ class ProjectBuilder(object):
             self._logger.debug("Can't recover cache from None")
             return
         cache_fname = self._getCacheFilename(self.project_file)
-        _logger.info("Trying to recover from '%s'", cache_fname)
+        _logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
         if p.exists(cache_fname):
             try:
                 cache = serializer.load(open(cache_fname, 'r'))
-                self._handleUiInfo("Recovered cache from using '%s'" %
-                                   serializer.__package__)
+                self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
+                                   (cache_fname, serializer.__package__))
                 self._setState(cache)
                 self.builder.checkEnvironment()
             except ValueError:
@@ -317,7 +312,7 @@ class ProjectBuilder(object):
                         (cache_fname, serializer.__package__,
                          traceback.format_exc()))
         else:
-            _logger.info("File not found")
+            _logger.debug("File not found")
 
     def getCompilationOrder(self):
         "Returns the build order needed by the _buildByDependency method"
@@ -326,13 +321,16 @@ class ProjectBuilder(object):
 
     def buildByDependency(self):
         "Build the project by checking source file dependencies"
-        if not self._background_thread.isAlive():
-            self._background_thread = \
-                    threading.Thread(target=self._buildByDependency,
-                                     name='_buildByDependency')
-            self._background_thread.start()
-        else:
-            self._handleUiInfo("Build thread is already running")
+        if self._USE_THREADS: # pragma: no cover
+            if not self._background_thread.isAlive():
+                self._background_thread = \
+                        threading.Thread(target=self._buildByDependency,
+                                         name='_buildByDependency')
+                self._background_thread.start()
+            else:
+                self._handleUiInfo("Build thread is already running")
+        else: # pragma: no cover
+            self._buildByDependency()
 
     def finishedBuilding(self):
         "Returns whether a background build has finished running"
@@ -370,7 +368,8 @@ class ProjectBuilder(object):
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
                 self.builder = builder_class(self._config.getTargetDir())
 
-            self._logger.warning("Final builder is '%s'", repr(self.builder))
+            self._logger.info("Selected builder is '%s'",
+                              self.builder.builder_name)
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:
@@ -413,7 +412,9 @@ class ProjectBuilder(object):
         else:
             abspath = path
 
-        if self.GET_MESSAGES_WITH_THREADS:
+        # _USE_THREADS is for debug only, no need to cover
+        # this
+        if self._USE_THREADS: # pragma: no cover
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \

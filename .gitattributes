@@ -1,0 +1,2 @@
+./hdlcc/_version.py export-subst
+hdlcc/_version.py export-subst

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
@@ -16,11 +15,12 @@
 "hdlcc installation script"
 
 from distutils.core import setup
+import versioneer
 
 # pylint: disable=bad-whitespace
 setup(
     name             = 'hdlcc',
-    version          = '0.1',
+    version          = versioneer.get_version(),
     description      = 'HDL code checker',
     author           = 'Andre Souto',
     author_email     = 'andre820@gmail.com',
@@ -28,8 +28,9 @@ setup(
     license          = 'GPLv3',
     packages         = ['hdlcc', 'hdlcc.builders'],
     install_requires = ['argcomplete', 'argparse', 'prettytable',],
+    cmdclass         = versioneer.get_cmdclass(),
     entry_points={
-        'console_scripts' : ['hdlcc=hdlcc.standalone:main']
+        'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
     }
 )
 # pylint: enable=bad-whitespace

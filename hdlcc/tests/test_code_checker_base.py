@@ -24,7 +24,7 @@ import logging
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.tests.utils import writeListToFile
+from hdlcc.utils import writeListToFile, addToPath, removeFromPath
 
 _logger = logging.getLogger(__name__)
 
@@ -41,12 +41,15 @@ else:
 
 from multiprocessing import Queue
 
-class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
-    "Class for testing ProjectBuilder"
+class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
+    "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
-    def __init__(self):
-        super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
+    def __init__(self, project_file=None):
+        if project_file is None:
+            super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
+        else:
+            super(StandaloneProjectBuilder, self).__init__(project_file)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(('info', message))
@@ -60,13 +63,12 @@ class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
-with such.A('hdlcc test using hdl_lib') as it:
+with such.A('hdlcc project') as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
     @it.has_setup
     def setup():
-        it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
@@ -78,7 +80,7 @@ with such.A('hdlcc test using hdl_lib') as it:
         if p.exists(it.DUMMY_PROJECT_FILE):
             shell.rmtree(it.DUMMY_PROJECT_FILE)
 
-    with it.having('a valid project file'):
+    with it.having('hdl_lib as reference and a valid project file'):
 
         @it.has_setup
         def setup():
@@ -87,13 +89,7 @@ with such.A('hdlcc test using hdl_lib') as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
-
-            it.builder_env = os.environ.copy()
-
-            _logger.info("Builder env path:")
-            for path in it.builder_env['PATH'].split(os.pathsep):
-                _logger.info(" >'%s'", path)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
 
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
@@ -103,23 +99,10 @@ with such.A('hdlcc test using hdl_lib') as it:
                     builder(it.DUMMY_PROJECT_FILE)
 
             it.original_env = os.environ.copy()
-            os.environ = it.builder_env.copy()
 
-            if os.name == 'posix':
-                os.environ['PATH'] = \
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-            elif os.name == 'nt':
-                os.putenv(
-                    'PATH',
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-                os.environ['PATH'] = \
-                    os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+            addToPath(BUILDER_PATH)
 
             it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
-
-            _logger.info("New env path:")
-            for path in os.environ['PATH'].split(os.pathsep):
-                _logger.info(" >'%s'", path)
 
             try:
                 builder(it.DUMMY_PROJECT_FILE)
@@ -129,8 +112,8 @@ with such.A('hdlcc test using hdl_lib') as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
-            os.environ = it.original_env.copy()
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
                 shell.rmtree(target_dir)
@@ -408,7 +391,7 @@ with such.A('hdlcc test using hdl_lib') as it:
 
         @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
                    "a design unit can't be found")
-        def test_011():
+        def test_012():
             if BUILDER_NAME is None:
                 return
 
@@ -425,6 +408,57 @@ with such.A('hdlcc test using hdl_lib') as it:
             except hdlcc.exceptions.DesignUnitNotFoundError:
                 it.fail("Shouldn't raise exception for a unit that is "
                         "supposed to be found")
+
+    with it.having('vim-hdl-examples as reference and a valid project file'):
+
+        @it.has_setup
+        def setup():
+            if BUILDER_NAME is None:
+                return
+            it.original_env = os.environ.copy()
+
+            addToPath(BUILDER_PATH)
+
+            it.vim_hdl_examples_path = p.join(".ci", "vim-hdl-examples")
+            it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
+            it.project = StandaloneProjectBuilder(it.project_file)
+            it.project.waitForBuild()
+            it.assertNotEquals(it.project.builder.builder_name, 'fallback')
+
+        @it.has_teardown
+        def teardown():
+            if BUILDER_NAME is None:
+                return
+            hdlcc.HdlCodeCheckerBase.clean(it.project_file)
+            removeFromPath(BUILDER_PATH)
+
+            target_dir = it.project._config.getTargetDir()
+
+            if p.exists(target_dir):
+                shell.rmtree(target_dir)
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
+            del it.project
+
+
+        @it.should("rebuild sources when needed")
+        def test_001():
+            if BUILDER_NAME is None:
+                return
+            clk_en_generator = p.join(it.vim_hdl_examples_path,
+                                      "basic_library", "clk_en_generator.vhd")
+
+            very_common_pkg = p.join(it.vim_hdl_examples_path,
+                                     "basic_library", "very_common_pkg.vhd")
+
+            for path in (clk_en_generator,
+                         very_common_pkg,
+                         clk_en_generator):
+                _logger.info("Building '%s'", path)
+                records = it.project.getMessagesByPath(path)
+                it.assertEqual(records, [])
 
 it.createTests(globals())
 

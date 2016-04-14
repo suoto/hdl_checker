@@ -21,7 +21,7 @@ from nose2.tools import such
 
 from hdlcc.source_file import VhdlSourceFile
 
-from hdlcc.tests.utils import writeListToFile
+from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 

@@ -2,6 +2,7 @@
 source = hdlcc
 omit =
     hdlcc/__main__.py
+    hdlcc/_version.py
     hdlcc/tests/*
 
 branch = True

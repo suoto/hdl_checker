@@ -8,21 +8,30 @@
 
 `hdlcc` provides a Python API between a VHDL project and some HDL compilers to
 catch errors and warnings the compilers generate that can be used to populate
-syntax checkers and linters of text editors. It takes into account the sources
-dependencies when building so you don't need to provide a source list ordered by
-hand.
+syntax checkers and linters of text editors.
 
-* [Installation] (#installation)
-* [Usage] (#usage)
+`hdlcc` automates tasks when possible. Currently, this means
+
+* Taking dependencies into account when building so you don't need to provide a
+  source list ordered by hand.
+* Finding and rebuilding sources and design units that the compiler says are out
+  of date (typically rebuilding sources that depend on package that has been
+  changed)
+* Easily switch between different compilers
+
+---
+
+* [Installation](#installation)
+* [Usage](#usage)
   * [Standalone](#standalone)
   * [Within Python](#within-python)
-* [Supported environments] (#supported-environments)
-  * [Supported systems] (#supported-systems)
-  * [Editor support] (#editor-support)
-  * [Supported third-party compilers] (#supported-third-party-compilers)
-* [Style checking] (#style-checking)
-* [Issues] (#issues)
-* [License] (#license)
+* [Supported environments](#supported-environments)
+  * [Supported systems](#supported-systems)
+  * [Editor support](#editor-support)
+  * [Supported third-party compilers](#supported-third-party-compilers)
+* [Style checking](#style-checking)
+* [Issues](#issues)
+* [License](#license)
 
 ---
 
@@ -93,12 +102,12 @@ Full API docs are not yet available. The example below should get you started, i
 you need more info, check the code or open an issue at the [issue tracker][issue_tracker]
 requesting help.
 
-1. Subclass the ```ProjectBuilder``` class from ```hdlcc.project_builder```
+1. Subclass the ```HdlCodeCheckerBase``` class from ```hdlcc.code_checker_base```
 
     ```python
-    from hdlcc.project_builder import ProjectBuilder
+    from hdlcc.code_checker_base import HdlCodeCheckerBase
 
-    class StandaloneProjectBuilder(ProjectBuilder):
+    class StandaloneProjectBuilder(HdlCodeCheckerBase):
         _ui_logger = logging.getLogger('UI')
         def handleUiInfo(self, message):
             self._ui_logger.info(message)
@@ -178,8 +187,6 @@ Tools with planned support:
 
 Style checks are independent of a third-party compiler. Checking includes:
 
-* Signal names in lower case
-* Constants and generics in upper case
 * Unused signals, constants, generics, shared variables, libraries, types and
  attributes
 * Comment tags (`FIXME`, `TODO`, `XXX`)

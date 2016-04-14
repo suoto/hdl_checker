@@ -60,6 +60,9 @@ environment:
 install:
   - appveyor AddMessage "Starting path is %CD%" -Category Information
   - git submodule update --init --recursive
+  - "git clone https://github.com/suoto/rainbow_logging_handler
+      %LOCALAPPDATA%\\rainbow_logging_handler"
+
   - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
                                             { 'C:\Python27-x64' }
 
@@ -68,6 +71,7 @@ install:
   - set PATH=%python%;%python%\Scripts;%PATH%
   # - python get-pip.py
   - pip install -r requirements.txt
+  - pip install git+https://github.com/suoto/rainbow_logging_handler
   - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
   - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
 
@@ -80,14 +84,18 @@ install:
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
 
+  - "pip install -U -e %LOCALAPPDATA%\\rainbow_logging_handler"
+  - "pip install -U -e %APPVEYOR_BUILD_FOLDER%"
+
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
-      -vv -F -B --log-capture"
+      -vv -F -B --log-capture %EXTRA_ARGS%"
 
   - coverage combine
   - coverage report
   - del ".ci\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd"
   - codecov
-  - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log"
+  - dir /B "%HOMEPATH%\\*.log"
+  - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log" "*.log"
   - appveyor PushArtifact hdlcc_success.zip
 
 # We won't build or run tests from here
@@ -95,7 +103,7 @@ build: off
 test: off
 
 on_failure:
-  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log"
+  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log" "*.log"
   - appveyor PushArtifact hdlcc_failure.zip
 
 # artifacts:

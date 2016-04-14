@@ -21,21 +21,19 @@ import os
 import os.path as p
 import shutil as shell
 import time
+import hdlcc.builders
+import hdlcc.utils as utils
+from hdlcc.source_file import VhdlSourceFile
+
 
 if not hasattr(p, 'samefile'):
     def samefile(file1, file2):
         return os.stat(file1) == os.stat(file2)
 else:
-    samefile = p.samefile
+    samefile = p.samefile # pylint: disable=invalid-name
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
-
-_BUILDER_ENV = os.environ.copy()
-_BUILDER_ENV['PATH'] = os.pathsep.join([BUILDER_PATH, _BUILDER_ENV['PATH']])
-
-import hdlcc.builders
-from hdlcc.source_file import VhdlSourceFile
 
 _logger = logging.getLogger(__name__)
 
@@ -93,15 +91,15 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         @it.has_setup
         def setup():
             it.original_env = os.environ.copy()
-            os.environ = _BUILDER_ENV.copy()
-            if os.name == 'nt':
-                os.putenv('PATH', _BUILDER_ENV['PATH'])
+
+            utils.addToPath(BUILDER_PATH)
+
             cls = hdlcc.builders.getBuilderByName(BUILDER_NAME)
             it.builder = cls('._%s' % BUILDER_NAME)
 
         @it.has_teardown
         def teardown():
-            os.environ = it.original_env.copy()
+            utils.removeFromPath(BUILDER_PATH)
             os.remove(it._ok_file)
             os.remove(it._error_file)
             if p.exists('._%s' % BUILDER_NAME):

@@ -24,7 +24,7 @@ from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.tests.utils import writeListToFile
+from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 

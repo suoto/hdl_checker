@@ -25,6 +25,7 @@ from multiprocessing import Queue
 from nose2.tools import such
 
 import hdlcc
+import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
@@ -40,8 +41,8 @@ if BUILDER_NAME is not None:
 else:
     PROJECT_FILE = None
 
-class StandaloneProjectBuilder(hdlcc.ProjectBuilder):
-    "Class for testing ProjectBuilder"
+class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
+    "Class for testing HdlCodeCheckerBase"
     _ui_handler = logging.getLogger('UI')
     def __init__(self):
         self._msg_queue = Queue()
@@ -63,21 +64,12 @@ with such.A('hdlcc project with persistency') as it:
 
     @it.has_setup
     def setup():
-        it.assertIn(os.name, ('nt', 'posix'))
         StandaloneProjectBuilder.clean(PROJECT_FILE)
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
 
-        if os.name == 'posix':
-            os.environ['PATH'] = \
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
-        elif os.name == 'nt':
-            os.putenv(
-                'PATH',
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']]))
-            os.environ['PATH'] = \
-                os.pathsep.join([BUILDER_PATH, it.builder_env['PATH']])
+        utils.addToPath(BUILDER_PATH)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
         _logger.info("Builder path: %s", BUILDER_PATH)
@@ -95,17 +87,17 @@ with such.A('hdlcc project with persistency') as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
             target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
             if p.exists(target_dir):
                 shutil.rmtree(target_dir)
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.should('measure time taken to build a project without any cache')
         def test_001():
-            for _ in range(3):
+            for _ in range(5):
                 start = time.time()
                 project = StandaloneProjectBuilder()
                 parse_time = time.time() - start
@@ -162,7 +154,7 @@ with such.A('hdlcc project with persistency') as it:
         failed = False
         while not it.project._msg_queue.empty():
             _, message = it.project._msg_queue.get()
-            if message.startswith("Recovered cache from using"):
+            if message.startswith("Recovered cache from "):
                 failed = True
             messages += [message]
 
@@ -180,7 +172,7 @@ with such.A('hdlcc project with persistency') as it:
         passed = False
         while not it.project._msg_queue.empty():
             _, message = it.project._msg_queue.get()
-            if message.startswith("Recovered cache from using"):
+            if message.startswith("Recovered cache from "):
                 passed = True
             messages += [message]
 
@@ -191,13 +183,13 @@ with such.A('hdlcc project with persistency') as it:
     with it.having('an undecodable cache file'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)
@@ -213,7 +205,7 @@ with such.A('hdlcc project with persistency') as it:
 
         @it.should('build without cache if cache is invalid')
         def test_003():
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             open(cache_fname, 'w').write("hello")
             project = StandaloneProjectBuilder()
             project.waitForBuild()
@@ -235,13 +227,13 @@ with such.A('hdlcc project with persistency') as it:
     with it.having('the builder working folder erased'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)
@@ -255,7 +247,7 @@ with such.A('hdlcc project with persistency') as it:
             shutil.rmtree(target_dir)
             _buildWithCache()
 
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
             _buildWithoutCache()
@@ -263,13 +255,13 @@ with such.A('hdlcc project with persistency') as it:
     with it.having('the builder failing to run'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.project_builder.ProjectBuilder._getCacheFilename(PROJECT_FILE)
+            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.has_teardown
         def teardown():
-            hdlcc.ProjectBuilder.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)
@@ -279,14 +271,8 @@ with such.A('hdlcc project with persistency') as it:
         def test_001():
             _logger.info("Building without cache")
             _buildWithoutCache()
-            _logger.info("Restoring original env")
-
-            if os.name == 'posix':
-                os.environ['PATH'] = it.original_env['PATH']
-            elif os.name == 'nt':
-                os.putenv('PATH', it.original_env['PATH'])
-                os.environ['PATH'] = it.original_env['PATH']
-
+            _logger.info("Restoring original path")
+            utils.removeFromPath(BUILDER_PATH)
 
             _logger.info("Building with changed env")
 

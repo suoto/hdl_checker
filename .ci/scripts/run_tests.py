@@ -48,33 +48,30 @@ def clear():
         print os.popen(cmd).read()
 
 def setupLogging():
-    sys.path.insert(0, os.path.join('.ci',
-                                    'rainbow_logging_handler'))
+    try:
+        from rainbow_logging_handler import RainbowLoggingHandler
+        handler = RainbowLoggingHandler(
+            sys.stdout,
+            #  Customizing each column's color
+            # pylint: disable=bad-whitespace
+            color_asctime          = ('dim white',  'black'),
+            color_name             = ('dim white',  'black'),
+            color_funcName         = ('green',      'black'),
+            color_lineno           = ('dim white',  'black'),
+            color_pathname         = ('black',      'red'),
+            color_module           = ('yellow',     None),
+            color_message_debug    = ('color_59',   None),
+            color_message_info     = (None,         None),
+            color_message_warning  = ('color_226',  None),
+            color_message_error    = ('red',        None),
+            color_message_critical = ('bold white', 'red'))
+            # pylint: enable=bad-whitespace
+    except ImportError:
+        handler = logging.StreamHandler(sys.stdout)
+        log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
+        handler.setFormatter(logging.Formatter(log_format))
 
-    from rainbow_logging_handler import RainbowLoggingHandler
-    rainbow_stream_handler = RainbowLoggingHandler(
-        sys.stdout,
-        #  Customizing each column's color
-        # pylint: disable=bad-whitespace
-        color_asctime          = ('dim white',  'black'),
-        color_name             = ('dim white',  'black'),
-        color_funcName         = ('green',      'black'),
-        color_lineno           = ('dim white',  'black'),
-        color_pathname         = ('black',      'red'),
-        color_module           = ('yellow',     None),
-        color_message_debug    = ('color_59',   None),
-        color_message_info     = (None,         None),
-        color_message_warning  = ('color_226',  None),
-        color_message_error    = ('red',        None),
-        color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
-
-    #  stream_handler = logging.StreamHandler(sys.stdout)
-    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
-    #  stream_handler.setFormatter(logging.Formatter(log_format))
-
-    logging.root.addHandler(rainbow_stream_handler)
-    #  logging.root.addHandler(stream_handler)
+    logging.root.addHandler(handler)
 
 def run_tests():
     if '--clear' in sys.argv[1:]:

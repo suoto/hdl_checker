@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-# PYTHON_ARGCOMPLETE_OK
-
 # This file is part of HDL Code Checker.
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
@@ -15,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"HDLCC standalone stuff"
 
 import os
 import os.path as p
@@ -35,35 +34,13 @@ try:
 except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
-_logger = logging.getLogger(__name__)
-
-def _pathSetup(): # pragma: no cover
-    "Insert hdlcc module into Python path"
-    path_to_this_file = p.realpath(__file__).split(p.sep)[:-2]
-    hdlcc_path = p.sep.join(path_to_this_file)
-    if hdlcc_path not in sys.path:
-        sys.path.insert(0, hdlcc_path)
-
-if __name__ == '__main__':
-    _pathSetup()
-
 import hdlcc
 
-class StandaloneProjectBuilder(hdlcc.project_builder.ProjectBuilder):
-    """Implementation of standalone hdlcc.project_builder.ProjectBuilder
-    to run via shell"""
-    _ui_logger = logging.getLogger('UI')
-    def _handleUiInfo(self, message):
-        self._ui_logger.info(message)
-
-    def _handleUiWarning(self, message):
-        self._ui_logger.warning(message)
-
-    def _handleUiError(self, message):
-        self._ui_logger.error(message)
+_logger = logging.getLogger(__name__)
 
 def _fileExtentensionCompleter(extension): # pragma: no cover
-    def _completer(**kwargs):
+    "Tab completion for 'extension'"
+    def _completer(**kwargs): # pylint: disable=missing-docstring
         prefix = kwargs['prefix']
         if prefix == '':
             prefix = os.curdir
@@ -79,9 +56,18 @@ def _fileExtentensionCompleter(extension): # pragma: no cover
     return _completer
 
 def parseArguments():
+    "Argument parser for standalone hdlcc"
+
+    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):
+        print hdlcc.__version__
+        sys.exit(0)
+
     parser = argparse.ArgumentParser()
 
     # Options
+    parser.add_argument('--version', action='store_true',
+                        help="Shows hdlcc version and exit")
+
     parser.add_argument('--verbose', '-v', action='append_const', const=1,
                         help="""Increases verbose level. Use multiple times to
                                 increase more""")
@@ -114,6 +100,8 @@ def parseArguments():
 
     args = parser.parse_args()
 
+    # PYTHON_ARGCOMPLETE_OK
+
     args.project_file = args.project_file[0]
 
     args.log_level = logging.FATAL
@@ -129,10 +117,20 @@ def parseArguments():
     if args.sources:
         args.sources = [source for sublist in args.sources for source in sublist]
 
-    hdlcc.config.Config.log_level = args.log_level
-    #  hdlcc.config.Config.setupBuild()
-
     return args
+
+class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
+    """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
+    to run via shell"""
+    _ui_logger = logging.getLogger('UI')
+    def _handleUiInfo(self, message):
+        self._ui_logger.info(message)
+
+    def _handleUiWarning(self, message):
+        self._ui_logger.warning(message)
+
+    def _handleUiError(self, message):
+        self._ui_logger.error(message)
 
 def runStandaloneSourceFileParse(fname):
     """Standalone source_file.VhdlSourceFile run"""
@@ -211,9 +209,7 @@ def runner(args):
         project.saveCache()
 
 def setupLogging():
-    path_to_this_file = p.sep.join(p.realpath(__file__).split(p.sep)[:-2])
-    sys.path.insert(0, p.sep.join([path_to_this_file, '.ci',
-                               'rainbow_logging_handler']))
+    "Tries to use RainbowLoggingHandler for logging to stdout"
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         # pylint: disable=bad-whitespace
@@ -239,14 +235,35 @@ def setupLogging():
     logging.root.setLevel(logging.WARNING)
 
 def main():
+    "Main hook for standalone usage"
     setupLogging()
     start = time.time()
     runner_args = parseArguments()
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+
+    # Running hdlcc with threads has two major drawbacks:
+    # 1) Makes interrupting it impossible currently because each source
+    #    file is parsed on is own thread. Since there can be lots of
+    #    sources, interrupting a single thread is not enough. This is
+    #    discussed at https://github.com/suoto/hdlcc/issues/19
+    # 2) When profiling, the result expected is of the inner hdlcc calls
+    #    and with threads we have no info. This is discussed at
+    #    https://github.com/suoto/hdlcc/issues/16
+    # poor results (see suoto/hdlcc/issues/16).
+    # To circumvent this we disable using threads at all when running
+    # via standalone (it's ugly, I know)
+    # pylint: disable=protected-access
+    StandaloneProjectBuilder._USE_THREADS = False
+    hdlcc.source_file.VhdlSourceFile._USE_THREADS = False
+    # pylint: enable=protected-access
+
     if runner_args.debug_profiling:
-        globals()['runner_args'] = runner_args
-        profile.run('runner(runner_args)', runner_args.debug_profiling)
+        profile.runctx(
+            'runner(runner_args)',
+            globals=globals(),
+            locals={'runner_args' : runner_args},
+            filename=runner_args.debug_profiling, sort=-1)
     else:
         runner(runner_args)
     end = time.time()

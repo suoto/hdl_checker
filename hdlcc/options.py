@@ -12,19 +12,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"""hdlcc provides a Python API between a VHDL project and some HDL
-compilers to catch errors and warnings the compilers generate that can
-be used to populate syntax checkers and linters of text editors. It
-takes into account the sources dependencies when building so you don't
-need to provide a source list ordered by hand."""
 
-__author__ = "Andre Souto (andre820@gmail.com)"
-__license__ = "GPLv3"
-__status__ = "Development"
 
-from hdlcc.code_checker_base import HdlCodeCheckerBase
-
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+# When we find errors, we can cache them to avoid recompiling a
+# specific source file or consider the file as changed. Notice this
+# is changed from True to False, the errors reported for a given
+# source will be the cached ontes until we force rebuilding it
+cache_error_messages = True
 

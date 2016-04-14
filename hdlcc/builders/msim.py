@@ -24,24 +24,24 @@ class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
 
     # Implementation of abstract class properties
-    __builder_name__ = 'msim'
+    builder_name = 'msim'
 
     # MSim specific class properties
-    _BuilderStdoutMessageScanner = re.compile('|'.join([
+    _stdout_message_scanner = re.compile('|'.join([
         r"^\*\*\s*([WE])\w+:\s*",
         r"\((\d+)\):",
         r"[\[\(]([\w-]+)[\]\)]\s*",
         r"(.*\.(vhd|sv|svh)\b)",
         r"\s*\(([\w-]+)\)",
         r"\s*(.+)",
-        ]), re.I)
+        ]), re.I).scanner
 
-    _BuilderStdoutIgnoreLines = re.compile('|'.join([
+    _should_ignore = re.compile('|'.join([
         r"^\s*$",
         r"^(?!\*\*\s(Error|Warning):).*",
-        r".*VHDL Compiler exiting\s*$"]))
+        r".*VHDL Compiler exiting\s*$"])).match
 
-    _IterRebuildUnits = re.compile(
+    _iter_rebuild_units = re.compile(
         r"(" \
             r"Recompile\s*(?P<lib_name_0>\w+)\.(?P<unit_name_0>\w+)\s+because" \
             r"\s+[^\s]+\s+has changed"
@@ -56,7 +56,7 @@ class MSim(BaseBuilder):
         r"(?P<library_path>.*)\.$", re.I)
 
     def _shouldIgnoreLine(self, line):
-        return self._BuilderStdoutIgnoreLines.match(line)
+        return self._should_ignore(line)
 
     def __init__(self, target_folder):
         self._version = ''
@@ -82,7 +82,7 @@ class MSim(BaseBuilder):
         error_type = None
         error_message = None
 
-        scan = self._BuilderStdoutMessageScanner.scanner(line)
+        scan = self._stdout_message_scanner(line)
 
         while True:
             match = scan.match()
@@ -105,7 +105,7 @@ class MSim(BaseBuilder):
                 error_message = match.group(match.lastindex)
 
         return [{
-            'checker'        : self.__builder_name__,
+            'checker'        : self.builder_name,
             'line_number'    : line_number,
             'column'         : column,
             'filename'       : filename,
@@ -127,7 +127,7 @@ class MSim(BaseBuilder):
             import traceback
             self._logger.warning("Sanity check failed:\n%s",
                                  traceback.format_exc())
-            raise SanityCheckError(self.__builder_name__, str(exc))
+            raise SanityCheckError(self.builder_name, str(exc))
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
@@ -141,7 +141,7 @@ class MSim(BaseBuilder):
 
     def _getUnitsToRebuild(self, line):
         rebuilds = []
-        for match in self._IterRebuildUnits(line):
+        for match in self._iter_rebuild_units(line):
             if not match:
                 continue
             mdict = match.groupdict()
@@ -171,8 +171,6 @@ class MSim(BaseBuilder):
         try:
             if p.exists(p.join(self._target_folder, source.library)):
                 return
-            #  if not p.exists(self._modelsim_ini):
-            #      self._createIniFile()
             self._mapLibrary(source.library)
         except: # pragma: no cover
             self._logger.debug("Current dir when exception was raised: %s",
@@ -181,7 +179,6 @@ class MSim(BaseBuilder):
 
     def _createIniFile(self):
         "Adds a library to a non-existent ModelSim init file"
-
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         if p.exists(_modelsim_ini):
@@ -193,7 +190,7 @@ class MSim(BaseBuilder):
 
         cwd = p.abspath(os.curdir)
         self._logger.debug("Current dir is %s, changing to %s",
-                          cwd, self._target_folder)
+                           cwd, self._target_folder)
         os.chdir(self._target_folder)
         if cwd == os.curdir: # pragma: no cover
             self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
@@ -207,7 +204,7 @@ class MSim(BaseBuilder):
             self._logger.debug("- '%s'", _dir)
 
         self._logger.debug("Current dir is %s, changing to %s",
-                          p.abspath(os.curdir), cwd)
+                           p.abspath(os.curdir), cwd)
         os.chdir(cwd)
 
     def deleteLibrary(self, library):

@@ -22,22 +22,22 @@ import time
 import subprocess as subp
 from threading import Lock
 
-from hdlcc.config import Config
+import hdlcc.options as options
 
-class BaseBuilder(object):
+class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     "Class that implements the base builder flow"
 
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
-    def __builder_name__(self):
+    def builder_name(self):
         "Defines the builder identification"
 
     def __init__(self, target_folder):
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__package__ + '.' + self.__builder_name__)
+        self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []
@@ -52,11 +52,11 @@ class BaseBuilder(object):
 
         try:
             self._parseBuiltinLibraries()
-            if self._builtin_libraries: # pragma: no-cover
-                self._logger.info("Builtin libraries")
+            if self._builtin_libraries: # pragma: no cover
+                self._logger.debug("Builtin libraries")
                 for lib in self._builtin_libraries:
-                    self._logger.info("-> %s", lib)
-            else: # pragma: no-cover
+                    self._logger.debug("-> %s", lib)
+            else: # pragma: no cover
                 self._logger.info("No builtin libraries found")
         except NotImplementedError:
             pass
@@ -123,20 +123,8 @@ class BaseBuilder(object):
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-            for line in traceback.format_exc().split('\n'): # pragma: no-cover
+            for line in traceback.format_exc().split('\n'): # pragma: no cover
                 self._logger.debug(line)
-
-            # We'll check if the return code means a command not found.
-            # In this case, we'll print the configured PATH for debugging
-            # purposes
-            if (os.name == 'posix' and exc.returncode == 127) or \
-               (os.name == 'nt' and exc.returncode == 9009): # pragma: no-cover
-                self._logger.debug("subprocess runner path:")
-                for path in subp_env['PATH'].split(os.pathsep):
-                    self._logger.debug(" - %s", path)
-                self._logger.debug("subprocess runner path:")
-                for path in subp_env['PATH'].split(os.pathsep):
-                    self._logger.debug(" - %s", path)
 
         for line in stdout:
             if line == '' or line.isspace():
@@ -207,8 +195,7 @@ class BaseBuilder(object):
             self._logger.info("Forcing build of %s", str(source))
         elif source.getmtime() > cached_info['compile_time']:
             build = True
-            self._logger.info("Building %s because it's out of date", \
-                    str(source))
+            self._logger.info("Building %s", str(source))
 
         if build:
             if flags is None:
@@ -229,7 +216,7 @@ class BaseBuilder(object):
             cached_info['rebuilds'] = rebuilds
             cached_info['compile_time'] = source.getmtime()
 
-            if not Config.cache_error_messages and \
+            if not options.cache_error_messages and \
                     'E' in [x['error_type'] for x in records]:
                 cached_info['compile_time'] = 0
 

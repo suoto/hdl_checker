@@ -22,6 +22,14 @@ import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
 
 _splitAtWhitespaces = re.compile(r"\s+").split # pylint: disable=invalid-name
+_replaceConfigFileComments = re.compile(r"(\s*#.*|\n)")
+_SCANNER = re.compile("|".join([
+    r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
+    r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
+        r"(?P<library>\w+)\s+"                  \
+        r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
+    ]), flags=re.I)
+
 
 def _extractSet(entry):
     '''Extract a list by splitting a string at whitespaces, removing
@@ -36,14 +44,6 @@ def _extractSet(entry):
             result += [value]
 
     return result
-
-_COMMENTS = re.compile(r"(\s*#.*|\n)")
-_SCANNER = re.compile("|".join([
-    r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
-    r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
-        r"(?P<library>\w+)\s+"                  \
-        r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
-    ]), flags=re.I)
 
 class ConfigParser(object):
     "Configuration info provider"
@@ -63,8 +63,8 @@ class ConfigParser(object):
 
         if filename is not None:
             self.filename = p.abspath(filename)
-            self._logger.info("Creating config parser for filename '%s'",
-                              self.filename)
+            self._logger.debug("Creating config parser for filename '%s'",
+                               self.filename)
         else:
             self.filename = None
             self._parms['builder'] = 'fallback'
@@ -145,10 +145,10 @@ class ConfigParser(object):
     def _parseIfNeeded(self):
         "Parses the configuration file"
         if self.shouldParse():
-            self._logger.debug("Parsing is required")
+            self._logger.info("Parsing '%s'", self.filename)
             self._updateTimestamp()
             for _line in open(self.filename, 'r').readlines():
-                line = _COMMENTS.sub("", _line)
+                line = _replaceConfigFileComments.sub("", _line)
                 self._parseLine(line)
 
             # If after parsing we haven't found the configured target
@@ -209,6 +209,9 @@ class ConfigParser(object):
 
         flags_set = _extractSet(flags)
 
+        # TODO: We could use a ThreadPool to create source file objects
+        # without the overhead of creating/destroying threads all the
+        # time
         self._sources[source_path] = \
                 VhdlSourceFile(source_path, library, flags_set)
 
