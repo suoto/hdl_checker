@@ -75,8 +75,8 @@ class ConfigParser(object):
         self._sources = {}
         self._timestamp = 0
 
-        self._addVunitIfFound()
         self._parseIfNeeded()
+        self._addVunitIfFound()
 
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
@@ -89,7 +89,9 @@ class ConfigParser(object):
         # appropriate. We don't know which compiler will be used so we
         # don't know how to tell it to use VHDL 2008. The implementation
         # below assumes msim
-        for vunit_source_obj in vunit.VUnit.from_argv([]).get_compile_order():
+        vunit_project = vunit.VUnit.from_argv(
+            ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
+        for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
             self._sources[path] = VhdlSourceFile(path, library, ['-2008'])

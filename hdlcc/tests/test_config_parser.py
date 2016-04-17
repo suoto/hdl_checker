@@ -121,7 +121,12 @@ with such.A('config parser object') as it:
                 for x in ('.ci/vim-hdl-examples/another_library/foo.vhd',
                           '.ci/vim-hdl-examples/basic_library/clock_divider.vhd')]
 
-            parser_sources = [x.filename for x in it.parser.getSources()]
+            parser_sources = []
+
+            # Don't add VUnit sources or else this test will fail
+            for source in it.parser.getSources():
+                if 'vunit' not in source.filename:
+                    parser_sources += [source.filename]
 
             it.assertItemsEqual(parser_sources, expected_sources)
 
