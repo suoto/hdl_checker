@@ -135,6 +135,17 @@ def getUiMessages():
 
     return response
 
+@app.post('/rebuild_project')
+def rebuildProject():
+    "Rebuilds the current project"
+
+    _logger.info("Rebuilding project")
+    project_file = bottle.request.forms.get('project_file')
+    HdlCodeCheckerSever.clean(project_file)
+    _logger.debug("Removing and recreating server object")
+    del _hdlcc_objects[project_file]
+    _getServerByProjectFile(project_file)
+
 @app.post('/shutdown')
 def shutdownServer():
     "Terminates the current process to shutdown the server"
