@@ -32,7 +32,8 @@ BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDL_LIB_PATH = p.join(".ci", "hdl_lib")
+HDLCC_CI = os.environ['HDLCC_CI']
+HDL_LIB_PATH = p.join(HDLCC_CI, "hdl_lib")
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
@@ -419,7 +420,7 @@ with such.A('hdlcc project') as it:
 
             addToPath(BUILDER_PATH)
 
-            it.vim_hdl_examples_path = p.join(".ci", "vim-hdl-examples")
+            it.vim_hdl_examples_path = p.join(HDLCC_CI, "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
             it.project.waitForBuild()

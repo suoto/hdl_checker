@@ -19,7 +19,7 @@ python:
 
 env:
   global:
-    - GRLIB_VERSION=v1.4.1-b4156
+    - HDLCC_CI="~/hdlcc_ci"
   matrix:
     - BUILDER=msim
     - BUILDER=ghdl
@@ -45,9 +45,7 @@ before_install:
 
 before_script:
   - "git submodule update"
-  # Download Aeroflex grlib
-  - "git clone https://github.com/suoto/grlib -b ${GRLIB_VERSION} \
-       --single-branch --depth 1 ~/grlib/"
+  - "git clone https://github.com/suoto/hdlcc_ci ${HDLCC_CI} --recursive"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
   - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi

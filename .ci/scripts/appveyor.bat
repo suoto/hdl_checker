@@ -1,7 +1,6 @@
 @echo off
 set APPVEYOR_BUILD_FOLDER=e:\vim-hdl\dependencies\hdlcc\
 
-REM git clone https://github.com/suoto/rainbow_logging_handler %LOCALAPPDATA%\\rainbow_logging_handler
 set PYTHONPATH=%LOCALAPPDATA%\rainbow_logging_handler
 
 set PATH=C:\Python27;%PATH%

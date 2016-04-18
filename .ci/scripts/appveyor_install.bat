@@ -1,20 +1,40 @@
 
-REM  @echo off
-@set PATH=%PROGRAMFILES%\7-Zip;%PATH%
-REM  @set PATH=c:\Arquivos de Programas\7-Zip;%PATH%
+echo "Starting path is %CD%"
+echo "HDLCC_CI=%HDLCC_CI%"
+echo "Configured builder is %BUILDER_NAME%"
 
-@set APPVEYOR_BUILD_FOLDER=e:\vim-hdl\dependencies\hdlcc\
-@set CACHE_PATH=%LOCALAPPDATA%\\cache
-@set BUILDER_NAME=msim
-@set BUILDER_PATH=%LOCALAPPDATA%\modelsim_ase\win32aloem
-@set arch=32
-@set URL=http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
+git submodule update --init --recursive
+if not exist %HDLCC_CI% git clone https://github.com/suoto/hdlcc_ci %HDLCC_CI% --recursive
 
-pause
+if %ARCH% == 32 (
+    set PYTHON=C:\Python27
+) else (
+    set PYTHON=C:\Python27-x64
+)
 
-if "%BUILDER_NAME%" == "msim" call %APPVEYOR_BUILD_FOLDER%\\scripts\\setup_msim.bat
-pause
+echo "Python selected is %PYTHON%"
 
-REM  python %APPVEYOR_BUILD_FOLDER%\\run_tests.py -vv -F -B --log-capture
+set PATH=%PYTHON%;%PYTHON%\Scripts;%PATH%
 
-@echo on
+IF %APPVEYOR% == "True" (
+    appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
+    python get-pip.py
+)
+
+pip install -r requirements.txt
+pip install git+https://github.com/suoto/rainbow_logging_handler
+
+if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
+
+
+if "%BUILDER_NAME%" == "msim"
+  call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_msim.bat
+
+if "%BUILDER_NAME%" == "ghdl"
+  call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_ghdl.bat
+
+if "%BUILDER_NAME%" == "msim"
+  %BUILDER_PATH%\\vcom -version
+
+pip install -U -e %APPVEYOR_BUILD_FOLDER%
+

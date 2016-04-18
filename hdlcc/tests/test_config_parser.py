@@ -28,6 +28,8 @@ from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
+HDLCC_CI = os.environ['HDLCC_CI']
+
 with such.A('config parser object') as it:
 
     @it.has_setup
@@ -55,15 +57,15 @@ with such.A('config parser object') as it:
                 r'global_build_flags = -g0 -g1',
                 r'builder = msim',
                 r'target_dir = .build',
-                r'vhdl work ' + p.join('.ci',
+                r'vhdl work ' + p.join(HDLCC_CI,
                                        'vim-hdl-examples',
                                        'another_library',
                                        'foo.vhd') + ' -f0',
-                r'vhdl work ' + p.abspath(p.join('.ci',
+                r'vhdl work ' + p.abspath(p.join(HDLCC_CI,
                                                  'vim-hdl-examples',
                                                  'basic_library',
                                                  'clock_divider.vhd')) + ' -f1',
-                r'verilog work ' + p.join('.ci',
+                r'verilog work ' + p.join(HDLCC_CI,
                                           'vim-hdl-examples',
                                           'another_library',
                                           'foo.v')
@@ -90,14 +92,14 @@ with such.A('config parser object') as it:
         def test():
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join('.ci', 'vim-hdl-examples',
+                    p.join(HDLCC_CI, 'vim-hdl-examples',
                            'another_library',
                            'foo.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join('.ci', 'vim-hdl-examples', 'basic_library',
+                    p.join(HDLCC_CI, 'vim-hdl-examples', 'basic_library',
                            'clock_divider.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
@@ -105,21 +107,21 @@ with such.A('config parser object') as it:
         def test():
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join('.ci', 'vim-hdl-examples', 'another_library',
+                    p.join(HDLCC_CI, 'vim-hdl-examples', 'another_library',
                            'foo.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join('.ci', 'vim-hdl-examples', 'basic_library',
+                    p.join(HDLCC_CI, 'vim-hdl-examples', 'basic_library',
                            'clock_divider.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
         @it.should('only include VHDL sources')
         def test():
             expected_sources = [p.abspath(x) \
-                for x in ('.ci/vim-hdl-examples/another_library/foo.vhd',
-                          '.ci/vim-hdl-examples/basic_library/clock_divider.vhd')]
+                for x in (HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
+                          HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd')]
 
             parser_sources = []
 
@@ -131,9 +133,9 @@ with such.A('config parser object') as it:
             it.assertItemsEqual(parser_sources, expected_sources)
 
         @it.should('tell correctly if a path is on the project file')
-        @params(('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params((HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                  True),
-                (p.abspath('.ci/vim-hdl-examples/basic_library/'
+                (p.abspath(HDLCC_CI + '/vim-hdl-examples/basic_library/'
                            'clock_divider.vhd',),
                  True),
                 ('hello', False))
@@ -144,7 +146,7 @@ with such.A('config parser object') as it:
         @it.should('keep build flags in the same order given by the user')
         def test():
             project_filename = 'test.prj'
-            source = '.ci/vim-hdl-examples/another_library/foo.vhd'
+            source = HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd'
             config_content = [
                 r'batch_build_flags = -a -b1 --some-flag some_value',
                 r'single_build_flags = --zero 0 --some-flag some_value 12',
@@ -177,7 +179,7 @@ with such.A('config parser object') as it:
                 r'global_build_flags = -global0 -global1',
                 r'builder = msim',
                 r'target_dir = .build',
-                r'vhdl work .ci/vim-hdl-examples/another_library/foo.vhd',
+                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
             ]
 
             writeListToFile(project_filename, config_content)
@@ -193,7 +195,7 @@ with such.A('config parser object') as it:
                 r'single_build_flags = -single0 -single1',
                 r'global_build_flags = -global0 -global1',
                 r'builder = msim',
-                r'vhdl work .ci/vim-hdl-examples/another_library/foo.vhd',
+                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
             ]
 
             writeListToFile(project_filename, config_content)
@@ -212,7 +214,7 @@ with such.A('config parser object') as it:
                 r'global_build_flags = -global0 -global1',
                 r'target_dir = .build',
                 r'builder = msim',
-                r'vhdl work .ci/vim-hdl-examples/another_library/foo.vhd',
+                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
             ]
 
             writeListToFile(project_filename, config_content)
@@ -236,21 +238,21 @@ with such.A('config parser object') as it:
             it.assertEqual(it.parser.getTargetDir(), '.fallback')
 
         @it.should('return empty single build flags for any path')
-        @params('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), [])
 
         @it.should('return empty batch build flags for any path')
-        @params('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), [])
 
         @it.should('say every path is on the project file')
-        @params('.ci/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)

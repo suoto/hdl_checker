@@ -32,7 +32,9 @@ import hdlcc.utils as utils
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
-HDL_LIB_PATH = p.abspath(p.join(".ci", "hdl_lib"))
+
+HDLCC_CI = os.environ['HDLCC_CI']
+HDL_LIB_PATH = p.abspath(p.join(HDLCC_CI, "hdl_lib"))
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
