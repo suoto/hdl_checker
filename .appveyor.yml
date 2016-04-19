@@ -76,11 +76,11 @@ install:
   - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
   - echo "Configured builder is %BUILDER_NAME%"
 
-  - if "%BUILDER_NAME%" == "msim"
-      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_msim.bat
+  - ps: if ($env:BUILDER_NAME -eq "msim")
+      {. "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"}
 
-  - if "%BUILDER_NAME%" == "ghdl"
-      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_ghdl.bat
+  - ps: if ($env:BUILDER_NAME -eq "ghdl")
+      {. "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"}
 
   - if "%BUILDER_NAME%" == "msim"
       %BUILDER_PATH%\\vcom -version
