@@ -18,16 +18,22 @@ write-host "Setting up GHDL..."
 $env:GHDL_PREFIX="$env:INSTALL_DIR\\lib"
 
 if (!(Test-Path "$env:CACHE_PATH\\ghdl.zip")) {
-    write-host "Downloading $env:BUILDER_NAME from $env:URL"
-    cmd /c "curl -fsS -o `"$env:CACHE_PATH\\ghdl.zip`" `"$env:URL`""
+    write-host "Downloading $env:BUILDER_NAME from $env:URL to $env:CACHE_PATH\\ghdl.zip"
+    if ($env:APPVEYOR -eq "True") {
+      curl -fsS "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
+    } else {
+      "curl -fS `"$env:URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
+      curl -fS "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
+    }
+    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
     write-host "Download finished"
 }
 
 if (!(Test-Path "$env:BUILDER_PATH")) {
-    write-host "Installing $env:BUILDER_NAME to $env:LOCALAPPDATA"
-    cmd /c "7z x `"$env:CACHE_PATH\\ghdl.zip`" -o`"$env:LOCALAPPDATA`" -y"
+    write-host "Installing $env:BUILDER_NAME to $env:CI_WORK_PATH"
+    cmd /c "7z x `"$env:CACHE_PATH\\ghdl.zip`" -o`"$env:CI_WORK_PATH`" -y"
 
-    if ("$env:INSTALL_DIR" -eq "$env:LOCALAPPDATA\\ghdl-0.31-mcode-win32") {
+    if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32") {
         write-host "Current dir: $(get-location)"
         set-location "$env:INSTALL_DIR"
         write-host "Current dir: $(get-location)"
@@ -42,7 +48,7 @@ if (!(Test-Path "$env:BUILDER_PATH")) {
         set-location "$env:APPVEYOR_BUILD_FOLDER"
     }
 
-    if ("$env:INSTALL_DIR" -eq "$env:LOCALAPPDATA\\ghdl-0.33") {
+    if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.33") {
         write-host "Current dir: $(get-location)"
         set-location "$env:INSTALL_DIR\\bin"
         write-host "Current dir: $(get-location)"

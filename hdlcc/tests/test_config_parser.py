@@ -16,6 +16,7 @@
 # pylint: disable=function-redefined, missing-docstring
 
 import os
+import sys
 import os.path as p
 import shutil as shell
 import logging
@@ -257,6 +258,46 @@ with such.A('config parser object') as it:
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertTrue(it.parser.hasSource(path))
+
+    with it.having('not installed VUnit'):
+        @it.has_setup
+        def setup():
+            import hdlcc.config_parser as cp
+            it.config_parser = cp
+            it.config_parser._HAS_VUNIT = False
+
+        @it.should('not add VUnit files to the source list')
+        def test():
+            # We'll add no project file, so the only sources that should
+            # be fond are VUnit's files
+            sources = it.config_parser.ConfigParser().getSources()
+
+            it.assertEquals(
+                sources, [], "We shouldn't find any source but found %s" %
+                ", ".join([x.filename for x in sources]))
+
+    with it.having('VUnit installed'):
+        @it.has_setup
+        def setup():
+            try:
+                import vunit
+            except ImportError:
+                it.fail("Couldn't import vunit")
+
+        @it.should('add VUnit files to the source list')
+        def test():
+            # We'll add no project file, so the only sources that should
+            # be fond are VUnit's files
+            it.assertIn('vunit', sys.modules)
+            sources = hdlcc.config_parser.ConfigParser().getSources()
+
+            vunit_files = 0
+            for source in sources:
+                if 'vunit' in source.filename.lower():
+                    vunit_files += 1
+
+            it.assertEqual(len(sources), vunit_files,
+                           "We should only find VUnit files")
 
 it.createTests(globals())
 

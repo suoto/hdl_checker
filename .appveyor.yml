@@ -39,17 +39,15 @@ clone_depth: 5
 
 # environment variables
 environment:
-  CACHE_PATH: "%LOCALAPPDATA%\\cache"
-  HDLCC_CI: "%LOCALAPPDATA%\\hdlcc_ci"
+  CI_WORK_PATH: "%USERPROFILE%\\ci"
+  ARCH: 32
   matrix:
     - BUILDER_NAME: ghdl
-      INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
-      arch: 32
+      INSTALL_DIR: "%CI_WORK_PATH%\\ghdl-0.31-mcode-win32"
       URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
       # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
-      BUILDER_PATH: "%LOCALAPPDATA%\\modelsim_ase\\win32aloem"
-      arch: 32
+      BUILDER_PATH: "%CI_WORK_PATH%\\modelsim_ase\\win32aloem"
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
 
 
@@ -59,33 +57,10 @@ environment:
 
 # scripts that run after cloning repository
 install:
-  - echo "Starting path is %CD%"
-  - "git submodule update --init --recursive"
-  - echo "HDLCC_CI=%HDLCC_CI%"
-  - "git clone https://github.com/suoto/hdlcc_ci %HDLCC_CI% --recursive"
-
-  - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
-                                            { 'C:\Python27-x64' }
-
-  - echo "Python selected is %python%"
-  # - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
-  - set PATH=%python%;%python%\Scripts;%PATH%
-  # - python get-pip.py
-  - pip install -r requirements.txt
-  - pip install git+https://github.com/suoto/rainbow_logging_handler
-  - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
-  - echo "Configured builder is %BUILDER_NAME%"
-
-  - ps: if ($env:BUILDER_NAME -eq "msim")
-      {. "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"}
-
-  - ps: if ($env:BUILDER_NAME -eq "ghdl")
-      {. "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"}
-
-  - if "%BUILDER_NAME%" == "msim"
-      %BUILDER_PATH%\\vcom -version
-
-  - "pip install -U -e %APPVEYOR_BUILD_FOLDER%"
+  - set CACHE_PATH="%CI_WORK_PATH%\\cache"
+  - set HDLCC_CI="%CI_WORK_PATH%\\hdlcc_ci"
+  - git submodule update --init --recursive
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
       -vv -F -B --log-capture %EXTRA_ARGS%"

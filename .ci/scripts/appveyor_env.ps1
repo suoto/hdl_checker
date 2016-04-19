@@ -13,9 +13,16 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
+write-host "Creating AppVeyor-like environment variables"
 $env:APPVEYOR_BUILD_FOLDER=$(get-location)
-$env:CACHE_PATH="$env:LOCALAPPDATA\\cache"
-$env:HDLCC_CI="$env:LOCALAPPDATA\\hdlcc_ci"
+$env:CI_WORK_PATH="$env:USERPROFILE\\ci"
+
+$env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
+$env:HDLCC_CI="$env:CI_WORK_PATH\\hdlcc_ci"
 $env:ARCH="32"
 $env:PATH="C:\Program Files\7-zip;$env:PATH"
+
+if (!(Test-Path "$env:CI_WORK_PATH")) {
+    cmd /c "mkdir `"$env:CI_WORK_PATH`""
+}
 

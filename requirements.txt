@@ -8,3 +8,4 @@ codecov
 coveralls
 colorama
 logutils
+vunit_hdl

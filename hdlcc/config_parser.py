@@ -45,6 +45,12 @@ def _extractSet(entry):
 
     return result
 
+try:
+    import vunit
+    _HAS_VUNIT = True
+except ImportError:
+    _HAS_VUNIT = False
+
 class ConfigParser(object):
     "Configuration info provider"
 
@@ -80,15 +86,15 @@ class ConfigParser(object):
 
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
-        try:
-            import vunit
-        except ImportError:
+        if not _HAS_VUNIT:
             return
 
-        # We can add VUnit right from the start, but this doesn't seems
-        # appropriate. We don't know which compiler will be used so we
-        # don't know how to tell it to use VHDL 2008. The implementation
-        # below assumes msim
+        self._logger.info("VUnit installation found")
+        logging.getLogger('vunit').setLevel(logging.WARNING)
+
+        # I'm not sure how this would work because VUnit specifies a
+        # single VHDL revision for a whole project, so there can be
+        # incompatibilities as this is really used
         vunit_project = vunit.VUnit.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
         for vunit_source_obj in vunit_project.get_compile_order():

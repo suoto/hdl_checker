@@ -15,13 +15,20 @@
 
 if (!(Test-Path "$env:CACHE_PATH\\modelsim.exe")) {
     write-host "Downloading $env:BUILDER_NAME from $env:URL"
-    cmd /c "curl -fsS -o `"$env:CACHE_PATH\\modelsim.exe`" `"$env:URL`""
+    if ($env:APPVEYOR -eq "True") {
+        cmd /c "curl -fsS -o `"$env:CACHE_PATH\\modelsim.exe`" `"$env:URL`""
+    } else {
+        cmd /c "copy `"e:\\ModelSimSetup-15.1.0.185-windows.exe`" `"$env:CACHE_PATH\\modelsim.exe`""
+    }
     write-host "Download finished"
 }
 
+write-host "BUILDER_PATH: $env:BUILDER_PATH"
+cmd /c "dir $env:BUILDER_PATH"
+
 if (!(Test-Path "$env:BUILDER_PATH")) {
-    write-host "Installing $env:BUILDER_NAME to $env:LOCALAPPDATA"
-    "$env:CACHE_PATH\\modelsim.exe --mode unattended --modelsim_edition modelsim_ase --installdir $env:LOCALAPPDATA"
+    write-host "Installing $env:BUILDER_NAME to $env:CI_WORK_PATH"
+    cmd /c "$env:CACHE_PATH\\modelsim.exe --mode unattended --modelsim_edition modelsim_ase --installdir $env:CI_WORK_PATH"
     write-host "Testing installation"
     cmd /c "$env:BUILDER_PATH\\vcom -version"
     write-host "Done here"
