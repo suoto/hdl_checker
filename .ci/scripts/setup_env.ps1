@@ -22,7 +22,7 @@ $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
 write-host "Python selected is $env:python"
 $env:PATH="$env:PYTHON;$env:PYTHON\Scripts;$env:PATH"
 
-git submodule update --init --recursive -q *>&1
+&"git" "submodule" "update" "--init" "--recursive" "-q" "*>&1"
 
 if (!(Test-Path $env:HDLCC_CI)) {
     &"git" "clone" "https://github.com/suoto/hdlcc_ci" "$env:HDLCC_CI" "--recursive" `
