@@ -57,7 +57,7 @@ environment:
 
 # scripts that run after cloning repository
 install:
-  - set CACHE_PATH="%CI_WORK_PATH%\\cache"
+  - ps: $env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
   - set HDLCC_CI="%CI_WORK_PATH%\\hdlcc_ci"
   - if not exist %CACHE_PATH% mkdir %CACHE_PATH%
   - git submodule update --init --recursive
