@@ -166,7 +166,7 @@ class VhdlSourceFile(object):
                         'type' : 'entity'}
             elif match['context_name'] is not None:
                 unit = {'name' : match['context_name'],
-                        'type' : 'package'}
+                        'type' : 'context'}
             if match['library_name'] is not None:
                 libraries += re.split(r"\s*,\s*", match['library_name'])
 

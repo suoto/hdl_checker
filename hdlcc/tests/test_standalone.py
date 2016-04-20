@@ -35,8 +35,10 @@ _BUILDER_ENV = os.environ.copy()
 _BUILDER_ENV["PATH"] = p.expandvars(os.pathsep.join([BUILDER_PATH, \
                                     _BUILDER_ENV["PATH"]]))
 
+HDLCC_CI = os.environ['HDLCC_CI']
+
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(".ci", "hdl_lib", BUILDER_NAME + ".prj")
+    PROJECT_FILE = p.join(HDLCC_CI, "hdl_lib", BUILDER_NAME + ".prj")
 else:
     PROJECT_FILE = None
 
@@ -103,20 +105,22 @@ with such.A("hdlcc standalone tool") as it:
                 shell(cmd)
 
             @it.should("run debug arguments")
-            @params(("--debug-print-sources", ),
-                    ("--debug-print-compile-order", ),
+            @params(
+                ("--debug-print-sources", ),
+                ("--debug-print-compile-order", ),
 
-                    ("--build", "-s",
-                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
+                ("--build", "-s",
+                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
 
-                    ("--debug-parse-source-file", "-s",
-                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),
+                ("--debug-parse-source-file", "-s",
+                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
 
-                    ("--debug-parse-source-file", "-s",
-                     "./.ci/hdl_lib/memory/ram_inference.vhd"),
+                ("--debug-parse-source-file", "-s",
+                 p.join(HDLCC_CI, "hdl_lib/memory/ram_inference.vhd")),
 
-                    ("--debug-run-static-check", "-s",
-                     "./.ci/hdl_lib/memory/testbench/async_fifo_tb.vhd"),)
+                ("--debug-run-static-check", "-s",
+                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
+                )
 
             def test(case, *args):
                 _logger.info("Running '%s'", case)

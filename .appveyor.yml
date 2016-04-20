@@ -39,16 +39,12 @@ clone_depth: 5
 
 # environment variables
 environment:
-  CACHE_PATH: "%LOCALAPPDATA%\\cache"
+  ARCH: 32
   matrix:
     - BUILDER_NAME: ghdl
-      INSTALL_DIR: "%LOCALAPPDATA%\\ghdl-0.31-mcode-win32"
-      arch: 32
       URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
       # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
-      BUILDER_PATH: "%LOCALAPPDATA%\\modelsim_ase\\win32aloem"
-      arch: 32
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
 
 
@@ -58,41 +54,16 @@ environment:
 
 # scripts that run after cloning repository
 install:
-  - appveyor AddMessage "Starting path is %CD%" -Category Information
   - git submodule update --init --recursive
-  - "git clone https://github.com/suoto/rainbow_logging_handler
-      %LOCALAPPDATA%\\rainbow_logging_handler"
 
-  - ps: $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
-                                            { 'C:\Python27-x64' }
-
-  - appveyor AddMessage "Python selected is %python%"
-  # - appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
-  - set PATH=%python%;%python%\Scripts;%PATH%
-  # - python get-pip.py
-  - pip install -r requirements.txt
-  - pip install git+https://github.com/suoto/rainbow_logging_handler
-  - if not exist "%CACHE_PATH%" mkdir "%CACHE_PATH%"
-  - appveyor AddMessage "Configured builder is %BUILDER_NAME%"
-
-  - if "%BUILDER_NAME%" == "msim"
-      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_msim.bat
-
-  - if "%BUILDER_NAME%" == "ghdl"
-      call %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\setup_ghdl.bat
-
-  - if "%BUILDER_NAME%" == "msim"
-      %BUILDER_PATH%\\vcom -version
-
-  - "pip install -U -e %LOCALAPPDATA%\\rainbow_logging_handler"
-  - "pip install -U -e %APPVEYOR_BUILD_FOLDER%"
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
       -vv -F -B --log-capture %EXTRA_ARGS%"
 
   - coverage combine
   - coverage report
-  - del ".ci\\hdl_lib\\osvvm_lib\\CoveragePkg.vhd"
   - codecov
   - dir /B "%HOMEPATH%\\*.log"
   - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log" "*.log"

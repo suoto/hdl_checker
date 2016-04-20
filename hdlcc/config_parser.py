@@ -45,6 +45,12 @@ def _extractSet(entry):
 
     return result
 
+try:
+    import vunit
+    _HAS_VUNIT = True
+except ImportError:
+    _HAS_VUNIT = False
+
 class ConfigParser(object):
     "Configuration info provider"
 
@@ -76,6 +82,25 @@ class ConfigParser(object):
         self._timestamp = 0
 
         self._parseIfNeeded()
+        self._addVunitIfFound()
+
+    def _addVunitIfFound(self):
+        "Tries to import files to support VUnit right out of the box"
+        if not _HAS_VUNIT:
+            return
+
+        self._logger.info("VUnit installation found")
+        logging.getLogger('vunit').setLevel(logging.WARNING)
+
+        # I'm not sure how this would work because VUnit specifies a
+        # single VHDL revision for a whole project, so there can be
+        # incompatibilities as this is really used
+        vunit_project = vunit.VUnit.from_argv(
+            ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
+        for vunit_source_obj in vunit_project.get_compile_order():
+            path = p.abspath(vunit_source_obj.name)
+            library = vunit_source_obj.library.name
+            self._sources[path] = VhdlSourceFile(path, library, ['-2008'])
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]

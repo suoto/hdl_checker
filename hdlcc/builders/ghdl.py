@@ -28,7 +28,7 @@ class GHDL(BaseBuilder):
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(
-        r"^(?P<filename>[^:]+):"
+        r"^(?P<filename>.*):(?=\d)"
         r"(?P<line_number>\d+):"
         r"(?P<column>\d+):"
         r"((?P<is_warning>warning:)\s*|\s*)"

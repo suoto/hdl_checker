@@ -24,6 +24,7 @@ import subprocess as subp
 import requests
 import time
 from multiprocessing import Queue, Process
+import shutil
 
 import hdlcc
 import hdlcc.utils as utils
@@ -31,7 +32,9 @@ import hdlcc.utils as utils
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
-HDL_LIB_PATH = p.abspath(p.join(".ci", "hdl_lib"))
+
+HDLCC_CI = os.environ['HDLCC_CI']
+HDL_LIB_PATH = p.abspath(p.join(HDLCC_CI, "hdl_lib"))
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
@@ -47,6 +50,33 @@ def doNothing(queue):
     _logger.debug("Ok, done")
 
 with such.A("hdlcc server") as it:
+
+    def waitForServer():
+        # Wait until the server is up and replying
+        for i in range(30):
+            _logger.info("Elapsed %ds", i)
+            try:
+                reply = requests.post('http://127.0.0.1:50000/get_diagnose_info')
+                if reply.ok:
+                    return
+            except requests.ConnectionError:
+                pass
+            time.sleep(1)
+
+    def waitUntilBuildFinishes(data):
+        _logger.info("Waiting for 30s until build is finished")
+        for i in range(30):
+            time.sleep(1)
+            _logger.info("Elapsed %ds", i)
+            _ = requests.post(it._url + '/get_messages_by_path',
+                                           timeout=10, data=data)
+            ui_messages = requests.post(it._url + '/get_ui_messages',
+                                        timeout=10, data=data)
+            _logger.debug("==> %s", ui_messages.json())
+            if ui_messages.json()['ui_messages'] == []:
+                _logger.info("Ok, done")
+                break
+
     with it.having("no PID attachment"):
         def setupPaths():
             "Add our dependencies to sys.path"
@@ -174,18 +204,157 @@ with such.A("hdlcc server") as it:
                 {'ui_messages': [['warning', "Project hasn't finished building, "
                                              "try again after it finishes."]]})
 
-            _logger.info("Waiting for 30s until build is finished")
-            for i in range(30):
-                time.sleep(1)
-                _logger.info("Elapsed %ds", i)
-                build_messages = requests.post(it._url + '/get_messages_by_path',
-                                               timeout=10, data=data)
-                ui_messages = requests.post(it._url + '/get_ui_messages',
-                                            timeout=10, data=data)
-                _logger.debug("==> %s", ui_messages.json())
-                if ui_messages.json()['ui_messages'] == []:
-                    _logger.info("Ok, done")
-                    break
+            waitUntilBuildFinishes(data)
+
+        @it.should("rebuild the project with directory cleanup")
+        def test():
+            # The main reason to rebuild is when the project data is corrupt
+            # Test is as follows:
+            # 1) Check that a file builds OK
+            # 2) Erase the target folder.
+            # 3) Check the file fails to build
+            # 4) Rebuild the project
+            # 5) Check the file builds OK again and returns the same set of
+            #    messages
+
+            def step_01_check_file_builds_ok():
+                data = {
+                    'project_file' : PROJECT_FILE,
+                    'path'         : p.join(HDL_LIB_PATH, 'memory',
+                                            'ram_inference_dport.vhd')}
+
+                ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                         data=data)
+
+                reply = requests.post(it._url + '/get_messages_by_path',
+                                      timeout=10, data=data)
+
+                return reply.json()['messages'] + ui_reply.json()['ui_messages']
+
+            def step_02_erase_target_folder():
+                target_folder = p.join(HDL_LIB_PATH, '.build')
+                it.assertTrue(
+                    p.exists(target_folder),
+                    "Target folder '%s' doesn't exists" % target_folder)
+                shutil.rmtree(target_folder)
+                it.assertFalse(
+                    p.exists(target_folder),
+                    "Target folder '%s' still exists!" % target_folder)
+
+            def step_03_check_build_fails(ref_msgs):
+                step_03_msgs = step_01_check_file_builds_ok()
+                if step_03_msgs:
+                    _logger.info("Step 03 messages:")
+                    for msg in step_03_msgs:
+                        _logger.info(msg)
+                else:
+                    _logger.info("Step 03 generated no messages")
+
+                it.assertNotEquals(step_01_msgs, step_03_msgs)
+
+            def step_04_rebuild_project():
+                data = {'project_file' : PROJECT_FILE}
+                requests.post(it._url + '/rebuild_project', timeout=10,
+                              data=data)
+                waitForServer()
+                data = {
+                    'project_file' : PROJECT_FILE,
+                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
+                                            'sr_delay.vhd')}
+                waitUntilBuildFinishes(data)
+
+            def step_05_check_messages_are_the_same(msgs):
+                step_05_msgs = step_01_check_file_builds_ok()
+                if step_05_msgs:
+                    _logger.info("Step 05 messages:")
+                    for msg in step_05_msgs:
+                        _logger.info(msg)
+                else:
+                    _logger.info("Step 05 generated no messages")
+
+                it.assertEquals(msgs, step_05_msgs)
+
+            _logger.info("Step 01")
+            step_01_msgs = step_01_check_file_builds_ok()
+            if step_01_msgs:
+                _logger.info("Step 01 messages:")
+                for msg in step_01_msgs:
+                    _logger.info(msg)
+            else:
+                _logger.info("Step 01 generated no messages")
+
+            _logger.info("Step 02")
+            step_02_erase_target_folder()
+
+            _logger.info("Step 03")
+            step_03_check_build_fails(step_01_msgs)
+
+            _logger.info("Step 04")
+            step_04_rebuild_project()
+
+            _logger.info("Step 05")
+            step_05_check_messages_are_the_same(step_01_msgs)
+
+        @it.should("rebuild the project without directory cleanup")
+        def test():
+            # If the user doesn't knows if the project data is corrupt, he/she
+            # should be able to rebuild even if everything is OK.
+            # Test is as follows:
+            # 1) Check that a file builds OK
+            # 2) Rebuild the project
+            # 3) Check the file builds OK again and returns the same set of
+            #    messages
+
+            def step_01_check_file_builds_ok():
+                data = {
+                    'project_file' : PROJECT_FILE,
+                    'path'         : p.join(HDL_LIB_PATH, 'memory',
+                                            'ram_inference_dport.vhd')}
+
+                ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
+                                         data=data)
+
+                reply = requests.post(it._url + '/get_messages_by_path',
+                                      timeout=10, data=data)
+
+                return reply.json()['messages'] + ui_reply.json()['ui_messages']
+
+            def step_02_rebuild_project():
+                data = {'project_file' : PROJECT_FILE}
+                requests.post(it._url + '/rebuild_project', timeout=10,
+                              data=data)
+                waitForServer()
+                data = {
+                    'project_file' : PROJECT_FILE,
+                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
+                                            'sr_delay.vhd')}
+                waitUntilBuildFinishes(data)
+
+            def step_03_check_messages_are_the_same(msgs):
+                step_03_msgs = step_01_check_file_builds_ok()
+                if step_03_msgs:
+                    _logger.info("Step 03 messages:")
+                    for msg in step_03_msgs:
+                        _logger.info(msg)
+                else:
+                    _logger.info("Step 03 generated no messages")
+
+                it.assertEquals(msgs, step_03_msgs)
+
+            _logger.info("Step 01")
+            step_01_msgs = step_01_check_file_builds_ok()
+            if step_01_msgs:
+                _logger.info("Step 01 messages:")
+                for msg in step_01_msgs:
+                    _logger.info(msg)
+            else:
+                _logger.info("Step 01 generated no messages")
+
+            _logger.info("Step 02")
+            step_02_rebuild_project()
+
+            _logger.info("Step 03")
+            step_03_check_messages_are_the_same(step_01_msgs)
 
         @it.should("shutdown the server when requested")
         def test():
@@ -225,17 +394,7 @@ with such.A("hdlcc server") as it:
 
             it._server = subp.Popen(cmd, env=os.environ.copy())
 
-            # Wait until the server is up and replying
-            for i in range(30):
-                _logger.info("Elapsed %ds", i)
-                try:
-                    reply = requests.post('http://127.0.0.1:50000/get_diagnose_info')
-                    if reply.ok:
-                        return
-                except requests.ConnectionError:
-                    pass
-                time.sleep(1)
-
+            waitForServer()
 
         @it.should("terminate when the parent PID is not running anymore")
         def test():
