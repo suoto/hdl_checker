@@ -16,10 +16,10 @@
 if (!(Test-Path "$env:CACHE_PATH\\modelsim.exe")) {
     write-host "Downloading $env:BUILDER_NAME from $env:URL"
     if ($env:APPVEYOR -eq "True") {
-        invoke-webrequest "$env:URL" -outfile "$env:CACHE_PATH\\modelsim.exe"
+        "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+        cmd /c "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\modelsim.exe`""
     } else {
-        cmd /c "copy `"e:\\ModelSimSetup-15.1.0.185-windows.exe`" `
-                     `"$env:CACHE_PATH\\modelsim.exe`""
+        cmd /c "copy `"e:\\ModelSimSetup-15.1.0.185-windows.exe`" `"$env:CACHE_PATH\\modelsim.exe`""
     }
     write-host "Download finished"
 }
