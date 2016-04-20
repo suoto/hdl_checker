@@ -59,6 +59,7 @@ environment:
 install:
   - set CACHE_PATH="%CI_WORK_PATH%\\cache"
   - set HDLCC_CI="%CI_WORK_PATH%\\hdlcc_ci"
+  - if not exist %CACHE_PATH% mkdir %CACHE_PATH%
   - git submodule update --init --recursive
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 

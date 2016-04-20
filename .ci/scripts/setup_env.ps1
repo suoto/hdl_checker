@@ -42,9 +42,9 @@ pip install -r requirements.txt
 pip install git+https://github.com/suoto/rainbow_logging_handler
 if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 
-if (!(Test-Path $env:CACHE_PATH)) {
-    new-item "$env:CACHE_PATH" -type directory -force
-}
+# if (!(Test-Path $env:CACHE_PATH)) {
+#     new-item "$env:CACHE_PATH" -type directory -force
+# }
 
 if ("$env:BUILDER_NAME" -eq "msim") {
     echo "Installing MSIM"
