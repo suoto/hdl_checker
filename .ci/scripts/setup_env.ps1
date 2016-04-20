@@ -32,7 +32,7 @@ if (!(Test-Path $env:HDLCC_CI)) {
     get-content git.log
 }
 
-IF ($env:APPVEYOR -eq "True") {
+if ($env:APPVEYOR -eq "True") {
     appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
     if (!$?) {write-error "Something went wrong, exiting"; exit -1}
     python get-pip.py

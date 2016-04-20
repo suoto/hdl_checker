@@ -39,15 +39,12 @@ clone_depth: 5
 
 # environment variables
 environment:
-  CI_WORK_PATH: "%USERPROFILE%\\ci"
   ARCH: 32
   matrix:
     - BUILDER_NAME: ghdl
-      INSTALL_DIR: "%CI_WORK_PATH%\\ghdl-0.31-mcode-win32"
       URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
       # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
     - BUILDER_NAME: msim
-      BUILDER_PATH: "%CI_WORK_PATH%\\modelsim_ase\\win32aloem"
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
 
 
@@ -57,10 +54,9 @@ environment:
 
 # scripts that run after cloning repository
 install:
-  - ps: $env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
-  - set HDLCC_CI="%CI_WORK_PATH%\\hdlcc_ci"
-  - if not exist %CACHE_PATH% mkdir %CACHE_PATH%
   - git submodule update --init --recursive
+
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py

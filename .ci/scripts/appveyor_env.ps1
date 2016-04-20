@@ -14,15 +14,40 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 write-host "Creating AppVeyor-like environment variables"
-$env:APPVEYOR_BUILD_FOLDER=$(get-location)
+
 $env:CI_WORK_PATH="$env:USERPROFILE\\ci"
+
+if ($env:APPVEYOR -ne "True") {
+    $env:APPVEYOR_BUILD_FOLDER=$(get-location)
+    $env:PATH="C:\Program Files\7-zip;$env:PATH"
+}
+
+if ($env:BUILDER_NAME -eq "msim") {
+    $env:BUILDER_PATH="$env:CI_WORK_PATH\\modelsim_ase\\win32aloem"
+} elseif ($env:BUILDER_NAME -eq "ghdl") {
+    $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
+    $env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
+}
 
 $env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
 $env:HDLCC_CI="$env:CI_WORK_PATH\\hdlcc_ci"
 $env:ARCH="32"
-$env:PATH="C:\Program Files\7-zip;$env:PATH"
 
 if (!(Test-Path "$env:CI_WORK_PATH")) {
     cmd /c "mkdir `"$env:CI_WORK_PATH`""
 }
 
+if (!(Test-Path "$env:CACHE_PATH")) {
+    cmd /c "mkdir `"$env:CACHE_PATH`""
+}
+
+"CACHE_PATH             $env:CACHE_PATH"
+"HDLCC_CI               $env:HDLCC_CI"
+"ARCH                   $env:ARCH"
+"CI_WORK_PATH           $env:CI_WORK_PATH"
+"APPVEYOR               $env:APPVEYOR"
+"APPVEYOR_BUILD_FOLDER  $env:APPVEYOR_BUILD_FOLDER"
+"PATH                   $env:PATH"
+"BUILDER_NAME           $env:BUILDER_NAME"
+"CACHE_PATH             $env:CACHE_PATH"
+"INSTALL_DIR            $env:INSTALL_DIR"

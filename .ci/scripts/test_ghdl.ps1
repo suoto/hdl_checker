@@ -15,15 +15,15 @@
 
 
 # Create variables defined on Appveyor YAML file
-.ci\\scripts\\appveyor_env.ps1
-
-if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 
 $env:BUILDER_NAME="ghdl"
 $env:ARCH="32"
 $env:URL="http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip"
-$env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
-$env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
+# $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
+# $env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
+
+.ci\\scripts\\appveyor_env.ps1
+if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 
 if ($env:APPVEYOR -ne "True") {
     write-host "Setting up virtualenv"

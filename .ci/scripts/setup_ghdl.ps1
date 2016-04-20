@@ -18,43 +18,43 @@ write-host "Setting up GHDL..."
 $env:GHDL_PREFIX="$env:INSTALL_DIR\\lib"
 
 if (!(Test-Path "$env:CACHE_PATH\\ghdl.zip")) {
-  write-host "Downloading $env:BUILDER_NAME from $env:URL to $env:CACHE_PATH\\ghdl.zip"
-  if ($env:APPVEYOR -eq "True") {
-    "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
-    cmd /c "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
-  } else {
-    "curl -fS `"$env:URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
-    curl -fS "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
-  }
-  if (!$?) {write-error "Something went wrong, exiting"; exit -1}
-  write-host "Download finished"
+    write-host "Downloading $env:BUILDER_NAME from $env:URL to $env:CACHE_PATH\\ghdl.zip"
+    if ($env:APPVEYOR -eq "True") {
+        "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+        cmd /c "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+    } else {
+        "curl -fsSL `"$env:URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
+        curl -fsSL "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
+    }
+    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
+    write-host "Download finished"
 }
 
 if (!(Test-Path "$env:BUILDER_PATH")) {
-  write-host "Installing $env:BUILDER_NAME to $env:CI_WORK_PATH"
-  cmd /c "7z x `"$env:CACHE_PATH\\ghdl.zip`" -o`"$env:CI_WORK_PATH`" -y"
+    write-host "Installing $env:BUILDER_NAME to $env:CI_WORK_PATH"
+    cmd /c "7z x `"$env:CACHE_PATH\\ghdl.zip`" -o`"$env:CI_WORK_PATH`" -y"
 
-  if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32") {
-    write-host "Current dir: $(get-location)"
-    set-location "$env:INSTALL_DIR"
-    write-host "Current dir: $(get-location)"
+    if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32") {
+        write-host "Current dir: $(get-location)"
+        set-location "$env:INSTALL_DIR"
+        write-host "Current dir: $(get-location)"
 
-    write-host "Testing GHDL before library update"
-    cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
-    cmd /c "set_ghdl_path.bat"
-    cmd /c "reanalyze_libs.bat"
-    write-host "Testing GHDL after library update"
-    cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
+        write-host "Testing GHDL before library update"
+        cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
+        cmd /c "set_ghdl_path.bat"
+        cmd /c "reanalyze_libs.bat"
+        write-host "Testing GHDL after library update"
+        cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
 
-    set-location "$env:APPVEYOR_BUILD_FOLDER"
-  }
+        set-location "$env:APPVEYOR_BUILD_FOLDER"
+    }
 
-  if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.33") {
-    write-host "Current dir: $(get-location)"
-    set-location "$env:INSTALL_DIR\\bin"
-    write-host "Current dir: $(get-location)"
-    cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
-    set-location "$env:APPVEYOR_BUILD_FOLDER"
-  }
+    if ("$env:INSTALL_DIR" -eq "$env:CI_WORK_PATH\\ghdl-0.33") {
+        write-host "Current dir: $(get-location)"
+        set-location "$env:INSTALL_DIR\\bin"
+        write-host "Current dir: $(get-location)"
+        cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
+        set-location "$env:APPVEYOR_BUILD_FOLDER"
+    }
 }
 
