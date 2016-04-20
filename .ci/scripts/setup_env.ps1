@@ -25,7 +25,8 @@ $env:PATH="$env:PYTHON;$env:PYTHON\Scripts;$env:PATH"
 git submodule update --init --recursive -q *>&1
 
 if (!(Test-Path $env:HDLCC_CI)) {
-    &"git" "clone" "https://github.com/suoto/hdlcc_ci" "$env:HDLCC_CI" "--recursive" "-q" "*>&1"
+    &"git" "clone" "https://github.com/suoto/hdlcc_ci" "$env:HDLCC_CI" "--recursive" `
+        "-q" "*>&1"
 }
 
 IF ($env:APPVEYOR -eq "True") {
