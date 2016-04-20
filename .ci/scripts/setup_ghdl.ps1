@@ -20,7 +20,7 @@ $env:GHDL_PREFIX="$env:INSTALL_DIR\\lib"
 if (!(Test-Path "$env:CACHE_PATH\\ghdl.zip")) {
     write-host "Downloading $env:BUILDER_NAME from $env:URL to $env:CACHE_PATH\\ghdl.zip"
     if ($env:APPVEYOR -eq "True") {
-      curl -fsS "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
+      invoke-webrequest "$env:URL" -outfile "$env:CACHE_PATH\\ghdl.zip"
     } else {
       "curl -fS `"$env:URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
       curl -fS "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
