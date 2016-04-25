@@ -280,7 +280,7 @@ with such.A('config parser object') as it:
         @it.has_setup
         def setup():
             try:
-                import vunit
+                import vunit # pylint: disable=unused-variable
             except ImportError:
                 it.fail("Couldn't import vunit")
 
@@ -298,6 +298,52 @@ with such.A('config parser object') as it:
 
             it.assertEqual(len(sources), vunit_files,
                            "We should only find VUnit files")
+
+    with it.having("a project file constantly updated"):
+        @it.has_setup
+        def setup():
+            it.lib_path = p.join(HDLCC_CI, 'vim-hdl-examples')
+            it.config_content = [
+                r'vhdl work ' + p.join(it.lib_path, 'another_library',
+                                       'foo.vhd'),
+                r'vhdl work ' + p.join(it.lib_path, 'basic_library',
+                                       'clock_divider.vhd'),
+            ]
+
+            writeListToFile(it.project_filename, it.config_content)
+            it.parser = hdlcc.config_parser.ConfigParser(it.project_filename)
+
+        @it.should("Find only the sources given then the extra source")
+        def test():
+            source_before = {}
+            for source in it.parser.getSources():
+                if 'vunit' not in source.filename:
+                    source_before[source.filename] = source
+
+            it.assertItemsEqual(
+                source_before.keys(),
+                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
+                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),])
+
+            it.config_content += [
+                r'vhdl work ' + p.join(it.lib_path, 'basic_library',
+                                       'very_common_pkg.vhd'), ]
+            writeListToFile(it.project_filename, it.config_content)
+
+            sources_after = {}
+            for source in it.parser.getSources():
+                if 'vunit' not in source.filename:
+                    sources_after[source.filename] = source
+
+            it.assertItemsEqual(
+                sources_after.keys(),
+                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
+                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),
+                 p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd'), ])
+
+            # Check the files originally found weren't re-created
+            for path, source in source_before.items():
+                it.assertEqual(source, sources_after[path])
 
 it.createTests(globals())
 

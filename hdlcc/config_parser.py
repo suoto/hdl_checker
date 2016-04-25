@@ -172,6 +172,7 @@ class ConfigParser(object):
         if self.shouldParse():
             self._logger.info("Parsing '%s'", self.filename)
             self._updateTimestamp()
+            self._parms['builder'] = 'fallback'
             for _line in open(self.filename, 'r').readlines():
                 line = _replaceConfigFileComments.sub("", _line)
                 self._parseLine(line)

@@ -1,3 +1,2 @@
 include versioneer.py
-include ./hdlcc/_version.py
 include hdlcc/_version.py
