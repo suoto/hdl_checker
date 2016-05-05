@@ -67,6 +67,8 @@ set +e
 
 RESULT=0
 
+# If we're not running on a CI server, create a virtual env to mimic
+# its behaviour
 if [ -z "${CI}" ]; then
   if [ -d "${VIRTUAL_ENV_DEST}" ]; then
     rm -rf ${VIRTUAL_ENV_DEST}
@@ -78,20 +80,18 @@ if [ -z "${CI}" ]; then
   pip install -r requirements.txt
 fi
 
-if [ -n "${PIP}" ]; then
-  pip uninstall hdlcc -y
-  if [ -n "${VIRTUAL_ENV}" ]; then
-    pip install -e .
-  else
-    pip install -e . --user
-  fi
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-
-  hdlcc -h
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+pip uninstall hdlcc -y
+if [ -n "${VIRTUAL_ENV}" ]; then
+  pip install -e .
+else
+  pip install -e . --user
 fi
+RESULT=$(($? || RESULT))
+[ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+
+hdlcc -h
+RESULT=$(($? || RESULT))
+[ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
 
 if [ "${RESULT}" != "0" ]; then
