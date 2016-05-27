@@ -50,6 +50,10 @@ def _extractSet(entry):
 try:
     import vunit
     _HAS_VUNIT = True
+    _VUNIT_FLAGS = {
+        'msim' : ['-2008'],
+        'ghdl' : ['--std=08'],
+        'xvhdl' : []}
 except ImportError:
     _HAS_VUNIT = False
 
@@ -88,7 +92,7 @@ class ConfigParser(object):
 
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
-        if not _HAS_VUNIT:
+        if not _HAS_VUNIT or self._parms['builder'] == 'fallback':
             return
 
         self._logger.info("VUnit installation found")
@@ -113,7 +117,9 @@ class ConfigParser(object):
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
-            self._sources[path] = VhdlSourceFile(path, library, ['-2008'])
+
+            self._sources[path] = VhdlSourceFile(path, library,
+                                                 _VUNIT_FLAGS[self._parms['builder']])
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]
@@ -243,7 +249,7 @@ class ConfigParser(object):
 
     def _getSourcePath(self, path):
         "Normalizes and handles absolute/relative paths"
-        source_path = p.normpath(path)
+        source_path = p.normpath(p.expanduser(path))
         # If the path to the source file was not absolute, we assume
         # it was relative to the config file base path
         if not p.isabs(source_path):

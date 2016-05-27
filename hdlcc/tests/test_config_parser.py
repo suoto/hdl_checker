@@ -29,7 +29,7 @@ from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_CI = os.environ['HDLCC_CI']
+HDLCC_CI = p.expanduser(os.environ['HDLCC_CI'])
 
 with such.A('config parser object') as it:
 
@@ -322,8 +322,8 @@ with such.A('config parser object') as it:
 
             it.assertItemsEqual(
                 sources_pre.keys(),
-                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
-                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),])
+                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),])
 
             # Add an extra file
             writeListToFile(
@@ -338,9 +338,9 @@ with such.A('config parser object') as it:
 
             it.assertItemsEqual(
                 sources_post.keys(),
-                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
-                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),
-                 p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd'), ])
+                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')), ])
 
             # Check the files originally found weren't re-created
             for path, source in sources_pre.items():
@@ -366,19 +366,20 @@ with such.A('config parser object') as it:
 
             it.assertItemsEqual(
                 sources_post.keys(),
-                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
-                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),
-                 p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd'), ])
+                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')), ])
 
-            added_path = p.join(it.lib_path, 'basic_library',
-                                'very_common_pkg.vhd')
+            added_path = p.normpath(p.join(it.lib_path, 'basic_library',
+                                           'very_common_pkg.vhd'))
 
             added_source = sources_post[added_path]
 
             # Check that the sources that have been previously added are
             # the same
-            for path in [p.join(it.lib_path, 'another_library', 'foo.vhd'),
-                         p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')]:
+            for path in [
+                    p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
+                    p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'))]:
                 it.assertEqual(sources_pre[path], sources_post[path])
 
             # Check that the source we changed library has changed
