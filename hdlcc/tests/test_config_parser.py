@@ -315,35 +315,78 @@ with such.A('config parser object') as it:
 
         @it.should("Find only the sources given then the extra source")
         def test():
-            source_before = {}
+            sources_pre = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:
-                    source_before[source.filename] = source
+                    sources_pre[source.filename] = source
 
             it.assertItemsEqual(
-                source_before.keys(),
+                sources_pre.keys(),
                 [p.join(it.lib_path, 'another_library', 'foo.vhd'),
                  p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),])
 
-            it.config_content += [
-                r'vhdl work ' + p.join(it.lib_path, 'basic_library',
-                                       'very_common_pkg.vhd'), ]
-            writeListToFile(it.project_filename, it.config_content)
+            # Add an extra file
+            writeListToFile(
+                it.project_filename,
+                it.config_content + [r'vhdl work ' + p.join(it.lib_path, 'basic_library',
+                                                            'very_common_pkg.vhd'), ])
 
-            sources_after = {}
+            sources_post = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:
-                    sources_after[source.filename] = source
+                    sources_post[source.filename] = source
 
             it.assertItemsEqual(
-                sources_after.keys(),
+                sources_post.keys(),
                 [p.join(it.lib_path, 'another_library', 'foo.vhd'),
                  p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),
                  p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd'), ])
 
             # Check the files originally found weren't re-created
-            for path, source in source_before.items():
-                it.assertEqual(source, sources_after[path])
+            for path, source in sources_pre.items():
+                it.assertEqual(source, sources_post[path])
+
+        @it.should("Update the source library if changed")
+        def test():
+            sources_pre = {}
+            for source in it.parser.getSources():
+                if 'vunit' not in source.filename:
+                    sources_pre[source.filename] = source
+
+            # Add an extra file
+            writeListToFile(
+                it.project_filename,
+                it.config_content + [r'vhdl foo_lib ' + p.join(it.lib_path, 'basic_library',
+                                                               'very_common_pkg.vhd'), ])
+
+            sources_post = {}
+            for source in it.parser.getSources():
+                if 'vunit' not in source.filename:
+                    sources_post[source.filename] = source
+
+            it.assertItemsEqual(
+                sources_post.keys(),
+                [p.join(it.lib_path, 'another_library', 'foo.vhd'),
+                 p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'),
+                 p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd'), ])
+
+            added_path = p.join(it.lib_path, 'basic_library',
+                                'very_common_pkg.vhd')
+
+            added_source = sources_post[added_path]
+
+            # Check that the sources that have been previously added are
+            # the same
+            for path in [p.join(it.lib_path, 'another_library', 'foo.vhd'),
+                         p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')]:
+                it.assertEqual(sources_pre[path], sources_post[path])
+
+            # Check that the source we changed library has changed
+            it.assertNotEqual(sources_pre[added_path], sources_post[added_path])
+            it.assertEqual(added_source.library, 'foo_lib')
+
+            # Also, check that there is no extra source left behind
+            it.assertEqual(len(sources_pre), len(sources_post))
 
 it.createTests(globals())
 
