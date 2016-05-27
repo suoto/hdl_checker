@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with hdlcc.  If not, see <http://www.gnu.org/licenses/>.
 
+VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
+
 ARGS=()
 
 CLEAN=0
@@ -65,20 +67,31 @@ set +e
 
 RESULT=0
 
-if [ -n "${PIP}" ]; then
-  pip uninstall hdlcc -y
-  if [ -n "${VIRTUAL_ENV}" ]; then
-    pip install -e .
-  else
-    pip install -e . --user
+# If we're not running on a CI server, create a virtual env to mimic
+# its behaviour
+if [ -z "${CI}" ]; then
+  if [ -d "${VIRTUAL_ENV_DEST}" ]; then
+    rm -rf ${VIRTUAL_ENV_DEST}
   fi
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
-  hdlcc -h
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+  virtualenv ${VIRTUAL_ENV_DEST}
+  . ${VIRTUAL_ENV_DEST}/bin/activate
+
+  pip install -r requirements.txt
 fi
+
+pip uninstall hdlcc -y
+if [ -n "${VIRTUAL_ENV}" ]; then
+  pip install -e .
+else
+  pip install -e . --user
+fi
+RESULT=$(($? || RESULT))
+[ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+
+hdlcc -h
+RESULT=$(($? || RESULT))
+[ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
 
 if [ "${RESULT}" != "0" ]; then
@@ -142,6 +155,8 @@ fi
 coverage combine
 coverage html
 # coverage report
+
+[ -z "${CI}" ] && [ -n "${VIRTUAL_ENV}" ] && deactivate
 
 exit "${RESULT}"
 

@@ -20,6 +20,7 @@ import logging
 
 import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
+from hdlcc.utils import onCI
 
 _splitAtWhitespaces = re.compile(r"\s+").split # pylint: disable=invalid-name
 _replaceConfigFileComments = re.compile(r"(\s*#.*|\n)")
@@ -97,6 +98,17 @@ class ConfigParser(object):
         # incompatibilities as this is really used
         vunit_project = vunit.VUnit.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
+        for func in (vunit_project.add_com,
+                     vunit_project.add_osvvm,
+                     vunit_project.add_array_util):
+            try:
+                func()
+            except: # pragma: no cover pylint:disable=bare-except
+                self._logger.exception("Error running '%s'", str(func))
+                # We only catch exceptions when this would break something for
+                # the user. We want it to break only inside CI
+                if onCI():  # pragma: no cover
+                    raise
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
