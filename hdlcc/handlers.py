@@ -141,7 +141,8 @@ def rebuildProject():
 
     _logger.info("Rebuilding project")
     project_file = bottle.request.forms.get('project_file')
-    HdlCodeCheckerSever.clean(project_file)
+    server = _getServerByProjectFile(project_file)
+    server.clean()
     _logger.debug("Removing and recreating server object")
     del _hdlcc_objects[project_file]
     _getServerByProjectFile(project_file)

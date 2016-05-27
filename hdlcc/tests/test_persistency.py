@@ -65,7 +65,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
     @it.has_setup
     def setup():
-        StandaloneProjectBuilder.clean(PROJECT_FILE)
+        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
@@ -77,7 +77,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
     @it.has_teardown
     def teardown():
-        StandaloneProjectBuilder.clean(PROJECT_FILE)
+        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
 
     with it.having('a performance requirement'):
 
@@ -88,7 +88,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
             target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
             if p.exists(target_dir):
                 shutil.rmtree(target_dir)
@@ -190,7 +190,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)
@@ -234,7 +234,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)
@@ -262,7 +262,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
             #  target_dir = it.project._config.getTargetDir()
             #  if p.exists(target_dir):
                 #  shell.rmtree(target_dir)

@@ -261,6 +261,7 @@ with such.A("hdlcc server") as it:
                     'project_file' : PROJECT_FILE,
                     'path'         : p.join(HDL_LIB_PATH, 'common_lib',
                                             'sr_delay.vhd')}
+                waitForServer()
                 waitUntilBuildFinishes(data)
 
             def step_05_check_messages_are_the_same(msgs):
