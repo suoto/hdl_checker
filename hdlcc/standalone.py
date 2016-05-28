@@ -163,7 +163,7 @@ def runner(args):
 
     if args.clean:
         _logger.info("Cleaning up")
-        StandaloneProjectBuilder.clean(args.project_file)
+        StandaloneProjectBuilder.cleanProjectCache(args.project_file)
 
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
         project = StandaloneProjectBuilder(args.project_file)

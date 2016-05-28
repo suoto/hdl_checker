@@ -70,14 +70,14 @@ with such.A('hdlcc project') as it:
 
     @it.has_setup
     def setup():
-        StandaloneProjectBuilder.clean(PROJECT_FILE)
+        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
         _logger.info("Builder path: %s", BUILDER_PATH)
 
     @it.has_teardown
     def teardown():
-        StandaloneProjectBuilder.clean(PROJECT_FILE)
+        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
             shell.rmtree(it.DUMMY_PROJECT_FILE)
 
@@ -90,7 +90,7 @@ with such.A('hdlcc project') as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
 
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
@@ -113,7 +113,7 @@ with such.A('hdlcc project') as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.clean(PROJECT_FILE)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
             removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
@@ -430,7 +430,7 @@ with such.A('hdlcc project') as it:
         def teardown():
             if BUILDER_NAME is None:
                 return
-            hdlcc.HdlCodeCheckerBase.clean(it.project_file)
+            hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.project_file)
             removeFromPath(BUILDER_PATH)
 
             target_dir = it.project._config.getTargetDir()

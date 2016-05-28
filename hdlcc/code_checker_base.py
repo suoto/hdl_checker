@@ -16,6 +16,7 @@
 
 import abc
 import os
+import shutil
 import os.path as p
 import logging
 import traceback
@@ -75,14 +76,23 @@ class HdlCodeCheckerBase(object):
             '.' + p.basename(project_file))
 
     @staticmethod
-    def clean(project_file):
-        "Clean up generated files for a clean build"
+    def cleanProjectCache(project_file):
+        "Clean up cached file"
         if project_file is None:
             _logger.debug("Project file is None, can't clean")
             return
         cache_fname = HdlCodeCheckerBase._getCacheFilename(project_file)
         if p.exists(cache_fname):
+            _logger.debug("Removing cached info in '%s'", cache_fname)
             os.remove(cache_fname)
+
+    def clean(self):
+        "Clean up generated files"
+        self.cleanProjectCache(self._config.filename)
+        target_dir = self._config.getTargetDir()
+        if p.exists(target_dir):
+            _logger.debug("Removing target dir '%s'", target_dir)
+            shutil.rmtree(target_dir)
 
     def _setState(self, state):
         "serializer load implementation"

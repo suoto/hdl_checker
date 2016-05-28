@@ -22,15 +22,16 @@ import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
 from hdlcc.utils import onCI
 
-_splitAtWhitespaces = re.compile(r"\s+").split # pylint: disable=invalid-name
-_replaceConfigFileComments = re.compile(r"(\s*#.*|\n)")
-_SCANNER = re.compile("|".join([
+# pylint: disable=invalid-name
+_splitAtWhitespaces = re.compile(r"\s+").split
+_configFileComments = re.compile(r"(\s*#.*|\n)").sub
+_configFileScan = re.compile("|".join([
     r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
     r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
         r"(?P<library>\w+)\s+"                  \
         r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
-    ]), flags=re.I)
-
+    ]), flags=re.I).finditer
+# pylint: enable=invalid-name
 
 def _extractSet(entry):
     '''Extract a list by splitting a string at whitespaces, removing
@@ -49,6 +50,10 @@ def _extractSet(entry):
 try:
     import vunit
     _HAS_VUNIT = True
+    _VUNIT_FLAGS = {
+        'msim' : ['-2008'],
+        'ghdl' : ['--std=08'],
+        'xvhdl' : []}
 except ImportError:
     _HAS_VUNIT = False
 
@@ -87,7 +92,7 @@ class ConfigParser(object):
 
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
-        if not _HAS_VUNIT:
+        if not _HAS_VUNIT or self._parms['builder'] == 'fallback':
             return
 
         self._logger.info("VUnit installation found")
@@ -112,7 +117,9 @@ class ConfigParser(object):
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
-            self._sources[path] = VhdlSourceFile(path, library, ['-2008'])
+
+            self._sources[path] = VhdlSourceFile(path, library,
+                                                 _VUNIT_FLAGS[self._parms['builder']])
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]
@@ -184,9 +191,13 @@ class ConfigParser(object):
         if self.shouldParse():
             self._logger.info("Parsing '%s'", self.filename)
             self._updateTimestamp()
+            self._parms['builder'] = 'fallback'
+            sources_found = []
             for _line in open(self.filename, 'r').readlines():
-                line = _replaceConfigFileComments.sub("", _line)
-                self._parseLine(line)
+                line = _configFileComments("", _line)
+                sources_found += self._parseLine(line)
+
+            self._updateSourceList(sources_found)
 
             # If after parsing we haven't found the configured target
             # dir, we'll use the builder name
@@ -202,15 +213,28 @@ class ConfigParser(object):
 
             self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
 
+    def _updateSourceList(self, sources):
+        """Removes sources we had found earlier and leave only the ones
+        whose path are found in the 'sources' argument"""
+        for path in self._sources:
+            if path not in sources:
+                self._logger.warning("Removing '%s' because it has been removed "
+                                     "from the config file", path)
+                del self._sources[path]
+
     def _parseLine(self, line):
         "Parses a line a calls the appropriate extraction methods"
-        for match in [x.groupdict() for x in _SCANNER.finditer(line)]:
+        sources_found = []
+        for match in [x.groupdict() for x in _configFileScan(line)]:
             if match['parameter'] is not None:
                 self._handleParsedParameter(match['parameter'],
                                             match['value'])
             else:
+                source_path = self._getSourcePath(match['path'])
+                sources_found += [source_path]
                 self._handleParsedSource(match['lang'], match['library'],
-                                         match['path'], match['flags'])
+                                         source_path, match['flags'])
+        return sources_found
 
     def _handleParsedParameter(self, parameter, value):
         "Handles a parsed line that sets a parameter"
@@ -222,6 +246,17 @@ class ConfigParser(object):
             self._parms[parameter] = _extractSet(value)
         else:
             raise hdlcc.exceptions.UnknownParameterError(parameter)
+
+    def _getSourcePath(self, path):
+        "Normalizes and handles absolute/relative paths"
+        source_path = p.normpath(p.expanduser(path))
+        # If the path to the source file was not absolute, we assume
+        # it was relative to the config file base path
+        if not p.isabs(source_path):
+            fname_base_dir = p.dirname(p.abspath(self.filename))
+            source_path = p.join(fname_base_dir, source_path)
+
+        return source_path
 
     # TODO: Handle sources added or removed from the configuration file
     # without deleting and recreating the objects
@@ -236,21 +271,31 @@ class ConfigParser(object):
             self._logger.warning("Unsupported language: %s", language)
             return
 
-        source_path = p.normpath(path)
-
-        # If the path to the source file was not absolute, we assume
-        # it was relative to the config file base path
-        if not p.isabs(source_path):
-            fname_base_dir = p.dirname(p.abspath(self.filename))
-            source_path = p.join(fname_base_dir, source_path)
-
         flags_set = _extractSet(flags)
 
         # TODO: We could use a ThreadPool to create source file objects
         # without the overhead of creating/destroying threads all the
         # time
-        self._sources[source_path] = \
-                VhdlSourceFile(source_path, library, flags_set)
+        if self._shouldAddSource(path, library, flags_set):
+            self._logger.debug("Adding source: lib '%s', '%s'", library, path)
+            self._sources[path] = \
+                    VhdlSourceFile(path, library, flags_set)
+
+    def _shouldAddSource(self, source_path, library, flags):
+        """Checks if the source with the given parameters should be
+        created/updated"""
+        # If the path can't be found, just add it
+        if source_path not in self._sources:
+            return  True
+
+        source = self._sources[source_path]
+
+        # If the path already exists, check that other parameters are
+        # the same. Should there be any difference, we'll need to update
+        # the object
+        if source.library != library or source.flags != flags:
+            return True
+        return False
 
     def getBuilder(self):
         "Returns the builder name"
