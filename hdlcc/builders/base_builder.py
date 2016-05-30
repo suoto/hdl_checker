@@ -114,22 +114,26 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
         self._logger.debug(" ".join(cmd_with_args))
 
+        exc = None
         try:
             stdout = list(subp.check_output(cmd_with_args, \
                     stderr=subp.STDOUT, shell=shell, env=subp_env).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
-            import traceback
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-            for line in traceback.format_exc().split('\n'): # pragma: no cover
-                self._logger.debug(line)
+        # If we had an exception, print a warning to make easier to skim
+        # logs for errors
+        if exc is None:
+            log = self._logger.debug
+        else:
+            log = self._logger.warning
 
         for line in stdout:
             if line == '' or line.isspace():
                 continue
-            self._logger.debug("> " + repr(line))
+            log("> " + repr(line))
 
         return stdout
 
