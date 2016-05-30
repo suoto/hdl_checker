@@ -139,10 +139,16 @@ class GHDL(BaseBuilder):
         cmd += [source.filename]
         return cmd
 
-    def _importSource(self, source):
+    def _importSource(self, source, flags=None):
         "Runs GHDL with import source switch"
-        cmd = ['ghdl', '-i'] + self._getGhdlArgs(source)
-        return self._subprocessRunner(cmd)
+        vhdl_std = []
+        for flag in flags:
+            if flag.startswith('--std='):
+                vhdl_std = [flag]
+                break
+        self._logger.debug("Importing source with std '%s'", vhdl_std)
+        cmd = ['ghdl', '-i'] + self._getGhdlArgs(source, tuple(vhdl_std))
+        return cmd
 
     def _analyzeSource(self, source, flags=None):
         "Runs GHDL with analyze source switch"
@@ -153,6 +159,8 @@ class GHDL(BaseBuilder):
         return ['ghdl', '-s'] + self._getGhdlArgs(source, flags)
 
     def _buildSource(self, source, flags=None):
+        self._importSource(source, flags)
+
         stdout = []
         for cmd in (self._analyzeSource(source, flags),
                     self._checkSyntax(source, flags)):
@@ -160,11 +168,10 @@ class GHDL(BaseBuilder):
 
         return stdout
 
-    def _createLibrary(self, source):
+    def _createLibrary(self, _):
         workdir = os.path.join(self._target_folder)
         if not os.path.exists(workdir):
             os.mkdir(workdir)
-        self._importSource(source)
 
     def _getUnitsToRebuild(self, line):
         rebuilds = []

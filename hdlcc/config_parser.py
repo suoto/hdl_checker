@@ -51,9 +51,15 @@ try:
     import vunit
     _HAS_VUNIT = True
     _VUNIT_FLAGS = {
-        'msim' : ['-2008'],
-        'ghdl' : ['--std=08'],
-        'xvhdl' : []}
+        'msim' : {
+            '93'   : ['-93'],
+            '2002' : ['-2002'],
+            '2008' : ['-2008']},
+        'ghdl' : {
+            '93'   : ['--std=93c'],
+            '2002' : ['--std=02'],
+            '2008' : ['--std=08']}
+        }
 except ImportError:
     _HAS_VUNIT = False
 
@@ -103,6 +109,7 @@ class ConfigParser(object):
         # incompatibilities as this is really used
         vunit_project = vunit.VUnit.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
+
         for func in (vunit_project.add_com,
                      vunit_project.add_osvvm,
                      vunit_project.add_array_util):
@@ -114,12 +121,18 @@ class ConfigParser(object):
                 # the user. We want it to break only inside CI
                 if onCI():  # pragma: no cover
                     raise
+
+        # Get extra flags for building VUnit sources
+        if self.getBuilder() in _VUNIT_FLAGS:
+            vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
+        else:
+            vunit_flags = []
+
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
 
-            self._sources[path] = VhdlSourceFile(path, library,
-                                                 _VUNIT_FLAGS[self._parms['builder']])
+            self._sources[path] = VhdlSourceFile(path, library, vunit_flags)
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]
@@ -216,11 +229,15 @@ class ConfigParser(object):
     def _updateSourceList(self, sources):
         """Removes sources we had found earlier and leave only the ones
         whose path are found in the 'sources' argument"""
+        rm_list = []
         for path in self._sources:
             if path not in sources:
                 self._logger.warning("Removing '%s' because it has been removed "
                                      "from the config file", path)
-                del self._sources[path]
+                rm_list += [path]
+
+        for rm_path in rm_list:
+            del self._sources[rm_path]
 
     def _parseLine(self, line):
         "Parses a line a calls the appropriate extraction methods"
