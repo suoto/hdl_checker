@@ -250,7 +250,7 @@ with such.A('hdlcc project') as it:
             if PROJECT_FILE is None:
                 _logger.warning("Skipping '%s'", case)
                 return
-            filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
+            filename = p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd')
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -265,7 +265,7 @@ with such.A('hdlcc project') as it:
             if BUILDER_NAME is None:
                 return
 
-            filename = p.join(HDL_LIB_PATH, 'memory', 'async_fifo.vhd')
+            filename = p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd')
             it.assertTrue(it.project._msg_queue.empty())
 
             code = open(filename, 'r').read().split('\n')

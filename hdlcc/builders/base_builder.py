@@ -114,22 +114,26 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
         self._logger.debug(" ".join(cmd_with_args))
 
+        exc = None
         try:
             stdout = list(subp.check_output(cmd_with_args, \
                     stderr=subp.STDOUT, shell=shell, env=subp_env).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
-            import traceback
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-            for line in traceback.format_exc().split('\n'): # pragma: no cover
-                self._logger.debug(line)
+        # If we had an exception, print a warning to make easier to skim
+        # logs for errors
+        if exc is None:
+            log = self._logger.debug
+        else:
+            log = self._logger.warning
 
         for line in stdout:
             if line == '' or line.isspace():
                 continue
-            self._logger.debug("> " + repr(line))
+            log("> " + repr(line))
 
         return stdout
 
@@ -169,6 +173,17 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         if exc_lines: # pragma: no cover
             for exc_line in exc_lines:
                 self._logger.error(exc_line)
+
+        if self._logger.isEnabledFor(logging.DEBUG): # pragma: no cover
+            if records:                              # pragma: no cover
+                self._logger.debug("Records found")
+                for record in records:               # pragma: no cover
+                    self._logger.debug(record)
+            if rebuilds:                             # pragma: no cover
+                self._logger.debug("Rebuilds found")
+                for rebuild in rebuilds:             # pragma: no cover
+                    self._logger.debug(rebuild)
+
         return records, rebuilds
 
     @abc.abstractmethod
