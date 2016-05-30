@@ -173,6 +173,17 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         if exc_lines: # pragma: no cover
             for exc_line in exc_lines:
                 self._logger.error(exc_line)
+
+        if self._logger.isEnabledFor(logging.DEBUG): # pragma: no cover
+            if records:                              # pragma: no cover
+                self._logger.debug("Records found")
+                for record in records:               # pragma: no cover
+                    self._logger.debug(record)
+            if rebuilds:                             # pragma: no cover
+                self._logger.debug("Rebuilds found")
+                for rebuild in rebuilds:             # pragma: no cover
+                    self._logger.debug(rebuild)
+
         return records, rebuilds
 
     @abc.abstractmethod
