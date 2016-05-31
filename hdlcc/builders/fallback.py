@@ -28,10 +28,8 @@ class Fallback(BaseBuilder):
 
     # Since Fallback._buildSource returns nothing,
     # Fallback._makeMessageRecords is never called
-    # pylint: disable=unused-argument
-    def _makeMessageRecords(self, line): # pragma: no cover
+    def _makeMessageRecords(self, _): # pragma: no cover
         return []
-    # pylint: enable=unused-argument
 
     def _shouldIgnoreLine(self, line):
         return True

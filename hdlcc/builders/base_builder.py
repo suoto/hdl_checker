@@ -42,11 +42,13 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         self._build_info_cache = {}
         self._builtin_libraries = []
 
-        if not p.exists(self._target_folder):
-            self._logger.info("Target folder '%s' was created", self._target_folder)
-            os.mkdir(self._target_folder)
-        else:
-            self._logger.info("%s already exists", self._target_folder)
+        # Skip creating a folder for the fallback builder
+        if self.builder_name != 'fallback':
+            if not p.exists(self._target_folder):
+                self._logger.info("Target folder '%s' was created", self._target_folder)
+                os.mkdir(self._target_folder)
+            else:
+                self._logger.info("%s already exists", self._target_folder)
 
         self.checkEnvironment()
 
@@ -170,21 +172,33 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
             except NotImplementedError:
                 pass
+
         if exc_lines: # pragma: no cover
             for exc_line in exc_lines:
                 self._logger.error(exc_line)
 
-        if self._logger.isEnabledFor(logging.DEBUG): # pragma: no cover
-            if records:                              # pragma: no cover
-                self._logger.debug("Records found")
-                for record in records:               # pragma: no cover
-                    self._logger.debug(record)
-            if rebuilds:                             # pragma: no cover
-                self._logger.debug("Rebuilds found")
-                for rebuild in rebuilds:             # pragma: no cover
-                    self._logger.debug(rebuild)
+        self._logBuildResults(records, rebuilds)
 
         return records, rebuilds
+
+    def _logBuildResults(self, records, rebuilds): # pragma: no cover
+        "Logs records and rebuilds only for debugging purposes"
+        if not self._logger.isEnabledFor(logging.DEBUG):
+            return
+
+        if records:
+            self._logger.debug("Records found")
+            for record in records:
+                self._logger.debug(record)
+        else:
+            self._logger.debug("No records found")
+
+        if rebuilds:
+            self._logger.debug("Rebuilds found")
+            for rebuild in rebuilds:
+                self._logger.debug(rebuild)
+        else:
+            self._logger.debug("No rebuild units found")
 
     @abc.abstractmethod
     def _createLibrary(self, library):
