@@ -41,6 +41,8 @@ class XVHDL(BaseBuilder):
     def _shouldIgnoreLine(self, line):
         if re.match(r"^\s*$", line):
             return True
+        if 'ignored due to previous errors' in line:
+            return True
         return not (line.startswith('ERROR') or
                     line.startswith('WARNING'))
 
