@@ -21,6 +21,7 @@ import logging
 import hdlcc.exceptions
 from hdlcc.source_file import VhdlSourceFile
 from hdlcc.utils import onCI
+from hdlcc.builders import getBuilderByName
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -217,14 +218,35 @@ class ConfigParser(object):
             if 'target_dir' not in self._parms.keys():
                 self._parms['target_dir'] = "." + self._parms['builder']
 
-            # If the configured target dir is not absolute, we assume it
-            # should be relative to the folder where the configuration
-            # file resides
+            # Set default flags if the user hasn't specified any
+            self._setDefaultBuildFlagsIfNeeded()
+
+            # If the configured target folder is not absolute, we assume it
+            # should be relative to the folder where the configuration file
+            # resides
             if not p.isabs(self._parms['target_dir']):
                 self._parms['target_dir'] = p.join(p.dirname(self.filename),
                                                    self._parms['target_dir'])
 
             self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
+
+    # TODO: Add a test for this
+    def _setDefaultBuildFlagsIfNeeded(self):
+        "Tries to get a default set of flags if none were specified"
+        if self.getBuilder() == 'fallback':
+            return
+
+        builder_class = getBuilderByName(self.getBuilder())
+
+        for context in builder_class.default_flags:
+            # If the global/batch/single flags list is not set, overwrite
+            # with the values given by the builder class
+            if not self._parms[context]:
+                self._logger.debug("Flag '%s' wasn't set, using the default "
+                                   "value from '%s' class: '%s'", context,
+                                   builder_class.builder_name,
+                                   builder_class.default_flags[context])
+                self._parms[context] = builder_class.default_flags[context]
 
     def _updateSourceList(self, sources):
         """Removes sources we had found earlier and leave only the ones

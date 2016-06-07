@@ -29,6 +29,12 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     __metaclass__ = abc.ABCMeta
 
+    # Set an empty container for the default flags
+    default_flags = {
+        'batch_build_flags' : [],
+        'single_build_flags' : [],
+        'global_build_flags' : []}
+
     @abc.abstractproperty
     def builder_name(self):
         "Defines the builder identification"

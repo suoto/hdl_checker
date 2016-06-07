@@ -55,6 +55,15 @@ class MSim(BaseBuilder):
         r"\s+maps to directory\s*"
         r"(?P<library_path>.*)\.$", re.I)
 
+    # Default build flags
+    default_flags = {
+        'batch_build_flags' : ['-defercheck', '-nocheck', '-permissive'],
+        'single_build_flags' : ['-check_synthesis', '-lint', '-rangecheck',
+                                '-bindAtCompile', '-pedanticerrors'],
+        'global_build_flags' : ['-explicit',]}
+
+
+
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
 
