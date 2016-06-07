@@ -17,9 +17,10 @@
 import os.path as p
 import re
 import logging
+from multiprocessing import Pool
 
 import hdlcc.exceptions
-from hdlcc.source_file import VhdlSourceFile
+from hdlcc.source_file import VhdlSourceFile, getSourceFileObjects
 from hdlcc.utils import onCI
 from hdlcc.builders import getBuilderByName
 
@@ -129,11 +130,17 @@ class ConfigParser(object):
         else:
             vunit_flags = []
 
+        _source_file_args = []
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
 
-            self._sources[path] = VhdlSourceFile(path, library, vunit_flags)
+            _source_file_args.append({'filename' : path,
+                                      'library' : library,
+                                      'flags' : vunit_flags})
+
+        for source in getSourceFileObjects(_source_file_args, workers=3):
+            self._sources[source.filename] = source
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]
@@ -207,11 +214,19 @@ class ConfigParser(object):
             self._updateTimestamp()
             self._parms['builder'] = 'fallback'
             sources_found = []
-            for _line in open(self.filename, 'r').readlines():
-                line = _configFileComments("", _line)
-                sources_found += self._parseLine(line)
+            pool_results = []
+            parser_pool = Pool(3)
+            try:
+                for _line in open(self.filename, 'r').readlines():
+                    line = _configFileComments("", _line)
+                    line_sources, line_results = self._parseLine(line, parser_pool)
+                    sources_found += line_sources
+                    pool_results += line_results
 
-            self._updateSourceList(sources_found)
+                self._updateSourceList(sources_found, pool_results)
+            finally:
+                parser_pool.close()
+                parser_pool.terminate()
 
             # If after parsing we haven't found the configured target
             # dir, we'll use the builder name
@@ -248,9 +263,14 @@ class ConfigParser(object):
                                    builder_class.default_flags[context])
                 self._parms[context] = builder_class.default_flags[context]
 
-    def _updateSourceList(self, sources):
+    def _updateSourceList(self, sources, pool_results):
         """Removes sources we had found earlier and leave only the ones
         whose path are found in the 'sources' argument"""
+
+        # Updates the sources list with the results of the worker pool
+        for source in [x.get() for x in pool_results]:
+            self._sources[source.filename] = source
+
         rm_list = []
         for path in self._sources:
             if path not in sources:
@@ -261,9 +281,10 @@ class ConfigParser(object):
         for rm_path in rm_list:
             del self._sources[rm_path]
 
-    def _parseLine(self, line):
+    def _parseLine(self, line, pool):
         "Parses a line a calls the appropriate extraction methods"
         sources_found = []
+        results = []
         for match in [x.groupdict() for x in _configFileScan(line)]:
             if match['parameter'] is not None:
                 self._handleParsedParameter(match['parameter'],
@@ -271,9 +292,14 @@ class ConfigParser(object):
             else:
                 source_path = self._getSourcePath(match['path'])
                 sources_found += [source_path]
-                self._handleParsedSource(match['lang'], match['library'],
-                                         source_path, match['flags'])
-        return sources_found
+                # Try to get the build info for this source. If we get nothing
+                # we just skip it
+                build_info = self._handleParsedSource(
+                    match['lang'], match['library'], source_path, match['flags'])
+                if build_info:
+                    results += [pool.apply_async(VhdlSourceFile, args=build_info)]
+
+        return sources_found, results
 
     def _handleParsedParameter(self, parameter, value):
         "Handles a parsed line that sets a parameter"
@@ -297,8 +323,6 @@ class ConfigParser(object):
 
         return source_path
 
-    # TODO: Handle sources added or removed from the configuration file
-    # without deleting and recreating the objects
     def _handleParsedSource(self, language, library, path, flags):
         "Handles a parsed line that adds a source"
 
@@ -312,13 +336,10 @@ class ConfigParser(object):
 
         flags_set = _extractSet(flags)
 
-        # TODO: We could use a ThreadPool to create source file objects
-        # without the overhead of creating/destroying threads all the
-        # time
+        # If the source should be built, return the build info for it
         if self._shouldAddSource(path, library, flags_set):
             self._logger.debug("Adding source: lib '%s', '%s'", library, path)
-            self._sources[path] = \
-                    VhdlSourceFile(path, library, flags_set)
+            return [path, library, flags_set]
 
     def _shouldAddSource(self, source_path, library, flags):
         """Checks if the source with the given parameters should be

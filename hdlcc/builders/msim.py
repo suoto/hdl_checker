@@ -38,7 +38,7 @@ class MSim(BaseBuilder):
 
     _should_ignore = re.compile('|'.join([
         r"^\s*$",
-        r"^(?!\*\*\s(Error|Warning):).*",
+        r"^(?!\*\*\s(Error|Warning)\b).*",
         r".*VHDL Compiler exiting\s*$"])).match
 
     _iter_rebuild_units = re.compile(
@@ -61,8 +61,6 @@ class MSim(BaseBuilder):
         'single_build_flags' : ['-check_synthesis', '-lint', '-rangecheck',
                                 '-bindAtCompile', '-pedanticerrors'],
         'global_build_flags' : ['-explicit',]}
-
-
 
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)

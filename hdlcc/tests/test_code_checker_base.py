@@ -167,6 +167,7 @@ with such.A('hdlcc project') as it:
 
             it.project.getMessagesByPath(filename)
 
+            _logger.info("Waiting for any message to arrive on message queue")
             for _ in range(50):
                 if it.project._msg_queue.empty():
                     break
@@ -174,16 +175,20 @@ with such.A('hdlcc project') as it:
 
             messages = []
             while not it.project._msg_queue.empty():
-                messages.append(it.project._msg_queue.get())
+                message = it.project._msg_queue.get()
+                _logger.info("Appending message '%s'", message)
+                messages.append(message)
 
             try:
                 it.assertIn(('warning', "Project hasn't finished building, "
                                         "try again after it finishes."),
                             messages)
             except:
+                _logger.warning("Waiting until the project finishes building")
                 it.project.waitForBuild()
                 raise
 
+            _logger.info("Waiting until the project finishes building")
             it.project.waitForBuild()
 
         @it.should('wait until build has finished')

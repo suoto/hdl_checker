@@ -35,6 +35,7 @@ except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
 import hdlcc
+from hdlcc.utils import setupLogging
 
 _logger = logging.getLogger(__name__)
 
@@ -208,37 +209,11 @@ def runner(args):
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
         project.saveCache()
 
-def setupLogging():
-    "Tries to use RainbowLoggingHandler for logging to stdout"
-    try:
-        from rainbow_logging_handler import RainbowLoggingHandler
-        # pylint: disable=bad-whitespace
-        stream_handler = RainbowLoggingHandler(
-            sys.stdout,
-            #  Customizing each column's color
-            color_asctime          = ('dim white',  'black'),
-            color_name             = ('dim white',  'black'),
-            color_funcName         = ('green',      'black'),
-            color_lineno           = ('dim white',  'black'),
-            color_pathname         = ('black',      'red'),
-            color_module           = ('yellow',     None),
-            color_message_debug    = ('color_59',   None),
-            color_message_info     = (None,         None),
-            color_message_warning  = ('color_226',  None),
-            color_message_error    = ('red',        None),
-            color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
-    except ImportError: # pragma: no cover
-        stream_handler = logging.StreamHandler(sys.stdout)
-
-    logging.root.addHandler(stream_handler)
-    logging.root.setLevel(logging.WARNING)
-
 def main():
     "Main hook for standalone usage"
-    setupLogging()
     start = time.time()
     runner_args = parseArguments()
+    setupLogging(sys.stdout, runner_args.log_level)
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
 
@@ -255,7 +230,6 @@ def main():
     # via standalone (it's ugly, I know)
     # pylint: disable=protected-access
     StandaloneProjectBuilder._USE_THREADS = False
-    hdlcc.source_file.VhdlSourceFile._USE_THREADS = False
     # pylint: enable=protected-access
 
     if runner_args.debug_profiling:

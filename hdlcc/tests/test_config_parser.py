@@ -151,6 +151,7 @@ with such.A('config parser object') as it:
             config_content = [
                 r'batch_build_flags = -a -b1 --some-flag some_value',
                 r'single_build_flags = --zero 0 --some-flag some_value 12',
+                r'global_build_flags = -global',
                 r'builder = msim',
                 r'vhdl work ' + source,
             ]
@@ -158,10 +159,12 @@ with such.A('config parser object') as it:
             writeListToFile(project_filename, config_content)
 
             parser = hdlcc.config_parser.ConfigParser(project_filename)
-            it.assertEqual(parser.getBatchBuildFlagsByPath(source),
-                           ['-a', '-b1', '--some-flag', 'some_value'])
-            it.assertEqual(parser.getSingleBuildFlagsByPath(source),
-                           ['--zero', '0', '--some-flag', 'some_value', '12'])
+            it.assertEqual(
+                parser.getBatchBuildFlagsByPath(source),
+                ['-a', '-b1', '--some-flag', 'some_value', '-global'])
+            it.assertEqual(
+                parser.getSingleBuildFlagsByPath(source),
+                ['--zero', '0', '--some-flag', 'some_value', '12', '-global'])
 
     with it.having('a project file with some non-standard stuff'):
         @it.has_teardown

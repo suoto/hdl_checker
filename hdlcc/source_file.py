@@ -12,15 +12,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"VHDL source file parser"
 
 import re
 import os
 import logging
-import threading
+from multiprocessing import Pool
 
 _logger = logging.getLogger(__name__)
-
-_MAX_OPEN_FILES = 100
 
 # Design unit scanner
 _DESIGN_UNIT_SCANNER = re.compile('|'.join([
@@ -35,13 +34,8 @@ class VhdlSourceFile(object):
     """Parses and stores information about a source file such as
     design units it depends on and design units it provides"""
 
-    # Use a semaphore to avoid opening too many files (Python raises
-    # an exception for this)
-    _semaphore = threading.BoundedSemaphore(_MAX_OPEN_FILES)
-
-    _USE_THREADS = True
-
     def __init__(self, filename, library='work', flags=None):
+        _logger.info("[start] '%s'", filename)
         self.filename = os.path.normpath(filename)
         self.library = library
         if flags is None:
@@ -53,12 +47,9 @@ class VhdlSourceFile(object):
         self._mtime = 0
 
         self.abspath = os.path.abspath(filename)
-        self._lock = threading.Lock()
-        if self._USE_THREADS:
-            threading.Thread(target=self._parseIfChanged,
-                             name='_parseIfChanged').start()
-        else:
-            self._parseIfChanged()
+        self._parseIfChanged()
+
+        _logger.info("[done]  '%s'", filename)
 
     def getState(self):
         "Gets a dict that describes the current state of this object"
@@ -85,7 +76,6 @@ class VhdlSourceFile(object):
         obj._design_units = state['_design_units']
         obj._deps = state['_deps']
         obj._mtime = state['_mtime']
-        obj._lock = threading.Lock()
         # pylint: enable=protected-access
 
         return obj
@@ -99,14 +89,13 @@ class VhdlSourceFile(object):
 
     def _parseIfChanged(self):
         "Parses this source file if it has changed"
-        with self._lock:
-            try:
-                if self._changed():
-                    _logger.debug("Parsing %s", str(self))
-                    self._mtime = self.getmtime()
-                    self._doParse()
-            except OSError: # pragma: no cover
-                _logger.warning("Couldn't parse '%s' at this moment", self)
+        try:
+            if self._changed():
+                _logger.debug("Parsing %s", str(self))
+                self._mtime = self.getmtime()
+                self._doParse()
+        except OSError: # pragma: no cover
+            _logger.warning("Couldn't parse '%s' at this moment", self)
 
     def _changed(self):
         """Checks if the file changed based on the modification time provided
@@ -116,10 +105,8 @@ class VhdlSourceFile(object):
     def _getSourceContent(self):
         """Replace everything from comment ('--') until a line break
         and converts to lowercase"""
-        VhdlSourceFile._semaphore.acquire()
         lines = list([re.sub(r"\s*--.*", "", x).lower() for x in \
                 open(self.filename, 'r').read().split("\n")])
-        VhdlSourceFile._semaphore.release()
         return lines
 
     def _iterDesignUnitMatches(self):
@@ -219,11 +206,76 @@ class VhdlSourceFile(object):
             mtime = None
         return mtime
 
+def getSourceFileObjects(kwargs, workers=1):
+    "Reads files from <fnames> list using up to <workers> threads"
+
+    pool = Pool(workers)
+
+    try:
+        if len(kwargs) == 1:
+            return [VhdlSourceFile(**kwargs[0])]
+        else:
+            results = [
+                pool.apply_async(VhdlSourceFile, kwds=_kwargs) \
+                    for _kwargs in kwargs]
+            return [res.get() for res in results]
+    finally:
+        pool.close()
+        pool.terminate()
+
+def parseArguments(): # pragma: no cover
+    "Argument parser for standalone usage"
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    # Options
+    parser.add_argument('--verbose', '-v', action='append_const', const=1,
+                        help="""Increases verbose level. Use multiple times to
+                                increase more""")
+
+    parser.add_argument('--processes', '-p', type=int, default=3,
+                        help="""Maximum number of processes to be used when
+                                parsing source files""")
+
+    # Mandatory arguments
+    parser.add_argument('sources', action='append', nargs='+',
+                        help="List of sources to parse")
+
+    args = parser.parse_args()
+
+    args.log_level = logging.FATAL
+    if args.verbose:
+        if len(args.verbose) == 1:
+            args.log_level = logging.WARNING
+        elif len(args.verbose) == 2:
+            args.log_level = logging.INFO
+        else:
+            args.log_level = logging.DEBUG
+
+    # Planify source list if supplied
+    args.sources = [source for sublist in args.sources for source in sublist]
+
+    if args.processes:
+        args.processes = min(args.processes, len(args.sources))
+
+    return args
+
 def standalone(): # pragma: no cover
     """Standalone run"""
     import sys
-    for arg in sys.argv[1:]:
-        source = VhdlSourceFile(arg)
+    import time
+    from hdlcc.utils import setupLogging
+    args = parseArguments()
+    setupLogging(sys.stdout, args.log_level, color=True)
+
+    start = time.time()
+    sources = list(getSourceFileObjects(
+        [{'filename' : source, 'library' : 'work'} for source in args.sources],
+        workers=args.processes))
+    diff = time.time() - start
+
+    for source in sources:
         print "Source: %s" % source
         design_units = source.getDesignUnits()
         if design_units:
@@ -235,6 +287,8 @@ def standalone(): # pragma: no cover
             print " - Dependencies:"
             for dependency in dependencies:
                 print " -- %s.%s" % (dependency['library'], dependency['unit'])
+
+    _logger.info("Parsing took %.4fs", diff)
 
 if __name__ == '__main__':
     standalone()
