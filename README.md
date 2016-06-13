@@ -5,6 +5,7 @@
 [![codecov](https://codecov.io/gh/suoto/hdlcc/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdlcc)
 [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
 [![Code Health](https://landscape.io/github/suoto/hdlcc/master/landscape.svg?style=flat)](https://landscape.io/github/suoto/hdlcc/master)
+[![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdlcc)
 
 `hdlcc` provides a Python API between a VHDL project and some HDL compilers to
 catch errors and warnings the compilers generate that can be used to populate
