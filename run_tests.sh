@@ -19,9 +19,12 @@ VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 ARGS=()
 
 CLEAN=0
+CLEAN_PIP=1
 
 while [ -n "$1" ]; do
-  if [ "$1" == "ghdl" ]; then
+  if [ "$1" == "-h" ]; then
+    HELP=1
+  elif [ "$1" == "ghdl" ]; then
     GHDL=1
   elif [ "$1" == "msim" ]; then
     MSIM=1
@@ -29,8 +32,8 @@ while [ -n "$1" ]; do
     XVHDL=1
   elif [ "$1" == "fallback" ]; then
     FALLBACK=1
-  elif [ "$1" == "pip" ]; then
-    PIP=1
+  elif [ "$1" == "reuse-pip" ]; then
+    CLEAN_PIP=0
   elif [ "$1" == "clean" ]; then
     CLEAN=1
   elif [ "$1" == "standalone" ]; then
@@ -45,6 +48,11 @@ while [ -n "$1" ]; do
   shift
 done
 
+if [ -n "${HELP}" ]; then
+  echo "Usage: $0 [ghdl|msim|xvhdl|fallback] [reuse-pip] [clean] [standalone]"
+  exit 0
+fi
+
 
 if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   GHDL=1
@@ -52,7 +60,7 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   FALLBACK=1
   XVHDL=1
   STANDALONE=1
-  PIP=1
+  CLEAN_PIP=1
 fi
 
 if [ "${CLEAN}" == "1" ]; then
@@ -69,11 +77,13 @@ RESULT=0
 
 # If we're not running on a CI server, create a virtual env to mimic
 # its behaviour
-if [ -z "${CI}" ]; then
+if [ "${CLEAN_PIP}" == "1" -a -z "${CI}" ]; then
   if [ -d "${VIRTUAL_ENV_DEST}" ]; then
     rm -rf ${VIRTUAL_ENV_DEST}
   fi
+fi
 
+if [ -z "${CI}" ]; then
   virtualenv ${VIRTUAL_ENV_DEST}
   . ${VIRTUAL_ENV_DEST}/bin/activate
 
