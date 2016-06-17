@@ -25,6 +25,7 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'ghdl'
+    file_types = ['vhdl', 'vhd']
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(

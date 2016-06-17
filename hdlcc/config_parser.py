@@ -20,7 +20,9 @@ import logging
 from multiprocessing import Pool
 
 import hdlcc.exceptions
-from hdlcc.source_file import VhdlSourceFile, getSourceFileObjects
+from hdlcc.parsers import getSourceFileObjects
+from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
+from hdlcc.parsers.verilog_source_file import VerilogSourceFile
 from hdlcc.utils import onCI
 from hdlcc.builders import getBuilderByName
 
@@ -164,9 +166,10 @@ class ConfigParser(object):
 
         state['_parms'] = self._parms.copy()
 
-        state['_parms']['batch_build_flags'] = list(self._parms['batch_build_flags'])
-        state['_parms']['single_build_flags'] = list(self._parms['single_build_flags'])
-        state['_parms']['global_build_flags'] = list(self._parms['global_build_flags'])
+        for context in ('batch_build_flags', 'single_build_flags',
+                        'global_build_flags'):
+            for lang in ('vhdl', 'verilog', 'systemverilog'):
+                state['_parms'][context][lang] = list(self._parms[context][lang])
 
         state['_sources'] = {}
         for path, source in self._sources.items():
@@ -191,7 +194,10 @@ class ConfigParser(object):
 
         obj._sources = {}
         for path, src_state in sources.items():
-            obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+            if src_state['_filetype'] == 'vhdl':
+                obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+            else:
+                obj._sources[path] = VerilogSourceFile.recoverFromState(src_state)
 
         # pylint: enable=protected-access
 
@@ -297,7 +303,9 @@ class ConfigParser(object):
                 build_info = self._handleParsedSource(
                     match['lang'], match['library'], source_path, match['flags'])
                 if build_info:
-                    results += [pool.apply_async(VhdlSourceFile, args=build_info)]
+                    cls = VhdlSourceFile if match['lang'] == 'vhdl' else \
+                          VerilogSourceFile
+                    results += [pool.apply_async(cls, args=build_info)]
 
         return sources_found, results
 
@@ -330,9 +338,9 @@ class ConfigParser(object):
                            "library: '%s', language: '%s', flags: '%s'",
                            path, library, language, flags)
 
-        if str.lower(language) != 'vhdl':
-            self._logger.warning("Unsupported language: %s", language)
-            return
+        #  if str.lower(language) != 'vhdl':
+        #      self._logger.warning("Unsupported language: %s", language)
+        #      return
 
         flags_set = _extractSet(flags)
 
@@ -372,18 +380,20 @@ class ConfigParser(object):
         self._parseIfNeeded()
         if self.filename is None:
             return []
+        lang = self.getSourceByPath(path).getFileType()
         return self._sources[p.abspath(path)].flags + \
-               self._parms['single_build_flags']  + \
-               self._parms['global_build_flags']
+               self._parms['single_build_flags'][lang]  + \
+               self._parms['global_build_flags'][lang]
 
     def getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
             return []
+        lang = self.getSourceByPath(path).getFileType()
         return self._sources[p.abspath(path)].flags + \
-               self._parms['batch_build_flags'] + \
-               self._parms['global_build_flags']
+               self._parms['batch_build_flags'][lang] + \
+               self._parms['global_build_flags'][lang]
 
     def getSources(self):
         "Returns a list of VhdlSourceFile objects parsed"

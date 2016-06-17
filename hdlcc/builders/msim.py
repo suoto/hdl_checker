@@ -25,6 +25,7 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'msim'
+    file_types = ['vhdl', 'verilog', 'systemverilog']
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile('|'.join([
@@ -57,10 +58,21 @@ class MSim(BaseBuilder):
 
     # Default build flags
     default_flags = {
-        'batch_build_flags' : ['-defercheck', '-nocheck', '-permissive'],
-        'single_build_flags' : ['-check_synthesis', '-lint', '-rangecheck',
-                                '-bindAtCompile', '-pedanticerrors'],
-        'global_build_flags' : ['-explicit',]}
+        'batch_build_flags' : {
+            'vhdl' : ['-defercheck', '-nocheck', '-permissive'],
+            'verilog' : [],
+            'systemverilog' : []},
+
+        'single_build_flags' : {
+            'vhdl' : ['-check_synthesis', '-lint', '-rangecheck',
+                      '-bindAtCompile', '-pedanticerrors'],
+            'verilog' : [],
+            'systemverilog' : []},
+
+        'global_build_flags' : {
+            'vhdl' : ['-explicit',],
+            'verilog' : ['-lint', '-hazards', '-pedanticerrors'],
+            'systemverilog' : ['-lint', '-hazards', '-pedanticerrors']}}
 
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
@@ -166,7 +178,24 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, source, flags=None):
+        if source.getFileType() == 'vhdl':
+            return self._buildVhdl(source, flags)
+        if source.getFileType() in ('verilog', 'systemverilog'):
+            return self._buildVerilog(source, flags)
+
+    def _buildVhdl(self, source, flags=None):
+        "Builds a VHDL file"
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
+               '-work', p.join(self._target_folder, source.library)]
+        if flags:
+            cmd += flags
+        cmd += [source.filename]
+
+        return self._subprocessRunner(cmd)
+
+    def _buildVerilog(self, source, flags=None):
+        "Builds a Verilog/SystemVerilog file"
+        cmd = ['vlog', '-modelsimini', self._modelsim_ini, '-quiet',
                '-work', p.join(self._target_folder, source.library)]
         if flags:
             cmd += flags

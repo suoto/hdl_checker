@@ -31,13 +31,27 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     # Set an empty container for the default flags
     default_flags = {
-        'batch_build_flags' : [],
-        'single_build_flags' : [],
-        'global_build_flags' : []}
+        'batch_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []},
+        'single_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []},
+        'global_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []}
+        }
 
     @abc.abstractproperty
     def builder_name(self):
         "Defines the builder identification"
+
+    @abc.abstractproperty
+    def file_types(self):
+        "Returns the file types supported by the builder"
 
     def __init__(self, target_folder):
         # Shell accesses must be atomic
@@ -210,9 +224,19 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     def _createLibrary(self, library):
         """Callback called to create a library"""
 
+    def _isFileTypeSupported(self, source):
+        "Checks if a given path is supported by this builder"
+        return source.getFileType() in self.file_types
+
     def build(self, source, forced=False, flags=None):
         """Method that interfaces with parents and implements the
         building chain"""
+
+        if not self._isFileTypeSupported(source):
+            self._logger.fatal("Source '%s' with file type '%s' is not "
+                               "supported", source.filename,
+                               source.getFileType())
+            return [], []
 
         start = time.time()
         if source.abspath not in self._build_info_cache.keys():
