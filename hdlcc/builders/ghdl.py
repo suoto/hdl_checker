@@ -44,7 +44,7 @@ class GHDL(BaseBuilder):
         r"ghdl: compilation error", ])).match
 
     _iter_rebuild_units = re.compile(
-        r'(entity "(?P<unit_name>\w+)" is obsoleted by package "\w+"'
+        r'((entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
         r'|'
         r'file (?P<rebuild_path>.*)\s+has changed and must be reanalysed)',
         flags=re.I).finditer

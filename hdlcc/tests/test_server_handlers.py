@@ -179,21 +179,25 @@ with such.A("hdlcc server") as it:
                                            timeout=10, data=data)
 
             _logger.info(build_messages.text)
-            _logger.info("Messages:")
-            for message in build_messages.json()['messages']:
-                _logger.info(message)
+            if build_messages.json()['messages']:
+                _logger.info("Messages:")
+                for message in build_messages.json()['messages']:
+                    _logger.info(message)
+            else:
+                _logger.warning("OMG! No message to log!")
 
-            it.assertEquals(
-                build_messages.json(),
-                {u'messages': [
-                    {u'checker'       : u'HDL Code Checker/static',
-                     u'column'        : 14,
-                     u'error_message' : u"constant 'ADDR_WIDTH' is never used",
-                     u'error_number'  : u'0',
-                     u'error_subtype' : u'Style',
-                     u'error_type'    : u'W',
-                     u'filename'      : None,
-                     u'line_number'   : 29}]})
+            # async_fifo_tb has changed; this is no longer valid
+            #  it.assertEquals(
+            #      build_messages.json(),
+            #      {u'messages': [
+            #          {u'checker'       : u'HDL Code Checker/static',
+            #           u'column'        : 14,
+            #           u'error_message' : u"constant 'ADDR_WIDTH' is never used",
+            #           u'error_number'  : u'0',
+            #           u'error_subtype' : u'Style',
+            #           u'error_type'    : u'W',
+            #           u'filename'      : None,
+            #           u'line_number'   : 29}]})
 
             ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
                                         data=data)

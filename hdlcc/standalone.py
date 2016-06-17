@@ -135,8 +135,13 @@ class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
 
 def runStandaloneSourceFileParse(fname):
     """Standalone source_file.VhdlSourceFile run"""
-    from hdlcc.source_file import VhdlSourceFile
-    source = VhdlSourceFile(fname)
+    from hdlcc.parsers import VhdlSourceFile, VerilogSourceFile
+
+    extension = fname.lower().split('.')[-1]
+    cls = VhdlSourceFile if extension in ('vhd', 'vhdl') else VerilogSourceFile
+
+    source = cls(fname)
+
     print "Source: %s" % source
 
     design_units = source.getDesignUnits()

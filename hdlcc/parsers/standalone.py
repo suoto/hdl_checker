@@ -17,6 +17,8 @@
 import logging
 _logger = logging.getLogger(__name__)
 
+from hdlcc.parsers import getSourceFileObjects
+
 def parseArguments(): # pragma: no cover
     "Argument parser for standalone usage"
     import argparse

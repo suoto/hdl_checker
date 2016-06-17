@@ -30,9 +30,9 @@ from hdlcc.builders import getBuilderByName
 _splitAtWhitespaces = re.compile(r"\s+").split
 _configFileComments = re.compile(r"(\s*#.*|\n)").sub
 _configFileScan = re.compile("|".join([
-    r"^\s*(?P<parameter>\w+)\s*=\s*(?P<value>.+)\s*$",
-    r"^\s*(?P<lang>(vhdl|verilog))\s+"          \
-        r"(?P<library>\w+)\s+"                  \
+    r"^\s*(?P<parameter>\w+)\s*(\[(?P<parm_lang>vhdl|verilog|systemverilog)\]|\s)*=\s*(?P<value>.+)\s*$",
+    r"^\s*(?P<lang>(vhdl|verilog|systemverilog))\s+"  \
+        r"(?P<library>\w+)\s+"                        \
         r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
     ]), flags=re.I).finditer
 # pylint: enable=invalid-name
@@ -79,9 +79,18 @@ class ConfigParser(object):
 
     def __init__(self, filename=None):
         self._parms = {
-            'batch_build_flags' : [],
-            'single_build_flags' : [],
-            'global_build_flags' : []}
+            'batch_build_flags' : {
+                'vhdl'          : [],
+                'verilog'       : [],
+                'systemverilog' : [], },
+            'single_build_flags' : {
+                'vhdl'          : [],
+                'verilog'       : [],
+                'systemverilog' : [], },
+            'global_build_flags' : {
+                'vhdl'          : [],
+                'verilog'       : [],
+                'systemverilog' : [], }}
 
         if filename is not None:
             self.filename = p.abspath(filename)
@@ -293,8 +302,9 @@ class ConfigParser(object):
         results = []
         for match in [x.groupdict() for x in _configFileScan(line)]:
             if match['parameter'] is not None:
+                self._logger.info("match: '%s'", match)
                 self._handleParsedParameter(match['parameter'],
-                                            match['value'])
+                                            match['parm_lang'], match['value'])
             else:
                 source_path = self._getSourcePath(match['path'])
                 sources_found += [source_path]
@@ -309,14 +319,18 @@ class ConfigParser(object):
 
         return sources_found, results
 
-    def _handleParsedParameter(self, parameter, value):
+    def _handleParsedParameter(self, parameter, lang, value):
         "Handles a parsed line that sets a parameter"
-        self._logger.debug("Found parameter '%s' with value '%s'",
-                           parameter, value)
+        self._logger.debug("Found parameter '%s' for '%s' with value '%s'",
+                           parameter, lang, value)
         if parameter in self._single_value_parms:
+            self._logger.debug("Handling parameter '%s' as a single value",
+                               parameter)
             self._parms[parameter] = value
         elif parameter in self._list_parms:
-            self._parms[parameter] = _extractSet(value)
+            self._logger.debug("Handling parameter '%s' as a list of values",
+                               parameter)
+            self._parms[parameter][lang] = _extractSet(value)
         else:
             raise hdlcc.exceptions.UnknownParameterError(parameter)
 

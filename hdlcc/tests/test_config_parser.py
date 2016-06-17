@@ -53,9 +53,9 @@ with such.A('config parser object') as it:
         @it.has_setup
         def setup():
             config_content = [
-                r'batch_build_flags = -b0 -b1',
-                r'single_build_flags = -s0 -s1',
-                r'global_build_flags = -g0 -g1',
+                r'batch_build_flags[vhdl] = -b0 -b1',
+                r'single_build_flags[vhdl] = -s0 -s1',
+                r'global_build_flags[vhdl] = -g0 -g1',
                 r'builder = msim',
                 r'target_dir = .build',
                 r'vhdl work ' + p.join(HDLCC_CI,
@@ -118,10 +118,11 @@ with such.A('config parser object') as it:
                            'clock_divider.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
-        @it.should('only include VHDL sources')
+        @it.should('include VHDL and Verilog sources')
         def test():
             expected_sources = [p.abspath(x) \
                 for x in (HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
+                          HDLCC_CI + '/vim-hdl-examples/another_library/foo.v',
                           HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd')]
 
             parser_sources = []
@@ -149,9 +150,9 @@ with such.A('config parser object') as it:
             project_filename = 'test.prj'
             source = HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd'
             config_content = [
-                r'batch_build_flags = -a -b1 --some-flag some_value',
-                r'single_build_flags = --zero 0 --some-flag some_value 12',
-                r'global_build_flags = -global',
+                r'batch_build_flags[vhdl] = -a -b1 --some-flag some_value',
+                r'single_build_flags[vhdl] = --zero 0 --some-flag some_value 12',
+                r'global_build_flags[vhdl] = -global',
                 r'builder = msim',
                 r'vhdl work ' + source,
             ]
@@ -178,9 +179,9 @@ with such.A('config parser object') as it:
             project_filename = 'test.prj'
             config_content = [
                 r'some_parm = -batch0 -batch1',
-                r'batch_build_flags = -batch0 -batch1',
-                r'single_build_flags = -single0 -single1',
-                r'global_build_flags = -global0 -global1',
+                r'batch_build_flags[vhdl] = -batch0 -batch1',
+                r'single_build_flags[vhdl] = -single0 -single1',
+                r'global_build_flags[vhdl] = -global0 -global1',
                 r'builder = msim',
                 r'target_dir = .build',
                 r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
@@ -195,9 +196,9 @@ with such.A('config parser object') as it:
         def test():
             project_filename = 'test.prj'
             config_content = [
-                r'batch_build_flags = -batch0 -batch1',
-                r'single_build_flags = -single0 -single1',
-                r'global_build_flags = -global0 -global1',
+                r'batch_build_flags[vhdl] = -batch0 -batch1',
+                r'single_build_flags[vhdl] = -single0 -single1',
+                r'global_build_flags[vhdl] = -global0 -global1',
                 r'builder = msim',
                 r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
             ]
@@ -213,9 +214,9 @@ with such.A('config parser object') as it:
                 os.mkdir('temp')
             project_filename = p.join('temp', 'test.prj')
             config_content = [
-                r'batch_build_flags = -batch0 -batch1',
-                r'single_build_flags = -single0 -single1',
-                r'global_build_flags = -global0 -global1',
+                r'batch_build_flags[vhdl] = -batch0 -batch1',
+                r'single_build_flags[vhdl] = -single0 -single1',
+                r'global_build_flags[vhdl] = -global0 -global1',
                 r'target_dir = .build',
                 r'builder = msim',
                 r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',

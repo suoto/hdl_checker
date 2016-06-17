@@ -32,7 +32,7 @@ class MSim(BaseBuilder):
         r"^\*\*\s*([WE])\w+:\s*",
         r"\((\d+)\):",
         r"[\[\(]([\w-]+)[\]\)]\s*",
-        r"(.*\.(vhd|sv|svh)\b)",
+        r"(.*\.(vhd|v|sv|svh)\b)",
         r"\s*\(([\w-]+)\)",
         r"\s*(.+)",
         ]), re.I).scanner
