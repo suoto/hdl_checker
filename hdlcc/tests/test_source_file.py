@@ -19,7 +19,7 @@ import os
 import logging
 from nose2.tools import such
 
-from hdlcc.source_file import VhdlSourceFile
+from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 
 from hdlcc.utils import writeListToFile
 

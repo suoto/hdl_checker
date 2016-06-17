@@ -23,7 +23,7 @@ import shutil as shell
 import time
 import hdlcc.builders
 import hdlcc.utils as utils
-from hdlcc.source_file import VhdlSourceFile
+from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 
 
 if not hasattr(p, 'samefile'):
