@@ -21,6 +21,7 @@ class Fallback(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'fallback'
+    file_types = ['vhdl', 'verilog', 'systemverilog']
 
     def __init__(self, target_folder):
         self._version = '<undefined>'
