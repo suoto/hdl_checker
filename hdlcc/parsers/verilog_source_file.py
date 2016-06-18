@@ -97,6 +97,4 @@ class VerilogSourceFile(BaseSourceFile):
                 self._design_units += [design_unit]
 
         self._deps = dependencies
-        _logger.info("Source '%s' depends on: %s", str(self), \
-                ", ".join(["%s.%s" % (x['library'], x['unit']) for x in self._deps]))
 

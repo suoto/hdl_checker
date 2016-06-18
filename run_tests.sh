@@ -66,6 +66,7 @@ fi
 if [ "${CLEAN}" == "1" ]; then
   git clean -fdx && git submodule foreach --recursive git clean -fdx
   cd ${HDLCC_CI} && git reset HEAD --hard \
+    && git submodule foreach --recursive git reset HEAD --hard \
     && git clean -fdx && git submodule foreach --recursive git clean -fdx
   cd - || exit
 fi

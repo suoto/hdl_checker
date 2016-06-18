@@ -44,12 +44,7 @@ def _extractSet(entry):
     if not entry:
         return []
 
-    result = []
-    for value in _splitAtWhitespaces(entry):
-        if value not in result:
-            result += [value]
-
-    return result
+    return [value for value in _splitAtWhitespaces(entry)]
 
 try:
     import vunit
@@ -352,10 +347,6 @@ class ConfigParser(object):
                            "library: '%s', language: '%s', flags: '%s'",
                            path, library, language, flags)
 
-        #  if str.lower(language) != 'vhdl':
-        #      self._logger.warning("Unsupported language: %s", language)
-        #      return
-
         flags_set = _extractSet(flags)
 
         # If the source should be built, return the build info for it
@@ -397,7 +388,8 @@ class ConfigParser(object):
         lang = self.getSourceByPath(path).getFileType()
         return self._sources[p.abspath(path)].flags + \
                self._parms['single_build_flags'][lang]  + \
-               self._parms['global_build_flags'][lang]
+               self._parms['global_build_flags'][lang] + \
+               ['-sv'] if lang == 'systemverilog' else []
 
     def getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
@@ -405,9 +397,11 @@ class ConfigParser(object):
         if self.filename is None:
             return []
         lang = self.getSourceByPath(path).getFileType()
+
         return self._sources[p.abspath(path)].flags + \
                self._parms['batch_build_flags'][lang] + \
-               self._parms['global_build_flags'][lang]
+               self._parms['global_build_flags'][lang] + \
+               ['-sv'] if lang == 'systemverilog' else []
 
     def getSources(self):
         "Returns a list of VhdlSourceFile objects parsed"

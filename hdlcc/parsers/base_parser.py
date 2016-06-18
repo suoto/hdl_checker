@@ -87,6 +87,12 @@ class BaseSourceFile(object):
                 _logger.debug("Parsing %s", str(self))
                 self._mtime = self.getmtime()
                 self._doParse()
+                if self._deps:
+                    _logger.info("Source '%s' depends on: %s", str(self), \
+                        ", ".join(["%s.%s" % (x['library'], x['unit']) \
+                            for x in self._deps]))
+                else:
+                    _logger.info("Source '%s' has no dependencies", str(self))
         except OSError: # pragma: no cover
             _logger.warning("Couldn't parse '%s' at this moment", self)
 
@@ -145,7 +151,7 @@ class BaseSourceFile(object):
             return 'vhdl'
         if extension == 'v':
             return 'verilog'
-        if extension == 'sv':
+        if extension in ('sv', 'svh'):
             return 'systemverilog'
         assert False, "Unknown file type: '%s'" % extension
 
