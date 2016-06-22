@@ -26,12 +26,6 @@ import hdlcc.utils as utils
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 
 
-if not hasattr(p, 'samefile'):
-    def samefile(file1, file2):
-        return os.stat(file1) == os.stat(file2)
-else:
-    samefile = p.samefile # pylint: disable=invalid-name
-
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
 
@@ -140,7 +134,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
             it.assertIn(
                 True,
-                [samefile(ref['filename'], x['filename']) for x in records],
+                [utils.samefile(ref['filename'], x['filename']) for x in records],
                 "Mention to file '%s' not found in '%s'" % \
                         (ref['filename'], [x['filename'] for x in records]))
 

@@ -18,6 +18,8 @@ import abc
 import os
 import logging
 
+from hdlcc.utils import getFileType
+
 _logger = logging.getLogger(__name__)
 
 class BaseSourceFile(object):
@@ -37,6 +39,7 @@ class BaseSourceFile(object):
         self._design_units = []
         self._deps = []
         self._mtime = 0
+        self.filetype = getFileType(self.filename)
 
         self.abspath = os.path.abspath(filename)
         self._parseIfChanged()
@@ -53,7 +56,7 @@ class BaseSourceFile(object):
             '_design_units' : self._design_units,
             '_deps' : self._deps,
             '_mtime' : self._mtime,
-            '_filetype' : self.getFileType(),
+            'filetype' : self.filetype,
             }
         return state
 
@@ -69,9 +72,11 @@ class BaseSourceFile(object):
         obj._design_units = state['_design_units']
         obj._deps = state['_deps']
         obj._mtime = state['_mtime']
+        obj.filetype = state['filetype']
         # pylint: enable=protected-access
 
         return obj
+
 
     def __repr__(self):
         return "BaseSourceFile('%s', library='%s', flags=%s)" % \
@@ -143,15 +148,4 @@ class BaseSourceFile(object):
         except OSError: # pragma: no cover
             mtime = None
         return mtime
-
-    def getFileType(self):
-        "Gets the file type of the source file"
-        extension = self.filename[str(self.filename).rfind('.') + 1:].lower()
-        if extension in ['vhd', 'vhdl']:
-            return 'vhdl'
-        if extension == 'v':
-            return 'verilog'
-        if extension in ('sv', 'svh'):
-            return 'systemverilog'
-        assert False, "Unknown file type: '%s'" % extension
 

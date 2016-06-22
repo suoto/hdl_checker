@@ -226,7 +226,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     def _isFileTypeSupported(self, source):
         "Checks if a given path is supported by this builder"
-        return source.getFileType() in self.file_types
+        return source.filetype in self.file_types
 
     def build(self, source, forced=False, flags=None):
         """Method that interfaces with parents and implements the
@@ -235,7 +235,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         if not self._isFileTypeSupported(source):
             self._logger.fatal("Source '%s' with file type '%s' is not "
                                "supported", source.filename,
-                               source.getFileType())
+                               source.filetype)
             return [], []
 
         start = time.time()

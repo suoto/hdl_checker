@@ -198,7 +198,7 @@ class ConfigParser(object):
 
         obj._sources = {}
         for path, src_state in sources.items():
-            if src_state['_filetype'] == 'vhdl':
+            if src_state['filetype'] == 'vhdl':
                 obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
             else:
                 obj._sources[path] = VerilogSourceFile.recoverFromState(src_state)
@@ -263,15 +263,21 @@ class ConfigParser(object):
 
         builder_class = getBuilderByName(self.getBuilder())
 
+        # If the global/batch/single flags list is not set, overwrite
+        # with the values given by the builder class
         for context in builder_class.default_flags:
-            # If the global/batch/single flags list is not set, overwrite
-            # with the values given by the builder class
-            if not self._parms[context]:
-                self._logger.debug("Flag '%s' wasn't set, using the default "
-                                   "value from '%s' class: '%s'", context,
-                                   builder_class.builder_name,
-                                   builder_class.default_flags[context])
-                self._parms[context] = builder_class.default_flags[context]
+            for lang in ('vhdl', 'verilog', 'systemverilog'):
+                if not self._parms[context][lang]:
+                    self._logger.debug(
+                        "Flag '%s' for '%s' wasn't set, using the default "
+                        "value from '%s' class: '%s'", context, lang,
+                        builder_class.builder_name,
+                        builder_class.default_flags[context][lang])
+                    self._parms[context][lang] = builder_class.default_flags[context][lang]
+                else:
+                    self._logger.debug(
+                        "Flag '%s' for '%s' was already set with value '%s'",
+                        context, lang, self._parms[context])
 
     def _updateSourceList(self, sources, pool_results):
         """Removes sources we had found earlier and leave only the ones
@@ -385,23 +391,21 @@ class ConfigParser(object):
         self._parseIfNeeded()
         if self.filename is None:
             return []
-        lang = self.getSourceByPath(path).getFileType()
+        lang = self.getSourceByPath(path).filetype
         return self._sources[p.abspath(path)].flags + \
                self._parms['single_build_flags'][lang]  + \
-               self._parms['global_build_flags'][lang] + \
-               ['-sv'] if lang == 'systemverilog' else []
+               self._parms['global_build_flags'][lang]
 
     def getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
             return []
-        lang = self.getSourceByPath(path).getFileType()
+        lang = self.getSourceByPath(path).filetype
 
         return self._sources[p.abspath(path)].flags + \
                self._parms['batch_build_flags'][lang] + \
-               self._parms['global_build_flags'][lang] + \
-               ['-sv'] if lang == 'systemverilog' else []
+               self._parms['global_build_flags'][lang]
 
     def getSources(self):
         "Returns a list of VhdlSourceFile objects parsed"

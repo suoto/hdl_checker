@@ -25,7 +25,7 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'msim'
-    file_types = ['vhdl', 'verilog', 'systemverilog']
+    file_types = ('vhdl', 'verilog', 'systemverilog')
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile('|'.join([
@@ -60,19 +60,19 @@ class MSim(BaseBuilder):
     default_flags = {
         'batch_build_flags' : {
             'vhdl' : ['-defercheck', '-nocheck', '-permissive'],
-            'verilog' : [],
-            'systemverilog' : []},
+            'verilog' : ['-permissive', ],
+            'systemverilog' : ['-permissive', ]},
 
         'single_build_flags' : {
             'vhdl' : ['-check_synthesis', '-lint', '-rangecheck',
                       '-bindAtCompile', '-pedanticerrors'],
-            'verilog' : [],
-            'systemverilog' : []},
+            'verilog' : ['-lint', '-hazards', '-pedanticerrors'],
+            'systemverilog' : ['-lint', '-hazards', '-pedanticerrors']},
 
         'global_build_flags' : {
             'vhdl' : ['-explicit',],
-            'verilog' : ['-lint', '-hazards', '-pedanticerrors'],
-            'systemverilog' : ['-lint', '-hazards', '-pedanticerrors']}}
+            'verilog' : [],
+            'systemverilog' : []}}
 
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
@@ -178,9 +178,9 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, source, flags=None):
-        if source.getFileType() == 'vhdl':
+        if source.filetype == 'vhdl':
             return self._buildVhdl(source, flags)
-        if source.getFileType() in ('verilog', 'systemverilog'):
+        if source.filetype in ('verilog', 'systemverilog'):
             return self._buildVerilog(source, flags)
 
     def _buildVhdl(self, source, flags=None):
@@ -197,6 +197,8 @@ class MSim(BaseBuilder):
         "Builds a Verilog/SystemVerilog file"
         cmd = ['vlog', '-modelsimini', self._modelsim_ini, '-quiet',
                '-work', p.join(self._target_folder, source.library)]
+        if source.filetype == 'systemverilog':
+            cmd += ['-sv']
         if flags:
             cmd += flags
         cmd += [source.filename]

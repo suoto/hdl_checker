@@ -183,3 +183,22 @@ def onCI(): # pragma: no cover
     return 'CI' in os.environ
 # pylint: enable=missing-docstring
 
+def getFileType(filename):
+    "Gets the file type of a source file"
+    extension = filename[str(filename).rfind('.') + 1:].lower()
+    if extension in ['vhd', 'vhdl']:
+        return 'vhdl'
+    if extension == 'v':
+        return 'verilog'
+    if extension in ('sv', 'svh'):
+        return 'systemverilog'
+    assert False, "Unknown file type: '%s'" % extension
+
+
+if not hasattr(p, 'samefile'):
+    def samefile(file1, file2):
+        "Emulated version of os.path.samefile"
+        return os.stat(file1) == os.stat(file2)
+else:
+    samefile = p.samefile # pylint: disable=invalid-name
+

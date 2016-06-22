@@ -24,7 +24,7 @@ import logging
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.utils import writeListToFile, addToPath, removeFromPath
+from hdlcc.utils import writeListToFile, addToPath, removeFromPath, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -260,9 +260,27 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesByPath(filename)
+            records = []
+            for record in it.project.getMessagesByPath(filename):
+                it.assertTrue(samefile(filename, record.pop('filename')))
+                records += [record]
 
-            it.assertEquals(records, [])
+            if BUILDER_NAME == 'msim':
+                expected_records = [{
+                    'checker': 'msim',
+                    'column': None,
+                    'error_message': "Synthesis Warning: Reset signal 'reset' "
+                                     "is not in the sensitivity list of process "
+                                     "'line__45'.",
+                    'error_number': None,
+                    'error_type': 'W',
+                    'line_number': '45'}]
+            elif BUILDER_NAME == 'ghdl':
+                expected_records = []
+            elif BUILDER_NAME == 'xvhdl':
+                expected_records = []
+
+            it.assertEquals(records, expected_records)
 
             it.assertTrue(it.project._msg_queue.empty())
 
