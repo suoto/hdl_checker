@@ -15,12 +15,12 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-from nose2.tools import such
 import logging
 import os
 import os.path as p
 import shutil as shell
 import time
+from nose2.tools import such
 import hdlcc.builders
 import hdlcc.utils as utils
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
@@ -28,59 +28,11 @@ from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
+SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'sources')
 
 _logger = logging.getLogger(__name__)
 
-_VHD_SAMPLE_ENTITY = """library ieee;
-use ieee.std_logic_1164.all;
-
-entity clock_divider is
-    generic (
-        DIVIDER : integer := 10
-    );
-    port (
-        reset : in std_logic;
-        clk_input : in  std_logic;
-        clk_output : out std_logic
-    );
-
-end clock_divider;
-
-architecture clock_divider of clock_divider is
-
-begin
-
-end clock_divider;
-""".splitlines()
-
-_ERRORS = {
-    'ghdl' : {'line_number'   : '1',
-              'error_number'  : None,
-              'error_message' : "entity, architecture, package or "
-                                "configuration keyword expected",
-              'column'        : '1',
-              'error_type'    : 'E',
-              'filename'      : 'some_file_with_error.vhd',
-              'checker'       : 'ghdl'},
-    'msim' : {'line_number'   : '1',
-              'error_number'  : None,
-              'error_message' : "near \"hello\": syntax error",
-              'column'        : None,
-              'error_type'    : 'E',
-              'filename'      : 'some_file_with_error.vhd',
-              'checker'       : 'msim'},
-    'xvhdl' : {'line_number'   : '1',
-               'error_number'  : 'VRFC 10-1412',
-               'error_message' : 'syntax error near hello ',
-               'column'        : '',
-               'error_type'    : 'E',
-               'filename'      : 'some_file_with_error.vhd',
-               'checker'       : 'xvhdl'},
-    }
-
 with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
-    it._ok_file = 'some_file.vhd'
-    it._error_file = 'some_file_with_error.vhd'
     with it.having('its binary executable'):
         @it.has_setup
         def setup():
@@ -94,8 +46,6 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         @it.has_teardown
         def teardown():
             utils.removeFromPath(BUILDER_PATH)
-            os.remove(it._ok_file)
-            os.remove(it._error_file)
             if p.exists('._%s' % BUILDER_NAME):
                 shell.rmtree('._%s' % BUILDER_NAME)
 
@@ -103,40 +53,52 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         def test():
             it.builder.checkEnvironment()
 
-        @it.should('compile some source without errors')
+        @it.should('compile a VHDL source without errors')
         def test():
-            open(it._ok_file, 'w').write('\n'.join(_VHD_SAMPLE_ENTITY))
-            source = VhdlSourceFile(it._ok_file)
+            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.vhd'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 
-        @it.should('catch an error')
+        @it.should('catch a known error on a VHDL source')
         def test():
-            open(it._error_file, 'w').write('\n'.join(['hello\n'] + _VHD_SAMPLE_ENTITY))
-            time.sleep(1)
-            source = VhdlSourceFile(it._error_file)
+            source = VhdlSourceFile(p.join(SOURCES_PATH,
+                                           'source_with_error.vhd'))
             records, rebuilds = it.builder.build(source)
 
             for record in records:
                 _logger.info(record)
 
-            ref = _ERRORS[BUILDER_NAME]
+            if BUILDER_NAME == 'msim':
+                expected = [{
+                    'line_number': '21',
+                    'error_number': None,
+                    'error_message': 'near "EOF": expecting \';\'',
+                    'column': None,
+                    'error_type': 'E',
+                    'checker': 'msim'}]
+            elif BUILDER_NAME == 'ghdl':
+                expected = [{
+                    'line_number': '21',
+                    'error_number': None,
+                    'error_message': "';' is expected instead of '<EOF>'",
+                    'column': '1',
+                    'error_type': 'E',
+                    'checker': 'ghdl'}]
+            elif BUILDER_NAME == 'xvhdl':
+                expected = [{
+                    'line_number': '21',
+                    'error_number': 'VRFC 10-1491',
+                    'error_message': 'unexpected EOF ',
+                    'column': '',
+                    'error_type': 'E',
+                    'checker': 'xvhdl'}]
 
-            # We check everything except the filename. XVHDL returns
-            # an absolute path but we should work based on relative
-            # paths. Any conversion needed should be handled by the
-            # editor client
-            for item in ('line_number', 'error_number', 'error_message',
-                         'column', 'error_type', 'checker'):
-                it.assertIn(ref[item], [x[item] for x in records])
-
-            it.assertIn(
-                True,
-                [utils.samefile(ref['filename'], x['filename']) for x in records],
-                "Mention to file '%s' not found in '%s'" % \
-                        (ref['filename'], [x['filename'] for x in records]))
+            it.assertEqual(len(records), 1)
+            it.assertTrue(utils.samefile(records[0].pop('filename'),
+                                         source.filename))
+            it.assertEquals(records, expected)
 
             it.assertEqual(rebuilds, [])
 
