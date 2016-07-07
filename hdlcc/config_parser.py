@@ -277,7 +277,7 @@ class ConfigParser(object):
                 else:
                     self._logger.debug(
                         "Flag '%s' for '%s' was already set with value '%s'",
-                        context, lang, self._parms[context])
+                        context, lang, self._parms[context][lang])
 
     def _updateSourceList(self, sources, pool_results):
         """Removes sources we had found earlier and leave only the ones
@@ -392,9 +392,10 @@ class ConfigParser(object):
         if self.filename is None:
             return []
         lang = self.getSourceByPath(path).filetype
-        return self._sources[p.abspath(path)].flags + \
-               self._parms['single_build_flags'][lang]  + \
-               self._parms['global_build_flags'][lang]
+
+        return self._parms['global_build_flags'][lang] + \
+               self._parms['single_build_flags'][lang] + \
+               self._sources[p.abspath(path)].flags
 
     def getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
@@ -403,9 +404,9 @@ class ConfigParser(object):
             return []
         lang = self.getSourceByPath(path).filetype
 
-        return self._sources[p.abspath(path)].flags + \
+        return self._parms['global_build_flags'][lang] + \
                self._parms['batch_build_flags'][lang] + \
-               self._parms['global_build_flags'][lang]
+               self._sources[p.abspath(path)].flags
 
     def getSources(self):
         "Returns a list of VhdlSourceFile objects parsed"

@@ -56,7 +56,7 @@ class XVHDL(BaseBuilder):
 
     def _makeMessageRecords(self, line):
         line_number = None
-        column = ''
+        column = None
         filename = None
         error_number = None
         error_type = None

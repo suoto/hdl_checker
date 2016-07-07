@@ -30,55 +30,31 @@ from hdlcc.utils import writeListToFile
 _logger = logging.getLogger(__name__)
 
 HDLCC_CI = p.expanduser(os.environ['HDLCC_CI'])
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support',
+                      'test_config_parser')
 
 with such.A('config parser object') as it:
-
     @it.has_setup
     def setup():
-        it.project_filename = 'test.prj'
-        if p.exists(it.project_filename):
-            os.remove(it.project_filename)
+        it.project_filename = p.join(TEST_SUPPORT_PATH,
+                                     'standard_project_file.prj')
 
     @it.has_teardown
     def teardown():
-        if p.exists(it.project_filename):
-            os.remove(it.project_filename)
         if p.exists('.build'):
             shell.rmtree('.build')
-
-        del it.project_filename
-        del it.parser
 
     with it.having('a standard project file'):
         @it.has_setup
         def setup():
-            config_content = [
-                r'batch_build_flags[vhdl] = -b0 -b1',
-                r'single_build_flags[vhdl] = -s0 -s1',
-                r'global_build_flags[vhdl] = -g0 -g1',
-                r'builder = msim',
-                r'target_dir = .build',
-                r'vhdl work ' + p.join(HDLCC_CI,
-                                       'vim-hdl-examples',
-                                       'another_library',
-                                       'foo.vhd') + ' -f0',
-                r'vhdl work ' + p.abspath(p.join(HDLCC_CI,
-                                                 'vim-hdl-examples',
-                                                 'basic_library',
-                                                 'clock_divider.vhd')) + ' -f1',
-                r'verilog work ' + p.join(HDLCC_CI,
-                                          'vim-hdl-examples',
-                                          'another_library',
-                                          'foo.v')
-            ]
+            import hdlcc.config_parser as cp
+            it.config_parser = cp
+            it.config_parser._HAS_VUNIT = False
+            it.parser = it.config_parser.ConfigParser(it.project_filename)
 
-            writeListToFile(it.project_filename, config_content)
-
-            it.parser = hdlcc.config_parser.ConfigParser(it.project_filename)
-
-        @it.has_teardown
-        def teardown():
-            del it.parser
+        #  @it.has_teardown
+        #  def teardown():
+        #      del it.parser
 
         @it.should('extract builder')
         def test():
@@ -87,146 +63,105 @@ with such.A('config parser object') as it:
         @it.should('extract target dir')
         def test():
             it.assertTrue(p.isabs(it.parser.getTargetDir()))
-            it.assertEqual(it.parser.getTargetDir(), p.abspath('.build'))
+            it.assertEqual(it.parser.getTargetDir(),
+                           p.abspath(p.join(TEST_SUPPORT_PATH, '.build')))
 
         @it.should('extract build flags for single build')
         def test():
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(HDLCC_CI, 'vim-hdl-examples',
-                           'another_library',
-                           'foo.vhd')),
+                    p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(HDLCC_CI, 'vim-hdl-examples', 'basic_library',
-                           'clock_divider.vhd')),
+                    p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
+
+            it.assertItemsEqual(
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
 
         @it.should('extract build flags for batch builds')
         def test():
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(HDLCC_CI, 'vim-hdl-examples', 'another_library',
-                           'foo.vhd')),
+                    p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(HDLCC_CI, 'vim-hdl-examples', 'basic_library',
-                           'clock_divider.vhd')),
+                    p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
         @it.should('include VHDL and Verilog sources')
         def test():
-            expected_sources = [p.abspath(x) \
-                for x in (HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
-                          HDLCC_CI + '/vim-hdl-examples/another_library/foo.v',
-                          HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd')]
-
-            parser_sources = []
-
-            # Don't add VUnit sources or else this test will fail
-            for source in it.parser.getSources():
-                if 'vunit' not in source.filename:
-                    parser_sources += [source.filename]
-
-            it.assertItemsEqual(parser_sources, expected_sources)
+            it.assertItemsEqual(
+                [x.filename for x in it.parser.getSources()
+                 if 'vunit' not in x.filename],
+                [p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
+                 p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
+                 p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                 p.abspath(p.join(TEST_SUPPORT_PATH, 'foo.v')),
+                 p.abspath(p.join(TEST_SUPPORT_PATH, 'bar.sv'))])
 
         @it.should('tell correctly if a path is on the project file')
-        @params((HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
-                 True),
-                (p.abspath(HDLCC_CI + '/vim-hdl-examples/basic_library/'
-                           'clock_divider.vhd',),
-                 True),
-                ('hello', False))
+        @params((p.join(TEST_SUPPORT_PATH, 'sample_file.vhd'), True),
+                (p.join(TEST_SUPPORT_PATH, 'foo.v'), True),
+                (p.join(TEST_SUPPORT_PATH, 'bar.sv'), True),
+                (p.join(TEST_SUPPORT_PATH, 'hello_world.vhd'), False))
         def test(case, path, result):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.hasSource(path), result)
 
-        @it.should('keep build flags in the same order given by the user')
+        @it.should('return build flags for a VHDL file')
         def test():
-            project_filename = 'test.prj'
-            source = HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd'
-            config_content = [
-                r'batch_build_flags[vhdl] = -a -b1 --some-flag some_value',
-                r'single_build_flags[vhdl] = --zero 0 --some-flag some_value 12',
-                r'global_build_flags[vhdl] = -global',
-                r'builder = msim',
-                r'vhdl work ' + source,
-            ]
-
-            writeListToFile(project_filename, config_content)
-
-            parser = hdlcc.config_parser.ConfigParser(project_filename)
             it.assertEqual(
-                parser.getBatchBuildFlagsByPath(source),
-                ['-a', '-b1', '--some-flag', 'some_value', '-global'])
+                it.parser.getBatchBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                ['-g0', '-g1', '-b0', '-b1', '-build-using', 'some', 'way', ])
             it.assertEqual(
-                parser.getSingleBuildFlagsByPath(source),
-                ['--zero', '0', '--some-flag', 'some_value', '12', '-global'])
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                ['-g0', '-g1', '-s0', '-s1', '-build-using', 'some', 'way', ])
 
-    with it.having('a project file with some non-standard stuff'):
-        @it.has_teardown
-        def teardown():
-            if p.exists('temp'):
-                shell.rmtree('temp')
-
-        @it.should('raise UnknownParameterError exception when an unknown parameter '
-                   'is found')
+        @it.should('return build flags for a Verilog file')
         def test():
-            project_filename = 'test.prj'
-            config_content = [
-                r'some_parm = -batch0 -batch1',
-                r'batch_build_flags[vhdl] = -batch0 -batch1',
-                r'single_build_flags[vhdl] = -single0 -single1',
-                r'global_build_flags[vhdl] = -global0 -global1',
-                r'builder = msim',
-                r'target_dir = .build',
-                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
-            ]
+            it.assertEqual(
+                it.parser.getBatchBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'foo.v')),
+                ['-permissive', '-some-flag', 'some', 'value', ])
+            it.assertEqual(
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'foo.v')),
+                ['-lint', '-hazards', '-pedanticerrors', '-some-flag',
+                 'some', 'value'])
 
-            writeListToFile(project_filename, config_content)
-
-            with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
-                hdlcc.config_parser.ConfigParser(project_filename)
-
-        @it.should('assign a default value for target dir equal to the builder value')
+        @it.should('return build flags for a System Verilog file')
         def test():
-            project_filename = 'test.prj'
-            config_content = [
-                r'batch_build_flags[vhdl] = -batch0 -batch1',
-                r'single_build_flags[vhdl] = -single0 -single1',
-                r'global_build_flags[vhdl] = -global0 -global1',
-                r'builder = msim',
-                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
-            ]
+            it.assertEqual(
+                it.parser.getBatchBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'bar.sv')),
+                ['-permissive', 'some', 'sv', 'flag'])
+            it.assertEqual(
+                it.parser.getSingleBuildFlagsByPath(
+                    p.join(TEST_SUPPORT_PATH, 'bar.sv')),
+                ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
 
-            writeListToFile(project_filename, config_content)
+    @it.should('raise UnknownParameterError exception when an unknown parameter '
+               'is found')
+    def test():
+        with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
+            hdlcc.config_parser.ConfigParser(
+                p.join(TEST_SUPPORT_PATH, 'project_unknown_parm.prj'))
 
-            parser = hdlcc.config_parser.ConfigParser(project_filename)
-            it.assertEquals(parser.getTargetDir(), p.abspath('.msim'))
-
-        @it.should('report target dir relative to project path')
-        def test():
-            if not p.exists('temp'):
-                os.mkdir('temp')
-            project_filename = p.join('temp', 'test.prj')
-            config_content = [
-                r'batch_build_flags[vhdl] = -batch0 -batch1',
-                r'single_build_flags[vhdl] = -single0 -single1',
-                r'global_build_flags[vhdl] = -global0 -global1',
-                r'target_dir = .build',
-                r'builder = msim',
-                r'vhdl work ' + HDLCC_CI + '/vim-hdl-examples/another_library/foo.vhd',
-            ]
-
-            writeListToFile(project_filename, config_content)
-
-            parser = hdlcc.config_parser.ConfigParser(project_filename)
-            it.assertEquals(parser.getTargetDir(),
-                            p.abspath(p.join('temp', '.build')))
+    @it.should('assign a default value for target dir equal to the builder value')
+    def test():
+        parser = hdlcc.config_parser.ConfigParser(
+            p.join(TEST_SUPPORT_PATH, 'project_no_target.prj'))
+        it.assertEquals(parser.getTargetDir(),
+                        p.abspath(p.join(TEST_SUPPORT_PATH, '.msim')))
 
     with it.having('no project file'):
         @it.should('create the object without error')
@@ -306,6 +241,7 @@ with such.A('config parser object') as it:
     with it.having("a project file constantly updated"):
         @it.has_setup
         def setup():
+            it.project_filename = 'test.prj'
             it.lib_path = p.join(HDLCC_CI, 'vim-hdl-examples')
             it.config_content = [
                 r'vhdl work ' + p.join(it.lib_path, 'another_library',
@@ -318,7 +254,7 @@ with such.A('config parser object') as it:
             it.parser = hdlcc.config_parser.ConfigParser(it.project_filename)
 
         @it.should("Find only the sources given then the extra source")
-        def test():
+        def test_01():
             sources_pre = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:
@@ -351,7 +287,7 @@ with such.A('config parser object') as it:
                 it.assertEqual(source, sources_post[path])
 
         @it.should("Update the source library if changed")
-        def test():
+        def test_02():
             sources_pre = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:

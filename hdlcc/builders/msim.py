@@ -28,14 +28,16 @@ class MSim(BaseBuilder):
     file_types = ('vhdl', 'verilog', 'systemverilog')
 
     # MSim specific class properties
-    _stdout_message_scanner = re.compile('|'.join([
-        r"^\*\*\s*([WE])\w+:\s*",
-        r"\((\d+)\):",
-        r"[\[\(]([\w-]+)[\]\)]\s*",
-        r"(.*\.(vhd|v|sv|svh)\b)",
-        r"\s*\(([\w-]+)\)",
-        r"\s*(.+)",
-        ]), re.I).scanner
+    _stdout_message_scanner = re.compile(
+        r"^\*\*\s*(?P<error_type>[WE])\w+\s*" \
+            r"(:\s*|\(suppressible\):\s*)"
+        r"(" \
+            r"(?P<filename>.*(?=\(\d+\)))"
+            r"\((?P<line_number>\d+)\):\s*"
+        r"|" \
+            r"\(vcom-\d+\)\s*"
+        r")"
+        r"(?P<error_message>.*)\s*").finditer
 
     _should_ignore = re.compile('|'.join([
         r"^\s*$",
@@ -94,44 +96,28 @@ class MSim(BaseBuilder):
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
     def _makeMessageRecords(self, line):
-        line_number = None
-        column = None
-        filename = None
-        error_number = None
-        error_type = None
-        error_message = None
+        records = []
 
-        scan = self._stdout_message_scanner(line)
+        for match in self._stdout_message_scanner(line):
+            info = {
+                'checker'        : self.builder_name,
+                'line_number'    : None,
+                'column'         : None,
+                'filename'       : None,
+                'error_number'   : None,
+                'error_type'     : None,
+                'error_message'  : None}
+            for key, content in match.groupdict().items():
+                info[key] = content
 
-        while True:
-            match = scan.match()
-            if not match:
-                break
+            if ('vcom-' in line) or ('vlog' in line):
+                info['error_number'] = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
 
-            if match.lastindex == 1:
-                error_type = match.group(match.lastindex)
-            if match.lastindex == 2:
-                line_number = match.group(match.lastindex)
-            if match.lastindex in (3, 6):
-                try:
-                    error_number = \
-                            re.findall(r"\d+", match.group(match.lastindex))[0]
-                except IndexError:
-                    error_number = 0
-            if match.lastindex == 4:
-                filename = match.group(match.lastindex)
-            if match.lastindex == 7:
-                error_message = match.group(match.lastindex)
+            info['error_message'] = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
+                                           info['error_message']).strip()
+            records += [info]
 
-        return [{
-            'checker'        : self.builder_name,
-            'line_number'    : line_number,
-            'column'         : column,
-            'filename'       : filename,
-            'error_number'   : error_number,
-            'error_type'     : error_type,
-            'error_message'  : error_message,
-        }]
+        return records
 
     def checkEnvironment(self):
         try:
