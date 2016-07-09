@@ -18,11 +18,11 @@
 import logging
 import os
 import os.path as p
-import shutil as shell
-import time
+import shutil
 import unittest
 from nose2.tools import such
 from nose2.tools.params import params
+
 import hdlcc.builders
 import hdlcc.utils as utils
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
@@ -50,7 +50,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         def teardown():
             utils.removeFromPath(BUILDER_PATH)
             if p.exists('._%s' % BUILDER_NAME):
-                shell.rmtree('._%s' % BUILDER_NAME)
+                shutil.rmtree('._%s' % BUILDER_NAME)
 
         @it.should('pass environment check')
         def test():
@@ -159,7 +159,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'filename'       : path,
                   'error_number'   : 'VRFC 10-1412',
                   'error_type'     : 'E',
-                  'error_message'  : "syntax error near ) "}])
+                  'error_message'  : "syntax error near )"}])
 
         @it.should('compile a VHDL source without errors')
         def test():
@@ -168,6 +168,25 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
+
+        @it.should('compile a Verilog source without errors')
+        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
+        def test():
+            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.v'))
+            records, rebuilds = it.builder.build(source)
+            it.assertNotIn('E', [x['error_type'] for x in records],
+                           'This source should not generate errors.')
+            it.assertEqual(rebuilds, [])
+
+        @it.should('compile a SystemVerilog source without errors')
+        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
+        def test():
+            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.sv'))
+            records, rebuilds = it.builder.build(source)
+            it.assertNotIn('E', [x['error_type'] for x in records],
+                           'This source should not generate errors.')
+            it.assertEqual(rebuilds, [])
+
 
         @it.should('catch a known error on a VHDL source')
         def test():
@@ -180,25 +199,25 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
             if BUILDER_NAME == 'msim':
                 expected = [{
-                    'line_number': '12',
-                    'error_number': None,
-                    'error_message': "near \")\": expecting FUNCTION or PROCEDURE or IMPURE or PURE",
+                    'line_number': '4',
+                    'error_number': '1136',
+                    'error_message': 'Unknown identifier "some_lib".',
                     'column': None,
                     'error_type': 'E',
                     'checker': 'msim'}]
             elif BUILDER_NAME == 'ghdl':
                 expected = [{
-                    'line_number': '11',
+                    'line_number': '4',
                     'error_number': None,
-                    'error_message': "extra ';' at end of interface list",
-                    'column': '35',
+                    'error_message': 'no declaration for "some_lib"',
+                    'column': '5',
                     'error_type': 'E',
                     'checker': 'ghdl'}]
             elif BUILDER_NAME == 'xvhdl':
                 expected = [{
-                    'line_number': '12',
-                    'error_number': 'VRFC 10-1412',
-                    'error_message': 'syntax error near ) ',
+                    'line_number': '4',
+                    'error_number': 'VRFC 10-91',
+                    'error_message': 'some_lib is not declared',
                     'column': None,
                     'error_type': 'E',
                     'checker': 'xvhdl'}]

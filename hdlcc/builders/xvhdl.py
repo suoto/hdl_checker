@@ -25,7 +25,7 @@ class XVHDL(BaseBuilder):
     # Implementation of abstract class properties
     builder_name = 'xvhdl'
     # TODO: Add xvlog support
-    file_types = ['vhdl', 'v']
+    file_types = ('vhdl', )
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
@@ -41,8 +41,6 @@ class XVHDL(BaseBuilder):
         flags=re.I).finditer
 
     def _shouldIgnoreLine(self, line):
-        if re.match(r"^\s*$", line):
-            return True
         if 'ignored due to previous errors' in line:
             return True
         return not (line.startswith('ERROR') or
@@ -75,7 +73,7 @@ class XVHDL(BaseBuilder):
             filename = _dict['filename']
             error_number = _dict['error_number']
             error_type = _dict['error_type']
-            error_message = _dict['error_message']
+            error_message = _dict['error_message'].strip()
 
         return [{
             'checker'        : self.builder_name,

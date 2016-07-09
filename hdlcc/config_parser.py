@@ -112,10 +112,17 @@ class ConfigParser(object):
         self._logger.info("VUnit installation found")
         logging.getLogger('vunit').setLevel(logging.WARNING)
 
+
+        if 'verilog' in getBuilderByName(self.getBuilder()).file_types:
+            from vunit.verilog import VUnit
+            self._logger.warning("Using vunit.verilog.VUnit")
+        else:
+            from vunit import VUnit
+
         # I'm not sure how this would work because VUnit specifies a
         # single VHDL revision for a whole project, so there can be
         # incompatibilities as this is really used
-        vunit_project = vunit.VUnit.from_argv(
+        vunit_project = VUnit.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
 
         for func in (vunit_project.add_com,
@@ -141,9 +148,11 @@ class ConfigParser(object):
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
 
-            _source_file_args.append({'filename' : path,
-                                      'library' : library,
-                                      'flags' : vunit_flags})
+            #  if path.endswith('.vhd'):
+            _source_file_args.append(
+                {'filename' : path,
+                 'library' : library,
+                 'flags' : vunit_flags if path.endswith('.vhd') else []})
 
         for source in getSourceFileObjects(_source_file_args, workers=3):
             self._sources[source.filename] = source

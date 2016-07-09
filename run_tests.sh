@@ -18,7 +18,6 @@ VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 
 ARGS=()
 
-CLEAN=0
 CLEAN_PIP=1
 
 while [ -n "$1" ]; do
@@ -34,8 +33,6 @@ while [ -n "$1" ]; do
     FALLBACK=1
   elif [ "$1" == "reuse-pip" ]; then
     CLEAN_PIP=0
-  elif [ "$1" == "clean" ]; then
-    CLEAN=1
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
   else
@@ -49,7 +46,7 @@ while [ -n "$1" ]; do
 done
 
 if [ -n "${HELP}" ]; then
-  echo "Usage: $0 [ghdl|msim|xvhdl|fallback] [reuse-pip] [clean] [standalone]"
+  echo "Usage: $0 [ghdl|msim|xvhdl|fallback] [reuse-pip] [standalone]"
   exit 0
 fi
 
@@ -63,13 +60,11 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   CLEAN_PIP=1
 fi
 
-if [ "${CLEAN}" == "1" ]; then
-  git clean -fdx && git submodule foreach --recursive git clean -fdx
-  cd ${HDLCC_CI} && git reset HEAD --hard \
-    && git submodule foreach --recursive git reset HEAD --hard \
-    && git clean -fdx && git submodule foreach --recursive git clean -fdx
-  cd - || exit
-fi
+git clean -fdx && git submodule foreach --recursive git clean -fdx
+cd "${HDLCC_CI}" && git reset HEAD --hard \
+  && git submodule foreach --recursive git reset HEAD --hard \
+  && git clean -fdx && git submodule foreach --recursive git clean -fdx
+cd - || exit
 
 set -x
 set +e
@@ -92,11 +87,8 @@ if [ -z "${CI}" ]; then
 fi
 
 pip uninstall hdlcc -y
-if [ -n "${VIRTUAL_ENV}" ]; then
-  pip install -e .
-else
-  pip install -e . --user
-fi
+pip install -e .
+
 RESULT=$(($? || RESULT))
 [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
@@ -166,8 +158,6 @@ fi
 coverage combine
 coverage html
 # coverage report
-
-[ -z "${CI}" ] && [ -n "${VIRTUAL_ENV}" ] && deactivate
 
 exit "${RESULT}"
 
