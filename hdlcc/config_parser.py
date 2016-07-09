@@ -242,9 +242,10 @@ class ConfigParser(object):
                     sources_found += line_sources
                     pool_results += line_results
 
+                parser_pool.close()
                 self._updateSourceList(sources_found, pool_results)
             finally:
-                parser_pool.close()
+                self._logger.error("Something went wrong, terminating pool")
                 parser_pool.terminate()
 
             # If after parsing we haven't found the configured target

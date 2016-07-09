@@ -69,7 +69,7 @@ with such.A("hdlcc server") as it:
             time.sleep(1)
             _logger.info("Elapsed %ds", i)
             _ = requests.post(it._url + '/get_messages_by_path',
-                                           timeout=10, data=data)
+                              timeout=10, data=data)
             ui_messages = requests.post(it._url + '/get_ui_messages',
                                         timeout=10, data=data)
             _logger.debug("==> %s", ui_messages.json())
@@ -315,6 +315,8 @@ with such.A("hdlcc server") as it:
                     'project_file' : PROJECT_FILE,
                     'path'         : p.join(HDL_LIB_PATH, 'memory',
                                             'ram_inference_dport.vhd')}
+                _logger.info("Waiting for any previous process to finish")
+                waitUntilBuildFinishes(data)
 
                 ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
                                          data=data)

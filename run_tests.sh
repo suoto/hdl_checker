@@ -84,6 +84,7 @@ if [ -z "${CI}" ]; then
   . ${VIRTUAL_ENV_DEST}/bin/activate
 
   pip install -r requirements.txt
+  pip install git+https://github.com/suoto/rainbow_logging_handler
 fi
 
 pip uninstall hdlcc -y

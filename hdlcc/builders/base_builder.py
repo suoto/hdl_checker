@@ -18,7 +18,6 @@ import logging
 import os
 import os.path as p
 import abc
-import time
 import subprocess as subp
 from threading import Lock
 
@@ -210,15 +209,11 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             self._logger.debug("Records found")
             for record in records:
                 self._logger.debug(record)
-        else:
-            self._logger.debug("No records found")
 
         if rebuilds:
             self._logger.debug("Rebuilds found")
             for rebuild in rebuilds:
                 self._logger.debug(rebuild)
-        else:
-            self._logger.debug("No rebuild units found")
 
     @abc.abstractmethod
     def _createLibrary(self, library):
@@ -238,7 +233,6 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                                source.filetype)
             return [], []
 
-        start = time.time()
         if source.abspath not in self._build_info_cache.keys():
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
@@ -279,8 +273,6 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                     'E' in [x['error_type'] for x in records]:
                 cached_info['compile_time'] = 0
 
-            end = time.time()
-            self._logger.debug("Compilation took %.2fs", (end - start))
         else:
             self._logger.debug("Nothing to do for %s", source)
             records = cached_info['records']

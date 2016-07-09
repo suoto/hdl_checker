@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with hdlcc.  If not, see <http://www.gnu.org/licenses/>.
-"Script should be called within Vim to launch tests"
+"The actual nose test runner"
 
 import os
 import os.path as p
@@ -29,7 +29,8 @@ _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _LOG = p.abspath(p.expanduser("~/tests.log"))
 
-def test(nose2_argv):
+def noseRunner(nose2_argv):
+    "Runs nose2 with coverage"
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
 
@@ -42,12 +43,14 @@ def test(nose2_argv):
     return result
 
 def clear():
+    "Clears the current repo and submodules"
     for cmd in ('git clean -fdx',
                 'git submodule foreach --recursive git clean -fdx'):
         print cmd
         print os.popen(cmd).read()
 
 def setupLogging():
+    "Logging formatter setup"
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
         handler = RainbowLoggingHandler(
@@ -73,14 +76,12 @@ def setupLogging():
 
     logging.root.addHandler(handler)
 
-def run_tests():
+def runTests():
     if '--clear' in sys.argv[1:]:
         clear()
         sys.argv.pop(sys.argv.index('--clear'))
 
-    if '--debug' in sys.argv[1:]:
-        setupLogging()
-        sys.argv.pop(sys.argv.index('--debug'))
+    setupLogging()
 
     logging.getLogger('nose2').setLevel(logging.INFO)
     file_handler = logging.FileHandler(_LOG)
@@ -98,7 +99,7 @@ def run_tests():
     _logger.info(" - TRAVIS:   %s", _TRAVIS)
     _logger.info(" - LOG:      %s", _LOG)
 
-    tests = test(nose2_argv=sys.argv)
+    tests = noseRunner(nose2_argv=sys.argv)
 
     return tests.result.wasSuccessful()
 
@@ -113,7 +114,7 @@ def _uploadAppveyorArtifact(path):
         _logger.info(line)
 
 def main():
-    passed = run_tests()
+    passed = runTests()
 
     return 0 if passed else 1
 

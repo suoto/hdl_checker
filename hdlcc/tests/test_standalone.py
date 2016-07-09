@@ -160,9 +160,6 @@ with such.A("hdlcc standalone tool") as it:
                     it.assertTrue(len(stdout) >= previous)
                     previous = len(stdout)
 
-        #  with it.having("an invalid environment"):
-        #      pass
-
 if BUILDER_NAME is not None:
     it.createTests(globals())
 

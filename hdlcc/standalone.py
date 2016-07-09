@@ -221,6 +221,7 @@ def main():
     setupLogging(sys.stdout, runner_args.log_level)
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+    logging.getLogger('vunit.project').setLevel(logging.ERROR)
 
     # Running hdlcc with threads has two major drawbacks:
     # 1) Makes interrupting it impossible currently because each source

@@ -183,13 +183,10 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 it.assertIn(('warning', "Project hasn't finished building, "
                                         "try again after it finishes."),
                             messages)
-            except:
+                _logger.info("OK, the mesage was found")
+            finally:
                 _logger.warning("Waiting until the project finishes building")
                 it.project.waitForBuild()
-                raise
-
-            _logger.info("Waiting until the project finishes building")
-            it.project.waitForBuild()
 
         @it.should('wait until build has finished')
         def test004():

@@ -29,7 +29,6 @@ class BaseSourceFile(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, filename, library='work', flags=None):
-        _logger.info("[start] '%s'", filename)
         self.filename = os.path.normpath(filename)
         self.library = library
         if flags is None:
@@ -43,8 +42,6 @@ class BaseSourceFile(object):
 
         self.abspath = os.path.abspath(filename)
         self._parseIfChanged()
-
-        _logger.info("[done]  '%s'", filename)
 
     def getState(self):
         "Gets a dict that describes the current state of this object"

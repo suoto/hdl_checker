@@ -24,12 +24,6 @@ _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
 # Design unit scanner
 _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
-    #  r";\s*(?P<dep_unit>{0})\s+{0}\s*\(".format(_VERILOG_IDENTIFIER),
-    #  r"^\s*package\s+(?P<package_name>\w+)\s+is\b",
-    #  r"^\s*package\s+body\s+(?P<package_body_name>\w+)\s+is\b",
-    #  r"^\s*entity\s+(?P<entity_name>\w+)\s+is\b",
-    #  r"^\s*library\s+(?P<library_name>[\w,\s]+)\b",
-    #  r"^\s*context\s+(?P<context_name>\w+)\s+is\b",
     ]),)
 
 class VerilogSourceFile(BaseSourceFile):
@@ -54,26 +48,12 @@ class VerilogSourceFile(BaseSourceFile):
     def _getDependencies(self, libraries):
         """Parses the source and returns a list of dictionaries that
         describe its dependencies"""
-        lib_deps_regex = re.compile(r'|'.join([ \
-                r"%s\.\w+" % x for x in libraries]), flags=re.I)
-        dependencies = []
-        for line in self._getSourceContent():
-            for match in lib_deps_regex.finditer(line):
-                dependency = {}
-                dependency['library'], dependency['unit'] = match.group().split('.')[:2]
-                # Library 'work' means 'this' library, so we replace it
-                # by the library name itself
-                if dependency['library'] == 'work':
-                    dependency['library'] = self.library
-                if dependency not in dependencies:
-                    dependencies.append(dependency)
-
-        return dependencies
+        return []
 
     def _getParsedData(self):
         "Parses the source file to find design units and dependencies"
         design_units = []
-        libraries = ['work']
+        libraries = []
 
         for match in self._iterDesignUnitMatches():
             if match['module_name'] is not None:

@@ -348,8 +348,12 @@ class HdlCodeCheckerBase(object):
 
     def waitForBuild(self):
         "Waits until the background build finishes"
-        if self._background_thread.isAlive():
+        try:
             self._background_thread.join()
+            self._logger.debug("Background thread joined")
+        except RuntimeError:
+            self._logger.debug("Background thread was not active")
+
         with self._lock:
             self._logger.info("Build has finished")
 
