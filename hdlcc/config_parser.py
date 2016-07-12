@@ -28,7 +28,7 @@ from hdlcc.builders import getBuilderByName
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
-_configFileComments = re.compile(r"(\s*#.*|\n)").sub
+_replaceCfgComments = re.compile(r"(\s*#.*|\n)").sub
 _configFileScan = re.compile("|".join([
     r"^\s*(?P<parameter>\w+)\s*(\[(?P<parm_lang>vhdl|verilog|systemverilog)\]|\s)*=\s*(?P<value>.+)\s*$",
     r"^\s*(?P<lang>(vhdl|verilog|systemverilog))\s+"  \
@@ -228,42 +228,50 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         "Parses the configuration file"
-        if self.shouldParse():
-            self._logger.info("Parsing '%s'", self.filename)
-            self._updateTimestamp()
-            self._parms['builder'] = 'fallback'
-            sources_found = []
-            pool_results = []
-            parser_pool = Pool(3)
-            try:
-                for _line in open(self.filename, 'r').readlines():
-                    line = _configFileComments("", _line)
-                    line_sources, line_results = self._parseLine(line, parser_pool)
-                    sources_found += line_sources
-                    pool_results += line_results
+        if not self.shouldParse():
+            return
 
-                parser_pool.close()
-                self._updateSourceList(sources_found, pool_results)
-            finally:
-                self._logger.error("Something went wrong, terminating pool")
-                parser_pool.terminate()
+        self._logger.info("Parsing '%s'", self.filename)
+        self._updateTimestamp()
+        self._parms['builder'] = 'fallback'
+        sources_found = []
+        parser_pool = Pool(2)
 
-            # If after parsing we haven't found the configured target
-            # dir, we'll use the builder name
-            if 'target_dir' not in self._parms.keys():
-                self._parms['target_dir'] = "." + self._parms['builder']
+        # Callback to handle results from the process pool
+        def _poolCallback(source): # pylint: disable=missing-docstring
+            self._logger.debug("Adding pool result %s", str(source))
+            self._sources[source.filename] = source
 
-            # Set default flags if the user hasn't specified any
-            self._setDefaultBuildFlagsIfNeeded()
+        try:
+            for _line in open(self.filename, 'r').readlines():
+                line = _replaceCfgComments("", _line)
+                line_sources = self._parseLine(line, parser_pool, _poolCallback)
+                sources_found += line_sources
 
-            # If the configured target folder is not absolute, we assume it
-            # should be relative to the folder where the configuration file
-            # resides
-            if not p.isabs(self._parms['target_dir']):
-                self._parms['target_dir'] = p.join(p.dirname(self.filename),
-                                                   self._parms['target_dir'])
+            parser_pool.close()
+            parser_pool.join()
+            self._updateSourceList(sources_found)
+        except:
+            self._logger.exception("Something went wrong, terminating pool")
+            parser_pool.terminate()
+            raise
 
-            self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
+        # If after parsing we haven't found the configured target
+        # dir, we'll use the builder name
+        if 'target_dir' not in self._parms.keys():
+            self._parms['target_dir'] = "." + self._parms['builder']
+
+        # Set default flags if the user hasn't specified any
+        self._setDefaultBuildFlagsIfNeeded()
+
+        # If the configured target folder is not absolute, we assume it
+        # should be relative to the folder where the configuration file
+        # resides
+        if not p.isabs(self._parms['target_dir']):
+            self._parms['target_dir'] = p.join(p.dirname(self.filename),
+                                               self._parms['target_dir'])
+
+        self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
 
     # TODO: Add a test for this
     def _setDefaultBuildFlagsIfNeeded(self):
@@ -289,13 +297,9 @@ class ConfigParser(object):
                         "Flag '%s' for '%s' was already set with value '%s'",
                         context, lang, self._parms[context][lang])
 
-    def _updateSourceList(self, sources, pool_results):
+    def _updateSourceList(self, sources):
         """Removes sources we had found earlier and leave only the ones
         whose path are found in the 'sources' argument"""
-
-        # Updates the sources list with the results of the worker pool
-        for source in [x.get() for x in pool_results]:
-            self._sources[source.filename] = source
 
         rm_list = []
         for path in self._sources:
@@ -307,10 +311,9 @@ class ConfigParser(object):
         for rm_path in rm_list:
             del self._sources[rm_path]
 
-    def _parseLine(self, line, pool):
+    def _parseLine(self, line, pool, callback):
         "Parses a line a calls the appropriate extraction methods"
         sources_found = []
-        results = []
         for match in [x.groupdict() for x in _configFileScan(line)]:
             if match['parameter'] is not None:
                 self._logger.info("match: '%s'", match)
@@ -326,9 +329,9 @@ class ConfigParser(object):
                 if build_info:
                     cls = VhdlSourceFile if match['lang'] == 'vhdl' else \
                           VerilogSourceFile
-                    results += [pool.apply_async(cls, args=build_info)]
+                    pool.apply_async(cls, args=build_info, callback=callback)
 
-        return sources_found, results
+        return sources_found
 
     def _handleParsedParameter(self, parameter, lang, value):
         "Handles a parsed line that sets a parameter"
