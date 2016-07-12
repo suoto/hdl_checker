@@ -44,6 +44,25 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             'systemverilog' : []}
         }
 
+    _external_libraries = {
+        'vhdl' : [],
+        'verilog' : []}
+
+    _include_paths = {
+        'vhdl' : [],
+        'verilog' : []}
+
+    @classmethod
+    def addExternalLibrary(cls, lang, library_name):
+        assert lang in cls._external_libraries, "Uknown language '%s'" & lang
+        if library_name not in cls._external_libraries[lang]:
+            cls._external_libraries[lang].append(library_name)
+
+    @classmethod
+    def addIncludePath(cls, lang, path):
+        if path not in cls._include_paths[lang]:
+            cls._include_paths[lang].append(path)
+
     @abc.abstractproperty
     def builder_name(self):
         "Defines the builder identification"
@@ -60,6 +79,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []
+        self._added_libraries = []
 
         # Skip creating a folder for the fallback builder
         if self.builder_name != 'fallback':

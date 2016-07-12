@@ -112,10 +112,15 @@ class ConfigParser(object):
         self._logger.info("VUnit installation found")
         logging.getLogger('vunit').setLevel(logging.WARNING)
 
+        builder_class = getBuilderByName(self.getBuilder())
 
-        if 'verilog' in getBuilderByName(self.getBuilder()).file_types:
+        if 'verilog' in builder_class.file_types:
             from vunit.verilog import VUnit
             self._logger.warning("Using vunit.verilog.VUnit")
+            builder_class.addExternalLibrary('verilog', 'vunit_lib')
+            builder_class.addIncludePath(
+                'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
+                                  'include'))
         else:
             from vunit import VUnit
 
@@ -148,7 +153,6 @@ class ConfigParser(object):
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
 
-            #  if path.endswith('.vhd'):
             _source_file_args.append(
                 {'filename' : path,
                  'library' : library,

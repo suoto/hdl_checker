@@ -64,5 +64,5 @@ def getSourceFileObjects(kwargs, workers=1):
             return [res.get() for res in results]
     finally:
         pool.close()
-        pool.terminate()
+        pool.join()
 

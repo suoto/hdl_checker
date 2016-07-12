@@ -169,6 +169,14 @@ class MSim(BaseBuilder):
         if source.filetype in ('verilog', 'systemverilog'):
             return self._buildVerilog(source, flags)
 
+    def _getExtraFlags(self, lang):
+        libs = []
+        for library in self._added_libraries + self._external_libraries[lang]:
+            libs = ['-L', library]
+        for path in self._include_paths[lang]:
+            libs += ['+incdir+' + str(path)]
+        return libs
+
     def _buildVhdl(self, source, flags=None):
         "Builds a VHDL file"
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
@@ -187,11 +195,16 @@ class MSim(BaseBuilder):
             cmd += ['-sv']
         if flags:
             cmd += flags
+
+        cmd += self._getExtraFlags('verilog')
         cmd += [source.filename]
 
         return self._subprocessRunner(cmd)
 
     def _createLibrary(self, source):
+        if source.library in self._added_libraries:
+            return
+        self._added_libraries.append(source.library)
         try:
             if p.exists(p.join(self._target_folder, source.library)):
                 return
