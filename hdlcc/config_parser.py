@@ -17,7 +17,7 @@
 import os.path as p
 import re
 import logging
-from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool as Pool
 
 import hdlcc.exceptions
 from hdlcc.parsers import getSourceFileObjects
@@ -158,7 +158,7 @@ class ConfigParser(object):
                  'library' : library,
                  'flags' : vunit_flags if path.endswith('.vhd') else []})
 
-        for source in getSourceFileObjects(_source_file_args, workers=3):
+        for source in getSourceFileObjects(_source_file_args, workers=2):
             self._sources[source.filename] = source
 
     def __repr__(self):
@@ -249,8 +249,7 @@ class ConfigParser(object):
         try:
             for _line in open(self.filename, 'r').readlines():
                 line = _replaceCfgComments("", _line)
-                line_sources = self._parseLine(line, parser_pool, _poolCallback)
-                sources_found += line_sources
+                sources_found += self._parseLine(line, parser_pool, _poolCallback)
 
             parser_pool.close()
             parser_pool.join()
