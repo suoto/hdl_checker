@@ -31,10 +31,7 @@ class BaseSourceFile(object):
     def __init__(self, filename, library='work', flags=None):
         self.filename = os.path.normpath(filename)
         self.library = library
-        if flags is None:
-            self.flags = []
-        else:
-            self.flags = flags
+        self.flags = flags if flags is not None else []
         self._design_units = []
         self._deps = []
         self._mtime = 0
@@ -53,8 +50,7 @@ class BaseSourceFile(object):
             '_design_units' : self._design_units,
             '_deps' : self._deps,
             '_mtime' : self._mtime,
-            'filetype' : self.filetype,
-            }
+            'filetype' : self.filetype}
         return state
 
     @classmethod
@@ -73,7 +69,6 @@ class BaseSourceFile(object):
         # pylint: enable=protected-access
 
         return obj
-
 
     def __repr__(self):
         return "BaseSourceFile('%s', library='%s', flags=%s)" % \
