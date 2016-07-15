@@ -17,9 +17,10 @@
 
 import os
 import os.path as p
-import shutil as shell
+import shutil
 import time
 import logging
+import unittest
 
 from nose2.tools import such
 
@@ -79,7 +80,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     def teardown():
         StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
-            shell.rmtree(it.DUMMY_PROJECT_FILE)
+            shutil.rmtree(it.DUMMY_PROJECT_FILE)
 
     with it.having('hdl_lib as reference and a valid project file'):
 
@@ -117,7 +118,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
-                shell.rmtree(target_dir)
+                shutil.rmtree(target_dir)
             if p.exists('modelsim.ini'):
                 _logger.warning("Modelsim ini found at %s",
                                 p.abspath('modelsim.ini'))
@@ -136,10 +137,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.assertFalse(it.project.finishedBuilding())
 
         @it.should('notify if a build is already running')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test002(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
             it.project.buildByDependency()
             while it.project._msg_queue.empty():
                 time.sleep(0.1)
@@ -156,10 +156,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
         @it.should('warn when trying to build a source before the build '
                    'thread completes')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test003(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
                               'foo.vhd')
 
@@ -248,10 +247,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get messages by path of a different source')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test007(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
                               'clock_divider.vhd')
 
@@ -282,10 +280,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get updated messages of a different source')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test008():
-            if BUILDER_NAME is None:
-                return
-
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
                               'clock_divider.vhd')
             it.assertTrue(it.project._msg_queue.empty())
@@ -311,10 +308,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('rebuild sources when needed within the same library')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test009():
-            if BUILDER_NAME is None:
-                return
-
             # Count how many messages each source has
             source_msgs = {}
 
@@ -362,10 +358,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             writeListToFile(very_common_pkg, code)
 
         @it.should('rebuild sources when needed for different libraries')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test010():
-            if BUILDER_NAME is None:
-                return
-
             # Count how many messages each source has
             source_msgs = {}
 
@@ -414,10 +409,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
         @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
                    "a design unit can't be found")
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test012():
-            if BUILDER_NAME is None:
-                return
-
             with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
                 it.project._findSourceByDesignUnit('some_lib.some_unit')
                 _logger.info("Raised exception: %s", str(exc))
@@ -458,7 +452,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             target_dir = it.project._config.getTargetDir()
 
             if p.exists(target_dir):
-                shell.rmtree(target_dir)
+                shutil.rmtree(target_dir)
             if p.exists('modelsim.ini'):
                 _logger.warning("Modelsim ini found at %s",
                                 p.abspath('modelsim.ini'))
@@ -467,9 +461,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
 
         @it.should("rebuild sources when needed")
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
         def test001():
-            if BUILDER_NAME is None:
-                return
             clk_en_generator = p.join(it.vim_hdl_examples_path,
                                       "basic_library", "clk_en_generator.vhd")
 
