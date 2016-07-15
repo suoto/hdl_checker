@@ -19,7 +19,8 @@
 import os.path as p
 import re
 import logging
-from multiprocessing.pool import ThreadPool as Pool
+#  from multiprocessing.pool import ThreadPool as Pool
+from multiprocessing import Pool
 
 import hdlcc.exceptions
 from hdlcc.parsers import getSourceFileObjects
@@ -123,13 +124,18 @@ class ConfigParser(object):
             builder_class.addIncludePath(
                 'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
                                   'include'))
-        else:
-            from vunit import VUnit
+            self._importVunitFiles(VUnit)
+
+        from vunit import VUnit
+        self._importVunitFiles(VUnit)
+
+    def _importVunitFiles(self, vunit_module):
+        "Imports VUnit sources from a VUnit module"
 
         # I'm not sure how this would work because VUnit specifies a
         # single VHDL revision for a whole project, so there can be
         # incompatibilities as this is really used
-        vunit_project = VUnit.from_argv(
+        vunit_project = vunit_module.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
 
         for func in (vunit_project.add_com,
@@ -240,26 +246,40 @@ class ConfigParser(object):
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
         self._parms['builder'] = 'fallback'
-        sources_found = []
-        parser_pool = Pool(2)
+        source_path_list = []
+        source_build_list = []
+        for _line in open(self.filename, 'r').readlines():
+            line = _replaceCfgComments("", _line)
+            line_source_list, line_build_list = self._parseLine(line)
+            source_path_list += line_source_list
+            source_build_list += line_build_list
 
-        # Callback to handle results from the process pool
-        def _poolCallback(source): # pylint: disable=missing-docstring
-            self._logger.debug("Adding pool result %s", str(source))
-            self._sources[source.filename] = source
-
+        # At this point we have a list of sources parsed from the config
+        # file and the info we need to build each one. We'll use a pool
+        # to speed up parsing (important especially libraries with many
+        # files. The multiprocessing.Pool class used to hang, so watch
+        # out if this behaves well enough to be used
         try:
-            for _line in open(self.filename, 'r').readlines():
-                line = _replaceCfgComments("", _line)
-                sources_found += self._parseLine(line, parser_pool, _poolCallback)
+            parser_pool = Pool(2)
+
+            # Callback to handle results from the process pool
+            def _poolCallback(source): # pylint: disable=missing-docstring
+                self._logger.debug("Adding pool result %s", str(source))
+                self._sources[source.filename] = source
+
+            for lang, build_info in source_build_list:
+                cls = VhdlSourceFile if lang == 'vhdl' else \
+                      VerilogSourceFile
+                parser_pool.apply_async(cls, args=build_info, callback=_poolCallback)
 
             parser_pool.close()
             parser_pool.join()
-            self._updateSourceList(sources_found)
         except:
             self._logger.exception("Something went wrong, terminating pool")
             parser_pool.terminate()
             raise
+
+        self._cleanUpSourcesList(source_path_list)
 
         # If after parsing we haven't found the configured target
         # dir, we'll use the builder name
@@ -302,7 +322,7 @@ class ConfigParser(object):
                         "Flag '%s' for '%s' was already set with value '%s'",
                         context, lang, self._parms[context][lang])
 
-    def _updateSourceList(self, sources):
+    def _cleanUpSourcesList(self, sources):
         """Removes sources we had found earlier and leave only the ones
         whose path are found in the 'sources' argument"""
 
@@ -316,9 +336,11 @@ class ConfigParser(object):
         for rm_path in rm_list:
             del self._sources[rm_path]
 
-    def _parseLine(self, line, pool, callback):
+    def _parseLine(self, line):
         "Parses a line a calls the appropriate extraction methods"
-        sources_found = []
+        source_path_list = []
+        source_build_list = []
+
         for match in [x.groupdict() for x in _configFileScan(line)]:
             if match['parameter'] is not None:
                 self._logger.info("match: '%s'", match)
@@ -326,17 +348,15 @@ class ConfigParser(object):
                                             match['parm_lang'], match['value'])
             else:
                 source_path = self._getSourcePath(match['path'])
-                sources_found += [source_path]
+                source_path_list += [source_path]
                 # Try to get the build info for this source. If we get nothing
                 # we just skip it
                 build_info = self._handleParsedSource(
                     match['lang'], match['library'], source_path, match['flags'])
                 if build_info:
-                    cls = VhdlSourceFile if match['lang'] == 'vhdl' else \
-                          VerilogSourceFile
-                    pool.apply_async(cls, args=build_info, callback=callback)
+                    source_build_list.append((match['lang'], build_info))
 
-        return sources_found
+        return source_path_list, source_build_list
 
     def _handleParsedParameter(self, parameter, lang, value):
         "Handles a parsed line that sets a parameter"
