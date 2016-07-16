@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -21,6 +23,7 @@ import shutil
 import time
 import logging
 import unittest
+from multiprocessing import Queue
 
 from nose2.tools import such
 
@@ -41,15 +44,13 @@ if BUILDER_NAME is not None:
 else:
     PROJECT_FILE = None
 
-from multiprocessing import Queue
-
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
     def __init__(self, project_file=None):
         if project_file is None:
-            super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
+            super(StandaloneProjectBuilder, self).__init__()
         else:
             super(StandaloneProjectBuilder, self).__init__(project_file)
 
