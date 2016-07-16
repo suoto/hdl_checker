@@ -28,7 +28,11 @@ from multiprocessing import Queue
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.utils import writeListToFile, addToPath, removeFromPath, samefile
+from hdlcc.utils import (writeListToFile,
+                         addToPath,
+                         removeFromPath,
+                         samefile,
+                         onCI)
 
 _logger = logging.getLogger(__name__)
 
@@ -96,8 +100,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
-            if os.environ.get('CI', '') == 'true' and \
-                    BUILDER_NAME is not None:
+            if onCI() and BUILDER_NAME is not None:
                 with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                     builder(it.DUMMY_PROJECT_FILE)
 
@@ -140,7 +143,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         @it.should('notify if a build is already running')
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
-        def test002(case):
+        def test002():
             it.project.buildByDependency()
             while it.project._msg_queue.empty():
                 time.sleep(0.1)
@@ -159,7 +162,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                    'thread completes')
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
-        def test003(case):
+        def test003():
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
                               'foo.vhd')
 
@@ -250,7 +253,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         @it.should('get messages by path of a different source')
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
-        def test007(case):
+        def test007():
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
                               'clock_divider.vhd')
 
