@@ -54,7 +54,7 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     _ui_handler = logging.getLogger('UI')
     def __init__(self, project_file=None):
         if project_file is None:
-            super(StandaloneProjectBuilder, self).__init__()
+            super(StandaloneProjectBuilder, self).__init__(PROJECT_FILE)
         else:
             super(StandaloneProjectBuilder, self).__init__(project_file)
 

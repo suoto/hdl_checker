@@ -16,7 +16,7 @@
 
 import re
 import logging
-from base_parser import BaseSourceFile
+from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
 
@@ -53,28 +53,18 @@ class VerilogSourceFile(BaseSourceFile):
     def _getParsedData(self):
         "Parses the source file to find design units and dependencies"
         design_units = []
-        libraries = []
 
         for match in self._iterDesignUnitMatches():
-            if match['module_name'] is not None:
-                if match['module_name'] not in design_units:
-                    design_units += [{
-                        'name' : match['module_name'],
-                        'type' : 'entity'}]
+            if match['module_name'] not in design_units:
+                design_units += [{
+                    'name' : match['module_name'],
+                    'type' : 'entity'}]
 
-        return design_units, self._getDependencies(libraries)
+        return design_units
 
     def _doParse(self):
         """Finds design units and dependencies then translate some design
         units into information useful in the conext of the project"""
-        design_units, dependencies = self._getParsedData()
 
-        self._design_units = []
-        for design_unit in design_units:
-            if design_unit['type'] == 'package body':
-                dependencies += [{'library' : self.library, 'unit': design_unit['name']}]
-            else:
-                self._design_units += [design_unit]
-
-        self._deps = dependencies
+        self._design_units = self._getParsedData()
 
