@@ -287,7 +287,10 @@ class ConfigParser(object):
             self._parms['target_dir'] = "." + self._parms['builder']
 
         # Set default flags if the user hasn't specified any
-        self._setDefaultBuildFlagsIfNeeded()
+        try:
+            self._setDefaultBuildFlagsIfNeeded()
+        except:
+            self._logger.exception("Ops!!")
 
         # If the configured target folder is not absolute, we assume it
         # should be relative to the folder where the configuration file
@@ -309,7 +312,7 @@ class ConfigParser(object):
         # If the global/batch/single flags list is not set, overwrite
         # with the values given by the builder class
         for context in builder_class.default_flags:
-            for lang in ('vhdl', 'verilog', 'systemverilog'):
+            for lang in builder_class.default_flags[context]:
                 if not self._parms[context][lang]:
                     self._logger.debug(
                         "Flag '%s' for '%s' wasn't set, using the default "

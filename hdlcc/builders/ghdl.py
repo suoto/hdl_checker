@@ -29,6 +29,11 @@ class GHDL(BaseBuilder):
     builder_name = 'ghdl'
     file_types = ['vhdl', 'vhd']
 
+    # Default build flags
+    default_flags = {
+        'global_build_flags' : {
+            'vhdl' : ['-fexplicit', '-frelaxed-rules']}}
+
     # GHDL specific class properties
     _stdout_message_parser = re.compile(
         r"^(?P<filename>.*):(?=\d)"
@@ -70,8 +75,7 @@ class GHDL(BaseBuilder):
             'filename'      : None,
             'error_number'  : None,
             'error_type'    : None,
-            'error_message' : None,
-            }
+            'error_message' : None}
 
         for match in self._stdout_message_parser(line):
             _dict = match.groupdict()
