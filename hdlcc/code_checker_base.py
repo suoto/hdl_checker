@@ -413,8 +413,9 @@ class HdlCodeCheckerBase(object):
                     elif record['error_type'] == 'W':
                         _logger.debug(str(record))
                         warnings += 1
-                    else: # pragma: no cover
+                    elif self.builder.builder_name != 'xvhdl': # pragma: no cover
                         _logger.error("Invalid record: %s", str(record))
+                        raise ValueError("Record '%s' is invalid" % record)
                 built += 1
             self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
                     built, errors, warnings)

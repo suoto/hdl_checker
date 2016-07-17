@@ -25,7 +25,8 @@ if ($env:APPVEYOR -ne "True") {
 if ($env:BUILDER_NAME -eq "msim") {
     $env:BUILDER_PATH="$env:CI_WORK_PATH\\modelsim_ase\\win32aloem"
 } elseif ($env:BUILDER_NAME -eq "ghdl") {
-    $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
+    # $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
+    $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.33"
     $env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
 }
 
