@@ -74,12 +74,12 @@ def setupSignalHandlers():
 
 def _getProjectDiags(project_file):
     "Get project specific diagnose"
-    diags = {}
+    diags = []
     server = _getServerByProjectFile(project_file)
     if server.builder is not None:
-        diags['builder'] = server.builder.builder_name
+        diags += ["Builder: %s" % server.builder.builder_name]
     else:
-        diags['builder'] = '<unknown>'
+        diags += ["Builder: <unknown> (config file parsing is underway)"]
 
     return diags
 
@@ -88,17 +88,17 @@ def getDiagnoseInfo():
     "Collects misc diagnose info for the clients"
     _logger.info("Collecting diagnose info")
     project_file = bottle.request.forms.get('project_file')
-    response = {}
-    response['hdlcc version'] = hdlcc.__version__
+    response = ["hdlcc version: %s" % hdlcc.__version__,
+                "Server PID: %d" % os.getpid()]
 
     if project_file is not None and p.exists(project_file):
-        response.update(_getProjectDiags(project_file))
+        response += _getProjectDiags(project_file)
 
     _logger.info("Diagnose info collected:")
-    for key, val in response.items():
-        _logger.info(" - %s: %s", key, val)
+    for diag in response:
+        _logger.info(" - %s", diag)
 
-    return response
+    return {'info' : response}
 
 @app.post('/get_messages_by_path')
 def getMessagesByPath():

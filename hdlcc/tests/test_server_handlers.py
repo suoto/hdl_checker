@@ -138,33 +138,29 @@ with such.A("hdlcc server") as it:
         @it.should("get diagnose info without any project")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
         @it.should("get diagnose info with an existing project file before it has "
                    "parsed the configuration file")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                                   data={'project_file' : PROJECT_FILE})
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertIn('hdlcc version', content)
-            it.assertNotIn('error', content)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(
-                content,
-                {"builder": "<unknown>", "hdlcc version": hdlcc.__version__})
+            for expected in (
+                    u'hdlcc version: %s' % hdlcc.__version__,
+                    u'Builder: <unknown> (config file parsing is underway)'):
+                it.assertIn(expected, info)
 
         @it.should("get diagnose info with a non existing project file")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                                   data={'project_file' : 'some_project'})
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
         @it.should("get UI warning when getting messages before project build "
                    "has finished")
