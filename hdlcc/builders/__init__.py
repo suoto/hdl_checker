@@ -26,6 +26,7 @@ from .xvhdl import XVHDL
 _logger = logging.getLogger(__name__)
 
 def getBuilderByName(name):
+    "Returns the builder class given a string name"
     # Check if the builder selected is implemented and create the
     # builder attribute
     if name == 'msim':

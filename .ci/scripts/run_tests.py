@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # This file is part of hdlcc.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # hdlcc is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -31,6 +33,7 @@ _LOG = p.abspath(p.expanduser("~/tests.log"))
 
 def noseRunner(nose2_argv):
     "Runs nose2 with coverage"
+    _logger.info("nose2 args: %s", repr(nose2_argv))
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
 

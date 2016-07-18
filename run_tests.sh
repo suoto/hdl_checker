@@ -107,7 +107,7 @@ fi
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser hdlcc.tests.test_vhdl_source_file hdlcc.tests.test_verilog_source_file
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi

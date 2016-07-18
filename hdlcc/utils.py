@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -204,4 +206,25 @@ if not hasattr(p, 'samefile'):
         return os.stat(file1) == os.stat(file2)
 else:
     samefile = p.samefile # pylint: disable=invalid-name
+
+def findFilesInPath(path, func=None, recursive=True):
+    """
+    Finds files that match func(_file_), where _file_ is the relative
+    path to the item found.
+    """
+    if func is None:
+        func = lambda x: 1
+    if recursive:
+        for dirpath, _, filenames in os.walk(path):
+            for filename in filenames:
+                relpath_to_filename = p.join(dirpath, filename)
+                if func(relpath_to_filename):
+                    yield p.normpath(relpath_to_filename)
+    else:
+        for _path in os.listdir(path):
+            _path = p.join(path, _path)
+            if not p.isfile(_path):
+                continue
+            if func(_path):
+                yield p.normpath(_path)
 
