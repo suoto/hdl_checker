@@ -5,6 +5,7 @@
 [![codecov](https://codecov.io/gh/suoto/hdlcc/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdlcc)
 [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
 [![Code Health](https://landscape.io/github/suoto/hdlcc/master/landscape.svg?style=flat)](https://landscape.io/github/suoto/hdlcc/master)
+[![Join the chat at https://gitter.im/suoto/hdlcc](https://badges.gitter.im/suoto/hdlcc.svg)](https://gitter.im/suoto/hdlcc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdlcc)
 
 `hdlcc` provides a Python API between a VHDL project and some HDL compilers to
