@@ -40,8 +40,8 @@ BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDLCC_CI = os.environ['HDLCC_CI']
-VIM_HDL_EXAMPLES_PATH = p.join(HDLCC_CI, "vim-hdl-examples")
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+VIM_HDL_EXAMPLES_PATH = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 if BUILDER_NAME is not None:
     PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
@@ -94,7 +94,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         # Re enable VUnit if it was available
         hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
-    with it.having('hdl_lib as reference and a valid project file'):
+    with it.having('vim-hdl-examples as reference and a valid project file'):
 
         @it.has_setup
         def setup():
@@ -447,7 +447,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             addToPath(BUILDER_PATH)
 
-            it.vim_hdl_examples_path = p.join(HDLCC_CI, "vim-hdl-examples")
+            it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
             it.project.waitForBuild()

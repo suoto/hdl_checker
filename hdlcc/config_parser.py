@@ -19,8 +19,8 @@
 import os.path as p
 import re
 import logging
-#  from multiprocessing.pool import ThreadPool as Pool
-from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool as Pool
+#  from multiprocessing import Pool
 
 import hdlcc.exceptions
 from hdlcc.parsers import getSourceFileObjects
@@ -138,16 +138,18 @@ class ConfigParser(object):
         vunit_project = vunit_module.from_argv(
             ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
 
-        for func in (vunit_project.add_com,
-                     vunit_project.add_osvvm,
-                     vunit_project.add_array_util):
-            try:
-                func()
-            except: # pragma: no cover pylint:disable=bare-except
-                self._logger.exception("Error running '%s'", str(func))
-                # We only catch exceptions when this would break something for
-                # the user. We want it to break only inside CI
-                if onCI():  # pragma: no cover
+        # OSVVM is always avilable
+        vunit_project.add_osvvm()
+
+        # Communication library and array utility library are only
+        # available on VHDL 2008
+        if vunit_project.vhdl_standard == '2008':
+            for func in (vunit_project.add_com,
+                         vunit_project.add_array_util):
+                try:
+                    func()
+                except: # pragma: no cover pylint:disable=bare-except
+                    self._logger.exception("Error running '%s'", str(func))
                     raise
 
         # Get extra flags for building VUnit sources
@@ -470,6 +472,4 @@ class ConfigParser(object):
         if self.filename is None:
             return True
         return p.abspath(path) in self._sources.keys()
-
-
 

@@ -209,7 +209,7 @@ class HdlCodeCheckerBase(object):
         '''Checks if the builder can be called via self._getBuilderMessages
         or return info/messages identifying why it couldn't be done'''
 
-        if self._background_thread.isAlive():
+        if not self.finishedBuilding():
             self._handleUiWarning("Project hasn't finished building, try again "
                                   "after it finishes.")
             return []

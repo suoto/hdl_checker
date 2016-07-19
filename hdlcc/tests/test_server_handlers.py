@@ -31,15 +31,14 @@ from nose2.tools import such
 import hdlcc
 import hdlcc.utils as utils
 
-
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
 
-HDLCC_CI = os.environ['HDLCC_CI']
-HDL_LIB_PATH = p.abspath(p.join(HDLCC_CI, "hdl_lib"))
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+VIM_HDL_EXAMPLES_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
+    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
 else:
     PROJECT_FILE = None
 
@@ -65,6 +64,8 @@ with such.A("hdlcc server") as it:
                 pass
             time.sleep(1)
 
+        assert False, "Server is not replying after 30s"
+
     def waitUntilBuildFinishes(data):
         _logger.info("Waiting for 30s until build is finished")
         for i in range(30):
@@ -77,7 +78,9 @@ with such.A("hdlcc server") as it:
             _logger.debug("==> %s", ui_messages.json())
             if ui_messages.json()['ui_messages'] == []:
                 _logger.info("Ok, done")
-                break
+                return
+
+        assert False, "Server is still building after 30s"
 
     @it.has_setup
     def setup():
@@ -140,9 +143,12 @@ with such.A("hdlcc server") as it:
 
         @it.has_teardown
         def teardown():
-            if it._server.poll() is not None:
-                _logger.info("Server was alive, terminating it")
-                it._server.terminate()
+            #  if it._server.poll() is not None:
+            #      _logger.info("Server was alive, terminating it")
+            #      it._server.terminate()
+            #      os.kill(it._server.pid, 9)
+            it._server.terminate()
+            #  os.kill(it._server.pid, 9)
             utils.removeFromPath(BUILDER_PATH)
             time.sleep(2)
 
@@ -178,8 +184,8 @@ with such.A("hdlcc server") as it:
         def test():
             data = {
                 'project_file' : PROJECT_FILE,
-                'path'         : p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                        'async_fifo_tb.vhd')}
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
             ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
                                         data=data)
@@ -233,8 +239,8 @@ with such.A("hdlcc server") as it:
             def step_01_check_file_builds_ok():
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'memory',
-                                            'ram_inference_dport.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
                 ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
                                          data=data)
@@ -245,7 +251,7 @@ with such.A("hdlcc server") as it:
                 return reply.json()['messages'] + ui_reply.json()['ui_messages']
 
             def step_02_erase_target_folder():
-                target_folder = p.join(HDL_LIB_PATH, '.build')
+                target_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
                 it.assertTrue(
                     p.exists(target_folder),
                     "Target folder '%s' doesn't exists" % target_folder)
@@ -272,8 +278,8 @@ with such.A("hdlcc server") as it:
                 waitForServer()
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
-                                            'sr_delay.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitForServer()
                 waitUntilBuildFinishes(data)
 
@@ -322,8 +328,8 @@ with such.A("hdlcc server") as it:
             def step_01_check_file_builds_ok():
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'memory',
-                                            'ram_inference_dport.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
                 _logger.info("Waiting for any previous process to finish")
                 waitUntilBuildFinishes(data)
 
@@ -342,8 +348,8 @@ with such.A("hdlcc server") as it:
                 waitForServer()
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
-                                            'sr_delay.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitUntilBuildFinishes(data)
 
             def step_03_check_messages_are_the_same(msgs):

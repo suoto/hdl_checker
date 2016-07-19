@@ -33,7 +33,6 @@ if ($env:BUILDER_NAME -eq "msim") {
 }
 
 $env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
-$env:HDLCC_CI="$env:CI_WORK_PATH\\hdlcc_ci"
 $env:ARCH="32"
 
 if (!(Test-Path "$env:CI_WORK_PATH")) {
@@ -45,7 +44,6 @@ if (!(Test-Path "$env:CACHE_PATH")) {
 }
 
 "CACHE_PATH             $env:CACHE_PATH"
-"HDLCC_CI               $env:HDLCC_CI"
 "ARCH                   $env:ARCH"
 "CI_WORK_PATH           $env:CI_WORK_PATH"
 "APPVEYOR               $env:APPVEYOR"

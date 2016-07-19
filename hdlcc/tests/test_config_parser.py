@@ -31,14 +31,15 @@ from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_CI = p.expanduser(os.environ['HDLCC_CI'])
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support',
-                      'test_config_parser')
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+
+TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
+    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
 
 with such.A('config parser object') as it:
     @it.has_setup
     def setup():
-        it.project_filename = p.join(TEST_SUPPORT_PATH,
+        it.project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                      'standard_project_file.prj')
 
     @it.has_teardown
@@ -65,36 +66,37 @@ with such.A('config parser object') as it:
         @it.should('extract target dir')
         def test():
             it.assertTrue(p.isabs(it.parser.getTargetDir()))
-            it.assertEqual(it.parser.getTargetDir(),
-                           p.abspath(p.join(TEST_SUPPORT_PATH, '.build')))
+            it.assertEqual(
+                it.parser.getTargetDir(),
+                p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.build')))
 
         @it.should('extract build flags for single build')
         def test():
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
             it.assertItemsEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
 
         @it.should('extract build flags for batch builds')
         def test():
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
         @it.should('include VHDL and Verilog sources')
@@ -102,17 +104,17 @@ with such.A('config parser object') as it:
             it.assertItemsEqual(
                 [x.filename for x in it.parser.getSources()
                  if 'vunit' not in x.filename],
-                [p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_file.vhd')),
-                 p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_package.vhd')),
-                 p.abspath(p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
-                 p.abspath(p.join(TEST_SUPPORT_PATH, 'foo.v')),
-                 p.abspath(p.join(TEST_SUPPORT_PATH, 'bar.sv'))])
+                [p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
+                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
+                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
+                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
+                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))])
 
         @it.should('tell correctly if a path is on the project file')
-        @params((p.join(TEST_SUPPORT_PATH, 'sample_file.vhd'), True),
-                (p.join(TEST_SUPPORT_PATH, 'foo.v'), True),
-                (p.join(TEST_SUPPORT_PATH, 'bar.sv'), True),
-                (p.join(TEST_SUPPORT_PATH, 'hello_world.vhd'), False))
+        @params((p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd'), True),
+                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'), True),
+                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'), True),
+                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'hello_world.vhd'), False))
         def test(case, path, result):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.hasSource(path), result)
@@ -121,22 +123,22 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 ['-g0', '-g1', '-b0', '-b1', '-build-using', 'some', 'way', ])
             it.assertEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'sample_testbench.vhd')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 ['-g0', '-g1', '-s0', '-s1', '-build-using', 'some', 'way', ])
 
         @it.should('return build flags for a Verilog file')
         def test():
             it.assertEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'foo.v')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
                 ['-permissive', '-some-flag', 'some', 'value', ])
             it.assertEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'foo.v')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
                 ['-lint', '-hazards', '-pedanticerrors', '-some-flag',
                  'some', 'value'])
 
@@ -144,11 +146,11 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(
                 it.parser.getBatchBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'bar.sv')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
                 ['-permissive', 'some', 'sv', 'flag'])
             it.assertEqual(
                 it.parser.getSingleBuildFlagsByPath(
-                    p.join(TEST_SUPPORT_PATH, 'bar.sv')),
+                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
                 ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
 
     @it.should('raise UnknownParameterError exception when an unknown parameter '
@@ -156,14 +158,14 @@ with such.A('config parser object') as it:
     def test():
         with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
             hdlcc.config_parser.ConfigParser(
-                p.join(TEST_SUPPORT_PATH, 'project_unknown_parm.prj'))
+                p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_unknown_parm.prj'))
 
     @it.should('assign a default value for target dir equal to the builder value')
     def test():
         parser = hdlcc.config_parser.ConfigParser(
-            p.join(TEST_SUPPORT_PATH, 'project_no_target.prj'))
+            p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_no_target.prj'))
         it.assertEquals(parser.getTargetDir(),
-                        p.abspath(p.join(TEST_SUPPORT_PATH, '.msim')))
+                        p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.msim')))
 
     with it.having('no project file'):
         @it.should('create the object without error')
@@ -180,21 +182,21 @@ with such.A('config parser object') as it:
             it.assertEqual(it.parser.getTargetDir(), '.fallback')
 
         @it.should('return empty single build flags for any path')
-        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), [])
 
         @it.should('return empty batch build flags for any path')
-        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), [])
 
         @it.should('say every path is on the project file')
-        @params(HDLCC_CI + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
@@ -244,7 +246,7 @@ with such.A('config parser object') as it:
         @it.has_setup
         def setup():
             it.project_filename = 'test.prj'
-            it.lib_path = p.join(HDLCC_CI, 'vim-hdl-examples')
+            it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
             it.config_content = [
                 r'vhdl work ' + p.join(it.lib_path, 'another_library',
                                        'foo.vhd'),

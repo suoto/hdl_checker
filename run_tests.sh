@@ -63,10 +63,6 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
 fi
 
 git clean -fdx && git submodule foreach --recursive git clean -fdx
-cd "${HDLCC_CI}" && git reset HEAD --hard \
-  && git submodule foreach --recursive git reset HEAD --hard \
-  && git clean -fdx && git submodule foreach --recursive git clean -fdx
-cd - || exit
 
 set -x
 set +e
@@ -137,7 +133,7 @@ if [ -n "${XVHDL}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi
 
-  ${TEST_RUNNER} "${ARGS[@]}"
+  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}"
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi

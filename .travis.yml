@@ -18,8 +18,6 @@ python:
   - "2.7"
 
 env:
-  global:
-    - HDLCC_CI="${HOME}/hdlcc_ci"
   matrix:
     - BUILDER=msim
     - BUILDER=ghdl
@@ -45,7 +43,6 @@ before_install:
 
 before_script:
   - "git submodule update"
-  - "git clone https://github.com/suoto/hdlcc_ci ${HDLCC_CI} --recursive"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
   - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi

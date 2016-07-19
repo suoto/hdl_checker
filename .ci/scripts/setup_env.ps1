@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-write-host "HDLCC_CI=$env:HDLCC_CI"
 write-host "Configured builder is $env:BUILDER_NAME"
 
 $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
@@ -27,12 +26,6 @@ $env:PATH="$env:PYTHON;$env:PYTHON\Scripts;$env:PATH"
 Start-Process "git" -RedirectStandardError git.log -Wait -NoNewWindow -ArgumentList `
     "submodule update --init --recursive"
 get-content git.log
-
-if (!(Test-Path $env:HDLCC_CI)) {
-    Start-Process "git" -RedirectStandardError git.log -Wait -NoNewWindow -ArgumentList `
-        "clone https://github.com/suoto/hdlcc_ci $env:HDLCC_CI --recursive" 
-    get-content git.log
-}
 
 if ($env:APPVEYOR -eq "True") {
     appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py

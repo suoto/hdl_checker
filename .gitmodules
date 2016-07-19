@@ -7,3 +7,6 @@
 [submodule "dependencies/requests"]
 	path = dependencies/requests
 	url = https://github.com/kennethreitz/requests
+[submodule ".ci/test_support/vim-hdl-examples"]
+	path = .ci/test_support/vim-hdl-examples
+	url = https://github.com/suoto/vim-hdl-examples
