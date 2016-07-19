@@ -207,24 +207,3 @@ if not hasattr(p, 'samefile'):
 else:
     samefile = p.samefile # pylint: disable=invalid-name
 
-def findFilesInPath(path, func=None, recursive=True):
-    """
-    Finds files that match func(_file_), where _file_ is the relative
-    path to the item found.
-    """
-    if func is None:
-        func = lambda x: 1
-    if recursive:
-        for dirpath, _, filenames in os.walk(path):
-            for filename in filenames:
-                relpath_to_filename = p.join(dirpath, filename)
-                if func(relpath_to_filename):
-                    yield p.normpath(relpath_to_filename)
-    else:
-        for _path in os.listdir(path):
-            _path = p.join(path, _path)
-            if not p.isfile(_path):
-                continue
-            if func(_path):
-                yield p.normpath(_path)
-

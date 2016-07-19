@@ -19,7 +19,7 @@ python:
 
 env:
   global:
-    - HDLCC_CI="~/hdlcc_ci"
+    - HDLCC_CI="${HOME}/hdlcc_ci"
   matrix:
     - BUILDER=msim
     - BUILDER=ghdl

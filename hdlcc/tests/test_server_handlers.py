@@ -21,12 +21,12 @@ import sys
 import logging
 import os
 import os.path as p
-from nose2.tools import such
 import subprocess as subp
-import requests
 import time
 from multiprocessing import Queue, Process
 import shutil
+import requests
+from nose2.tools import such
 
 import hdlcc
 import hdlcc.utils as utils
@@ -78,6 +78,17 @@ with such.A("hdlcc server") as it:
             if ui_messages.json()['ui_messages'] == []:
                 _logger.info("Ok, done")
                 break
+
+    @it.has_setup
+    def setup():
+        # Force disabling VUnit
+        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
+        hdlcc.config_parser._HAS_VUNIT = False
+
+    @it.has_teardown
+    def teardown():
+        # Re enable VUnit if it was available
+        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
     with it.having("no PID attachment"):
         def setupPaths():

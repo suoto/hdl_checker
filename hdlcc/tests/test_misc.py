@@ -19,11 +19,10 @@
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
 import re
+import subprocess as subp
 import os.path as p
 import logging
 from nose2.tools import such
-
-from hdlcc.utils import findFilesInPath
 
 _logger = logging.getLogger(__name__)
 
@@ -62,10 +61,7 @@ with such.A("hdlcc sources") as it:
                 return False
             return path.split('.')[-1] in ('py', 'sh', 'ps1')
 
-        files = list(findFilesInPath(
-            p.abspath(p.join(p.dirname(__file__), "..", "..")),
-            _fileFilter,
-            True))
+        files = list(getFiles(_fileFilter))
 
         it.assertNotEquals(files, [], "Couldn't find any files!")
         _logger.info("Files found: %s", ", ".join(files))
@@ -79,6 +75,12 @@ with such.A("hdlcc sources") as it:
 
         it.assertEquals(bad_files, [],
                         "Some files have problems: %s" % ", ".join(bad_files))
+
+    def getFiles(func):
+        for filename in subp.check_output(
+                ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
+            if func(filename):
+                yield p.abspath(filename)
 
     def checkFile(filename):
         lines = open(filename, 'r').read()

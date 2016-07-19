@@ -76,6 +76,10 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
     @it.has_setup
     def setup():
+        # Force disabling VUnit
+        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
+        hdlcc.config_parser._HAS_VUNIT = False
+
         StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
@@ -86,6 +90,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
             shutil.rmtree(it.DUMMY_PROJECT_FILE)
+
+        # Re enable VUnit if it was available
+        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
     with it.having('hdl_lib as reference and a valid project file'):
 

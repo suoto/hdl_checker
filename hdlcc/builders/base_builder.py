@@ -136,7 +136,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         """Static method that converts a string into a dict that has
         elements identifying its fields"""
 
-    def _getUnitsToRebuild(self, line):
+    def _getUnitsToRebuild(self, line): # pragma: no cover
         "Finds units that the builders is telling us to rebuild"
         raise NotImplementedError
 
@@ -150,7 +150,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
         "Runs a shell command and handles stdout catching"
-        if env is not None:
+        if env is not None: # pragma: no cover
             subp_env = env
         else:
             subp_env = os.environ
@@ -174,7 +174,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             log = self._logger.warning
 
         for line in stdout:
-            if line == '' or line.isspace():
+            if line == '' or line.isspace(): # pragma: no cover
                 continue
             log("> " + repr(line))
 
@@ -211,7 +211,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                     if rebuild not in rebuilds:
                         rebuilds += [rebuild]
 
-            except NotImplementedError:
+            except NotImplementedError: # pragma: no cover
                 pass
 
         if exc_lines: # pragma: no cover
