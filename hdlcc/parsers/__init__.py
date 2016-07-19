@@ -21,7 +21,6 @@ _logger = logging.getLogger(__name__)
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 from hdlcc.parsers.verilog_source_file import VerilogSourceFile
 
-
 def _isVhdl(p):
     if p.lower().endswith('.vhd'):
         return True

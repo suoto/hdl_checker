@@ -48,14 +48,29 @@ _HEADER = re.compile(
 with such.A("hdlcc sources") as it:
     @it.should("contain the correct file header")
     def test():
-        hdlcc_path = p.abspath(p.join(p.dirname(__file__), ".."))
-        files = list(findFilesInPath(hdlcc_path, lambda x: str(x).endswith('.py')))
+
+        def _fileFilter(path):
+            # Exclude dependencies
+            if 'bottle' in path.split(p.sep):
+                return False
+            if 'requests' in path.split(p.sep):
+                return False
+            if 'waitress' in path.split(p.sep):
+                return False
+            # Exclude versioneer files
+            if p.basename(path) in ('_version.py', 'versioneer.py'):
+                return False
+            return path.split('.')[-1] in ('py', 'sh', 'ps1')
+
+        files = list(findFilesInPath(
+            p.abspath(p.join(p.dirname(__file__), "..", "..")),
+            _fileFilter,
+            True))
+
+        it.assertNotEquals(files, [], "Couldn't find any files!")
         _logger.info("Files found: %s", ", ".join(files))
         bad_files = []
         for filename in files:
-            if p.basename(filename) in ('_version.py', ):
-                _logger.debug("Skipping %s", filename)
-                continue
             if checkFile(filename):
                 _logger.debug("%s: Ok", filename)
             else:

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# This file is part of hdlcc.
+# This file is part of HDL Code Checker.
 #
 # Copyright (c) 2016 Andre Souto
 #
-# hdlcc is free software: you can redistribute it and/or modify
+# HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# hdlcc is distributed in the hope that it will be useful,
+# HDL Code Checker is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with hdlcc.  If not, see <http://www.gnu.org/licenses/>.
+# along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 
@@ -107,7 +107,10 @@ fi
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser hdlcc.tests.test_vhdl_source_file hdlcc.tests.test_verilog_source_file
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
+                              hdlcc.tests.test_vhdl_source_file \
+                              hdlcc.tests.test_verilog_source_file \
+                              hdlcc.tests.test_misc
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
