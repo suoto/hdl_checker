@@ -274,7 +274,7 @@ class ConfigParser(object):
         # If after parsing we haven't found the configured target
         # dir, we'll use the builder name
         if 'target_dir' not in self._parms.keys():
-            self._parms['target_dir'] = "." + self._parms['builder']
+            self._parms['target_dir'] = ".hdlcc"
 
         # Set default flags if the user hasn't specified any
         self._setDefaultBuildFlagsIfNeeded()

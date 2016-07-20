@@ -164,8 +164,9 @@ with such.A('config parser object') as it:
     def test():
         parser = hdlcc.config_parser.ConfigParser(
             p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_no_target.prj'))
-        it.assertEquals(parser.getTargetDir(),
-                        p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.msim')))
+        it.assertEquals(
+            parser.getTargetDir(),
+            p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.hdlcc')))
 
     with it.having('no project file'):
         @it.should('create the object without error')

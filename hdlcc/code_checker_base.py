@@ -71,26 +71,19 @@ class HdlCodeCheckerBase(object):
 
         self.buildByDependency()
 
-    @staticmethod
-    def _getCacheFilename(project_file):
+    def _getCacheFilename(self):
         "Returns the cache file name for a given project file"
-        return p.join(p.dirname(project_file), \
-            '.' + p.basename(project_file))
-
-    @staticmethod
-    def cleanProjectCache(project_file):
-        "Clean up cached file"
-        if project_file is None:
-            _logger.debug("Project file is None, can't clean")
-            return
-        cache_fname = HdlCodeCheckerBase._getCacheFilename(project_file)
-        if p.exists(cache_fname):
-            _logger.debug("Removing cached info in '%s'", cache_fname)
-            os.remove(cache_fname)
+        if self._config is None:
+            return None
+        return p.join(self._config.getTargetDir(), '.hdlcc.cache')
 
     def clean(self):
         "Clean up generated files"
-        self.cleanProjectCache(self._config.filename)
+        cache_fname = self._getCacheFilename()
+        if cache_fname is not None and p.exists(cache_fname):
+            _logger.debug("Removing cached info in '%s'", cache_fname)
+            os.remove(cache_fname)
+
         target_dir = self._config.getTargetDir()
         if p.exists(target_dir):
             _logger.debug("Removing target dir '%s'", target_dir)
@@ -288,7 +281,7 @@ class HdlCodeCheckerBase(object):
 
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
-        cache_fname = self._getCacheFilename(self._config.filename)
+        cache_fname = self._getCacheFilename()
 
         state = {'serializer' : serializer.__name__,
                  '_logger': {'name' : self._logger.name,
@@ -301,13 +294,16 @@ class HdlCodeCheckerBase(object):
         _dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self):
-        '''Tries to recover cached info for the given project_file.
-        If something goes wrong, assume the cache is invalid and return
-        nothing. Otherwise, return the cached object'''
-        if self.project_file is None:
+        """
+        Tries to recover cached info for the given project_file. If
+        something goes wrong, assume the cache is invalid and return
+        nothing. Otherwise, return the cached object
+        """
+        cache_fname = self._getCacheFilename()
+        if self.project_file is None or cache_fname is None:
             self._logger.debug("Can't recover cache from None")
             return
-        cache_fname = self._getCacheFilename(self.project_file)
+
         _logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
         if p.exists(cache_fname):
