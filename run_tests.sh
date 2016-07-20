@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
-# This file is part of hdlcc.
+# This file is part of HDL Code Checker.
 #
-# hdlcc is free software: you can redistribute it and/or modify
+# Copyright (c) 2016 Andre Souto
+#
+# HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# hdlcc is distributed in the hope that it will be useful,
+# HDL Code Checker is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with hdlcc.  If not, see <http://www.gnu.org/licenses/>.
+# along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 
 ARGS=()
 
-CLEAN=0
+CLEAN_PIP=1
 
 while [ -n "$1" ]; do
-  if [ "$1" == "ghdl" ]; then
+  if [ "$1" == "-h" ]; then
+    HELP=1
+  elif [ "$1" == "ghdl" ]; then
     GHDL=1
   elif [ "$1" == "msim" ]; then
     MSIM=1
@@ -29,10 +33,8 @@ while [ -n "$1" ]; do
     XVHDL=1
   elif [ "$1" == "fallback" ]; then
     FALLBACK=1
-  elif [ "$1" == "pip" ]; then
-    PIP=1
-  elif [ "$1" == "clean" ]; then
-    CLEAN=1
+  elif [ "$1" == "reuse-pip" ]; then
+    CLEAN_PIP=0
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
   else
@@ -45,6 +47,11 @@ while [ -n "$1" ]; do
   shift
 done
 
+if [ -n "${HELP}" ]; then
+  echo "Usage: $0 [ghdl|msim|xvhdl|fallback] [reuse-pip] [standalone]"
+  exit 0
+fi
+
 
 if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   GHDL=1
@@ -52,15 +59,10 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   FALLBACK=1
   XVHDL=1
   STANDALONE=1
-  PIP=1
+  CLEAN_PIP=1
 fi
 
-if [ "${CLEAN}" == "1" ]; then
-  git clean -fdx && git submodule foreach --recursive git clean -fdx
-  cd ${HDLCC_CI} && git reset HEAD --hard \
-    && git clean -fdx && git submodule foreach --recursive git clean -fdx
-  cd - || exit
-fi
+git clean -fdx && git submodule foreach --recursive git clean -fdx
 
 set -x
 set +e
@@ -69,23 +71,23 @@ RESULT=0
 
 # If we're not running on a CI server, create a virtual env to mimic
 # its behaviour
-if [ -z "${CI}" ]; then
+if [ "${CLEAN_PIP}" == "1" -a -z "${CI}" ]; then
   if [ -d "${VIRTUAL_ENV_DEST}" ]; then
     rm -rf ${VIRTUAL_ENV_DEST}
   fi
+fi
 
+if [ -z "${CI}" ]; then
   virtualenv ${VIRTUAL_ENV_DEST}
   . ${VIRTUAL_ENV_DEST}/bin/activate
 
   pip install -r requirements.txt
+  pip install git+https://github.com/suoto/rainbow_logging_handler
 fi
 
 pip uninstall hdlcc -y
-if [ -n "${VIRTUAL_ENV}" ]; then
-  pip install -e .
-else
-  pip install -e . --user
-fi
+pip install -e .
+
 RESULT=$(($? || RESULT))
 [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 
@@ -101,7 +103,10 @@ fi
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser hdlcc.tests.test_source_file
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
+                              hdlcc.tests.test_vhdl_source_file \
+                              hdlcc.tests.test_verilog_source_file \
+                              hdlcc.tests.test_misc
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
@@ -128,7 +133,7 @@ if [ -n "${XVHDL}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi
 
-  ${TEST_RUNNER} "${ARGS[@]}"
+  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}"
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
@@ -155,8 +160,6 @@ fi
 coverage combine
 coverage html
 # coverage report
-
-[ -z "${CI}" ] && [ -n "${VIRTUAL_ENV}" ] && deactivate
 
 exit "${RESULT}"
 

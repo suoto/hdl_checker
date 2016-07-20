@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -183,7 +185,7 @@ def getStaticMessages(vbuffer=None):
 
 def standalone(): # pragma: no cover
     import sys
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
         print arg
         for message in getStaticMessages(open(arg, 'r').read().split('\n')):

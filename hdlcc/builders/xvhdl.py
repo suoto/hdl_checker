@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -24,6 +26,8 @@ class XVHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'xvhdl'
+    # TODO: Add xvlog support
+    file_types = ('vhdl', )
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
@@ -39,8 +43,6 @@ class XVHDL(BaseBuilder):
         flags=re.I).finditer
 
     def _shouldIgnoreLine(self, line):
-        if re.match(r"^\s*$", line):
-            return True
         if 'ignored due to previous errors' in line:
             return True
         return not (line.startswith('ERROR') or
@@ -54,7 +56,7 @@ class XVHDL(BaseBuilder):
 
     def _makeMessageRecords(self, line):
         line_number = None
-        column = ''
+        column = None
         filename = None
         error_number = None
         error_type = None
@@ -73,7 +75,7 @@ class XVHDL(BaseBuilder):
             filename = _dict['filename']
             error_number = _dict['error_number']
             error_type = _dict['error_type']
-            error_message = _dict['error_message']
+            error_message = _dict['error_message'].strip()
 
         return [{
             'checker'        : self.builder_name,

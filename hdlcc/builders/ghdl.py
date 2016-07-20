@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -25,6 +27,12 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'ghdl'
+    file_types = ['vhdl', 'vhd']
+
+    # Default build flags
+    default_flags = {
+        'global_build_flags' : {
+            'vhdl' : ['-fexplicit', '-frelaxed-rules']}}
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(
@@ -43,7 +51,7 @@ class GHDL(BaseBuilder):
         r"ghdl: compilation error", ])).match
 
     _iter_rebuild_units = re.compile(
-        r'(entity "(?P<unit_name>\w+)" is obsoleted by package "\w+"'
+        r'((entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
         r'|'
         r'file (?P<rebuild_path>.*)\s+has changed and must be reanalysed)',
         flags=re.I).finditer
@@ -67,8 +75,7 @@ class GHDL(BaseBuilder):
             'filename'      : None,
             'error_number'  : None,
             'error_type'    : None,
-            'error_message' : None,
-            }
+            'error_message' : None}
 
         for match in self._stdout_message_parser(line):
             _dict = match.groupdict()

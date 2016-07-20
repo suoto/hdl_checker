@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -21,6 +23,7 @@ import logging
 import signal
 import time
 import subprocess as subp
+from threading import Lock
 
 _logger = logging.getLogger(__name__)
 
@@ -30,10 +33,12 @@ def setupLogging(stream, level, color=True): # pragma: no cover
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
+            _lock = Lock()
             def isatty(self):
                 return color
             def write(self, *args, **kwargs):
-                super(Stream, self).write(*args, **kwargs)
+                with self._lock:
+                    super(Stream, self).write(*args, **kwargs)
 
         stream = Stream(stream, 'ab', buffering=1)
 
@@ -182,4 +187,23 @@ def onTravis(): # pragma: no cover
 def onCI(): # pragma: no cover
     return 'CI' in os.environ
 # pylint: enable=missing-docstring
+
+def getFileType(filename):
+    "Gets the file type of a source file"
+    extension = filename[str(filename).rfind('.') + 1:].lower()
+    if extension in ['vhd', 'vhdl']:
+        return 'vhdl'
+    if extension == 'v':
+        return 'verilog'
+    if extension in ('sv', 'svh'):
+        return 'systemverilog'
+    assert False, "Unknown file type: '%s'" % extension
+
+
+if not hasattr(p, 'samefile'):
+    def samefile(file1, file2):
+        "Emulated version of os.path.samefile"
+        return os.stat(file1) == os.stat(file2)
+else:
+    samefile = p.samefile # pylint: disable=invalid-name
 

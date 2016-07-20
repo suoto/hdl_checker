@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -24,6 +26,7 @@ from .xvhdl import XVHDL
 _logger = logging.getLogger(__name__)
 
 def getBuilderByName(name):
+    "Returns the builder class given a string name"
     # Check if the builder selected is implemented and create the
     # builder attribute
     if name == 'msim':

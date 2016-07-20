@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -207,7 +209,7 @@ class HdlCodeCheckerBase(object):
         '''Checks if the builder can be called via self._getBuilderMessages
         or return info/messages identifying why it couldn't be done'''
 
-        if self._background_thread.isAlive():
+        if not self.finishedBuilding():
             self._handleUiWarning("Project hasn't finished building, try again "
                                   "after it finishes.")
             return []
@@ -348,8 +350,12 @@ class HdlCodeCheckerBase(object):
 
     def waitForBuild(self):
         "Waits until the background build finishes"
-        if self._background_thread.isAlive():
+        try:
             self._background_thread.join()
+            self._logger.debug("Background thread joined")
+        except RuntimeError:
+            self._logger.debug("Background thread was not active")
+
         with self._lock:
             self._logger.info("Build has finished")
 
@@ -407,8 +413,9 @@ class HdlCodeCheckerBase(object):
                     elif record['error_type'] == 'W':
                         _logger.debug(str(record))
                         warnings += 1
-                    else: # pragma: no cover
+                    elif self.builder.builder_name != 'xvhdl': # pragma: no cover
                         _logger.error("Invalid record: %s", str(record))
+                        raise ValueError("Record '%s' is invalid" % record)
                 built += 1
             self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
                     built, errors, warnings)

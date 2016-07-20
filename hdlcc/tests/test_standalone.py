@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -35,13 +37,12 @@ _BUILDER_ENV = os.environ.copy()
 _BUILDER_ENV["PATH"] = p.expandvars(os.pathsep.join([BUILDER_PATH, \
                                     _BUILDER_ENV["PATH"]]))
 
-HDLCC_CI = os.environ['HDLCC_CI']
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(HDLCC_CI, "hdl_lib", BUILDER_NAME + ".prj")
+    PROJECT_FILE = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples", BUILDER_NAME + ".prj")
 else:
     PROJECT_FILE = None
-
 
 def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
@@ -110,16 +111,16 @@ with such.A("hdlcc standalone tool") as it:
                 ("--debug-print-compile-order", ),
 
                 ("--build", "-s",
-                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
+                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
 
                 ("--debug-parse-source-file", "-s",
-                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
+                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
 
                 ("--debug-parse-source-file", "-s",
-                 p.join(HDLCC_CI, "hdl_lib/memory/ram_inference.vhd")),
+                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/basic_library/clk_en_generator.vhd")),
 
                 ("--debug-run-static-check", "-s",
-                 p.join(HDLCC_CI, "hdl_lib/memory/testbench/async_fifo_tb.vhd")),
+                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/basic_library/clock_divider.vhd")),
                 )
 
             def test(case, *args):
@@ -159,9 +160,6 @@ with such.A("hdlcc standalone tool") as it:
                     stdout = shell(cmd + ["-" + "v"*level])
                     it.assertTrue(len(stdout) >= previous)
                     previous = len(stdout)
-
-        #  with it.having("an invalid environment"):
-        #      pass
 
 if BUILDER_NAME is not None:
     it.createTests(globals())

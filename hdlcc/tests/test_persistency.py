@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -29,16 +31,16 @@ import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
-CACHE_BUILD_SPEEDUP = 10
+CACHE_BUILD_SPEEDUP = 5
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDLCC_CI = os.environ['HDLCC_CI']
-TEST_LIB_PATH = p.join(HDLCC_CI, "hdl_lib")
+VIM_HDL_EXAMPLES_PATH = p.join(
+    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'vim-hdl-examples')
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(TEST_LIB_PATH, BUILDER_NAME + '.prj')
+    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
 else:
     PROJECT_FILE = None
 

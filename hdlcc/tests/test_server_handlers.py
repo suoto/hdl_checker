@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -19,25 +21,24 @@ import sys
 import logging
 import os
 import os.path as p
-from nose2.tools import such
 import subprocess as subp
-import requests
 import time
 from multiprocessing import Queue, Process
 import shutil
+import requests
+from nose2.tools import such
 
 import hdlcc
 import hdlcc.utils as utils
 
-
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
 
-HDLCC_CI = os.environ['HDLCC_CI']
-HDL_LIB_PATH = p.abspath(p.join(HDLCC_CI, "hdl_lib"))
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+VIM_HDL_EXAMPLES_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
+    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
 else:
     PROJECT_FILE = None
 
@@ -63,19 +64,34 @@ with such.A("hdlcc server") as it:
                 pass
             time.sleep(1)
 
+        assert False, "Server is not replying after 30s"
+
     def waitUntilBuildFinishes(data):
         _logger.info("Waiting for 30s until build is finished")
         for i in range(30):
             time.sleep(1)
             _logger.info("Elapsed %ds", i)
             _ = requests.post(it._url + '/get_messages_by_path',
-                                           timeout=10, data=data)
+                              timeout=10, data=data)
             ui_messages = requests.post(it._url + '/get_ui_messages',
                                         timeout=10, data=data)
             _logger.debug("==> %s", ui_messages.json())
             if ui_messages.json()['ui_messages'] == []:
                 _logger.info("Ok, done")
-                break
+                return
+
+        assert False, "Server is still building after 30s"
+
+    @it.has_setup
+    def setup():
+        # Force disabling VUnit
+        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
+        hdlcc.config_parser._HAS_VUNIT = False
+
+    @it.has_teardown
+    def teardown():
+        # Re enable VUnit if it was available
+        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
     with it.having("no PID attachment"):
         def setupPaths():
@@ -101,7 +117,7 @@ with such.A("hdlcc server") as it:
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
                    '--host', it._host, '--port', it._port,
-                   '--log-level', 'DEBUG',
+                   '--log-level', 'ERROR',
                    '--attach-to-pid', str(os.getpid()),
                   ]
 
@@ -127,50 +143,49 @@ with such.A("hdlcc server") as it:
 
         @it.has_teardown
         def teardown():
-            if it._server.poll() is not None:
-                _logger.info("Server was alive, terminating it")
-                it._server.terminate()
+            #  if it._server.poll() is not None:
+            #      _logger.info("Server was alive, terminating it")
+            #      it._server.terminate()
+            #      os.kill(it._server.pid, 9)
+            it._server.terminate()
+            utils.terminateProcess(it._server.pid)
             utils.removeFromPath(BUILDER_PATH)
             time.sleep(2)
 
         @it.should("get diagnose info without any project")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
         @it.should("get diagnose info with an existing project file before it has "
                    "parsed the configuration file")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                                   data={'project_file' : PROJECT_FILE})
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertIn('hdlcc version', content)
-            it.assertNotIn('error', content)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(
-                content,
-                {"builder": "<unknown>", "hdlcc version": hdlcc.__version__})
+            for expected in (
+                    u'hdlcc version: %s' % hdlcc.__version__,
+                    u'Builder: <unknown> (config file parsing is underway)'):
+                it.assertIn(expected, info)
 
         @it.should("get diagnose info with a non existing project file")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
                                   data={'project_file' : 'some_project'})
-            content = reply.json()
+            info = reply.json()['info']
             _logger.info(reply.text)
-            it.assertNotIn('unknown', content['hdlcc version'])
-            it.assertEquals(content, {'hdlcc version' : hdlcc.__version__})
+            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
         @it.should("get UI warning when getting messages before project build "
                    "has finished")
         def test():
             data = {
                 'project_file' : PROJECT_FILE,
-                'path'         : p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                                        'async_fifo_tb.vhd')}
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
             ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
                                         data=data)
@@ -179,21 +194,25 @@ with such.A("hdlcc server") as it:
                                            timeout=10, data=data)
 
             _logger.info(build_messages.text)
-            _logger.info("Messages:")
-            for message in build_messages.json()['messages']:
-                _logger.info(message)
+            if build_messages.json()['messages']:
+                _logger.info("Messages:")
+                for message in build_messages.json()['messages']:
+                    _logger.info(message)
+            else:
+                _logger.warning("OMG! No message to log!")
 
-            it.assertEquals(
-                build_messages.json(),
-                {u'messages': [
-                    {u'checker'       : u'HDL Code Checker/static',
-                     u'column'        : 14,
-                     u'error_message' : u"constant 'ADDR_WIDTH' is never used",
-                     u'error_number'  : u'0',
-                     u'error_subtype' : u'Style',
-                     u'error_type'    : u'W',
-                     u'filename'      : None,
-                     u'line_number'   : 29}]})
+            # async_fifo_tb has changed; this is no longer valid
+            #  it.assertEquals(
+            #      build_messages.json(),
+            #      {u'messages': [
+            #          {u'checker'       : u'HDL Code Checker/static',
+            #           u'column'        : 14,
+            #           u'error_message' : u"constant 'ADDR_WIDTH' is never used",
+            #           u'error_number'  : u'0',
+            #           u'error_subtype' : u'Style',
+            #           u'error_type'    : u'W',
+            #           u'filename'      : None,
+            #           u'line_number'   : 29}]})
 
             ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
                                         data=data)
@@ -220,8 +239,8 @@ with such.A("hdlcc server") as it:
             def step_01_check_file_builds_ok():
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'memory',
-                                            'ram_inference_dport.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
                 ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
                                          data=data)
@@ -232,7 +251,7 @@ with such.A("hdlcc server") as it:
                 return reply.json()['messages'] + ui_reply.json()['ui_messages']
 
             def step_02_erase_target_folder():
-                target_folder = p.join(HDL_LIB_PATH, '.build')
+                target_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
                 it.assertTrue(
                     p.exists(target_folder),
                     "Target folder '%s' doesn't exists" % target_folder)
@@ -259,8 +278,8 @@ with such.A("hdlcc server") as it:
                 waitForServer()
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
-                                            'sr_delay.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitForServer()
                 waitUntilBuildFinishes(data)
 
@@ -309,8 +328,10 @@ with such.A("hdlcc server") as it:
             def step_01_check_file_builds_ok():
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'memory',
-                                            'ram_inference_dport.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
+                _logger.info("Waiting for any previous process to finish")
+                waitUntilBuildFinishes(data)
 
                 ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
                                          data=data)
@@ -327,8 +348,8 @@ with such.A("hdlcc server") as it:
                 waitForServer()
                 data = {
                     'project_file' : PROJECT_FILE,
-                    'path'         : p.join(HDL_LIB_PATH, 'common_lib',
-                                            'sr_delay.vhd')}
+                    'path'         : p.join(
+                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitUntilBuildFinishes(data)
 
             def step_03_check_messages_are_the_same(msgs):
@@ -381,7 +402,7 @@ with such.A("hdlcc server") as it:
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
-                   '--log-level', 'DEBUG',
+                   '--log-level', 'ERROR',
                    '--attach-to-pid', str(pid),
                   ]
 
@@ -396,6 +417,11 @@ with such.A("hdlcc server") as it:
             it._server = subp.Popen(cmd, env=os.environ.copy())
 
             waitForServer()
+
+        @it.has_teardown
+        def teardown():
+            it._server.terminate()
+            utils.terminateProcess(it._server.pid)
 
         @it.should("terminate when the parent PID is not running anymore")
         def test():

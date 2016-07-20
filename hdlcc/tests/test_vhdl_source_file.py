@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -19,7 +21,7 @@ import os
 import logging
 from nose2.tools import such
 
-from hdlcc.source_file import VhdlSourceFile
+from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 
 from hdlcc.utils import writeListToFile
 

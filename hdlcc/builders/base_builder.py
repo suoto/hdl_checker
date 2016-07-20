@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -18,7 +20,6 @@ import logging
 import os
 import os.path as p
 import abc
-import time
 import subprocess as subp
 from threading import Lock
 
@@ -31,13 +32,46 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     # Set an empty container for the default flags
     default_flags = {
-        'batch_build_flags' : [],
-        'single_build_flags' : [],
-        'global_build_flags' : []}
+        'batch_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []},
+        'single_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []},
+        'global_build_flags' : {
+            'vhdl' : [],
+            'verilog' : [],
+            'systemverilog' : []}
+        }
+
+    _external_libraries = {
+        'vhdl' : [],
+        'verilog' : []}
+
+    _include_paths = {
+        'vhdl' : [],
+        'verilog' : []}
+
+    @classmethod
+    def addExternalLibrary(cls, lang, library_name):
+        assert lang in cls._external_libraries, "Uknown language '%s'" & lang
+        if library_name not in cls._external_libraries[lang]:
+            cls._external_libraries[lang].append(library_name)
+
+    @classmethod
+    def addIncludePath(cls, lang, path):
+        if path not in cls._include_paths[lang]:
+            cls._include_paths[lang].append(path)
 
     @abc.abstractproperty
     def builder_name(self):
         "Defines the builder identification"
+
+    @abc.abstractproperty
+    def file_types(self):
+        "Returns the file types supported by the builder"
 
     def __init__(self, target_folder):
         # Shell accesses must be atomic
@@ -47,6 +81,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
         self._builtin_libraries = []
+        self._added_libraries = []
 
         # Skip creating a folder for the fallback builder
         if self.builder_name != 'fallback':
@@ -101,7 +136,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         """Static method that converts a string into a dict that has
         elements identifying its fields"""
 
-    def _getUnitsToRebuild(self, line):
+    def _getUnitsToRebuild(self, line): # pragma: no cover
         "Finds units that the builders is telling us to rebuild"
         raise NotImplementedError
 
@@ -115,7 +150,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
         "Runs a shell command and handles stdout catching"
-        if env is not None:
+        if env is not None: # pragma: no cover
             subp_env = env
         else:
             subp_env = os.environ
@@ -139,7 +174,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             log = self._logger.warning
 
         for line in stdout:
-            if line == '' or line.isspace():
+            if line == '' or line.isspace(): # pragma: no cover
                 continue
             log("> " + repr(line))
 
@@ -176,7 +211,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                     if rebuild not in rebuilds:
                         rebuilds += [rebuild]
 
-            except NotImplementedError:
+            except NotImplementedError: # pragma: no cover
                 pass
 
         if exc_lines: # pragma: no cover
@@ -196,25 +231,30 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             self._logger.debug("Records found")
             for record in records:
                 self._logger.debug(record)
-        else:
-            self._logger.debug("No records found")
 
         if rebuilds:
             self._logger.debug("Rebuilds found")
             for rebuild in rebuilds:
                 self._logger.debug(rebuild)
-        else:
-            self._logger.debug("No rebuild units found")
 
     @abc.abstractmethod
     def _createLibrary(self, library):
         """Callback called to create a library"""
 
+    def _isFileTypeSupported(self, source):
+        "Checks if a given path is supported by this builder"
+        return source.filetype in self.file_types
+
     def build(self, source, forced=False, flags=None):
         """Method that interfaces with parents and implements the
         building chain"""
 
-        start = time.time()
+        if not self._isFileTypeSupported(source):
+            self._logger.fatal("Source '%s' with file type '%s' is not "
+                               "supported", source.filename,
+                               source.filetype)
+            return [], []
+
         if source.abspath not in self._build_info_cache.keys():
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
@@ -255,8 +295,6 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                     'E' in [x['error_type'] for x in records]:
                 cached_info['compile_time'] = 0
 
-            end = time.time()
-            self._logger.debug("Compilation took %.2fs", (end - start))
         else:
             self._logger.debug("Nothing to do for %s", source)
             records = cached_info['records']

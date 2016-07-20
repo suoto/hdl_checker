@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -135,8 +137,13 @@ class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
 
 def runStandaloneSourceFileParse(fname):
     """Standalone source_file.VhdlSourceFile run"""
-    from hdlcc.source_file import VhdlSourceFile
-    source = VhdlSourceFile(fname)
+    from hdlcc.parsers import VhdlSourceFile, VerilogSourceFile
+
+    extension = fname.lower().split('.')[-1]
+    cls = VhdlSourceFile if extension in ('vhd', 'vhdl') else VerilogSourceFile
+
+    source = cls(fname)
+
     print "Source: %s" % source
 
     design_units = source.getDesignUnits()
@@ -216,6 +223,7 @@ def main():
     setupLogging(sys.stdout, runner_args.log_level)
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+    logging.getLogger('vunit.project').setLevel(logging.ERROR)
 
     # Running hdlcc with threads has two major drawbacks:
     # 1) Makes interrupting it impossible currently because each source

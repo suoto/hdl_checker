@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -25,16 +27,19 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'msim'
+    file_types = ('vhdl', 'verilog', 'systemverilog')
 
     # MSim specific class properties
-    _stdout_message_scanner = re.compile('|'.join([
-        r"^\*\*\s*([WE])\w+:\s*",
-        r"\((\d+)\):",
-        r"[\[\(]([\w-]+)[\]\)]\s*",
-        r"(.*\.(vhd|sv|svh)\b)",
-        r"\s*\(([\w-]+)\)",
-        r"\s*(.+)",
-        ]), re.I).scanner
+    _stdout_message_scanner = re.compile(
+        r"^\*\*\s*(?P<error_type>[WE])\w+\s*" \
+            r"(:\s*|\(suppressible\):\s*)"
+        r"(" \
+            r"(?P<filename>.*(?=\(\d+\)))"
+            r"\((?P<line_number>\d+)\):\s*"
+        r"|" \
+            r"\(vcom-\d+\)\s*"
+        r")"
+        r"(?P<error_message>.*)\s*").finditer
 
     _should_ignore = re.compile('|'.join([
         r"^\s*$",
@@ -57,10 +62,21 @@ class MSim(BaseBuilder):
 
     # Default build flags
     default_flags = {
-        'batch_build_flags' : ['-defercheck', '-nocheck', '-permissive'],
-        'single_build_flags' : ['-check_synthesis', '-lint', '-rangecheck',
-                                '-bindAtCompile', '-pedanticerrors'],
-        'global_build_flags' : ['-explicit',]}
+        'batch_build_flags' : {
+            'vhdl' : ['-defercheck', '-nocheck', '-permissive'],
+            'verilog' : ['-permissive', ],
+            'systemverilog' : ['-permissive', ]},
+
+        'single_build_flags' : {
+            'vhdl' : ['-check_synthesis', '-lint', '-rangecheck',
+                      '-bindAtCompile', '-pedanticerrors'],
+            'verilog' : ['-lint', '-hazards', '-pedanticerrors'],
+            'systemverilog' : ['-lint', '-hazards', '-pedanticerrors']},
+
+        'global_build_flags' : {
+            'vhdl' : ['-explicit',],
+            'verilog' : [],
+            'systemverilog' : []}}
 
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
@@ -82,44 +98,28 @@ class MSim(BaseBuilder):
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
     def _makeMessageRecords(self, line):
-        line_number = None
-        column = None
-        filename = None
-        error_number = None
-        error_type = None
-        error_message = None
+        records = []
 
-        scan = self._stdout_message_scanner(line)
+        for match in self._stdout_message_scanner(line):
+            info = {
+                'checker'        : self.builder_name,
+                'line_number'    : None,
+                'column'         : None,
+                'filename'       : None,
+                'error_number'   : None,
+                'error_type'     : None,
+                'error_message'  : None}
+            for key, content in match.groupdict().items():
+                info[key] = content
 
-        while True:
-            match = scan.match()
-            if not match:
-                break
+            if ('vcom-' in line) or ('vlog' in line):
+                info['error_number'] = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
 
-            if match.lastindex == 1:
-                error_type = match.group(match.lastindex)
-            if match.lastindex == 2:
-                line_number = match.group(match.lastindex)
-            if match.lastindex in (3, 6):
-                try:
-                    error_number = \
-                            re.findall(r"\d+", match.group(match.lastindex))[0]
-                except IndexError:
-                    error_number = 0
-            if match.lastindex == 4:
-                filename = match.group(match.lastindex)
-            if match.lastindex == 7:
-                error_message = match.group(match.lastindex)
+            info['error_message'] = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
+                                           info['error_message']).strip()
+            records += [info]
 
-        return [{
-            'checker'        : self.builder_name,
-            'line_number'    : line_number,
-            'column'         : column,
-            'filename'       : filename,
-            'error_number'   : error_number,
-            'error_type'     : error_type,
-            'error_message'  : error_message,
-        }]
+        return records
 
     def checkEnvironment(self):
         try:
@@ -166,6 +166,21 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, source, flags=None):
+        if source.filetype == 'vhdl':
+            return self._buildVhdl(source, flags)
+        if source.filetype in ('verilog', 'systemverilog'):
+            return self._buildVerilog(source, flags)
+
+    def _getExtraFlags(self, lang):
+        libs = []
+        for library in self._added_libraries + self._external_libraries[lang]:
+            libs = ['-L', library]
+        for path in self._include_paths[lang]:
+            libs += ['+incdir+' + str(path)]
+        return libs
+
+    def _buildVhdl(self, source, flags=None):
+        "Builds a VHDL file"
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
                '-work', p.join(self._target_folder, source.library)]
         if flags:
@@ -174,7 +189,24 @@ class MSim(BaseBuilder):
 
         return self._subprocessRunner(cmd)
 
+    def _buildVerilog(self, source, flags=None):
+        "Builds a Verilog/SystemVerilog file"
+        cmd = ['vlog', '-modelsimini', self._modelsim_ini, '-quiet',
+               '-work', p.join(self._target_folder, source.library)]
+        if source.filetype == 'systemverilog':
+            cmd += ['-sv']
+        if flags:
+            cmd += flags
+
+        cmd += self._getExtraFlags('verilog')
+        cmd += [source.filename]
+
+        return self._subprocessRunner(cmd)
+
     def _createLibrary(self, source):
+        if source.library in self._added_libraries:
+            return
+        self._added_libraries.append(source.library)
         try:
             if p.exists(p.join(self._target_folder, source.library)):
                 return

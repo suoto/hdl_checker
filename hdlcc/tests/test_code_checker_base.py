@@ -1,5 +1,7 @@
 # This file is part of HDL Code Checker.
 #
+# Copyright (c) 2016 Andre Souto
+#
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -17,14 +19,20 @@
 
 import os
 import os.path as p
-import shutil as shell
+import shutil
 import time
 import logging
+import unittest
+from multiprocessing import Queue
 
 from nose2.tools import such
 
 import hdlcc
-from hdlcc.utils import writeListToFile, addToPath, removeFromPath
+from hdlcc.utils import (writeListToFile,
+                         addToPath,
+                         removeFromPath,
+                         samefile,
+                         onCI)
 
 _logger = logging.getLogger(__name__)
 
@@ -32,15 +40,13 @@ BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
 
-HDLCC_CI = os.environ['HDLCC_CI']
-HDL_LIB_PATH = p.join(HDLCC_CI, "hdl_lib")
+TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+VIM_HDL_EXAMPLES_PATH = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(HDL_LIB_PATH, BUILDER_NAME + '.prj')
+    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
 else:
     PROJECT_FILE = None
-
-from multiprocessing import Queue
 
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
@@ -64,12 +70,16 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
-with such.A('hdlcc project') as it:
+with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
     @it.has_setup
     def setup():
+        # Force disabling VUnit
+        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
+        hdlcc.config_parser._HAS_VUNIT = False
+
         StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
@@ -79,9 +89,12 @@ with such.A('hdlcc project') as it:
     def teardown():
         StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
-            shell.rmtree(it.DUMMY_PROJECT_FILE)
+            shutil.rmtree(it.DUMMY_PROJECT_FILE)
 
-    with it.having('hdl_lib as reference and a valid project file'):
+        # Re enable VUnit if it was available
+        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
+
+    with it.having('vim-hdl-examples as reference and a valid project file'):
 
         @it.has_setup
         def setup():
@@ -94,8 +107,7 @@ with such.A('hdlcc project') as it:
 
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
-            if os.environ.get('CI', '') == 'true' and \
-                    BUILDER_NAME is not None:
+            if onCI() and BUILDER_NAME is not None:
                 with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                     builder(it.DUMMY_PROJECT_FILE)
 
@@ -117,7 +129,7 @@ with such.A('hdlcc project') as it:
             removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
-                shell.rmtree(target_dir)
+                shutil.rmtree(target_dir)
             if p.exists('modelsim.ini'):
                 _logger.warning("Modelsim ini found at %s",
                                 p.abspath('modelsim.ini'))
@@ -125,7 +137,7 @@ with such.A('hdlcc project') as it:
             del it.project
 
         @it.should('build project by dependency in background')
-        def test_001(case):
+        def test001(case):
             _logger.info("Creating project builder object")
             it.project = StandaloneProjectBuilder()
             _logger.info("Checking if msg queue is empty")
@@ -136,10 +148,9 @@ with such.A('hdlcc project') as it:
             it.assertFalse(it.project.finishedBuilding())
 
         @it.should('notify if a build is already running')
-        def test_002(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test002():
             it.project.buildByDependency()
             while it.project._msg_queue.empty():
                 time.sleep(0.1)
@@ -156,12 +167,11 @@ with such.A('hdlcc project') as it:
 
         @it.should('warn when trying to build a source before the build '
                    'thread completes')
-        def test_003(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
-            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                              'async_fifo_tb.vhd')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test003():
+            filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
+                              'foo.vhd')
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -183,22 +193,19 @@ with such.A('hdlcc project') as it:
                 it.assertIn(('warning', "Project hasn't finished building, "
                                         "try again after it finishes."),
                             messages)
-            except:
+                _logger.info("OK, the mesage was found")
+            finally:
                 _logger.warning("Waiting until the project finishes building")
                 it.project.waitForBuild()
-                raise
-
-            _logger.info("Waiting until the project finishes building")
-            it.project.waitForBuild()
 
         @it.should('wait until build has finished')
-        def test_004():
+        def test004():
             it.project.waitForBuild()
 
         @it.should('get messages by path')
-        def test_005():
-            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                              'async_fifo_tb.vhd')
+        def test005():
+            filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
+                              'foo.vhd')
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -206,10 +213,10 @@ with such.A('hdlcc project') as it:
 
             it.assertIn(
                 {'error_subtype' : 'Style',
-                 'line_number'   : 29,
+                 'line_number'   : 43,
                  'checker'       : 'HDL Code Checker/static',
-                 'error_message' : "constant 'ADDR_WIDTH' is never used",
-                 'column'        : 14,
+                 'error_message' : "signal 'neat_signal' is never used",
+                 'column'        : 12,
                  'error_type'    : 'W',
                  'error_number'  : '0',
                  'filename'      : None},
@@ -218,9 +225,9 @@ with such.A('hdlcc project') as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get updated messages')
-        def test_006():
-            filename = p.join(HDL_LIB_PATH, 'memory', 'testbench',
-                              'async_fifo_tb.vhd')
+        def test006():
+            filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
+                              'foo.vhd')
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -251,26 +258,44 @@ with such.A('hdlcc project') as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get messages by path of a different source')
-        def test_007(case):
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
-            filename = p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test007():
+            filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+                              'clock_divider.vhd')
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesByPath(filename)
+            records = []
+            for record in it.project.getMessagesByPath(filename):
+                it.assertTrue(samefile(filename, record.pop('filename')))
+                records += [record]
 
-            it.assertEquals(records, [])
+            if BUILDER_NAME == 'msim':
+                expected_records = [{
+                    'checker': 'msim',
+                    'column': None,
+                    'error_message': "Synthesis Warning: Reset signal 'reset' "
+                                     "is not in the sensitivity list of process "
+                                     "'line__45'.",
+                    'error_number': None,
+                    'error_type': 'W',
+                    'line_number': '45'}]
+            elif BUILDER_NAME == 'ghdl':
+                expected_records = []
+            elif BUILDER_NAME == 'xvhdl':
+                expected_records = []
+
+            it.assertEquals(records, expected_records)
 
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('get updated messages of a different source')
-        def test_008():
-            if BUILDER_NAME is None:
-                return
-
-            filename = p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd')
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test008():
+            filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+                              'clock_divider.vhd')
             it.assertTrue(it.project._msg_queue.empty())
 
             code = open(filename, 'r').read().split('\n')
@@ -294,40 +319,39 @@ with such.A('hdlcc project') as it:
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should('rebuild sources when needed within the same library')
-        def test_009():
-            if BUILDER_NAME is None:
-                return
-
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test009():
             # Count how many messages each source has
             source_msgs = {}
 
             for filename in (
-                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                    p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clk_en_generator.vhd')):
 
                 _logger.info("Getting messages for '%s'", filename)
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
 
-            _logger.info("Changing common_pkg to force rebuilding "
+            _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
                          "right now")
-            common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
-                                'common_pkg.vhd')
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+                                     'very_common_pkg.vhd')
 
-            code = open(common_pkg, 'r').read().split('\n')
+            code = open(very_common_pkg, 'r').read().split('\n')
 
-            writeListToFile(common_pkg,
-                            code[:9] + \
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
                             ["    constant TESTING : integer := 4;"] + \
-                            code[9:])
+                            code[22:])
 
             # The number of messages on all sources should not change
-            it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+            it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
             for filename in (
-                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                    p.join(HDL_LIB_PATH, 'common_lib', 'edge_detector.vhd')):
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clk_en_generator.vhd')):
 
                 if source_msgs[filename]:
                     _logger.info("Source %s had the following messages:\n%s",
@@ -342,43 +366,42 @@ with such.A('hdlcc project') as it:
                                 it.project.getMessagesByPath(filename))
 
             _logger.info("Restoring previous content")
-            writeListToFile(common_pkg, code)
+            writeListToFile(very_common_pkg, code)
 
         @it.should('rebuild sources when needed for different libraries')
-        def test_010():
-            if BUILDER_NAME is None:
-                return
-
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test010():
             # Count how many messages each source has
             source_msgs = {}
 
             for filename in (
-                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                    p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
 
                 _logger.info("Getting messages for '%s'", filename)
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
 
-            _logger.info("Changing common_pkg to force rebuilding "
+            _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
                          "right now")
-            common_pkg = p.join(HDL_LIB_PATH, 'common_lib',
-                                'common_pkg.vhd')
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+                                     'very_common_pkg.vhd')
 
-            code = open(common_pkg, 'r').read().split('\n')
+            code = open(very_common_pkg, 'r').read().split('\n')
 
-            writeListToFile(common_pkg,
-                            code[:9] + \
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
                             ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-                            code[9:])
+                            code[22:])
 
             # The number of messages on all sources should not change
-            it.assertEquals(it.project.getMessagesByPath(common_pkg), [])
+            it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
             for filename in (
-                    p.join(HDL_LIB_PATH, 'common_lib', 'sr_delay.vhd'),
-                    p.join(HDL_LIB_PATH, 'memory', 'ram_inference.vhd')):
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
 
                 if source_msgs[filename]:
                     _logger.info("Source %s had the following messages:\n%s",
@@ -393,20 +416,19 @@ with such.A('hdlcc project') as it:
                                 it.project.getMessagesByPath(filename))
 
             _logger.info("Restoring previous content")
-            writeListToFile(common_pkg, code)
+            writeListToFile(very_common_pkg, code)
 
         @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
                    "a design unit can't be found")
-        def test_012():
-            if BUILDER_NAME is None:
-                return
-
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test012():
             with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
                 it.project._findSourceByDesignUnit('some_lib.some_unit')
                 _logger.info("Raised exception: %s", str(exc))
 
             try:
-                sources = it.project._findSourceByDesignUnit('memory.async_fifo')
+                sources = it.project._findSourceByDesignUnit('another_library.foo')
                 for source in sources:
                     it.assertTrue(
                         p.exists(source.filename),
@@ -425,7 +447,7 @@ with such.A('hdlcc project') as it:
 
             addToPath(BUILDER_PATH)
 
-            it.vim_hdl_examples_path = p.join(HDLCC_CI, "vim-hdl-examples")
+            it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
             it.project.waitForBuild()
@@ -441,7 +463,7 @@ with such.A('hdlcc project') as it:
             target_dir = it.project._config.getTargetDir()
 
             if p.exists(target_dir):
-                shell.rmtree(target_dir)
+                shutil.rmtree(target_dir)
             if p.exists('modelsim.ini'):
                 _logger.warning("Modelsim ini found at %s",
                                 p.abspath('modelsim.ini'))
@@ -450,9 +472,9 @@ with such.A('hdlcc project') as it:
 
 
         @it.should("rebuild sources when needed")
-        def test_001():
-            if BUILDER_NAME is None:
-                return
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test001():
             clk_en_generator = p.join(it.vim_hdl_examples_path,
                                       "basic_library", "clk_en_generator.vhd")
 
