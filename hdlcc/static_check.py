@@ -185,7 +185,7 @@ def getStaticMessages(vbuffer=None):
 
 def standalone(): # pragma: no cover
     import sys
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
         print arg
         for message in getStaticMessages(open(arg, 'r').read().split('\n')):

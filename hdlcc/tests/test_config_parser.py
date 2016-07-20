@@ -213,7 +213,8 @@ with such.A('config parser object') as it:
         def test():
             # We'll add no project file, so the only sources that should
             # be fond are VUnit's files
-            sources = it.config_parser.ConfigParser().getSources()
+            parser = it.config_parser.ConfigParser()
+            sources = parser.getSources()
 
             it.assertEquals(
                 sources, [], "We shouldn't find any source but found %s" %
@@ -232,7 +233,8 @@ with such.A('config parser object') as it:
             # We'll add no project file, so the only sources that should
             # be fond are VUnit's files
             it.assertIn('vunit', sys.modules)
-            sources = hdlcc.config_parser.ConfigParser().getSources()
+            parser = hdlcc.config_parser.ConfigParser()
+            sources = parser.getSources()
 
             vunit_files = 0
             for source in sources:
@@ -248,43 +250,58 @@ with such.A('config parser object') as it:
             it.project_filename = 'test.prj'
             it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
             it.config_content = [
-                r'vhdl work ' + p.join(it.lib_path, 'another_library',
-                                       'foo.vhd'),
-                r'vhdl work ' + p.join(it.lib_path, 'basic_library',
-                                       'clock_divider.vhd'),
-            ]
+                r'vhdl work ' + p.normpath(p.join(
+                    it.lib_path, 'another_library', 'foo.vhd')),
+                r'vhdl work ' + p.normpath(p.join(
+                    it.lib_path, 'basic_library', 'clock_divider.vhd')),]
 
             writeListToFile(it.project_filename, it.config_content)
             it.parser = hdlcc.config_parser.ConfigParser(it.project_filename)
 
+        @it.has_teardown
+        def teardown():
+            os.remove(it.project_filename)
+
         @it.should("Find only the sources given then the extra source")
         def test_01():
+            _logger.info("Getting sources before adding the extra source")
             sources_pre = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:
                     sources_pre[source.filename] = source
+
+            _logger.info("Paths found:")
+            for source in sources_pre.keys():
+                _logger.info(" - %s", source)
 
             it.assertItemsEqual(
                 sources_pre.keys(),
                 [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
                  p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),])
 
+
+            _logger.info("Adding the extra source...")
             # Add an extra file
             writeListToFile(
                 it.project_filename,
-                it.config_content + [r'vhdl work ' + p.join(it.lib_path, 'basic_library',
-                                                            'very_common_pkg.vhd'), ])
+                it.config_content + [r'vhdl work ' + p.normpath(p.join(
+                    it.lib_path, 'basic_library', 'very_common_pkg.vhd'))])
 
             sources_post = {}
             for source in it.parser.getSources():
                 if 'vunit' not in source.filename:
                     sources_post[source.filename] = source
 
+            _logger.info("Paths found:")
+            for source in sources_post.keys():
+                _logger.info(" - %s", source)
+
+
             it.assertItemsEqual(
                 sources_post.keys(),
                 [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
                  p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')), ])
+                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')),])
 
             # Check the files originally found weren't re-created
             for path, source in sources_pre.items():

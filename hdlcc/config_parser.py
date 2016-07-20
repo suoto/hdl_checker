@@ -19,14 +19,12 @@
 import os.path as p
 import re
 import logging
-from multiprocessing.pool import ThreadPool as Pool
-#  from multiprocessing import Pool
+from threading import Lock
 
 import hdlcc.exceptions
 from hdlcc.parsers import getSourceFileObjects
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 from hdlcc.parsers.verilog_source_file import VerilogSourceFile
-from hdlcc.utils import onCI
 from hdlcc.builders import getBuilderByName
 
 # pylint: disable=invalid-name
@@ -103,9 +101,12 @@ class ConfigParser(object):
 
         self._sources = {}
         self._timestamp = 0
+        self._lock = Lock()
 
-        self._parseIfNeeded()
-        self._addVunitIfFound()
+        if self.filename is not None:
+            with self._lock:
+                self._doParseConfigFile()
+                self._addVunitIfFound()
 
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
@@ -168,7 +169,7 @@ class ConfigParser(object):
                  'library' : library,
                  'flags' : vunit_flags if path.endswith('.vhd') else []})
 
-        for source in getSourceFileObjects(_source_file_args, workers=2):
+        for source in getSourceFileObjects(_source_file_args):
             self._sources[source.filename] = source
 
     def __repr__(self):
@@ -242,9 +243,12 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         "Parses the configuration file"
-        if not self.shouldParse():
-            return
+        if self.shouldParse():
+            with self._lock:
+                self._doParseConfigFile()
 
+    def _doParseConfigFile(self):
+        "Parse the configuration file without any previous checking"
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
         self._parms['builder'] = 'fallback'
@@ -258,28 +262,12 @@ class ConfigParser(object):
 
         # At this point we have a list of sources parsed from the config
         # file and the info we need to build each one. We'll use a pool
-        # to speed up parsing (important especially libraries with many
-        # files. The multiprocessing.Pool class used to hang, so watch
-        # out if this behaves well enough to be used
-        try:
-            parser_pool = Pool(2)
-
-            # Callback to handle results from the process pool
-            def _poolCallback(source): # pylint: disable=missing-docstring
-                self._logger.debug("Adding pool result %s", str(source))
-                self._sources[source.filename] = source
-
-            for lang, build_info in source_build_list:
-                cls = VhdlSourceFile if lang == 'vhdl' else \
-                      VerilogSourceFile
-                parser_pool.apply_async(cls, args=build_info, callback=_poolCallback)
-
-            parser_pool.close()
-            parser_pool.join()
-        except:
-            self._logger.exception("Something went wrong, terminating pool")
-            parser_pool.terminate()
-            raise
+        # to speed up parsing (important especially for libraries with
+        # many files. The multiprocessing.Pool class used to hang, so
+        # watch out if this behaves well enough to be used
+        for source in getSourceFileObjects(source_build_list):
+            self._logger.debug("Adding source %s", source)
+            self._sources[source.filename] = source
 
         self._cleanUpSourcesList(source_path_list)
 
@@ -289,10 +277,7 @@ class ConfigParser(object):
             self._parms['target_dir'] = "." + self._parms['builder']
 
         # Set default flags if the user hasn't specified any
-        try:
-            self._setDefaultBuildFlagsIfNeeded()
-        except:
-            self._logger.exception("Ops!!")
+        self._setDefaultBuildFlagsIfNeeded()
 
         # If the configured target folder is not absolute, we assume it
         # should be relative to the folder where the configuration file
@@ -359,7 +344,7 @@ class ConfigParser(object):
                 build_info = self._handleParsedSource(
                     match['lang'], match['library'], source_path, match['flags'])
                 if build_info:
-                    source_build_list.append((match['lang'], build_info))
+                    source_build_list.append(build_info)
 
         return source_path_list, source_build_list
 
@@ -401,7 +386,7 @@ class ConfigParser(object):
         # If the source should be built, return the build info for it
         if self._shouldAddSource(path, library, flags_set):
             self._logger.debug("Adding source: lib '%s', '%s'", library, path)
-            return [path, library, flags_set]
+            return {'filename' : path, 'library' : library, 'flags' : flags_set}
 
     def _shouldAddSource(self, source_path, library, flags):
         """Checks if the source with the given parameters should be

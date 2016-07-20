@@ -117,7 +117,7 @@ with such.A("hdlcc server") as it:
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
                    '--host', it._host, '--port', it._port,
-                   '--log-level', 'DEBUG',
+                   '--log-level', 'ERROR',
                    '--attach-to-pid', str(os.getpid()),
                   ]
 
@@ -148,7 +148,7 @@ with such.A("hdlcc server") as it:
             #      it._server.terminate()
             #      os.kill(it._server.pid, 9)
             it._server.terminate()
-            #  os.kill(it._server.pid, 9)
+            utils.terminateProcess(it._server.pid)
             utils.removeFromPath(BUILDER_PATH)
             time.sleep(2)
 
@@ -402,7 +402,7 @@ with such.A("hdlcc server") as it:
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
-                   '--log-level', 'DEBUG',
+                   '--log-level', 'ERROR',
                    '--attach-to-pid', str(pid),
                   ]
 
@@ -417,6 +417,11 @@ with such.A("hdlcc server") as it:
             it._server = subp.Popen(cmd, env=os.environ.copy())
 
             waitForServer()
+
+        @it.has_teardown
+        def teardown():
+            it._server.terminate()
+            utils.terminateProcess(it._server.pid)
 
         @it.should("terminate when the parent PID is not running anymore")
         def test():

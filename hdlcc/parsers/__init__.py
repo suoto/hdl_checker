@@ -14,8 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"Top of the hdlcc.parsers submodule"
+
 import logging
 from multiprocessing import Pool
+#  from multiprocessing.pool import ThreadPool as Pool
 
 from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
 from hdlcc.parsers.verilog_source_file import VerilogSourceFile
@@ -39,25 +42,26 @@ def _isVerilog(path): # pragma: no cover
         return True
     return False
 
-
-def getSourceFileObjects(kwargs, workers=1):
-    "Reads files from <fnames> list using up to <workers> threads"
+def getSourceFileObjects(kwargs_list, workers=None):
+    """
+    Gets source file objects by applying each item on kwargs_list as
+    kwargs on the source parser class. Uses kwargs['filename'] to
+    determine if the source is VHDL or Verilog/SystemVerilog
+    """
 
     pool = Pool(workers)
+    async_results = []
 
-    try:
-        results = []
+    for kwargs in kwargs_list:
+        if _isVhdl(kwargs['filename']):
+            cls = VhdlSourceFile
+        else:
+            cls = VerilogSourceFile
+        async_results += [pool.apply_async(cls, kwds=kwargs)]
 
-        for _kwargs in kwargs:
-            if _isVhdl(_kwargs['filename']):
-                cls = VhdlSourceFile
-            elif _isVerilog(_kwargs['filename']):
-                cls = VerilogSourceFile
-            else: # pragma: no cover
-                assert False
-            results += [pool.apply_async(cls, kwds=_kwargs)]
-        return [res.get() for res in results]
-    finally:
-        pool.close()
-        pool.join()
+    pool.close()
+    pool.join()
+    results = [x.get() for x in async_results]
+
+    return results
 
