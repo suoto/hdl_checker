@@ -170,11 +170,14 @@ def runner(args):
     _logger.info("Creating project object")
 
     project = StandaloneProjectBuilder(args.project_file)
+
     if args.clean:
         _logger.info("Cleaning up")
-        project.cleanProjectCache(args.project_file)
+        project.clean()
+        project.setupEnvIfNeeded()
 
     if args.debug_print_sources or args.debug_print_compile_order or args.build:
+        project.buildByDependency()
         project.waitForBuild()
 
     if args.debug_print_sources:

@@ -220,7 +220,10 @@ def cleanProjectCache(project_file): # pragma: no cover
     Removes the default hdlcc cache folder.
     Intended for testing only.
     """
-    cache_folder = getDefaultCachePath(project_file)
-    if p.exists(cache_folder):
-        shutil.rmtree(cache_folder)
+    if project_file is None:
+        _logger.debug("Can't clean None")
+    else:
+        cache_folder = getDefaultCachePath(project_file)
+        if p.exists(cache_folder):
+            shutil.rmtree(cache_folder)
 

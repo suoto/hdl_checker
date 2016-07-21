@@ -18,11 +18,14 @@
 
 import abc
 import os
-import shutil
 import os.path as p
+import shutil
 import logging
 import traceback
+import threading
+from multiprocessing.pool import ThreadPool
 
+# Make the serializer transparent
 try:
     import json as serializer
     def _dump(*args, **kwargs):
@@ -35,9 +38,6 @@ except ImportError:
         import pickle as serializer
 
     _dump = serializer.dump # pylint: disable=invalid-name
-
-import threading
-from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
 import hdlcc.builders
@@ -69,13 +69,17 @@ class HdlCodeCheckerBase(object):
         self._config = None
         self.builder = None
 
-        self.buildByDependency()
+        self.setupEnvIfNeeded()
+        #  self.buildByDependency()
 
-    def _getCacheFilename(self):
+    def _getCacheFilename(self, target_dir=None):
         "Returns the cache file name for a given project file"
-        if self._config is None:
-            return None
-        return p.join(self._config.getTargetDir(), '.hdlcc.cache')
+        if target_dir is None:
+            if self._config is None:
+                return None
+            else:
+                target_dir = self._config.getTargetDir()
+        return p.join(target_dir, '.hdlcc.cache')
 
     def clean(self):
         "Clean up generated files"
@@ -88,6 +92,11 @@ class HdlCodeCheckerBase(object):
         if p.exists(target_dir):
             _logger.debug("Removing target dir '%s'", target_dir)
             shutil.rmtree(target_dir)
+
+        del self._config
+        del self.builder
+        self._config = None
+        self.builder = None
 
     def _setState(self, state):
         "serializer load implementation"
@@ -199,8 +208,10 @@ class HdlCodeCheckerBase(object):
                 (x['error_type'], x['line_number'], x['error_number']))
 
     def _getMessagesAvailable(self, path, *args, **kwargs):
-        '''Checks if the builder can be called via self._getBuilderMessages
-        or return info/messages identifying why it couldn't be done'''
+        """
+        Checks if the builder can be called via self._getBuilderMessages
+        or return info/messages identifying why it couldn"t be done
+        """
 
         if not self.finishedBuilding():
             self._handleUiWarning("Project hasn't finished building, try again "
@@ -293,15 +304,16 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Saving state to '%s'", cache_fname)
         _dump(state, open(cache_fname, 'w'))
 
-    def _recoverCache(self):
+    def _recoverCache(self, target_dir):
         """
         Tries to recover cached info for the given project_file. If
         something goes wrong, assume the cache is invalid and return
         nothing. Otherwise, return the cached object
         """
-        cache_fname = self._getCacheFilename()
-        if self.project_file is None or cache_fname is None:
-            self._logger.debug("Can't recover cache from None")
+        cache_fname = self._getCacheFilename(target_dir)
+        #  if self.project_file is None or cache_fname is None:
+        if cache_fname is None:
+            self._logger.warning("Can't recover cache from None")
             return
 
         _logger.debug("Trying to recover from '%s'", cache_fname)
@@ -355,18 +367,20 @@ class HdlCodeCheckerBase(object):
         with self._lock:
             self._logger.info("Build has finished")
 
-    def _setupEnvIfNeeded(self):
-        '''Updates or creates the environment, which includes checking
+    def setupEnvIfNeeded(self):
+        """
+        Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the
-        appropriate builder objects'''
-
-        _logger.debug("Current builder is %s", self.builder)
-
+        appropriate builder objects
+        """
         try:
-            # No builder defined means it's the first time we run, so
-            # try to recover from cache
-            if self.builder is None:
-                self._recoverCache()
+            # If the configuration is undefined, try to extract the
+            # target dir from the project file so we can have a hint of
+            # where the cache file should be
+            if self._config is None and self.project_file is not None:
+                target_dir, _ = ConfigParser.simpleParse(self.project_file)
+                if target_dir:
+                    self._recoverCache(target_dir)
 
             # No configuration defined means we failed to recover it
             # from the cache
@@ -393,7 +407,7 @@ class HdlCodeCheckerBase(object):
     def _buildByDependency(self):
         "Build the project by checking source file dependencies"
         with self._lock:
-            self._setupEnvIfNeeded()
+            self.setupEnvIfNeeded()
             built = 0
             errors = 0
             warnings = 0
@@ -417,9 +431,12 @@ class HdlCodeCheckerBase(object):
                     built, errors, warnings)
 
     def getMessagesByPath(self, path, *args, **kwargs):
-        '''Returns the messages for the given path, including messages
+        """
+        Returns the messages for the given path, including messages
         from the import configured builder (if available) and static
-        checks'''
+        checks
+        """
+        self.setupEnvIfNeeded()
         if not p.isabs(path):
             abspath = p.join(self._start_dir, path)
         else:

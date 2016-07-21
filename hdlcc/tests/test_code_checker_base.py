@@ -149,6 +149,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 _logger.warning("Skipping '%s'", case)
                 return
             it.assertTrue(it.project._msg_queue.empty())
+            it.project.buildByDependency()
             it.assertFalse(it.project.finishedBuilding())
 
         @it.should('notify if a build is already running')
@@ -454,6 +455,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
+            it.project.buildByDependency()
             it.project.waitForBuild()
             it.assertNotEquals(it.project.builder.builder_name, 'fallback')
 

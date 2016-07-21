@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Configuration file parser"
 
+import os
 import os.path as p
 import re
 import logging
@@ -120,7 +121,8 @@ class ConfigParser(object):
 
         if 'verilog' in builder_class.file_types:
             from vunit.verilog import VUnit
-            self._logger.warning("Using vunit.verilog.VUnit")
+            self._logger.debug("Builder supports Verilog, "
+                               "using vunit.verilog.VUnit")
             builder_class.addExternalLibrary('verilog', 'vunit_lib')
             builder_class.addIncludePath(
                 'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
@@ -231,7 +233,7 @@ class ConfigParser(object):
 
         return obj
 
-    def shouldParse(self):
+    def _shouldParse(self):
         "Checks if we should parse the configuration file"
         if self.filename is None:
             return False
@@ -243,7 +245,7 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         "Parses the configuration file"
-        if self.shouldParse():
+        if self._shouldParse():
             with self._lock:
                 self._doParseConfigFile()
 
@@ -272,7 +274,7 @@ class ConfigParser(object):
         self._cleanUpSourcesList(source_path_list)
 
         # If after parsing we haven't found the configured target
-        # dir, we'll use the builder name
+        # dir, we'll use '.hdlcc' as default
         if 'target_dir' not in self._parms.keys():
             self._parms['target_dir'] = ".hdlcc"
 
@@ -408,6 +410,24 @@ class ConfigParser(object):
         "Returns the builder name"
         self._parseIfNeeded()
         return self._parms['builder']
+
+    @staticmethod
+    def simpleParse(filename):
+        params = {}
+        for _line in open(filename, 'r').readlines():
+            line = _replaceCfgComments("", _line)
+            for match in re.finditer(r"\s*target_dir\s*=\s*(?P<target_dir>.+)\s*"
+                                     r"|"
+                                     r"\s*builder\s*=\s*(?P<builder>.+)\s*",
+                                     open(filename, 'r').read()):
+                params.update(match.groupdict())
+        target_dir = params['target_dir']
+        builder = params['builder']
+        if target_dir:
+            ConfigParser._logger.warning("Debug: parsed value is '%s'", target_dir)
+            target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
+            ConfigParser._logger.warning("Returning '%s'", target_dir)
+        return target_dir, builder
 
     def getTargetDir(self):
         "Returns the target folder that should be used by the builder"
