@@ -85,6 +85,8 @@ if [ -z "${CI}" ]; then
   pip install git+https://github.com/suoto/rainbow_logging_handler
 fi
 
+# . ${VIRTUAL_ENV_DEST}/bin/activate
+
 pip uninstall hdlcc -y
 pip install -e .
 
@@ -104,15 +106,20 @@ TEST_RUNNER="./.ci/scripts/run_tests.py"
 
 if [ -n "${STANDALONE}" ]; then
   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
-                              hdlcc.tests.test_vhdl_source_file \
-                              hdlcc.tests.test_verilog_source_file \
+                              hdlcc.tests.test_vhdl_parser \
+                              hdlcc.tests.test_verilog_parser \
                               hdlcc.tests.test_misc
+
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
 
 if [ -n "${FALLBACK}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_code_checker_base hdlcc.tests.test_standalone
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
+
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
@@ -121,7 +128,11 @@ if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim
   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 
-  ${TEST_RUNNER} "${ARGS[@]}"
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_persistency \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
@@ -133,7 +144,11 @@ if [ -n "${XVHDL}" ]; then
     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
   fi
 
-  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}"
+  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                                                     hdlcc.tests.test_code_checker_base \
+                                                     hdlcc.tests.test_persistency \
+                                                     hdlcc.tests.test_server_handlers \
+                                                     hdlcc.tests.test_standalone
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
@@ -152,7 +167,11 @@ if [ -n "${GHDL}" ]; then
 
   echo "BUILDER_PATH=$BUILDER_PATH"
 
-  ${TEST_RUNNER} "${ARGS[@]}"
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_persistency \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi

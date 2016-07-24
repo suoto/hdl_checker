@@ -20,8 +20,8 @@ import logging
 from multiprocessing import Pool
 #  from multiprocessing.pool import ThreadPool as Pool
 
-from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
-from hdlcc.parsers.verilog_source_file import VerilogSourceFile
+from hdlcc.parsers.vhdl_parser import VhdlParser
+from hdlcc.parsers.verilog_parser import VerilogParser
 
 _logger = logging.getLogger(__name__)
 
@@ -54,9 +54,9 @@ def getSourceFileObjects(kwargs_list, workers=None):
 
     for kwargs in kwargs_list:
         if _isVhdl(kwargs['filename']):
-            cls = VhdlSourceFile
+            cls = VhdlParser
         else:
-            cls = VerilogSourceFile
+            cls = VerilogParser
         async_results += [pool.apply_async(cls, kwds=kwargs)]
 
     pool.close()

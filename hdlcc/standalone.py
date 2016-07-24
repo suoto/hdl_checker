@@ -136,11 +136,11 @@ class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
         self._ui_logger.error(message)
 
 def runStandaloneSourceFileParse(fname):
-    """Standalone source_file.VhdlSourceFile run"""
-    from hdlcc.parsers import VhdlSourceFile, VerilogSourceFile
+    """Standalone parser run"""
+    from hdlcc.parsers import VhdlParser, VerilogParser
 
     extension = fname.lower().split('.')[-1]
-    cls = VhdlSourceFile if extension in ('vhd', 'vhdl') else VerilogSourceFile
+    cls = VhdlParser if extension in ('vhd', 'vhdl') else VerilogParser
 
     source = cls(fname)
 
@@ -158,7 +158,7 @@ def runStandaloneSourceFileParse(fname):
             print " -- %s.%s" % (dependency['library'], dependency['unit'])
 
 def runStandaloneStaticCheck(fname):
-    """Standalone source_file.VhdlSourceFile run"""
+    """Standalone source_file.VhdlParser run"""
     from hdlcc.static_check import getStaticMessages
 
     for record in getStaticMessages(open(fname, 'r').read().split('\n')):

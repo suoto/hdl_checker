@@ -31,7 +31,7 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"^\s*context\s+(?P<context_name>\w+)\s+is\b",
     ]), flags=re.I)
 
-class VhdlSourceFile(BaseSourceFile):
+class VhdlParser(BaseSourceFile):
     """Parses and stores information about a source file such as
     design units it depends on and design units it provides"""
 

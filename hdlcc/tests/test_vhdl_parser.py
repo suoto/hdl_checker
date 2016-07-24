@@ -21,7 +21,7 @@ import os
 import logging
 from nose2.tools import such
 
-from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
+from hdlcc.parsers import VhdlParser
 
 from hdlcc.utils import writeListToFile
 
@@ -69,7 +69,7 @@ with such.A('VHDL source file object') as it:
 
         @it.should('parse a file without errors')
         def test():
-            it.source = VhdlSourceFile(_FILENAME)
+            it.source = VhdlParser(_FILENAME)
 
 
         @it.should('return its entities')
@@ -184,7 +184,7 @@ with such.A('VHDL source file object') as it:
 
         @it.should('parse a file without errors')
         def test():
-            it.source = VhdlSourceFile(_FILENAME)
+            it.source = VhdlParser(_FILENAME)
 
         @it.should('return the names of the packages found')
         def test():

@@ -22,9 +22,9 @@ import logging
 from threading import Lock
 
 import hdlcc.exceptions
-from hdlcc.parsers import getSourceFileObjects
-from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
-from hdlcc.parsers.verilog_source_file import VerilogSourceFile
+from hdlcc.parsers import (getSourceFileObjects,
+                           VhdlParser,
+                           VerilogParser)
 from hdlcc.builders import getBuilderByName
 
 # pylint: disable=invalid-name
@@ -248,9 +248,9 @@ class ConfigParser(object):
         obj._sources = {}
         for path, src_state in sources.items():
             if src_state['filetype'] == 'vhdl':
-                obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+                obj._sources[path] = VhdlParser.recoverFromState(src_state)
             else:
-                obj._sources[path] = VerilogSourceFile.recoverFromState(src_state)
+                obj._sources[path] = VerilogParser.recoverFromState(src_state)
 
         # pylint: enable=protected-access
 
@@ -487,7 +487,7 @@ class ConfigParser(object):
                self._sources[p.abspath(path)].flags
 
     def getSources(self):
-        "Returns a list of VhdlSourceFile objects parsed"
+        "Returns a list of VhdlParser/VerilogParser objects parsed"
         self._parseIfNeeded()
         return self._sources.values()
 

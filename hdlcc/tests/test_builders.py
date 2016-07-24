@@ -27,7 +27,7 @@ from nose2.tools.params import params
 
 import hdlcc.builders
 import hdlcc.utils as utils
-from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
+from hdlcc.parsers import VhdlParser
 
 
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
@@ -165,7 +165,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
         @it.should('compile a VHDL source without errors')
         def test():
-            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.vhd'))
+            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.vhd'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
@@ -174,7 +174,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         @it.should('compile a Verilog source without errors')
         @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
-            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.v'))
+            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.v'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
@@ -183,7 +183,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         @it.should('compile a SystemVerilog source without errors')
         @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
-            source = VhdlSourceFile(p.join(SOURCES_PATH, 'no_messages.sv'))
+            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.sv'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
@@ -192,7 +192,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
         @it.should('catch a known error on a VHDL source')
         def test():
-            source = VhdlSourceFile(p.join(SOURCES_PATH,
+            source = VhdlParser(p.join(SOURCES_PATH,
                                            'source_with_error.vhd'))
             records, rebuilds = it.builder.build(source)
 
