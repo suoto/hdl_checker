@@ -82,17 +82,6 @@ with such.A("hdlcc server") as it:
 
         assert False, "Server is still building after 30s"
 
-    @it.has_setup
-    def setup():
-        # Force disabling VUnit
-        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
-        hdlcc.config_parser._HAS_VUNIT = False
-
-    @it.has_teardown
-    def teardown():
-        # Re enable VUnit if it was available
-        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
-
     with it.having("no PID attachment"):
         def setupPaths():
             "Add our dependencies to sys.path"

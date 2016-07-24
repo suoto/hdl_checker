@@ -181,8 +181,9 @@ class HdlCodeCheckerBase(object):
                 yield source
 
             if empty_step:
-                for missing_path in \
-                        list(set(self._config.getSourcesPaths()) - set(sources_built)):
+                missing_paths = list(set(
+                    self._config.getSourcesPaths()) - set(sources_built))
+                for missing_path in missing_paths: # pragma: no cover
                     source = self._config.getSourceByPath(missing_path)
                     dependencies = self._getSourceDependenciesSet(source)
                     missing_dependencies = dependencies - set(self._units_built)
@@ -437,7 +438,7 @@ class HdlCodeCheckerBase(object):
         checks
         """
         self.setupEnvIfNeeded()
-        if not p.isabs(path):
+        if not p.isabs(path): # pragma: no cover
             abspath = p.join(self._start_dir, path)
         else:
             abspath = path

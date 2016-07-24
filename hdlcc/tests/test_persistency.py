@@ -26,6 +26,8 @@ from multiprocessing import Queue
 
 from nose2.tools import such
 
+import mock
+
 import hdlcc
 import hdlcc.utils as utils
 
@@ -69,8 +71,6 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
     def setup():
         #  StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
         utils.cleanProjectCache(PROJECT_FILE)
-        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
-        hdlcc.config_parser._HAS_VUNIT = False
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
@@ -86,8 +86,6 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
         target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
         if p.exists(target_dir):
             shutil.rmtree(target_dir)
-
-        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
     with it.having('a performance requirement'):
 
@@ -108,6 +106,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
                 os.remove(cache_fname)
 
         @it.should('measure time taken to build a project without any cache')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_001():
             for _ in range(5):
                 start = time.time()
@@ -142,15 +141,16 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.should('build at least %dx faster when recovering the info' %
                    CACHE_BUILD_SPEEDUP)
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_002():
-            _logger.fatal("Creating object")
+            _logger.info("Creating object")
             start = time.time()
             project = StandaloneProjectBuilder()
             parse_time = time.time() - start
-            _logger.fatal("Building de facto")
+            _logger.info("Building de facto")
             project.buildByDependency()
             project.waitForBuild()
-            _logger.fatal("Done")
+            _logger.info("Done")
             build_time = time.time() - start - parse_time
 
             _logger.info("Parsing took %fs", parse_time)
@@ -163,6 +163,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
                 "Building with cache took %f (should be < %f)" % \
                     (build_time, average/CACHE_BUILD_SPEEDUP))
 
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder()
         it.project.waitForBuild()
@@ -180,6 +181,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
                        "Project shouldn't have recovered from cache. "
                        "Messages found:\n%s" % "\n".join(messages))
 
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithCache():
         del it.project
 
@@ -220,6 +222,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
             _buildWithCache()
 
         @it.should('build without cache if cache is invalid')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_003():
             target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
             cache_fname = p.join(target_dir, '.hdlcc.cache')
@@ -273,6 +276,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
             utils.cleanProjectCache(PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_001():
             _logger.info("Building without cache")
             _buildWithoutCache()

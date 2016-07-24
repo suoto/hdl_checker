@@ -16,7 +16,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Configuration file parser"
 
-import os
 import os.path as p
 import re
 import logging
@@ -48,21 +47,25 @@ def _extractSet(entry):
 
     return [value for value in _splitAtWhitespaces(entry)]
 
-try:
-    import vunit
-    _HAS_VUNIT = True
-    _VUNIT_FLAGS = {
-        'msim' : {
-            '93'   : ['-93'],
-            '2002' : ['-2002'],
-            '2008' : ['-2008']},
-        'ghdl' : {
-            '93'   : ['--std=93c'],
-            '2002' : ['--std=02'],
-            '2008' : ['--std=08']}
-        }
-except ImportError:
-    _HAS_VUNIT = False
+def hasVunit():
+    "Checks if our env has VUnit installed"
+    try:
+        import vunit
+        result = True
+    except ImportError: # pragma: no cover
+        result = False
+    return result
+
+_VUNIT_FLAGS = {
+    'msim' : {
+        '93'   : ['-93'],
+        '2002' : ['-2002'],
+        '2008' : ['-2008']},
+    'ghdl' : {
+        '93'   : ['--std=93c'],
+        '2002' : ['--std=02'],
+        '2008' : ['--std=08']}
+    }
 
 class ConfigParser(object):
     "Configuration info provider"
@@ -109,17 +112,37 @@ class ConfigParser(object):
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
+    def __eq__(self, other): # pragma: no cover
+        if not isinstance(other, type(self)):
+            return False
+
+        for attr in ('_parms', '_list_parms', '_single_value_parms',
+                     '_sources', 'filename'):
+            if not hasattr(other, attr):
+                #  self._logger.warning("Other has no %s attribute", attr)
+                return False
+            if getattr(self, attr) != getattr(other, attr):
+                #  self._logger.warning("Attribute %s differs", attr)
+                return False
+
+        return True
+
+    def __ne__(self, other): # pragma: no cover
+        return not self.__eq__(other)
+
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
-        if not _HAS_VUNIT or self._parms['builder'] == 'fallback':
+        if not hasVunit() or self._parms['builder'] == 'fallback':
             return
+
+        import vunit
 
         self._logger.info("VUnit installation found")
         logging.getLogger('vunit').setLevel(logging.WARNING)
 
         builder_class = getBuilderByName(self.getBuilder())
 
-        if 'verilog' in builder_class.file_types:
+        if 'systemverilog' in builder_class.file_types:
             from vunit.verilog import VUnit
             self._logger.debug("Builder supports Verilog, "
                                "using vunit.verilog.VUnit")
@@ -413,21 +436,28 @@ class ConfigParser(object):
 
     @staticmethod
     def simpleParse(filename):
-        params = {}
+        target_dir = None
+        builder_name = None
         for _line in open(filename, 'r').readlines():
             line = _replaceCfgComments("", _line)
-            for match in re.finditer(r"\s*target_dir\s*=\s*(?P<target_dir>.+)\s*"
-                                     r"|"
-                                     r"\s*builder\s*=\s*(?P<builder>.+)\s*",
-                                     open(filename, 'r').read()):
-                params.update(match.groupdict())
-        target_dir = params['target_dir']
-        builder = params['builder']
+            for match in re.finditer(
+                    r"^\s*target_dir\s*=\s*(?P<target_dir>.+)\s*$"
+                    r"|"
+                    r"^\s*builder\s*=\s*(?P<builder>.+)\s*$",
+                    line):
+                match_dict = match.groupdict()
+                if match_dict['target_dir'] is not None:
+                    target_dir = match_dict['target_dir']
+                if match_dict['builder'] is not None:
+                    builder_name = match_dict['builder']
+
         if target_dir:
-            ConfigParser._logger.warning("Debug: parsed value is '%s'", target_dir)
             target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
-            ConfigParser._logger.warning("Returning '%s'", target_dir)
-        return target_dir, builder
+
+        ConfigParser._logger.info("Simple parse found target_dir = %s and "
+                                  "builder = %s", repr(target_dir),
+                                  repr(builder_name))
+        return target_dir, builder_name
 
     def getTargetDir(self):
         "Returns the target folder that should be used by the builder"
