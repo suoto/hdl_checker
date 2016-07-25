@@ -82,17 +82,6 @@ with such.A("hdlcc server") as it:
 
         assert False, "Server is still building after 30s"
 
-    @it.has_setup
-    def setup():
-        # Force disabling VUnit
-        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
-        hdlcc.config_parser._HAS_VUNIT = False
-
-    @it.has_teardown
-    def teardown():
-        # Re enable VUnit if it was available
-        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
-
     with it.having("no PID attachment"):
         def setupPaths():
             "Add our dependencies to sys.path"
@@ -117,7 +106,7 @@ with such.A("hdlcc server") as it:
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
                    '--host', it._host, '--port', it._port,
-                   '--log-level', 'ERROR',
+                   '--log-level', 'DEBUG',
                    '--attach-to-pid', str(os.getpid()),
                   ]
 
@@ -159,17 +148,17 @@ with such.A("hdlcc server") as it:
             _logger.info(reply.text)
             it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
-        @it.should("get diagnose info with an existing project file before it has "
-                   "parsed the configuration file")
-        def test():
-            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                  data={'project_file' : PROJECT_FILE})
-            info = reply.json()['info']
-            _logger.info(reply.text)
-            for expected in (
-                    u'hdlcc version: %s' % hdlcc.__version__,
-                    u'Builder: <unknown> (config file parsing is underway)'):
-                it.assertIn(expected, info)
+        #  @it.should("get diagnose info with an existing project file before it has "
+        #             "parsed the configuration file")
+        #  def test():
+        #      reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+        #                            data={'project_file' : PROJECT_FILE})
+        #      info = reply.json()['info']
+        #      _logger.info(reply.text)
+        #      for expected in (
+        #              u'hdlcc version: %s' % hdlcc.__version__,
+        #              u'Builder: <unknown> (config file parsing is underway)'):
+        #          it.assertIn(expected, info)
 
         @it.should("get diagnose info with a non existing project file")
         def test():

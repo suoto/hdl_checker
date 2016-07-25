@@ -204,7 +204,7 @@ class MSim(BaseBuilder):
         return self._subprocessRunner(cmd)
 
     def _createLibrary(self, source):
-        if source.library in self._added_libraries:
+        if not self._createIniFile() and source.library in self._added_libraries:
             return
         self._added_libraries.append(source.library)
         try:
@@ -220,10 +220,13 @@ class MSim(BaseBuilder):
         "Adds a library to a non-existent ModelSim init file"
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
+        if not p.exists(self._target_folder):
+            os.mkdir(self._target_folder)
+
         if p.exists(_modelsim_ini):
-            self._logger.warning("modelsim.ini already exists at '%s', "
-                                 "returning", _modelsim_ini)
-            return
+            self._logger.debug("modelsim.ini already exists at '%s', "
+                               "returning", _modelsim_ini)
+            return False
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
@@ -245,6 +248,8 @@ class MSim(BaseBuilder):
         self._logger.debug("Current dir is %s, changing to %s",
                            p.abspath(os.curdir), cwd)
         os.chdir(cwd)
+
+        return True
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"

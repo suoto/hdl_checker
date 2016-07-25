@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Xilinx xhvdl builder implementation"
 
+import os
 import os.path as p
 import re
 from .base_builder import BaseBuilder
@@ -52,7 +53,6 @@ class XVHDL(BaseBuilder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
         self._xvhdlini = '.xvhdl.init'
-        self._built_libs = []
 
     def _makeMessageRecords(self, line):
         line_number = None
@@ -108,13 +108,18 @@ class XVHDL(BaseBuilder):
                 'synopsis', 'maxii', 'family_support']
 
     def _createLibrary(self, source):
-        if source.library in self._built_libs:
+        if not p.exists(self._target_folder):
+            os.mkdir(self._target_folder)
+            self._added_libraries = []
+
+        if source.library in self._added_libraries:
             return
 
-        self._built_libs += [source.library]
+        self._added_libraries.append(source.library)
+
         open(self._xvhdlini, 'w').write('\n'.join(\
                 ["%s=%s" % (x, p.join(self._target_folder, x)) \
-                for x in self._built_libs]))
+                for x in self._added_libraries]))
 
     def _buildSource(self, source, flags=None):
         cmd = ['xvhdl',

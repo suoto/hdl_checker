@@ -34,18 +34,18 @@ class Fallback(BaseBuilder):
     def _makeMessageRecords(self, _): # pragma: no cover
         return []
 
-    def _shouldIgnoreLine(self, line):
+    def _shouldIgnoreLine(self, line): # pragma: no cover
         return True
 
     def checkEnvironment(self):
         return True
 
-    def _buildSource(self, source, flags=None):
+    def _buildSource(self, source, flags=None): # pragma: no cover
         return [], []
 
-    def _createLibrary(self, source):
+    def _createLibrary(self, source): # pragma: no cover
         pass
 
-    def getBuiltinLibraries(self):
+    def getBuiltinLibraries(self): # pragma: no cover
         return []
 

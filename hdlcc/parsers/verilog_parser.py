@@ -28,7 +28,7 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
     ]),)
 
-class VerilogSourceFile(BaseSourceFile):
+class VerilogParser(BaseSourceFile):
     """Parses and stores information about a source file such as
     design units it depends on and design units it provides"""
 

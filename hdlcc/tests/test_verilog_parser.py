@@ -21,7 +21,7 @@ import os
 import logging
 from nose2.tools import such
 
-from hdlcc.parsers import VerilogSourceFile
+from hdlcc.parsers import VerilogParser
 
 from hdlcc.utils import writeListToFile
 
@@ -54,7 +54,7 @@ module clock_divider
 
         @it.should('parse a file without errors')
         def test():
-            it.source = VerilogSourceFile(_FILENAME)
+            it.source = VerilogParser(_FILENAME)
 
         @it.should('return its design units')
         def test():

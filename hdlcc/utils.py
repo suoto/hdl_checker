@@ -23,6 +23,7 @@ import logging
 import signal
 import time
 import subprocess as subp
+import shutil
 from threading import Lock
 
 _logger = logging.getLogger(__name__)
@@ -206,4 +207,23 @@ if not hasattr(p, 'samefile'):
         return os.stat(file1) == os.stat(file2)
 else:
     samefile = p.samefile # pylint: disable=invalid-name
+
+def getDefaultCachePath(project_file): # pragma: no cover
+    """
+    Gets the default path of hdlcc cache.
+    Intended for testing only.
+    """
+    return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
+
+def cleanProjectCache(project_file): # pragma: no cover
+    """
+    Removes the default hdlcc cache folder.
+    Intended for testing only.
+    """
+    if project_file is None:
+        _logger.debug("Can't clean None")
+    else:
+        cache_folder = getDefaultCachePath(project_file)
+        if p.exists(cache_folder):
+            shutil.rmtree(cache_folder)
 

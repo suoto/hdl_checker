@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"VHDL source file parser"
+"Base source file parser"
 
 import abc
 import os
@@ -75,6 +75,27 @@ class BaseSourceFile(object):
     def __repr__(self):
         return "BaseSourceFile('%s', library='%s', flags=%s)" % \
                 (self.abspath, self.library, self.flags)
+
+    # We'll use Python data model to make easier to check if a recovered object
+    # matches its original counterpart
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+
+        for attr in ('filename', 'library', 'flags', 'filetype', 'abspath'):
+            if not hasattr(other, attr):
+                #  _logger.warning("Other has no %s attribute", attr)
+                return False
+            if getattr(self, attr) != getattr(other, attr):
+                #  _logger.warning("Attribute %s differs", attr)
+                return False
+
+
+        #  _logger.warning("%s matches %s", repr(self), repr(other))
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)

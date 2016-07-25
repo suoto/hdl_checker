@@ -26,12 +26,14 @@ from multiprocessing import Queue
 
 from nose2.tools import such
 
+import mock
+
 import hdlcc
 import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
-CACHE_BUILD_SPEEDUP = 5
+CACHE_BUILD_SPEEDUP = 10
 BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
 BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
                             p.expanduser("~/ghdl/bin/")))
@@ -67,7 +69,8 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
     @it.has_setup
     def setup():
-        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        #  StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        utils.cleanProjectCache(PROJECT_FILE)
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
@@ -79,7 +82,10 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
     @it.has_teardown
     def teardown():
-        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        #  StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+        if p.exists(target_dir):
+            shutil.rmtree(target_dir)
 
     with it.having('a performance requirement'):
 
@@ -90,20 +96,24 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            utils.cleanProjectCache(PROJECT_FILE)
             target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
             if p.exists(target_dir):
                 shutil.rmtree(target_dir)
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
+            cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.should('measure time taken to build a project without any cache')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_001():
             for _ in range(5):
                 start = time.time()
                 project = StandaloneProjectBuilder()
+                project.clean()
                 parse_time = time.time() - start
+                project.buildByDependency()
                 project.waitForBuild()
                 build_time = time.time() - start - parse_time
 
@@ -131,11 +141,16 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
 
         @it.should('build at least %dx faster when recovering the info' %
                    CACHE_BUILD_SPEEDUP)
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_002():
+            _logger.info("Creating object")
             start = time.time()
             project = StandaloneProjectBuilder()
             parse_time = time.time() - start
+            _logger.info("Building de facto")
+            project.buildByDependency()
             project.waitForBuild()
+            _logger.info("Done")
             build_time = time.time() - start - parse_time
 
             _logger.info("Parsing took %fs", parse_time)
@@ -148,6 +163,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
                 "Building with cache took %f (should be < %f)" % \
                     (build_time, average/CACHE_BUILD_SPEEDUP))
 
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder()
         it.project.waitForBuild()
@@ -165,6 +181,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
                        "Project shouldn't have recovered from cache. "
                        "Messages found:\n%s" % "\n".join(messages))
 
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithCache():
         del it.project
 
@@ -186,17 +203,15 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
     with it.having('an undecodable cache file'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
+            cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-            #  target_dir = it.project._config.getTargetDir()
-            #  if p.exists(target_dir):
-                #  shell.rmtree(target_dir)
-            #  del it.project
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+            shutil.rmtree(target_dir)
 
         @it.should('build a project without cache')
         def test_001():
@@ -207,8 +222,10 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
             _buildWithCache()
 
         @it.should('build without cache if cache is invalid')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_003():
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
+            target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+            cache_fname = p.join(target_dir, '.hdlcc.cache')
             open(cache_fname, 'w').write("hello")
             project = StandaloneProjectBuilder()
             project.waitForBuild()
@@ -230,47 +247,36 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
     with it.having('the builder working folder erased'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
-            if p.exists(cache_fname):
-                os.remove(cache_fname)
+            target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+            if p.exists(target_dir):
+                shutil.rmtree(target_dir)
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-            #  target_dir = it.project._config.getTargetDir()
-            #  if p.exists(target_dir):
-                #  shell.rmtree(target_dir)
-            #  del it.project
+            target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+            if p.exists(target_dir):
+                shutil.rmtree(target_dir)
 
         @it.should('build without cache if cache is invalid')
         def test_001():
             _buildWithoutCache()
             target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
-            it.assertTrue(p.exists(target_dir))
             shutil.rmtree(target_dir)
-            _buildWithCache()
-
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
-            if p.exists(cache_fname):
-                os.remove(cache_fname)
             _buildWithoutCache()
 
     with it.having('the builder failing to run'):
         @it.has_setup
         def setup():
-            cache_fname = hdlcc.code_checker_base.HdlCodeCheckerBase._getCacheFilename(PROJECT_FILE)
+            cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-            #  target_dir = it.project._config.getTargetDir()
-            #  if p.exists(target_dir):
-                #  shell.rmtree(target_dir)
-            #  del it.project
+            utils.cleanProjectCache(PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test_001():
             _logger.info("Building without cache")
             _buildWithoutCache()

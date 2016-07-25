@@ -22,9 +22,9 @@ import logging
 from threading import Lock
 
 import hdlcc.exceptions
-from hdlcc.parsers import getSourceFileObjects
-from hdlcc.parsers.vhdl_source_file import VhdlSourceFile
-from hdlcc.parsers.verilog_source_file import VerilogSourceFile
+from hdlcc.parsers import (getSourceFileObjects,
+                           VhdlParser,
+                           VerilogParser)
 from hdlcc.builders import getBuilderByName
 
 # pylint: disable=invalid-name
@@ -47,21 +47,25 @@ def _extractSet(entry):
 
     return [value for value in _splitAtWhitespaces(entry)]
 
-try:
-    import vunit
-    _HAS_VUNIT = True
-    _VUNIT_FLAGS = {
-        'msim' : {
-            '93'   : ['-93'],
-            '2002' : ['-2002'],
-            '2008' : ['-2008']},
-        'ghdl' : {
-            '93'   : ['--std=93c'],
-            '2002' : ['--std=02'],
-            '2008' : ['--std=08']}
-        }
-except ImportError:
-    _HAS_VUNIT = False
+def hasVunit():
+    "Checks if our env has VUnit installed"
+    try:
+        import vunit
+        result = True
+    except ImportError: # pragma: no cover
+        result = False
+    return result
+
+_VUNIT_FLAGS = {
+    'msim' : {
+        '93'   : ['-93'],
+        '2002' : ['-2002'],
+        '2008' : ['-2008']},
+    'ghdl' : {
+        '93'   : ['--std=93c'],
+        '2002' : ['--std=02'],
+        '2008' : ['--std=08']}
+    }
 
 class ConfigParser(object):
     "Configuration info provider"
@@ -108,19 +112,40 @@ class ConfigParser(object):
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
+    def __eq__(self, other): # pragma: no cover
+        if not isinstance(other, type(self)):
+            return False
+
+        for attr in ('_parms', '_list_parms', '_single_value_parms',
+                     '_sources', 'filename'):
+            if not hasattr(other, attr):
+                #  self._logger.warning("Other has no %s attribute", attr)
+                return False
+            if getattr(self, attr) != getattr(other, attr):
+                #  self._logger.warning("Attribute %s differs", attr)
+                return False
+
+        return True
+
+    def __ne__(self, other): # pragma: no cover
+        return not self.__eq__(other)
+
     def _addVunitIfFound(self):
         "Tries to import files to support VUnit right out of the box"
-        if not _HAS_VUNIT or self._parms['builder'] == 'fallback':
+        if not hasVunit() or self._parms['builder'] == 'fallback':
             return
+
+        import vunit
 
         self._logger.info("VUnit installation found")
         logging.getLogger('vunit').setLevel(logging.WARNING)
 
         builder_class = getBuilderByName(self.getBuilder())
 
-        if 'verilog' in builder_class.file_types:
+        if 'systemverilog' in builder_class.file_types:
             from vunit.verilog import VUnit
-            self._logger.warning("Using vunit.verilog.VUnit")
+            self._logger.debug("Builder supports Verilog, "
+                               "using vunit.verilog.VUnit")
             builder_class.addExternalLibrary('verilog', 'vunit_lib')
             builder_class.addIncludePath(
                 'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
@@ -223,15 +248,15 @@ class ConfigParser(object):
         obj._sources = {}
         for path, src_state in sources.items():
             if src_state['filetype'] == 'vhdl':
-                obj._sources[path] = VhdlSourceFile.recoverFromState(src_state)
+                obj._sources[path] = VhdlParser.recoverFromState(src_state)
             else:
-                obj._sources[path] = VerilogSourceFile.recoverFromState(src_state)
+                obj._sources[path] = VerilogParser.recoverFromState(src_state)
 
         # pylint: enable=protected-access
 
         return obj
 
-    def shouldParse(self):
+    def _shouldParse(self):
         "Checks if we should parse the configuration file"
         if self.filename is None:
             return False
@@ -243,7 +268,7 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         "Parses the configuration file"
-        if self.shouldParse():
+        if self._shouldParse():
             with self._lock:
                 self._doParseConfigFile()
 
@@ -272,9 +297,9 @@ class ConfigParser(object):
         self._cleanUpSourcesList(source_path_list)
 
         # If after parsing we haven't found the configured target
-        # dir, we'll use the builder name
+        # dir, we'll use '.hdlcc' as default
         if 'target_dir' not in self._parms.keys():
-            self._parms['target_dir'] = "." + self._parms['builder']
+            self._parms['target_dir'] = ".hdlcc"
 
         # Set default flags if the user hasn't specified any
         self._setDefaultBuildFlagsIfNeeded()
@@ -409,6 +434,31 @@ class ConfigParser(object):
         self._parseIfNeeded()
         return self._parms['builder']
 
+    @staticmethod
+    def simpleParse(filename):
+        target_dir = None
+        builder_name = None
+        for _line in open(filename, 'r').readlines():
+            line = _replaceCfgComments("", _line)
+            for match in re.finditer(
+                    r"^\s*target_dir\s*=\s*(?P<target_dir>.+)\s*$"
+                    r"|"
+                    r"^\s*builder\s*=\s*(?P<builder>.+)\s*$",
+                    line):
+                match_dict = match.groupdict()
+                if match_dict['target_dir'] is not None:
+                    target_dir = match_dict['target_dir']
+                if match_dict['builder'] is not None:
+                    builder_name = match_dict['builder']
+
+        if target_dir:
+            target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
+
+        ConfigParser._logger.info("Simple parse found target_dir = %s and "
+                                  "builder = %s", repr(target_dir),
+                                  repr(builder_name))
+        return target_dir, builder_name
+
     def getTargetDir(self):
         "Returns the target folder that should be used by the builder"
         self._parseIfNeeded()
@@ -437,7 +487,7 @@ class ConfigParser(object):
                self._sources[p.abspath(path)].flags
 
     def getSources(self):
-        "Returns a list of VhdlSourceFile objects parsed"
+        "Returns a list of VhdlParser/VerilogParser objects parsed"
         self._parseIfNeeded()
         return self._sources.values()
 

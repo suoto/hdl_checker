@@ -27,12 +27,15 @@ from multiprocessing import Queue
 
 from nose2.tools import such
 
+import mock
+
 import hdlcc
 from hdlcc.utils import (writeListToFile,
                          addToPath,
                          removeFromPath,
                          samefile,
-                         onCI)
+                         onCI,
+                         cleanProjectCache)
 
 _logger = logging.getLogger(__name__)
 
@@ -76,23 +79,17 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
     @it.has_setup
     def setup():
-        # Force disabling VUnit
-        it._HAS_VUNIT = hdlcc.config_parser._HAS_VUNIT
-        hdlcc.config_parser._HAS_VUNIT = False
-
-        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        cleanProjectCache(PROJECT_FILE)
 
         _logger.info("Builder name: %s", BUILDER_NAME)
         _logger.info("Builder path: %s", BUILDER_PATH)
 
     @it.has_teardown
     def teardown():
-        StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        #  StandaloneProjectBuilder.cleanProjectCache(PROJECT_FILE)
+        cleanProjectCache(PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
             shutil.rmtree(it.DUMMY_PROJECT_FILE)
-
-        # Re enable VUnit if it was available
-        hdlcc.config_parser._HAS_VUNIT = it._HAS_VUNIT
 
     with it.having('vim-hdl-examples as reference and a valid project file'):
 
@@ -103,7 +100,8 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            cleanProjectCache(PROJECT_FILE)
 
             builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
 
@@ -123,9 +121,13 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 it.fail("Builder creation failed even after configuring "
                         "the builder path")
 
+            _logger.info("Creating project builder object")
+            it.project = StandaloneProjectBuilder()
+
         @it.has_teardown
         def teardown():
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+            cleanProjectCache(PROJECT_FILE)
             removeFromPath(BUILDER_PATH)
             target_dir = it.project._config.getTargetDir()
             if p.exists(target_dir):
@@ -137,14 +139,12 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             del it.project
 
         @it.should('build project by dependency in background')
-        def test001(case):
-            _logger.info("Creating project builder object")
-            it.project = StandaloneProjectBuilder()
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test001():
             _logger.info("Checking if msg queue is empty")
-            if PROJECT_FILE is None:
-                _logger.warning("Skipping '%s'", case)
-                return
             it.assertTrue(it.project._msg_queue.empty())
+            it.project.buildByDependency()
             it.assertFalse(it.project.finishedBuilding())
 
         @it.should('notify if a build is already running')
@@ -440,6 +440,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     with it.having('vim-hdl-examples as reference and a valid project file'):
 
         @it.has_setup
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def setup():
             if BUILDER_NAME is None:
                 return
@@ -450,6 +451,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
             it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
             it.project = StandaloneProjectBuilder(it.project_file)
+            it.project.buildByDependency()
             it.project.waitForBuild()
             it.assertNotEquals(it.project.builder.builder_name, 'fallback')
 
@@ -457,7 +459,8 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         def teardown():
             if BUILDER_NAME is None:
                 return
-            hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.project_file)
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.project_file)
+            cleanProjectCache(PROJECT_FILE)
             removeFromPath(BUILDER_PATH)
 
             target_dir = it.project._config.getTargetDir()
