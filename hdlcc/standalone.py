@@ -122,8 +122,8 @@ def parseArguments():
 
     return args
 
-class StandaloneProjectBuilder(hdlcc.code_checker_base.HdlCodeCheckerBase):
-    """Implementation of standalone hdlcc.code_checker_base.HdlCodeCheckerBase
+class StandaloneProjectBuilder(hdlcc.hdlcc_base.HdlCodeCheckerBase):
+    """Implementation of standalone hdlcc.hdlcc_base.HdlCodeCheckerBase
     to run via shell"""
     _ui_logger = logging.getLogger('UI')
     def _handleUiInfo(self, message):

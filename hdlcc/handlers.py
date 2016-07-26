@@ -27,7 +27,7 @@ _logger = logging.getLogger(__name__)
 
 import hdlcc
 import hdlcc.utils as utils
-from hdlcc.code_checker_base import HdlCodeCheckerBase
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
 app = bottle.Bottle() # pylint: disable=invalid-name
 

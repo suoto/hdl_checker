@@ -22,7 +22,7 @@ takes into account the sources dependencies when building so you don't
 need to provide a source list ordered by hand.
 """
 
-from hdlcc.code_checker_base import HdlCodeCheckerBase
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from ._version import get_versions
 
 __author__ = "Andre Souto (andre820@gmail.com)"

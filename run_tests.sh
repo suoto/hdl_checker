@@ -116,7 +116,7 @@ fi
 
 if [ -n "${FALLBACK}" ]; then
   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_hdlcc_base \
                               hdlcc.tests.test_server_handlers \
                               hdlcc.tests.test_standalone
 
@@ -129,7 +129,7 @@ if [ -n "${MSIM}" ]; then
   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 
   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_hdlcc_base \
                               hdlcc.tests.test_persistency \
                               hdlcc.tests.test_server_handlers \
                               hdlcc.tests.test_standalone
@@ -145,7 +145,7 @@ if [ -n "${XVHDL}" ]; then
   fi
 
   VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                                                     hdlcc.tests.test_code_checker_base \
+                                                     hdlcc.tests.test_hdlcc_base \
                                                      hdlcc.tests.test_persistency \
                                                      hdlcc.tests.test_server_handlers \
                                                      hdlcc.tests.test_standalone
@@ -168,7 +168,7 @@ if [ -n "${GHDL}" ]; then
   echo "BUILDER_PATH=$BUILDER_PATH"
 
   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_code_checker_base \
+                              hdlcc.tests.test_hdlcc_base \
                               hdlcc.tests.test_persistency \
                               hdlcc.tests.test_server_handlers \
                               hdlcc.tests.test_standalone

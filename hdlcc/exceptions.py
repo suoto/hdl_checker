@@ -43,7 +43,7 @@ class UnknownParameterError(VimHdlBaseException):
         return "Unknown parameter '%s'" % self._parameter
 
 class DesignUnitNotFoundError(VimHdlBaseException):
-    '''Exception raised when code_checker_base.HdlCodeCheckerBase can't find
+    '''Exception raised when hdlcc_base.HdlCodeCheckerBase can't find
     the source file that defines the given design unit'''
 
     def __init__(self, design_unit):

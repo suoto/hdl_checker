@@ -98,7 +98,7 @@ with such.A("hdlcc server") as it:
 
         def startCodeCheckerServer():
             hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
-                                        'code_checker_server.py')
+                                        'hdlcc_server.py')
 
             it._host = '127.0.0.1'
             it._port = '50000'
@@ -386,7 +386,7 @@ with such.A("hdlcc server") as it:
     with it.having("PID attachment"):
         def startCodeCheckerServerAttachedToPid(pid):
             hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
-                                        'code_checker_server.py')
+                                        'hdlcc_server.py')
 
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
             cmd = ['coverage', 'run',
