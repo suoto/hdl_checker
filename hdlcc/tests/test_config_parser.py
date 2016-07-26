@@ -403,5 +403,43 @@ with such.A('config parser object') as it:
             # Also, check that there is no extra source left behind
             it.assertEqual(len(sources_pre), len(sources_post))
 
+    with it.having("no builder configured on the project file"):
+        @it.has_setup
+        def setup():
+            it.patcher = mock.patch('hdlcc.config_parser.hasVunit',
+                                    lambda: False)
+            it.patcher.start()
+
+        @it.has_teardown
+        def teardown():
+            it.patcher.stop()
+
+        @it.should("find a builder should it pass the environment check")
+        @params('MSim', 'GHDL', 'XVHDL')
+        def test(case, builder):
+            _logger.info("%s: Testing builder %s", case, builder)
+            commands = []
+
+            def _subprocessMocker(self, cmd_with_args, shell=False, env=None):
+                commands.append(cmd_with_args)
+                return []
+
+            with mock.patch('hdlcc.builders.%s.checkEnvironment' % builder,
+                            lambda self: setattr(self, '_version', '<foo>')):
+                with mock.patch('hdlcc.builders.%s._subprocessRunner' % builder,
+                                _subprocessMocker):
+
+                    parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                                 'project_wo_builder_wo_target_dir.prj'))
+                    for cmd in commands:
+                        _logger.warning('>' + str(cmd))
+                    it.assertEquals(parser.getBuilder(), builder.lower())
+
+        @it.should("use fallback is no builder pass")
+        def test():
+            parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                         'project_wo_builder_wo_target_dir.prj'))
+            it.assertEquals(parser.getBuilder(), 'fallback')
+
 it.createTests(globals())
 

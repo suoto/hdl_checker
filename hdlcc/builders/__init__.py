@@ -41,7 +41,7 @@ def getBuilderByName(name):
 
     return builder
 
-__all__ = ['MSim', 'XVHDL', 'Fallback', 'GHDL']
+__all__ = ['MSim', 'XVHDL', 'GHDL', 'Fallback']
 
-AVAILABLE_BUILDERS = MSim, XVHDL, Fallback, GHDL
+AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback
 

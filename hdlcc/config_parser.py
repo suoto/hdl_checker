@@ -17,6 +17,7 @@
 "Configuration file parser"
 
 import os.path as p
+import shutil
 import re
 import logging
 from threading import Lock
@@ -25,7 +26,7 @@ import hdlcc.exceptions
 from hdlcc.parsers import (getSourceFileObjects,
                            VhdlParser,
                            VerilogParser)
-from hdlcc.builders import getBuilderByName
+from hdlcc.builders import getBuilderByName, AVAILABLE_BUILDERS
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -276,7 +277,7 @@ class ConfigParser(object):
         "Parse the configuration file without any previous checking"
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        self._parms['builder'] = 'fallback'
+        self._parms['builder'] = None
         source_path_list = []
         source_build_list = []
         for _line in open(self.filename, 'r').readlines():
@@ -296,13 +297,17 @@ class ConfigParser(object):
 
         self._cleanUpSourcesList(source_path_list)
 
+        # If no builder was configured, try to discover
+        if self._parms['builder'] is None:
+            self._discoverBuilder()
+
+        # Set default flags if the user hasn't specified any
+        self._setDefaultBuildFlagsIfNeeded()
+
         # If after parsing we haven't found the configured target
         # dir, we'll use '.hdlcc' as default
         if 'target_dir' not in self._parms.keys():
             self._parms['target_dir'] = ".hdlcc"
-
-        # Set default flags if the user hasn't specified any
-        self._setDefaultBuildFlagsIfNeeded()
 
         # If the configured target folder is not absolute, we assume it
         # should be relative to the folder where the configuration file
@@ -312,6 +317,37 @@ class ConfigParser(object):
                                                self._parms['target_dir'])
 
         self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
+
+    def _discoverBuilder(self):
+        """
+        If no builder was specified, try to find one that works using
+        a dummy target dir
+        """
+        target_dir = '.dummy'
+        builder_class = None
+        for builder_class in AVAILABLE_BUILDERS:
+            if builder_class.builder_name == 'fallback':
+                continue
+            try:
+                builder_class(target_dir)
+                break
+            except hdlcc.exceptions.SanityCheckError:
+                self._logger.debug("Builder '%s' failed",
+                                   builder_class.builder_name)
+                continue
+            finally:
+                if p.exists(target_dir): # pragma: no cover
+                    shutil.rmtree(target_dir)
+
+        if builder_class is not None:
+            self._logger.info("Builder '%s' has worked",
+                              builder_class.builder_name)
+            self._parms['builder'] = builder_class.builder_name
+        else: # pragma: no cover
+            # Fallback is tested in the list above, so we shouldn't
+            # reach this
+            self._logger.info("Couldn't find any builder, using fallback")
+            self._parms['builder'] = 'fallback'
 
     # TODO: Add a test for this
     def _setDefaultBuildFlagsIfNeeded(self):
