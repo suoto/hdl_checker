@@ -30,7 +30,7 @@ import mock
 
 import hdlcc
 from hdlcc.config_parser import ConfigParser
-from hdlcc.utils import writeListToFile
+from hdlcc.utils import writeListToFile, handlePathPlease
 
 _logger = logging.getLogger(__name__)
 
@@ -297,18 +297,36 @@ with such.A('config parser object') as it:
                             "We should find %s files" % filetype)
 
     with it.having("a project file constantly updated"):
+
+        def getSourcesFrom(sources=None):
+            prj_content = []
+            if sources is None:
+                sources = list(it.sources)
+
+            for lib, path in sources:
+                prj_content += ["vhdl %s %s" % (lib, path)]
+
+            writeListToFile(it.project_filename, prj_content)
+
+            result = {}
+            for source in it.parser.getSources():
+                result[source.filename] = source
+
+            return result
+
         @it.has_setup
         @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def setup():
             it.project_filename = 'test.prj'
             it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
-            it.config_content = [
-                r'vhdl work ' + p.normpath(p.join(
-                    it.lib_path, 'another_library', 'foo.vhd')),
-                r'vhdl work ' + p.normpath(p.join(
-                    it.lib_path, 'basic_library', 'clock_divider.vhd')),]
+            it.sources = [
+                ('work', p.join('another_library', 'foo.vhd')),
+                ('work', p.join('basic_library', 'clock_divider.vhd'))]
 
-            writeListToFile(it.project_filename, it.config_content)
+            writeListToFile(
+                it.project_filename,
+                ["vhdl %s %s" % (lib, path) for lib, path in it.sources])
+
             it.parser = ConfigParser(it.project_filename)
 
         @it.has_teardown
@@ -318,10 +336,7 @@ with such.A('config parser object') as it:
         @it.should("Find only the sources given then the extra source")
         def test_01():
             _logger.info("Getting sources before adding the extra source")
-            sources_pre = {}
-            for source in it.parser.getSources():
-                if 'vunit' not in source.filename:
-                    sources_pre[source.filename] = source
+            sources_pre = getSourcesFrom()
 
             _logger.info("Paths found:")
             for source in sources_pre.keys():
@@ -329,32 +344,24 @@ with such.A('config parser object') as it:
 
             it.assertItemsEqual(
                 sources_pre.keys(),
-                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),])
-
+                [handlePathPlease('another_library', 'foo.vhd'),
+                 handlePathPlease('basic_library', 'clock_divider.vhd')])
 
             _logger.info("Adding the extra source...")
-            # Add an extra file
-            writeListToFile(
-                it.project_filename,
-                it.config_content + [r'vhdl work ' + p.normpath(p.join(
-                    it.lib_path, 'basic_library', 'very_common_pkg.vhd'))])
 
-            sources_post = {}
-            for source in it.parser.getSources():
-                if 'vunit' not in source.filename:
-                    sources_post[source.filename] = source
+            sources_post = getSourcesFrom(
+                it.sources +
+                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
 
             _logger.info("Paths found:")
             for source in sources_post.keys():
                 _logger.info(" - %s", source)
 
-
             it.assertItemsEqual(
                 sources_post.keys(),
-                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')),])
+                [handlePathPlease('another_library', 'foo.vhd'),
+                 handlePathPlease('basic_library', 'clock_divider.vhd'),
+                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
 
             # Check the files originally found weren't re-created
             for path, source in sources_pre.items():
@@ -362,46 +369,60 @@ with such.A('config parser object') as it:
 
         @it.should("Update the source library if changed")
         def test_02():
-            sources_pre = {}
-            for source in it.parser.getSources():
-                if 'vunit' not in source.filename:
-                    sources_pre[source.filename] = source
+            sources_pre = getSourcesFrom(
+                it.sources +
+                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
 
-            # Add an extra file
-            writeListToFile(
-                it.project_filename,
-                it.config_content + [r'vhdl foo_lib ' + p.join(it.lib_path, 'basic_library',
-                                                               'very_common_pkg.vhd'), ])
-
-            sources_post = {}
-            for source in it.parser.getSources():
-                if 'vunit' not in source.filename:
-                    sources_post[source.filename] = source
+            sources_post = getSourcesFrom(
+                it.sources +
+                [('foo_lib', p.join('basic_library', 'very_common_pkg.vhd'))])
 
             it.assertItemsEqual(
                 sources_post.keys(),
-                [p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd')),
-                 p.normpath(p.join(it.lib_path, 'basic_library', 'very_common_pkg.vhd')), ])
+                [handlePathPlease('another_library', 'foo.vhd'),
+                 handlePathPlease('basic_library', 'clock_divider.vhd'),
+                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
 
-            added_path = p.normpath(p.join(it.lib_path, 'basic_library',
-                                           'very_common_pkg.vhd'))
+            added_path = handlePathPlease('basic_library', 'very_common_pkg.vhd')
 
             added_source = sources_post[added_path]
 
             # Check that the sources that have been previously added are
             # the same
             for path in [
-                    p.normpath(p.join(it.lib_path, 'another_library', 'foo.vhd')),
-                    p.normpath(p.join(it.lib_path, 'basic_library', 'clock_divider.vhd'))]:
+                    handlePathPlease('another_library', 'foo.vhd'),
+                    handlePathPlease('basic_library', 'clock_divider.vhd')]:
                 it.assertEqual(sources_pre[path], sources_post[path])
 
+            _logger.warning("added path: %s", added_path)
+            _logger.warning("sources pre:\n%s", "\n".join(sources_pre.keys()))
+            _logger.warning("sources post:\n%s", "\n".join(sources_post.keys()))
             # Check that the source we changed library has changed
             it.assertNotEqual(sources_pre[added_path], sources_post[added_path])
             it.assertEqual(added_source.library, 'foo_lib')
 
             # Also, check that there is no extra source left behind
             it.assertEqual(len(sources_pre), len(sources_post))
+
+        @it.should("Remove sources from config object if they were removed "
+                   "from the project file")
+        def test_03():
+            sources_pre = getSourcesFrom(
+                it.sources +
+                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
+
+            it.assertItemsEqual(
+                sources_pre.keys(),
+                [handlePathPlease('another_library', 'foo.vhd'),
+                 handlePathPlease('basic_library', 'clock_divider.vhd'),
+                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+
+            sources_post = getSourcesFrom()
+
+            it.assertItemsEqual(
+                sources_post.keys(),
+                [handlePathPlease('another_library', 'foo.vhd'),
+                 handlePathPlease('basic_library', 'clock_divider.vhd')])
 
     with it.having("no builder configured on the project file"):
         @it.has_setup

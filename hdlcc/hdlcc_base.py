@@ -41,6 +41,8 @@ except ImportError:
 
 import hdlcc.exceptions
 import hdlcc.builders
+import hdlcc.utils as utils
+from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
 
@@ -208,29 +210,26 @@ class HdlCodeCheckerBase(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], x['line_number'], x['error_number']))
 
-    def _getMessagesAvailable(self, path, *args, **kwargs):
+    def _getSourceByPath(self, path, batch_mode):
         """
-        Checks if the builder can be called via self._getBuilderMessages
-        or return info/messages identifying why it couldn"t be done
+        Get the source object, flags and any additional info to be displayed
         """
-
-        if not self.finishedBuilding():
-            self._handleUiWarning("Project hasn't finished building, try again "
-                                  "after it finishes.")
-            return []
-
-        if self._config.filename is None:
-            return []
-
         source = None
+        flags = []
+        remarks = []
+
         if self._config is not None:
             try:
                 source = self._config.getSourceByPath(path)
             except KeyError:
                 pass
 
+        # If the source file was not found on the configuration file, add this
+        # as a remark.
+        # Also, create a source parser object with some library so the user can
+        # at least have some info on the source
         if source is None:
-            return [{
+            remarks += [{
                 'checker'        : 'hdlcc',
                 'line_number'    : '',
                 'column'         : '',
@@ -239,36 +238,30 @@ class HdlCodeCheckerBase(object):
                 'error_type'     : 'W',
                 'error_message'  : 'Path "%s" not found in project file' %
                                    p.abspath(path)}]
+            self._logger.info("Path %s not found in the project file", path)
+            cls = VhdlParser if utils.getFileType(path) == 'vhdl' else \
+                  VerilogParser
+            source = cls(path, library='undefined')
+        else:
+            flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
+                    self._config.getSingleBuildFlagsByPath(path)
 
-
-        with self._lock:
-            dependencies = self._getSourceDependenciesSet(source)
-
-            self._logger.debug("Source '%s' depends on %s", str(source), \
-                    ", ".join(["'%s'" % str(x) for x in dependencies]))
-
-            if dependencies.issubset(set(self._units_built)):
-                self._logger.debug("Dependencies for source '%s' are met", \
-                        str(source))
-                records = self._getBuilderMessages(path, *args, **kwargs)
-                self.saveCache()
-                return records
-
-            else:
-                return self._getBuilderMessages(path, *args, **kwargs)
+        return source, flags, remarks
 
     def _getBuilderMessages(self, path, batch_mode=False):
-        '''Builds a given source file handling rebuild of units reported
-        by the compiler'''
+        """
+        Builds a given source file handling rebuild of units reported
+        by the compiler
+        """
+        source, flags, remarks = self._getSourceByPath(path, batch_mode)
+        if source is None:
+            self._logger.info("Returning '%s'", repr(remarks))
+            return remarks
 
         self._logger.debug("Building '%s', batch_mode = %s",
                            str(path), batch_mode)
 
-        flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
-                self._config.getSingleBuildFlagsByPath(path)
-
-        records, rebuilds = self.builder.build(self._config.getSourceByPath(path),
-                                               forced=True, flags=flags)
+        records, rebuilds = self.builder.build(source, forced=True, flags=flags)
 
         if rebuilds:
             source = self._config.getSourceByPath(path)
@@ -289,18 +282,20 @@ class HdlCodeCheckerBase(object):
                                                  batch_mode=True)
             return self._getBuilderMessages(path)
 
-        return self._sortBuildMessages(records)
+        return self._sortBuildMessages(records + remarks)
 
     def saveCache(self):
         "Dumps project object to a file to recover its state later"
         cache_fname = self._getCacheFilename()
+        if self.builder.builder_name == 'fallback' or cache_fname is None:
+            self._logger.debug("Skipping cache save")
+            return
 
         state = {'serializer' : serializer.__name__,
                  '_logger': {'name' : self._logger.name,
                              'level' : self._logger.level},
                  'builder' : self.builder.getState(),
-                 '_config' : self._config.getState(),
-                }
+                 '_config' : self._config.getState()}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         _dump(state, open(cache_fname, 'w'))
@@ -380,8 +375,7 @@ class HdlCodeCheckerBase(object):
             # where the cache file should be
             if self._config is None and self.project_file is not None:
                 target_dir, _ = ConfigParser.simpleParse(self.project_file)
-                if target_dir:
-                    self._recoverCache(target_dir)
+                self._recoverCache(target_dir)
 
             # No configuration defined means we failed to recover it
             # from the cache
@@ -431,6 +425,18 @@ class HdlCodeCheckerBase(object):
             self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
                     built, errors, warnings)
 
+    def _isBuilderCallable(self):
+        """
+        Checks if all preconditions for calling the builder have been met
+        """
+        if self._config.filename is None:
+            return False
+
+        if not self.finishedBuilding():
+            return False
+
+        return True
+
     def getMessagesByPath(self, path, *args, **kwargs):
         """
         Returns the messages for the given path, including messages
@@ -443,6 +449,10 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
+        if not self.finishedBuilding():
+            self._handleUiWarning("Project hasn't finished building, try again "
+                                  "after it finishes.")
+
         # _USE_THREADS is for debug only, no need to cover
         # this
         if self._USE_THREADS: # pragma: no cover
@@ -450,18 +460,24 @@ class HdlCodeCheckerBase(object):
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \
                     args=(open(abspath, 'r').read().split('\n'), ))
-            builder_check = pool.apply_async(self._getMessagesAvailable, \
-                    args=[abspath, ] + list(args), kwds=kwargs)
+            if self._isBuilderCallable():
+                builder_check = pool.apply_async(
+                    self._getBuilderMessages,
+                    args=[abspath, ] + list(args),
+                    kwds=kwargs)
+                records += builder_check.get()
 
             records += static_check.get()
-            records += builder_check.get()
 
             pool.terminate()
             pool.join()
         else:
             records = getStaticMessages(open(abspath, 'r').read().split('\n'))
-            records += self._getMessagesAvailable(abspath, list(args), **kwargs)
+            if self._isBuilderCallable():
+                records += self._getBuilderMessages(
+                    abspath, list(args), **kwargs)
 
+        self.saveCache()
         return self._sortBuildMessages(records)
 
     def getSources(self):

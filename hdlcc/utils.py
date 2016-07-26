@@ -227,3 +227,9 @@ def cleanProjectCache(project_file): # pragma: no cover
         if p.exists(cache_folder):
             shutil.rmtree(cache_folder)
 
+def handlePathPlease(*args):
+    """
+    Join args with pathsep, gets the absolute path and normalizes
+    """
+    return p.normpath(p.abspath(p.join(*args)))
+

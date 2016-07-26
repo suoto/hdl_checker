@@ -277,7 +277,6 @@ class ConfigParser(object):
         "Parse the configuration file without any previous checking"
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        self._parms['builder'] = None
         source_path_list = []
         source_build_list = []
         for _line in open(self.filename, 'r').readlines():
@@ -298,7 +297,7 @@ class ConfigParser(object):
         self._cleanUpSourcesList(source_path_list)
 
         # If no builder was configured, try to discover
-        if self._parms['builder'] is None:
+        if 'builder' not in self._parms.keys():
             self._discoverBuilder()
 
         # Set default flags if the user hasn't specified any
@@ -489,6 +488,11 @@ class ConfigParser(object):
 
         if target_dir:
             target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
+        else:
+            target_dir = '.hdlcc'
+
+        if not p.isabs(target_dir):
+            target_dir = p.join(p.dirname(filename), target_dir)
 
         ConfigParser._logger.info("Simple parse found target_dir = %s and "
                                   "builder = %s", repr(target_dir),

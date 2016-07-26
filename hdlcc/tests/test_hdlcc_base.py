@@ -138,7 +138,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 os.remove('modelsim.ini')
             del it.project
 
-        @it.should('build project by dependency in background')
+        @it.should("build project by dependency in background")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
         def test001():
@@ -147,7 +147,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             it.project.buildByDependency()
             it.assertFalse(it.project.finishedBuilding())
 
-        @it.should('notify if a build is already running')
+        @it.should("notify if a build is already running")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
         def test002():
@@ -165,7 +165,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 it.project.waitForBuild()
                 raise
 
-        @it.should('warn when trying to build a source before the build '
+        @it.should("warn when trying to build a source before the build "
                    'thread completes')
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
@@ -198,11 +198,11 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
                 _logger.warning("Waiting until the project finishes building")
                 it.project.waitForBuild()
 
-        @it.should('wait until build has finished')
+        @it.should("wait until build has finished")
         def test004():
             it.project.waitForBuild()
 
-        @it.should('get messages by path')
+        @it.should("get messages by path")
         def test005():
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
                               'foo.vhd')
@@ -224,7 +224,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-        @it.should('get updated messages')
+        @it.should("get updated messages")
         def test006():
             filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
                               'foo.vhd')
@@ -257,7 +257,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-        @it.should('get messages by path of a different source')
+        @it.should("get messages by path of a different source")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
         def test007():
@@ -290,7 +290,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-        @it.should('get updated messages of a different source')
+        @it.should("get updated messages of a different source")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
         def test008():
@@ -318,10 +318,43 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-        @it.should('rebuild sources when needed within the same library')
+        @it.should("get messages from a source outside the project file")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
         def test009():
+            filename = 'some_file.vhd'
+            writeListToFile(filename, ['library some_lib;'])
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+            records = it.project.getMessagesByPath(filename)
+
+            _logger.info("Records found:")
+            for record in records:
+                _logger.info(record)
+
+            it.assertIn(
+                {'checker'        : 'hdlcc',
+                 'line_number'    : '',
+                 'column'         : '',
+                 'filename'       : '',
+                 'error_number'   : '',
+                 'error_type'     : 'W',
+                 'error_message'  : 'Path "%s" not found in '
+                                    'project file' % p.abspath(filename)},
+                records)
+
+            # The builder should find other issues as well...
+            it.assertTrue(len(records) > 1,
+                          "It was expected that the builder added some "
+                          "message here indicating an error")
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+        @it.should("rebuild sources when needed within the same library")
+        @unittest.skipUnless(PROJECT_FILE is not None,
+                             "Requires a valid project file")
+        def test010():
             # Count how many messages each source has
             source_msgs = {}
 
@@ -368,10 +401,10 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             _logger.info("Restoring previous content")
             writeListToFile(very_common_pkg, code)
 
-        @it.should('rebuild sources when needed for different libraries')
+        @it.should("rebuild sources when needed for different libraries")
         @unittest.skipUnless(PROJECT_FILE is not None,
                              "Requires a valid project file")
-        def test010():
+        def test011():
             # Count how many messages each source has
             source_msgs = {}
 
