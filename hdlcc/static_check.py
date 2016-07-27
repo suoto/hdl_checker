@@ -19,7 +19,7 @@
 import re
 import logging
 
-__logger__ = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 _GET_SCOPE = re.compile('|'.join([
     r"^\s*entity\s+(?P<entity_name>\w+)\s+is\b",
@@ -128,8 +128,7 @@ def _getUnusedObjects(vbuffer, objects):
             yield _object
 
 __COMMENT_TAG_SCANNER__ = re.compile('|'.join([
-    r"\s*--\s*(?P<tag>TODO|FIXME|XXX)\s*:\s*(?P<text>.*)",
-    ]))
+    r"\s*--\s*(?P<tag>TODO|FIXME|XXX)\s*:\s*(?P<text>.*)"]))
 
 def _getCommentTags(vbuffer):
     result = []
@@ -160,6 +159,28 @@ def _getCommentTags(vbuffer):
             result += [message]
     return result
 
+def _getMiscChecks(objects):
+    """
+    Get generic code hints (or it should do that sometime in the future...)
+    """
+    if 'library' not in [x['type'] for x in objects.values()]:
+        raise StopIteration
+
+    for library, obj in objects.items():
+        if obj['type'] != 'library':
+            continue
+        if library == 'work':
+            yield {
+                'checker'        : 'HDL Code Checker/static',
+                'line_number'    : obj['lnum'] + 1,
+                'column'         : obj['start'] + 1,
+                'filename'       : None,
+                'error_number'   : '0',
+                'error_type'     : 'W',
+                'error_subtype'  : 'Style',
+                'error_message'  : "Declaration of library '{library}' can "
+                                   "be omitted".format(library=library)}
+
 def getStaticMessages(vbuffer=None):
     "VHDL static checking"
     objects = _getObjectsFromText(vbuffer)
@@ -181,7 +202,7 @@ def getStaticMessages(vbuffer=None):
             }
 
         result.append(message)
-    return result + _getCommentTags(vbuffer)
+    return result + _getCommentTags(vbuffer) + list(_getMiscChecks(objects))
 
 def standalone(): # pragma: no cover
     import sys
