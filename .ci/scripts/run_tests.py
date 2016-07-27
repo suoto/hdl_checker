@@ -30,11 +30,13 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _LOG = p.abspath(p.expanduser("~/tests.log"))
+_COVERAGERC = p.join(os.environ.get("TRAVIS_BUILD_DIR"), '.coveragerc')
 
 def noseRunner(nose2_argv):
     "Runs nose2 with coverage"
     _logger.info("nose2 args: %s", repr(nose2_argv))
-    cov = coverage.Coverage(config_file='.coveragerc')
+    cov = coverage.Coverage(config_file=_COVERAGERC)
+    _logger.fatal("coveragerc is %s", _COVERAGERC)
     cov.start()
 
     try:

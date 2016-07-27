@@ -19,10 +19,10 @@ python:
 
 env:
   matrix:
-    - BUILDER=msim
+    # - BUILDER=msim
     - BUILDER=ghdl
     - BUILDER=fallback standalone
-    - BUILDER=xvhdl
+    # - BUILDER=xvhdl
 
 # This should work but it doesn't!
 # addons:
@@ -57,10 +57,13 @@ script: "./run_tests.sh ${BUILDER} -vv --log-capture"
 after_failure:
   - "cat tests.log"
 after_success:
+  - "find -iname '.coverage'"
   - "coverage combine"
+  - "find -iname '.coverage'"
   - "coverage report"
-  - "export COVERALLS_PARALLEL=true"
-  - "coveralls"
+  - "find -iname '.coverage'"
+  # - "export COVERALLS_PARALLEL=true"
+  # - "coveralls"
   - "codecov"
 cache:
   pip: true

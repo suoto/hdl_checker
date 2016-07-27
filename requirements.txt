@@ -4,7 +4,7 @@ nose2-cov
 argcomplete
 prettytable
 testfixtures
-coverage
+coverage==4.1
 codecov
 coveralls
 colorama
