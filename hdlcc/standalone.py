@@ -17,6 +17,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "HDLCC standalone stuff"
 
+from __future__ import print_function
+
 import os
 import os.path as p
 import logging
@@ -62,7 +64,7 @@ def parseArguments():
     "Argument parser for standalone hdlcc"
 
     if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):
-        print hdlcc.__version__
+        print(hdlcc.__version__)
         sys.exit(0)
 
     parser = argparse.ArgumentParser()
@@ -144,25 +146,25 @@ def runStandaloneSourceFileParse(fname):
 
     source = cls(fname)
 
-    print "Source: %s" % source
+    print("Source: %s" % source)
 
     design_units = source.getDesignUnits()
     if design_units: # pragma: no cover
-        print " - Design_units:"
+        print(" - Design_units:")
         for unit in design_units:
-            print " -- %s" % str(unit)
+            print(" -- %s" % str(unit))
     dependencies = source.getDependencies()
     if dependencies: # pragma: no cover
-        print " - Dependencies:"
+        print(" - Dependencies:")
         for dependency in dependencies:
-            print " -- %s.%s" % (dependency['library'], dependency['unit'])
+            print(" -- %s.%s" % (dependency['library'], dependency['unit']))
 
 def runStandaloneStaticCheck(fname):
     """Standalone source_file.VhdlParser run"""
     from hdlcc.static_check import getStaticMessages
 
     for record in getStaticMessages(open(fname, 'r').read().split('\n')):
-        print record
+        print(record)
 
 def runner(args):
     "Main runner command processing"
@@ -176,9 +178,9 @@ def runner(args):
         project.clean()
         project.setupEnvIfNeeded()
 
-    if args.debug_print_sources or args.debug_print_compile_order or args.build:
-        project.buildByDependency()
-        project.waitForBuild()
+    #  if args.debug_print_sources or args.debug_print_compile_order or args.build:
+    #      project.buildByDependency()
+    #      project.waitForBuild()
 
     if args.debug_print_sources:
         sources = PrettyTable(['Filename', 'Library', 'Flags'])
@@ -186,23 +188,23 @@ def runner(args):
         sources.sortby = 'Library'
         for source in project.getSources():
             sources.add_row([source.filename, source.library, " ".join(source.flags)])
-        print sources
+        print(sources)
 
-    if args.debug_print_compile_order:
-        for source in project.getCompilationOrder():
-            print "{lang} {library} {path} {flags}".format(
-                lang='vhdl', library=source.library, path=source.filename,
-                flags=' '.join(source.flags))
-            assert not set(['-93', '-2008']).issubset(source.flags)
+    #  if args.debug_print_compile_order:
+    #      for source in project.getCompilationOrder():
+    #          print("{lang} {library} {path} {flags}".format(
+    #              lang='vhdl', library=source.library, path=source.filename,
+    #              flags=' '.join(source.flags)))
+    #          assert not set(['-93', '-2008']).issubset(source.flags)
 
     if args.build and args.sources:
         for source in args.sources:
             try:
                 _logger.info("Building source '%s'", source)
                 for record in project.getMessagesByPath(source):
-                    print "[{error_type}-{error_number}] @ " \
+                    print("[{error_type}-{error_number}] @ " \
                           "({line_number},{column}): {error_message}"\
-                            .format(**record)
+                            .format(**record))
             except RuntimeError as exception:
                 _logger.error("Unable to build '%s': '%s'", source,
                               str(exception))
@@ -226,6 +228,7 @@ def main():
     setupLogging(sys.stdout, runner_args.log_level)
     logging.root.setLevel(runner_args.log_level)
     logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+    #  logging.getLogger('hdlcc.builders').setLevel(logging.INFO)
     logging.getLogger('vunit.project').setLevel(logging.ERROR)
 
     # Running hdlcc with threads has two major drawbacks:

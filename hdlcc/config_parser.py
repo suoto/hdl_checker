@@ -548,3 +548,16 @@ class ConfigParser(object):
             return True
         return p.abspath(path) in self._sources.keys()
 
+    def findSourcesByDesignUnit(self, unit, library='work'):
+        #  self._logger.info("Searching for [%s] %s", library, unit)
+        sources = []
+        for source in self._sources.itervalues():
+            if source.library != library:
+                continue
+            if unit in [x['name'] for x in source.getDesignUnits()]:
+                sources += [source]
+        if not sources:
+            raise hdlcc.exceptions.DesignUnitNotFoundError(
+                "%s.%s" % (library, unit))
+        return sources
+

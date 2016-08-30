@@ -52,12 +52,25 @@ def clear():
         print cmd
         print os.popen(cmd).read()
 
-def setupLogging():
-    "Logging formatter setup"
+def setupLogging(stream, level, color=True): # pragma: no cover
+    "Setup logging according to the command line parameters"
+    if type(stream) is str:
+        class Stream(file):
+            """File subclass that allows RainbowLoggingHandler to write
+            with colors"""
+            _lock = Lock()
+            def isatty(self):
+                return color
+            def write(self, *args, **kwargs):
+                with self._lock:
+                    super(Stream, self).write(*args, **kwargs)
+
+        stream = Stream(stream, 'ab', buffering=1)
+
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
-        handler = RainbowLoggingHandler(
-            sys.stdout,
+        rainbow_stream_handler = RainbowLoggingHandler(
+            stream,
             #  Customizing each column's color
             # pylint: disable=bad-whitespace
             color_asctime          = ('dim white',  'black'),
@@ -72,20 +85,23 @@ def setupLogging():
             color_message_error    = ('red',        None),
             color_message_critical = ('bold white', 'red'))
             # pylint: enable=bad-whitespace
-    except ImportError:
-        handler = logging.StreamHandler(sys.stdout)
-        log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
-        handler.setFormatter(logging.Formatter(log_format))
 
-    handler.setLevel(logging.DEBUG)
-    logging.root.addHandler(handler)
+        logging.root.addHandler(rainbow_stream_handler)
+        logging.root.setLevel(level)
+    except ImportError: # pragma: no cover
+        file_handler = logging.StreamHandler(stream)
+        #  log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
+        #  file_handler.formatter = logging.Formatter(log_format)
+        file_handler.formatter = logging.Formatter()
+        logging.root.addHandler(file_handler)
+        logging.root.setLevel(level)
 
 def runTests():
     if '--clear' in sys.argv[1:]:
         clear()
         sys.argv.pop(sys.argv.index('--clear'))
 
-    setupLogging()
+    setupLogging(sys.stdout, logging.FATAL)
 
     logging.getLogger('nose2').setLevel(logging.INFO)
     file_handler = logging.FileHandler(_LOG)

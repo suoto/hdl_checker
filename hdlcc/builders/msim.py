@@ -224,8 +224,6 @@ class MSim(BaseBuilder):
             os.mkdir(self._target_folder)
 
         if p.exists(_modelsim_ini):
-            self._logger.debug("modelsim.ini already exists at '%s', "
-                               "returning", _modelsim_ini)
             return False
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))

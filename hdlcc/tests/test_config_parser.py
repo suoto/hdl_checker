@@ -184,6 +184,23 @@ with such.A('config parser object') as it:
             restored = ConfigParser.recoverFromState(state)
             it.assertEqual(it.parser, restored)
 
+        @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
+                   "a design unit can't be found")
+        def test():
+            with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError) as exc:
+                it.parser.findSourcesByDesignUnit('some_unit', 'some_lib')
+                _logger.info("Raised exception: %s", str(exc))
+
+            try:
+                sources = it.parser.findSourcesByDesignUnit('sample_package')
+                for source in sources:
+                    it.assertTrue(
+                        p.exists(source.filename),
+                        "Couldn't find source with path '%s'" % source.filename)
+            except hdlcc.exceptions.DesignUnitNotFoundError:
+                it.fail("Shouldn't raise exception for a unit that is "
+                        "supposed to be found")
+
     with it.having("no project file"):
         @it.should("create the object without error")
         @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)

@@ -12,7 +12,6 @@ nose2==0.6.5
 nose2-cov==1.0a4
 pbr==1.10.0
 prettytable==0.7.2
-rainbow-logging-handler==2.2.2
 requests==2.10.0
 six==1.10.0
 testfixtures==4.10.0

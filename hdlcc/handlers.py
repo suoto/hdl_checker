@@ -59,7 +59,7 @@ def _getServerByProjectFile(project_file):
         if project_file not in _hdlcc_objects:
             _logger.debug("Created new project server for '%s'", project_file)
             project = HdlCodeCheckerSever(project_file)
-            project.buildByDependency()
+            #  project.buildByDependency()
             _hdlcc_objects[project_file] = project
         return _hdlcc_objects[project_file]
 

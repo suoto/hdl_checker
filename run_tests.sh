@@ -69,21 +69,21 @@ set +e
 
 RESULT=0
 
-# If we're not running on a CI server, create a virtual env to mimic
-# its behaviour
-if [ "${CLEAN_PIP}" == "1" -a -z "${CI}" ]; then
-  if [ -d "${VIRTUAL_ENV_DEST}" ]; then
-    rm -rf ${VIRTUAL_ENV_DEST}
-  fi
-fi
+# # If we're not running on a CI server, create a virtual env to mimic
+# # its behaviour
+# if [ "${CLEAN_PIP}" == "1" -a -z "${CI}" ]; then
+#   if [ -d "${VIRTUAL_ENV_DEST}" ]; then
+#     rm -rf ${VIRTUAL_ENV_DEST}
+#   fi
+# fi
 
-if [ -z "${CI}" ]; then
-  virtualenv ${VIRTUAL_ENV_DEST}
-  . ${VIRTUAL_ENV_DEST}/bin/activate
+# if [ -z "${CI}" ]; then
+#   virtualenv ${VIRTUAL_ENV_DEST}
+#   . ${VIRTUAL_ENV_DEST}/bin/activate
 
-  pip install -r requirements.txt
-  pip install git+https://github.com/suoto/rainbow_logging_handler
-fi
+#   pip install -r requirements.txt
+#   pip install git+https://github.com/suoto/rainbow_logging_handler
+# fi
 
 # . ${VIRTUAL_ENV_DEST}/bin/activate
 
@@ -104,77 +104,92 @@ fi
 
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
-if [ -n "${STANDALONE}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
-                              hdlcc.tests.test_vhdl_parser \
-                              hdlcc.tests.test_verilog_parser \
-                              hdlcc.tests.test_misc
-
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-fi
-
-if [ -n "${FALLBACK}" ]; then
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_hdlcc_base \
-                              hdlcc.tests.test_server_handlers \
-                              hdlcc.tests.test_standalone
-
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-fi
-
-if [ -n "${MSIM}" ]; then
-  export BUILDER_NAME=msim
-  export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
-
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_hdlcc_base \
-                              hdlcc.tests.test_persistency \
-                              hdlcc.tests.test_server_handlers \
-                              hdlcc.tests.test_standalone
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-fi
-
-if [ -n "${XVHDL}" ]; then
-  export BUILDER_NAME=xvhdl
-  export BUILDER_PATH=${HOME}/builders/xvhdl/bin
-  if [ ! -d "${BUILDER_PATH}" ]; then
-    export BUILDER_PATH=${HOME}/dev/xvhdl/bin
-  fi
-
-  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                                                     hdlcc.tests.test_hdlcc_base \
-                                                     hdlcc.tests.test_persistency \
-                                                     hdlcc.tests.test_server_handlers \
-                                                     hdlcc.tests.test_standalone
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-fi
-
-if [ -n "${GHDL}" ]; then
-  export BUILDER_NAME=ghdl
-  if [ "${CI}" == "true" ]; then
-    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+export BUILDER_NAME=ghdl
+if [ "${CI}" == "true" ]; then
+  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+else
+  if [ -f "${HOME}/.local/bin/ghdl" ]; then
+    export BUILDER_PATH=${HOME}/.local/bin/ghdl
   else
-    if [ -f "${HOME}/.local/bin/ghdl" ]; then
-      export BUILDER_PATH=${HOME}/.local/bin/ghdl
-    else
-      export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-    fi
+    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
   fi
-
-  echo "BUILDER_PATH=$BUILDER_PATH"
-
-  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-                              hdlcc.tests.test_hdlcc_base \
-                              hdlcc.tests.test_persistency \
-                              hdlcc.tests.test_server_handlers \
-                              hdlcc.tests.test_standalone
-  RESULT=$(($? || RESULT))
-  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
+
+echo "BUILDER_PATH=$BUILDER_PATH"
+
+${TEST_RUNNER} "${ARGS[@]}"
+
+# if [ -n "${STANDALONE}" ]; then
+#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
+#                               hdlcc.tests.test_vhdl_parser \
+#                               hdlcc.tests.test_verilog_parser \
+#                               hdlcc.tests.test_misc
+
+#   RESULT=$(($? || RESULT))
+#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+# fi
+
+# if [ -n "${FALLBACK}" ]; then
+#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+#                               hdlcc.tests.test_hdlcc_base \
+#                               hdlcc.tests.test_server_handlers \
+#                               hdlcc.tests.test_standalone
+
+#   RESULT=$(($? || RESULT))
+#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+# fi
+
+# if [ -n "${MSIM}" ]; then
+#   export BUILDER_NAME=msim
+#   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
+
+#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+#                               hdlcc.tests.test_hdlcc_base \
+#                               hdlcc.tests.test_persistency \
+#                               hdlcc.tests.test_server_handlers \
+#                               hdlcc.tests.test_standalone
+#   RESULT=$(($? || RESULT))
+#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+# fi
+
+# if [ -n "${XVHDL}" ]; then
+#   export BUILDER_NAME=xvhdl
+#   export BUILDER_PATH=${HOME}/builders/xvhdl/bin
+#   if [ ! -d "${BUILDER_PATH}" ]; then
+#     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
+#   fi
+
+#   VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+#                                                      hdlcc.tests.test_hdlcc_base \
+#                                                      hdlcc.tests.test_persistency \
+#                                                      hdlcc.tests.test_server_handlers \
+#                                                      hdlcc.tests.test_standalone
+#   RESULT=$(($? || RESULT))
+#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+# fi
+
+# if [ -n "${GHDL}" ]; then
+#   export BUILDER_NAME=ghdl
+#   if [ "${CI}" == "true" ]; then
+#     export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+#   else
+#     if [ -f "${HOME}/.local/bin/ghdl" ]; then
+#       export BUILDER_PATH=${HOME}/.local/bin/ghdl
+#     else
+#       export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+#     fi
+#   fi
+
+#   echo "BUILDER_PATH=$BUILDER_PATH"
+
+#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+#                               hdlcc.tests.test_hdlcc_base \
+#                               hdlcc.tests.test_persistency \
+#                               hdlcc.tests.test_server_handlers \
+#                               hdlcc.tests.test_standalone
+#   RESULT=$(($? || RESULT))
+#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+# fi
 
 coverage combine
 coverage html

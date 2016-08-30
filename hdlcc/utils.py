@@ -233,3 +233,8 @@ def handlePathPlease(*args):
     """
     return p.normpath(p.abspath(p.join(*args)))
 
+def removeDuplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
