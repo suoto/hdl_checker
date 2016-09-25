@@ -108,7 +108,7 @@ def runTests():
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
     logging.root.addHandler(file_handler)
-    logging.root.setLevel(logging.INFO)
+    logging.root.setLevel(logging.DEBUG)
 
     global _logger
     _logger = logging.getLogger(__name__)

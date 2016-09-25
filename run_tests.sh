@@ -37,6 +37,10 @@ while [ -n "$1" ]; do
     CLEAN_PIP=0
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
+  elif [ -f "$1" ]; then
+    NEW_ARG="$(echo "$1" | sed -e 's/\//./g' -e 's/\.py$//')"
+    echo "Changed argument \"$1\" to \"$NEW_ARG\""
+    ARGS+=($NEW_ARG)
   else
     if [ "$1" == "-F" ]; then
       FAILFAST=1
@@ -117,79 +121,79 @@ fi
 
 echo "BUILDER_PATH=$BUILDER_PATH"
 
-${TEST_RUNNER} "${ARGS[@]}"
+# ${TEST_RUNNER} "${ARGS[@]}"
 
-# if [ -n "${STANDALONE}" ]; then
-#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
-#                               hdlcc.tests.test_vhdl_parser \
-#                               hdlcc.tests.test_verilog_parser \
-#                               hdlcc.tests.test_misc
+if [ -n "${STANDALONE}" ]; then
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_config_parser \
+                              hdlcc.tests.test_vhdl_parser \
+                              hdlcc.tests.test_verilog_parser \
+                              hdlcc.tests.test_misc
 
-#   RESULT=$(($? || RESULT))
-#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-# fi
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+fi
 
-# if [ -n "${FALLBACK}" ]; then
-#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-#                               hdlcc.tests.test_hdlcc_base \
-#                               hdlcc.tests.test_server_handlers \
-#                               hdlcc.tests.test_standalone
+if [ -n "${FALLBACK}" ]; then
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_hdlcc_base \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
 
-#   RESULT=$(($? || RESULT))
-#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-# fi
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+fi
 
-# if [ -n "${MSIM}" ]; then
-#   export BUILDER_NAME=msim
-#   export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
+if [ -n "${MSIM}" ]; then
+  export BUILDER_NAME=msim
+  export BUILDER_PATH=${HOME}/builders/msim/modelsim_ase/linux/
 
-#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-#                               hdlcc.tests.test_hdlcc_base \
-#                               hdlcc.tests.test_persistency \
-#                               hdlcc.tests.test_server_handlers \
-#                               hdlcc.tests.test_standalone
-#   RESULT=$(($? || RESULT))
-#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-# fi
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_hdlcc_base \
+                              hdlcc.tests.test_persistency \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+fi
 
-# if [ -n "${XVHDL}" ]; then
-#   export BUILDER_NAME=xvhdl
-#   export BUILDER_PATH=${HOME}/builders/xvhdl/bin
-#   if [ ! -d "${BUILDER_PATH}" ]; then
-#     export BUILDER_PATH=${HOME}/dev/xvhdl/bin
-#   fi
+if [ -n "${XVHDL}" ]; then
+  export BUILDER_NAME=xvhdl
+  export BUILDER_PATH=${HOME}/builders/xvhdl/bin
+  if [ ! -d "${BUILDER_PATH}" ]; then
+    export BUILDER_PATH=${HOME}/dev/xvhdl/bin
+  fi
 
-#   VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-#                                                      hdlcc.tests.test_hdlcc_base \
-#                                                      hdlcc.tests.test_persistency \
-#                                                      hdlcc.tests.test_server_handlers \
-#                                                      hdlcc.tests.test_standalone
-#   RESULT=$(($? || RESULT))
-#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-# fi
+  VUNIT_VHDL_STANDARD=93 ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                                                     hdlcc.tests.test_hdlcc_base \
+                                                     hdlcc.tests.test_persistency \
+                                                     hdlcc.tests.test_server_handlers \
+                                                     hdlcc.tests.test_standalone
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+fi
 
-# if [ -n "${GHDL}" ]; then
-#   export BUILDER_NAME=ghdl
-#   if [ "${CI}" == "true" ]; then
-#     export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-#   else
-#     if [ -f "${HOME}/.local/bin/ghdl" ]; then
-#       export BUILDER_PATH=${HOME}/.local/bin/ghdl
-#     else
-#       export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-#     fi
-#   fi
+if [ -n "${GHDL}" ]; then
+  export BUILDER_NAME=ghdl
+  if [ "${CI}" == "true" ]; then
+    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+  else
+    if [ -f "${HOME}/.local/bin/ghdl" ]; then
+      export BUILDER_PATH=${HOME}/.local/bin/ghdl
+    else
+      export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+    fi
+  fi
 
-#   echo "BUILDER_PATH=$BUILDER_PATH"
+  echo "BUILDER_PATH=$BUILDER_PATH"
 
-#   ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
-#                               hdlcc.tests.test_hdlcc_base \
-#                               hdlcc.tests.test_persistency \
-#                               hdlcc.tests.test_server_handlers \
-#                               hdlcc.tests.test_standalone
-#   RESULT=$(($? || RESULT))
-#   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
-# fi
+  ${TEST_RUNNER} "${ARGS[@]}" hdlcc.tests.test_builders \
+                              hdlcc.tests.test_hdlcc_base \
+                              hdlcc.tests.test_persistency \
+                              hdlcc.tests.test_server_handlers \
+                              hdlcc.tests.test_standalone
+  RESULT=$(($? || RESULT))
+  [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
+fi
 
 coverage combine
 coverage html

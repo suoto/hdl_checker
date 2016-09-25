@@ -87,87 +87,87 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
         if p.exists(target_dir):
             shutil.rmtree(target_dir)
 
-    with it.having('a performance requirement'):
+    #  with it.having('a performance requirement'):
 
-        @it.has_setup
-        def setup():
-            it.parse_times = []
-            it.build_times = []
+    #      @it.has_setup
+    #      def setup():
+    #          it.parse_times = []
+    #          it.build_times = []
 
-        @it.has_teardown
-        def teardown():
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-            utils.cleanProjectCache(PROJECT_FILE)
-            target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
-            if p.exists(target_dir):
-                shutil.rmtree(target_dir)
-            cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
-            if p.exists(cache_fname):
-                os.remove(cache_fname)
+    #      @it.has_teardown
+    #      def teardown():
+    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
+    #          utils.cleanProjectCache(PROJECT_FILE)
+    #          target_dir = hdlcc.config_parser.ConfigParser(PROJECT_FILE).getTargetDir()
+    #          if p.exists(target_dir):
+    #              shutil.rmtree(target_dir)
+    #          cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
+    #          if p.exists(cache_fname):
+    #              os.remove(cache_fname)
 
-        @it.should('measure time taken to build a project without any cache')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test_001():
-            for _ in range(5):
-                start = time.time()
-                project = StandaloneProjectBuilder()
-                project.clean()
-                parse_time = time.time() - start
-                project.buildByDependency()
-                project.waitForBuild()
-                build_time = time.time() - start - parse_time
+    #      @it.should('measure time taken to build a project without any cache')
+    #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    #      def test_001():
+    #          for _ in range(5):
+    #              start = time.time()
+    #              project = StandaloneProjectBuilder()
+    #              project.clean()
+    #              parse_time = time.time() - start
+    #              project.buildByDependency()
+    #              project.waitForBuild()
+    #              build_time = time.time() - start - parse_time
 
-                _logger.info("Parsing took %fs", parse_time)
-                _logger.info("Building took %fs", build_time)
+    #              _logger.info("Parsing took %fs", parse_time)
+    #              _logger.info("Building took %fs", build_time)
 
-                it.parse_times += [parse_time]
-                it.build_times += [build_time]
+    #              it.parse_times += [parse_time]
+    #              it.build_times += [build_time]
 
-            _logger.info("Builds took between %f and %f",
-                         min(it.build_times), max(it.build_times))
+    #          _logger.info("Builds took between %f and %f",
+    #                       min(it.build_times), max(it.build_times))
 
-            # Remove spurious values we may have caught
-            it.build_times.remove(max(it.build_times))
-            it.build_times.remove(min(it.build_times))
+    #          # Remove spurious values we may have caught
+    #          it.build_times.remove(max(it.build_times))
+    #          it.build_times.remove(min(it.build_times))
 
-            # Maximum and minimum time shouldn't be too different
-            if max(it.build_times)/min(it.build_times) > 1.3:
-                _logger.warning(
-                    "Build times between %f and %f seems too different! "
-                    "Complete build times: %s",
-                    min(it.build_times), max(it.build_times), it.build_times)
+    #          # Maximum and minimum time shouldn't be too different
+    #          if max(it.build_times)/min(it.build_times) > 1.3:
+    #              _logger.warning(
+    #                  "Build times between %f and %f seems too different! "
+    #                  "Complete build times: %s",
+    #                  min(it.build_times), max(it.build_times), it.build_times)
 
-            project.saveCache()
+    #          project._saveCache()
 
-        @it.should('build at least %dx faster when recovering the info' %
-                   CACHE_BUILD_SPEEDUP)
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test_002():
-            _logger.info("Creating object")
-            start = time.time()
-            project = StandaloneProjectBuilder()
-            parse_time = time.time() - start
-            _logger.info("Building de facto")
-            project.buildByDependency()
-            project.waitForBuild()
-            _logger.info("Done")
-            build_time = time.time() - start - parse_time
+    #      @it.should('build at least %dx faster when recovering the info' %
+    #                 CACHE_BUILD_SPEEDUP)
+    #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    #      def test_002():
+    #          _logger.info("Creating object")
+    #          start = time.time()
+    #          project = StandaloneProjectBuilder()
+    #          parse_time = time.time() - start
+    #          _logger.info("Building de facto")
+    #          project.buildByDependency()
+    #          project.waitForBuild()
+    #          _logger.info("Done")
+    #          build_time = time.time() - start - parse_time
 
-            _logger.info("Parsing took %fs", parse_time)
-            _logger.info("Building took %fs", build_time)
+    #          _logger.info("Parsing took %fs", parse_time)
+    #          _logger.info("Building took %fs", build_time)
 
-            average = float(sum(it.build_times))/len(it.build_times)
+    #          average = float(sum(it.build_times))/len(it.build_times)
 
-            it.assertTrue(
-                build_time < average/CACHE_BUILD_SPEEDUP,
-                "Building with cache took %f (should be < %f)" % \
-                    (build_time, average/CACHE_BUILD_SPEEDUP))
+    #          it.assertTrue(
+    #              build_time < average/CACHE_BUILD_SPEEDUP,
+    #              "Building with cache took %f (should be < %f)" % \
+    #                  (build_time, average/CACHE_BUILD_SPEEDUP))
 
     @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder()
         it.project.waitForBuild()
-        it.project.saveCache()
+        it.project._saveCache()
 
         messages = []
         failed = False
@@ -229,7 +229,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
             open(cache_fname, 'w').write("hello")
             project = StandaloneProjectBuilder()
             project.waitForBuild()
-            project.saveCache()
+            project._saveCache()
 
             messages = []
             passed = False
@@ -289,7 +289,7 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
             time.sleep(1)
             project.waitForBuild()
             time.sleep(1)
-            project.saveCache()
+            project._saveCache()
             time.sleep(1)
 
             _logger.info("Searching UI messages")

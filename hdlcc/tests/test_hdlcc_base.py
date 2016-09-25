@@ -73,6 +73,59 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._msg_queue.put(('error', message))
         self._ui_handler.error(message)
 
+class SourceMock(object):
+    def __init__(self, library, design_units, dependencies=None, filename=None):
+        if filename is not None:
+            self.filename = filename
+        else:
+            self.filename = library + '_' + design_units[0]['name'] + '.vhd'
+        self.library = library
+        self._design_units = design_units
+        if dependencies is not None:
+            self._dependencies = dependencies
+        else:
+            self._dependencies = []
+
+    def __str__(self):
+        return "[%s] %s" % (self.library, self.filename)
+
+    def getDesignUnits(self):
+        return self._design_units
+
+    def getDependencies(self):
+        return self._dependencies
+
+
+class MSimMock(hdlcc.builders.base_builder.BaseBuilder):
+    _logger = logging.getLogger('MSimMock')
+    builder_name = 'msim_mock'
+    file_types = ('vhdl', )
+    def __init__(self, target_folder):
+        self._target_folder = target_folder
+        if not p.exists(self._target_folder):
+            os.mkdir(self._target_folder)
+
+        super(MSimMock, self).__init__(target_folder)
+
+    def _makeMessageRecords(self, _): # pragma: no cover
+        return []
+
+    def _shouldIgnoreLine(self, line): # pragma: no cover
+        return True
+
+    def checkEnvironment(self):
+        return True
+
+    def _buildSource(self, source, flags=None): # pragma: no cover
+        return [], []
+
+    def _createLibrary(self, source): # pragma: no cover
+        pass
+
+    def getBuiltinLibraries(self): # pragma: no cover
+        return []
+
+
 with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
@@ -112,6 +165,65 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         project = StandaloneProjectBuilder()
         project._recoverCache(project._getCacheFilename())
 
+    @it.should("recover from cache when recreating a project object")
+    @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
+    @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    def test():
+        # First create a project file with something in it
+        project_file = 'myproject.prj'
+        writeListToFile(project_file, [])
+
+        # Create a project object and force saving the cache
+        project = StandaloneProjectBuilder(project_file)
+        project._saveCache()
+        it.assertTrue(p.exists('.hdlcc/.hdlcc.cache'),
+                      "Cache filename not found")
+
+        # Now recreate the project and ensure it has recovered from the cache
+        del project
+        project = StandaloneProjectBuilder(project_file)
+        found = False
+        while not project._msg_queue.empty():
+            severity, message = project._msg_queue.get()
+            _logger.info("Message found: [%s] %s", severity, message)
+            if message.startswith("Recovered cache from"):
+                found = True
+                break
+
+        if p.exists('.hdlcc'):
+            shutil.rmtree('.hdlcc')
+        it.assertTrue(found, "Failed to warn that cache recovering has worked")
+
+    @it.should("warn when failing to recover from cache")
+    @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
+    @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    def test():
+        # First create a project file with something in it
+        project_file = 'myproject.prj'
+        writeListToFile(project_file, [])
+
+        project = StandaloneProjectBuilder(project_file)
+        project._saveCache()
+        it.assertTrue(p.exists('.hdlcc/.hdlcc.cache'),
+                      "Cache filename not found")
+
+        open('.hdlcc/.hdlcc.cache', 'a').write("something\n")
+
+        project = StandaloneProjectBuilder(project_file)
+        found = False
+        while not project._msg_queue.empty():
+            severity, message = project._msg_queue.get()
+            _logger.info("Message found: [%s] %s", severity, message)
+            if message.startswith("Unable to recover cache from"):
+                found = True
+                break
+
+        if p.exists('.hdlcc'):
+            shutil.rmtree('.hdlcc')
+        it.assertTrue(found, "Failed to warn that cache recovering has failed")
+
     @it.should("do nothing when cleaning files without config file")
     def test():
         project = StandaloneProjectBuilder()
@@ -122,7 +234,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     @it.should("provide a VHDL source code object given its path")
     def test():
         path = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
-                                 'very_common_pkg.vhd')
+                      'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
         source, remarks = project._getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
@@ -203,16 +315,222 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
              {'error_type': 'W', 'line_number': 11, 'error_number': 12},
              {'error_type': 'W', 'line_number': 11, 'error_number': 13}])
 
-    @it.should("")
+    @it.should("return the correct build sequence")
     def test():
-        def new(*args, **kwargs):
-            assert False
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'direct_dependency',
+                           'library' : 'some_lib'},
+                          {'unit' : 'common_dependency',
+                           'library' : 'some_lib'}])
 
-        with mock.patch(
-                'hdlcc.config_parser.ConfigParser.findSourcesByDesignUnit',
-                new=new):
-            project = StandaloneProjectBuilder()
-            project._config.findSourcesByDesignUnit('sr_delay', 'work')
+        direct_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'direct_dependency',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'indirect_dependency',
+                           'library' : 'some_lib'},
+                          {'unit' : 'common_dependency',
+                           'library' : 'some_lib'}])
+
+        indirect_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'indirect_dependency',
+                           'type' : 'package'}],
+            dependencies=[{'unit' : 'indirect_dependency',
+                           'library' : 'some_lib'},
+                          {'unit' : 'common_dependency',
+                           'library' : 'some_lib'}])
+
+        common_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'common_dependency',
+                           'type' : 'package'}],
+            dependencies=[])
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in (target_source, direct_dependency, indirect_dependency,
+                       common_dependency):
+            project._config._sources[str(source)] = source
+        it.assertEqual(
+            [common_dependency, indirect_dependency, direct_dependency],
+            project._getBuildSequence(target_source))
+
+    @it.should("not include sources that are not dependencies")
+    def test():
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'direct_dependency',
+                           'library' : 'some_lib'}])
+
+        direct_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'direct_dependency',
+                           'type' : 'entity'}],
+            dependencies=[])
+
+        not_a_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'not_a_dependency',
+                           'type' : 'package'}],
+            dependencies=[])
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in (target_source, direct_dependency, not_a_dependency):
+            project._config._sources[str(source)] = source
+        it.assertEqual([direct_dependency],
+                       project._getBuildSequence(target_source))
+
+    @it.should("fail if the source file for a dependency is not found")
+    def test():
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'direct_dependency',
+                           'library' : 'some_lib'}])
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in (target_source, ):
+            project._config._sources[str(source)] = source
+
+        with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError):
+            project._getBuildSequence(target_source)
+
+    @it.should("return empty list when the source has no dependencies")
+    def test():
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[])
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in (target_source, ):
+            project._config._sources[str(source)] = source
+
+        it.assertEqual([], project._getBuildSequence(target_source))
+
+    @it.should("catch ciruclar dependencies")
+    def test():
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'direct_dependency',
+                           'library' : 'some_lib'}])
+
+        direct_dependency = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'direct_dependency',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'target',
+                           'library' : 'some_lib'}])
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in (target_source, direct_dependency):
+            project._config._sources[str(source)] = source
+
+        with it.assertRaises(hdlcc.exceptions.CircularDependencyFound):
+            project._getBuildSequence(target_source)
+
+    @it.should("resolve conflicting dependencies by using signature")
+    def test():
+        target_source = SourceMock(
+            library='some_lib',
+            design_units=[{'name' : 'target',
+                           'type' : 'entity'}],
+            dependencies=[{'unit' : 'direct_dependency',
+                           'library' : 'some_lib'}])
+
+        implementation_a = SourceMock(
+            library='some_lib',
+            filename='implementation_a.vhd',
+            design_units=[{'name' : 'direct_dependency',
+                           'type' : 'entity'}],
+            dependencies=[])
+
+        implementation_b = SourceMock(
+            library='some_lib',
+            filename='implementation_b.vhd',
+            design_units=[{'name' : 'direct_dependency',
+                           'type' : 'entity'}],
+            dependencies=[])
+
+        project = StandaloneProjectBuilder()
+        messages = []
+        project._handleUiWarning = mock.MagicMock(    # pylint: disable=invalid-name
+            side_effect=lambda x: messages.append(x)) # pylint: disable=unnecessary-lambda
+
+        #  lambda message: messages += [message]
+        project._config._sources = {}
+        for source in (target_source, implementation_a, implementation_b):
+            project._config._sources[str(source)] = source
+
+        project._getBuildSequence(target_source)
+
+        it.assertNotEqual(messages, [])
+
+    @it.should("get builder messages by path")
+    def test():
+        sources = (
+            SourceMock(
+                library='some_lib',
+                design_units=[{'name' : 'entity_a',
+                               'type' : 'entity'}]),
+            SourceMock(
+                library='some_lib',
+                design_units=[{'name' : 'entity_b',
+                               'type' : 'entity'}]),
+            SourceMock(
+                library='some_lib',
+                design_units=[{'name' : 'package_a',
+                               'type' : 'package'}]),
+            )
+
+        project = StandaloneProjectBuilder()
+        project._config._sources = {}
+        for source in sources:
+            project._config._sources[source.filename] = source
+
+        path = sources[0].filename
+        it.assertEquals(
+            project._getBuilderMessages(path),
+            [{'checker'        : 'hdlcc',
+              'line_number'    : '',
+              'column'         : '',
+              'filename'       : '',
+              'error_number'   : '',
+              'error_type'     : 'W',
+              'error_message'  : 'Path "%s" not found in project file' %
+                                 p.abspath(path)}])
+
+
+
+        #  direct_dependency = SourceMock(
+        #      library='some_lib',
+        #      design_units=[{'name' : 'direct_dependency',
+        #                     'type' : 'entity'}],
+        #      dependencies=[])
+
+        #  not_a_dependency = SourceMock(
+        #      library='some_lib',
+        #      design_units=[{'name' : 'not_a_dependency',
+        #                     'type' : 'package'}],
+        #      dependencies=[])
+
+        #  it.assertEqual([direct_dependency],
+        #                 project._getBuildSequence(target_source))
+
 
     #  with it.having('vim-hdl-examples as reference and a valid project file'):
 
@@ -268,7 +586,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     #          _logger.info("Checking if msg queue is empty")
     #          it.assertTrue(it.project._msg_queue.empty())
     #          it.project.buildByDependency()
-    #          it.assertFalse(it.project.finishedBuilding())
+    #          it.assertFalse(it.project.hasFinishedBuilding())
 
     #      @it.should("notify if a build is already running")
     #      @unittest.skipUnless(PROJECT_FILE is not None,

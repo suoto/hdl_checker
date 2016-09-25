@@ -17,10 +17,14 @@
 'Exceptions raised by hdlcc'
 
 class VimHdlBaseException(Exception):
-    'Base class for exceptions raise by hdlcc'
+    """
+    Base class for exceptions raise by hdlcc
+    """
 
 class SanityCheckError(VimHdlBaseException):
-    'Exception raised when a builder fails to execute its sanity check'
+    """
+    Exception raised when a builder fails to execute its sanity check
+    """
 
     def __init__(self, builder, msg):
         self._msg = msg
@@ -32,8 +36,10 @@ class SanityCheckError(VimHdlBaseException):
                 (self.builder, self._msg)
 
 class UnknownParameterError(VimHdlBaseException):
-    '''Exception raised when an unknown parameter is found in a
-    configuration file'''
+    """
+    Exception raised when an unknown parameter is found in a
+    configuration file
+    """
 
     def __init__(self, parameter):
         self._parameter = parameter
@@ -43,8 +49,10 @@ class UnknownParameterError(VimHdlBaseException):
         return "Unknown parameter '%s'" % self._parameter
 
 class DesignUnitNotFoundError(VimHdlBaseException):
-    '''Exception raised when hdlcc_base.HdlCodeCheckerBase can't find
-    the source file that defines the given design unit'''
+    """
+    Exception raised when hdlcc_base.HdlCodeCheckerBase can't find
+    the source file that defines the given design unit
+    """
 
     def __init__(self, design_unit):
         self._design_unit = design_unit
@@ -53,4 +61,16 @@ class DesignUnitNotFoundError(VimHdlBaseException):
     def __str__(self): # pragma: no cover
         return "No source file defining design unit '%s' found" % \
                     self._design_unit
+
+class CircularDependencyFound(VimHdlBaseException):
+    """
+    """
+    def __init__(self, target, reference):
+        self._target = target
+        self._reference = reference
+        super(CircularDependencyFound, self).__init__()
+
+    def __str__(self): # pragma: no cover
+        return "Circular dependency found between %s and %s" % \
+                (self._target, self._reference)
 

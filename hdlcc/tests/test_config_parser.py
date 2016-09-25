@@ -87,29 +87,29 @@ with such.A('config parser object') as it:
         @it.should("extract build flags for single build")
         def test():
             it.assertItemsEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
             it.assertItemsEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
 
         @it.should("extract build flags for batch builds")
         def test():
             it.assertItemsEqual(
-                it.parser.getBatchBuildFlagsByPath(
+                it.parser._getBatchBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser.getBatchBuildFlagsByPath(
+                it.parser._getBatchBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
@@ -135,22 +135,22 @@ with such.A('config parser object') as it:
         @it.should("return build flags for a VHDL file")
         def test():
             it.assertEqual(
-                it.parser.getBatchBuildFlagsByPath(
+                it.parser._getBatchBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 ['-g0', '-g1', '-b0', '-b1', '-build-using', 'some', 'way', ])
             it.assertEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                 ['-g0', '-g1', '-s0', '-s1', '-build-using', 'some', 'way', ])
 
         @it.should("return build flags for a Verilog file")
         def test():
             it.assertEqual(
-                it.parser.getBatchBuildFlagsByPath(
+                it.parser._getBatchBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
                 ['-permissive', '-some-flag', 'some', 'value', ])
             it.assertEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
                 ['-lint', '-hazards', '-pedanticerrors', '-some-flag',
                  'some', 'value'])
@@ -158,11 +158,11 @@ with such.A('config parser object') as it:
         @it.should("return build flags for a System Verilog file")
         def test():
             it.assertEqual(
-                it.parser.getBatchBuildFlagsByPath(
+                it.parser._getBatchBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
                 ['-permissive', 'some', 'sv', 'flag'])
             it.assertEqual(
-                it.parser.getSingleBuildFlagsByPath(
+                it.parser._getSingleBuildFlagsByPath(
                     p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
                 ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
 
@@ -221,14 +221,14 @@ with such.A('config parser object') as it:
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser.getSingleBuildFlagsByPath(path), [])
+            it.assertEqual(it.parser._getSingleBuildFlagsByPath(path), [])
 
         @it.should("return empty batch build flags for any path")
         @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser.getBatchBuildFlagsByPath(path), [])
+            it.assertEqual(it.parser._getBatchBuildFlagsByPath(path), [])
 
         @it.should("say every path is on the project file")
         @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',

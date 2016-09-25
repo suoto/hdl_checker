@@ -281,30 +281,41 @@ class HdlCodeCheckerBase(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], x['line_number'], x['error_number']))
 
-    def _getBuildFlags(self, path, batch_mode):
-        return self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
-               self._config.getSingleBuildFlagsByPath(path)
-
-    def _resolveSourceDependencies(self, source, unit, library):
-        """
-        Searches for sources that implement the given design unit. If
-        more than one implement it, tries to pick one based on the
-        signature
-        """
-        dep_sources = self._config.findSourcesByDesignUnit(unit, library)
-        if len(dep_sources) == 1:
-            return dep_sources[0]
-        assert False
-
-    def _getCompilationSequence(self, source):
+    def _getBuildSequence(self, source, reference=None):
         """
         Recursively finds out the dependencies of the given source file
         """
+        self._logger.info("Checking build sequence for %s", source)
         build_sequence = []
         for library, unit in self._resolveRelativeNames(source):
-            dep_source = self._resolveSourceDependencies(source, unit, library)
-            build_sequence += self._getCompilationSequence(dep_source)
-            build_sequence += [dep_source]
+            # Get a list of source files that contains this design unit
+            dependencies_list = self._config.discoverSourceDependencies(
+                unit, library)
+
+            dependency = dependencies_list[0]
+
+            # If we found more than a single file, then multiple files
+            # have the same entity or package name and we failed to
+            # identify the real file
+            if len(dependencies_list) != 1:
+                self._handleUiWarning(
+                    "Returning dependency '%s' for %s.%s in file '%s', but "
+                    "there were %d other matches: %s. The selected option may "
+                    "be sub-optimal" % (
+                        dependency.filename, library, unit, source.filename,
+                        len(dependencies_list),
+                        ', '.join([x.filename for x in dependencies_list])))
+
+            # Check if we found out that a dependency is the same we
+            # found in the previous call to break the circular loop
+            if dependency == reference:
+                raise hdlcc.exceptions.CircularDependencyFound(
+                    source, dependency)
+
+            dependency_build_sequence = self._getBuildSequence(
+                dependency, reference=source)
+
+            build_sequence += dependency_build_sequence + [dependency]
 
         return removeDuplicates(build_sequence)
 
@@ -316,19 +327,20 @@ class HdlCodeCheckerBase(object):
         dependencies first
         """
         source, remarks = self._getSourceByPath(path)
-        flags = self._getBuildFlags(path, batch_mode)
+        flags = self._config.getBuildFlags(path, batch_mode)
 
         self._logger.debug("Building '%s', batch_mode = %s",
                            str(path), batch_mode)
 
-        sequence = self._getCompilationSequence(source)
+        build_sequence = self._getBuildSequence(source)
 
-        self._logger.debug("Compilation sequence is\n: %s",
-                           "\n".join([x.filename for x in sequence]))
+        self._logger.debug("Compilation build_sequence is\n: %s",
+                           "\n".join([x.filename for x in build_sequence]))
 
         records = []
-        for _source in sequence:
-            _flags = self._getBuildFlags(_source.filename, batch_mode=False)
+        for _source in build_sequence:
+            _flags = self._config.getBuildFlags(_source.filename,
+                                                batch_mode=False)
             _records, rebuilds = self.builder.build(_source, forced=False,
                                                     flags=_flags)
             records += _records
@@ -357,7 +369,7 @@ class HdlCodeCheckerBase(object):
                     self._getBuilderMessages(rebuild_source.abspath,
                                              batch_mode=True)
 
-    def finishedBuilding(self):
+    def hasFinishedBuilding(self):
         """
         Returns whether a background build has finished running
         """
@@ -385,12 +397,8 @@ class HdlCodeCheckerBase(object):
         Checks if all preconditions for calling the builder have been
         met
         """
-        if self._config.filename is None:
+        if self._config.filename is None or not self.hasFinishedBuilding():
             return False
-
-        if not self.finishedBuilding():
-            return False
-
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -405,7 +413,7 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
-        if not self.finishedBuilding():
+        if not self.hasFinishedBuilding():
             self._handleUiWarning("Project hasn't finished building, try again "
                                   "after it finishes.")
 

@@ -176,7 +176,7 @@ def runner(args):
     if args.clean:
         _logger.info("Cleaning up")
         project.clean()
-        project.setupEnvIfNeeded()
+        #  project.setupEnvIfNeeded()
 
     #  if args.debug_print_sources or args.debug_print_compile_order or args.build:
     #      project.buildByDependency()
@@ -218,8 +218,8 @@ def runner(args):
         for source in args.sources:
             runStandaloneStaticCheck(source)
 
-    if args.debug_print_sources or args.debug_print_compile_order or args.build:
-        project.saveCache()
+    #  if args.debug_print_sources or args.debug_print_compile_order or args.build:
+    #      project.saveCache()
 
 def main():
     "Main hook for standalone usage"

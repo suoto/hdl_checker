@@ -60,7 +60,7 @@ install:
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
   - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
-      -vv -F -B --log-capture %EXTRA_ARGS%"
+      -vv -B --log-capture %EXTRA_ARGS%"
 
   - coverage combine
   - coverage report

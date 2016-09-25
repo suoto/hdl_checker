@@ -87,7 +87,25 @@ with such.A("hdlcc standalone tool") as it:
         if p.exists(p.join(p.dirname(PROJECT_FILE), '.build')):
             shutil.rmtree(p.join(p.dirname(PROJECT_FILE), '.build'))
 
+        if p.exists(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build")):
+            shutil.rmtree(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build"))
+
     with it.having("a valid project file"):
+
+        @it.has_setup
+        def setup():
+            cleanUp()
+
+        @it.has_teardown
+        def teardown():
+            cleanUp()
+
+        def cleanUp():
+            # Ensure there is no leftover files from previous runs
+            path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build")
+            if p.exists(path):
+                shutil.rmtree(path)
+
 
         with it.having("a valid environment"):
 
@@ -105,12 +123,12 @@ with such.A("hdlcc standalone tool") as it:
 
                 shell(cmd)
 
-            @it.should("run debug arguments")
+            @it.should("run debug arguments with '%s'" % BUILDER_NAME)
             @params(
                 ("--debug-print-sources", ),
                 ("--debug-print-compile-order", ),
 
-                ("--build", "-s",
+                ("-vvv", "--build", "-s",
                  p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
 
                 ("--debug-parse-source-file", "-s",

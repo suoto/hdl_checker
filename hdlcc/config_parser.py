@@ -324,6 +324,8 @@ class ConfigParser(object):
         """
         target_dir = '.dummy'
         builder_class = None
+        self._logger.debug("Searching for builder among %s",
+                           AVAILABLE_BUILDERS)
         for builder_class in AVAILABLE_BUILDERS:
             if builder_class.builder_name == 'fallback':
                 continue
@@ -504,7 +506,7 @@ class ConfigParser(object):
         self._parseIfNeeded()
         return self._parms['target_dir']
 
-    def getSingleBuildFlagsByPath(self, path):
+    def _getSingleBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
@@ -515,7 +517,7 @@ class ConfigParser(object):
                self._parms['single_build_flags'][lang] + \
                self._sources[p.abspath(path)].flags
 
-    def getBatchBuildFlagsByPath(self, path):
+    def _getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
@@ -525,6 +527,10 @@ class ConfigParser(object):
         return self._parms['global_build_flags'][lang] + \
                self._parms['batch_build_flags'][lang] + \
                self._sources[p.abspath(path)].flags
+
+    def getBuildFlags(self, path, batch_mode):
+        return self._getBatchBuildFlagsByPath(path) if batch_mode else \
+               self._getSingleBuildFlagsByPath(path)
 
     def getSources(self):
         "Returns a list of VhdlParser/VerilogParser objects parsed"
@@ -560,4 +566,12 @@ class ConfigParser(object):
             raise hdlcc.exceptions.DesignUnitNotFoundError(
                 "%s.%s" % (library, unit))
         return sources
+
+    def discoverSourceDependencies(self, unit, library):
+        """
+        Searches for sources that implement the given design unit. If
+        more than one file implements an entity or package with the same
+        name, there is no guarantee that the right one was picked
+        """
+        return self.findSourcesByDesignUnit(unit, library)
 
