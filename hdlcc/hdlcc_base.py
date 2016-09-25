@@ -327,7 +327,10 @@ class HdlCodeCheckerBase(object):
         dependencies first
         """
         source, remarks = self._getSourceByPath(path)
-        flags = self._config.getBuildFlags(path, batch_mode)
+        try:
+            flags = self._config.getBuildFlags(path, batch_mode)
+        except KeyError:
+            flags = []
 
         self._logger.debug("Building '%s', batch_mode = %s",
                            str(path), batch_mode)

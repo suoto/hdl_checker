@@ -58,12 +58,8 @@ def setupLogging(stream, level, color=True): # pragma: no cover
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
-            _lock = Lock()
             def isatty(self):
                 return color
-            def write(self, *args, **kwargs):
-                with self._lock:
-                    super(Stream, self).write(*args, **kwargs)
 
         stream = Stream(stream, 'ab', buffering=1)
 

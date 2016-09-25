@@ -194,7 +194,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
         def test():
             source = VhdlParser(p.join(SOURCES_PATH,
                                            'source_with_error.vhd'))
-            records, rebuilds = it.builder.build(source)
+            records, rebuilds = it.builder.build(source, forced=True)
 
             for record in records:
                 _logger.info(record)

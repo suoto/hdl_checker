@@ -259,8 +259,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
                 'records' : [],
-                'rebuilds' : [],
-                }
+                'rebuilds' : []}
 
         cached_info = self._build_info_cache[source.abspath]
 

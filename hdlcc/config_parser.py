@@ -529,8 +529,18 @@ class ConfigParser(object):
                self._sources[p.abspath(path)].flags
 
     def getBuildFlags(self, path, batch_mode):
-        return self._getBatchBuildFlagsByPath(path) if batch_mode else \
-               self._getSingleBuildFlagsByPath(path)
+        lang = self.getSourceByPath(path).filetype
+        flags = list(self._parms['global_build_flags'][lang])
+
+        if batch_mode:
+            flags += self._parms['batch_build_flags'][lang]
+        else:
+            flags += self._parms['single_build_flags'][lang]
+
+        if path not in self._sources:
+            return flags
+
+        return flags + self._sources[p.abspath(path)].flags
 
     def getSources(self):
         "Returns a list of VhdlParser/VerilogParser objects parsed"

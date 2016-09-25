@@ -203,9 +203,13 @@ with such.A("hdlcc project using '%s' with persistency" % BUILDER_NAME) as it:
     with it.having('an undecodable cache file'):
         @it.has_setup
         def setup():
-            cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
-            if p.exists(cache_fname):
-                os.remove(cache_fname)
+            #  cache_fname = utils.getDefaultCachePath(PROJECT_FILE)
+            target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(PROJECT_FILE)
+            if p.exists(target_dir):
+                _logger.fatal("Target dir '%s' removed", target_dir)
+                shutil.rmtree(target_dir)
+            else:
+                _logger.fatal("target_dir '%s' not found", target_dir)
 
         @it.has_teardown
         def teardown():
