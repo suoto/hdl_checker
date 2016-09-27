@@ -291,7 +291,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             project._config._sources[str(source)] = source
         it.assertEqual(
             [common_dependency, indirect_dependency, direct_dependency],
-            project._getBuildSequence(target_source))
+            project.getBuildSequence(target_source))
 
     @it.should("not include sources that are not dependencies")
     def test():
@@ -319,7 +319,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         for source in (target_source, direct_dependency, not_a_dependency):
             project._config._sources[str(source)] = source
         it.assertEqual([direct_dependency],
-                       project._getBuildSequence(target_source))
+                       project.getBuildSequence(target_source))
 
     @it.should("fail if the source file for a dependency is not found")
     def test():
@@ -336,7 +336,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             project._config._sources[str(source)] = source
 
         with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError):
-            project._getBuildSequence(target_source)
+            project.getBuildSequence(target_source)
 
     @it.should("return empty list when the source has no dependencies")
     def test():
@@ -351,7 +351,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         for source in (target_source, ):
             project._config._sources[str(source)] = source
 
-        it.assertEqual([], project._getBuildSequence(target_source))
+        it.assertEqual([], project.getBuildSequence(target_source))
 
     @it.should("catch ciruclar dependencies")
     def test():
@@ -375,7 +375,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             project._config._sources[str(source)] = source
 
         with it.assertRaises(hdlcc.exceptions.CircularDependencyFound):
-            project._getBuildSequence(target_source)
+            project.getBuildSequence(target_source)
 
     @it.should("resolve conflicting dependencies by using signature")
     def test():
@@ -410,7 +410,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         for source in (target_source, implementation_a, implementation_b):
             project._config._sources[str(source)] = source
 
-        project._getBuildSequence(target_source)
+        project.getBuildSequence(target_source)
 
         it.assertNotEqual(messages, [])
 

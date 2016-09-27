@@ -238,7 +238,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
                 self._logger.debug(rebuild)
 
     @abc.abstractmethod
-    def _createLibrary(self, library):
+    def _createLibrary(self, source):
         """Callback called to create a library"""
 
     def _isFileTypeSupported(self, source):
@@ -277,7 +277,9 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             # Build a list of flags and pass it as tuple
             build_flags = source.flags + flags
             with self._lock:
-                self._createLibrary(source)
+                for lib in source.getLibraries():
+                    self._createLibrary(lib)
+
                 records, rebuilds = \
                         self._buildAndParse(source, flags=tuple(build_flags))
 

@@ -80,10 +80,7 @@ def parseArguments():
     parser.add_argument('--clean', '-c', action='store_true',
                         help="Cleans the project before building")
 
-    parser.add_argument('--build', '-b', action='store_true',
-                        help="Builds the project given by <project_file>")
-
-    parser.add_argument('--sources', '-s', action='append', nargs='*',
+    parser.add_argument('--sources', '-s', action='append', nargs='*', default=[],
                         help="""Source(s) file(s) to build individually""") \
                             .completer = _fileExtentensionCompleter('vhd')
 
@@ -178,10 +175,6 @@ def runner(args):
         project.clean()
         #  project.setupEnvIfNeeded()
 
-    #  if args.debug_print_sources or args.debug_print_compile_order or args.build:
-    #      project.buildByDependency()
-    #      project.waitForBuild()
-
     if args.debug_print_sources:
         sources = PrettyTable(['Filename', 'Library', 'Flags'])
         sources.align['Filename'] = 'l'
@@ -197,18 +190,33 @@ def runner(args):
     #              flags=' '.join(source.flags)))
     #          assert not set(['-93', '-2008']).issubset(source.flags)
 
-    if args.build and args.sources:
-        for source in args.sources:
-            try:
-                _logger.info("Building source '%s'", source)
-                for record in project.getMessagesByPath(source):
-                    print("[{error_type}-{error_number}] @ " \
-                          "({line_number},{column}): {error_message}"\
-                            .format(**record))
-            except RuntimeError as exception:
-                _logger.error("Unable to build '%s': '%s'", source,
-                              str(exception))
-                continue
+    for source in args.sources:
+        _logger.info("Building source '%s'", source)
+        for record in project.getMessagesByPath(source):
+            if record['filename'] is not None:
+                message = [record['filename']]
+            else:
+                message = [source]
+
+            location = []
+            if record['line_number'] is not None:
+                location += ["line %s" % record['line_number']]
+
+            if record['column'] is not None:
+                location += ["column %s" % record['column']]
+
+            if location:
+                message += ["(%s)" % ', '.join(location)]
+
+            if record['error_number'] is None:
+                message += ["(%s):" % record['error_type']]
+            else:
+                message += ["(%s-%s):" % (record['error_type'],
+                                          record['error_number'])]
+
+            message += [record['error_message']]
+
+            print(' '.join(message))
 
     if args.debug_parse_source_file:
         for source in args.sources:
@@ -227,7 +235,8 @@ def main():
     runner_args = parseArguments()
     setupLogging(sys.stdout, runner_args.log_level)
     logging.root.setLevel(runner_args.log_level)
-    logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+    #  logging.getLogger('hdlcc.source_file').setLevel(logging.WARNING)
+    logging.getLogger('hdlcc.config_parser').setLevel(logging.WARNING)
     #  logging.getLogger('hdlcc.builders').setLevel(logging.INFO)
     logging.getLogger('vunit.project').setLevel(logging.ERROR)
 

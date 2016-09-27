@@ -281,12 +281,18 @@ class HdlCodeCheckerBase(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], x['line_number'], x['error_number']))
 
-    def _getBuildSequence(self, source, reference=None):
+    def getBuildSequence(self, source):
+        build_sequence = []
+        self._getBuildSequence(source, build_sequence)
+        return build_sequence
+
+    def _getBuildSequence(self, source, build_sequence, reference=None):
         """
         Recursively finds out the dependencies of the given source file
         """
         self._logger.info("Checking build sequence for %s", source)
-        build_sequence = []
+        if build_sequence is None:
+            build_sequence = []
         for library, unit in self._resolveRelativeNames(source):
             # Get a list of source files that contains this design unit
             dependencies_list = self._config.discoverSourceDependencies(
@@ -312,12 +318,14 @@ class HdlCodeCheckerBase(object):
                 raise hdlcc.exceptions.CircularDependencyFound(
                     source, dependency)
 
-            dependency_build_sequence = self._getBuildSequence(
-                dependency, reference=source)
+            if dependency not in build_sequence:
+                self._getBuildSequence(dependency, reference=source,
+                                       build_sequence=build_sequence)
 
-            build_sequence += dependency_build_sequence + [dependency]
+            if dependency not in build_sequence:
+                build_sequence.append(dependency)
 
-        return removeDuplicates(build_sequence)
+        build_sequence = removeDuplicates(build_sequence)
 
     def _getBuilderMessages(self, path, batch_mode=False):
         """
@@ -335,9 +343,10 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Building '%s', batch_mode = %s",
                            str(path), batch_mode)
 
-        build_sequence = self._getBuildSequence(source)
+        build_sequence = []
+        self._getBuildSequence(source, build_sequence=build_sequence)
 
-        self._logger.debug("Compilation build_sequence is\n: %s",
+        self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
 
         records = []

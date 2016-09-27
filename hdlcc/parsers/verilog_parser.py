@@ -47,12 +47,12 @@ class VerilogParser(BaseSourceFile):
             for match in _DESIGN_UNIT_SCANNER.finditer(line):
                 yield match.groupdict()
 
-    def _getDependencies(self, libraries):
+    def _getDependencies(self):
         """Parses the source and returns a list of dictionaries that
         describe its dependencies"""
         return []
 
-    def _getParsedData(self):
+    def _getDesignUnits(self):
         "Parses the source file to find design units and dependencies"
         design_units = []
 
@@ -68,5 +68,10 @@ class VerilogParser(BaseSourceFile):
         """Finds design units and dependencies then translate some design
         units into information useful in the conext of the project"""
 
-        self._design_units = self._getParsedData()
+        self._design_units = self._getDesignUnits()
+
+    def _getLibraries(self):
+        return []
+
+
 

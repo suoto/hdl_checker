@@ -63,6 +63,11 @@ with such.A('config parser object') as it:
                                       'standard_project_file.prj')
             it.parser = ConfigParser(project_filename)
 
+            # Create empty files listed in the project file to avoid
+            # crashing the config parser
+            open(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'), 'a')
+            open(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'), 'a')
+
         @it.has_teardown
         def teardown():
             target_dir = p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
@@ -72,6 +77,9 @@ with such.A('config parser object') as it:
                 shutil.rmtree(target_dir)
             else:
                 _logger.info("Target dir '%s' not found", target_dir)
+
+            os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'))
+            os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))
 
         @it.should("extract builder")
         def test():

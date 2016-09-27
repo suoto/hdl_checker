@@ -40,8 +40,10 @@ _configFileScan = re.compile("|".join([
 # pylint: enable=invalid-name
 
 def _extractSet(entry):
-    '''Extract a list by splitting a string at whitespaces, removing
-    empty values caused by leading/trailing/multiple whitespaces'''
+    """
+    Extract a list by splitting a string at whitespaces, removing
+    empty values caused by leading/trailing/multiple whitespaces
+    """
     entry = str(entry).strip()
     if not entry:
         return []
@@ -49,7 +51,9 @@ def _extractSet(entry):
     return [value for value in _splitAtWhitespaces(entry)]
 
 def hasVunit():
-    "Checks if our env has VUnit installed"
+    """
+    Checks if our env has VUnit installed
+    """
     try:
         import vunit
         result = True
@@ -568,9 +572,8 @@ class ConfigParser(object):
         #  self._logger.info("Searching for [%s] %s", library, unit)
         sources = []
         for source in self._sources.itervalues():
-            if source.library != library:
-                continue
-            if unit in [x['name'] for x in source.getDesignUnits()]:
+            if source.library == library and unit in [x['name'] for x in
+                                                      source.getDesignUnits()]:
                 sources += [source]
         if not sources:
             raise hdlcc.exceptions.DesignUnitNotFoundError(

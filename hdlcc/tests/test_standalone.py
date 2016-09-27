@@ -115,20 +115,20 @@ with such.A("hdlcc standalone tool") as it:
                        HDLCC_LOCATION, "-h"]
                 shell(cmd)
 
-            @it.should("build a project")
-            def test():
-                cmd = ["coverage", "run",
-                       HDLCC_LOCATION, PROJECT_FILE,
-                       "--build"]
+            #  @it.should("build a project")
+            #  def test():
+            #      cmd = ["coverage", "run",
+            #             HDLCC_LOCATION, PROJECT_FILE,
+            #             "--build"]
 
-                shell(cmd)
+            #      shell(cmd)
 
             @it.should("run debug arguments with '%s'" % BUILDER_NAME)
             @params(
                 ("--debug-print-sources", ),
                 ("--debug-print-compile-order", ),
 
-                ("-vvv", "--build", "-s",
+                ("-vvv", "-s",
                  p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
 
                 ("--debug-parse-source-file", "-s",
@@ -169,7 +169,7 @@ with such.A("hdlcc standalone tool") as it:
             def test():
                 cmd = ["coverage", "run",
                        HDLCC_LOCATION, PROJECT_FILE,
-                       "--clean", "--build"]
+                       "--clean", ]
 
                 it.assertEqual(shell(cmd), [""])
 

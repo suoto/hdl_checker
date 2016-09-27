@@ -138,7 +138,8 @@ class MSim(BaseBuilder):
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
-        self._createIniFile()
+        if not self._iniFileExists():
+            self._createIniFile()
         for line in self._subprocessRunner(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 self._builtin_libraries.append(match.groupdict()['library_name'])
@@ -203,28 +204,39 @@ class MSim(BaseBuilder):
 
         return self._subprocessRunner(cmd)
 
-    def _createLibrary(self, source):
-        if not self._createIniFile() and source.library in self._added_libraries:
+    def _createLibrary(self, library):
+        library = library.lower()
+        if library in self._builtin_libraries:
             return
-        self._added_libraries.append(source.library)
+
+        if not self._iniFileExists() and library in self._added_libraries:
+            return
+        self._added_libraries.append(library)
         try:
-            if p.exists(p.join(self._target_folder, source.library)):
+            if p.exists(p.join(self._target_folder, library)):
                 return
-            self._mapLibrary(source.library)
+            self._mapLibrary(library)
         except: # pragma: no cover
             self._logger.debug("Current dir when exception was raised: %s",
                                p.abspath(os.curdir))
             raise
 
+    def _iniFileExists(self):
+        _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
+
+        return p.exists(_modelsim_ini)
+
     def _createIniFile(self):
-        "Adds a library to a non-existent ModelSim init file"
+        """
+        Adds a library to a non-existent ModelSim init file
+        """
+
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
-        if p.exists(_modelsim_ini):
-            return False
+        self._logger.fatal("Creating ini file")
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
@@ -247,8 +259,6 @@ class MSim(BaseBuilder):
                            p.abspath(os.curdir), cwd)
         os.chdir(cwd)
 
-        return True
-
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
         if not p.exists(p.join(self._target_folder, library)):
@@ -259,8 +269,13 @@ class MSim(BaseBuilder):
              '-all'])
 
     def _mapLibrary(self, library):
-        "Adds a library to an existing ModelSim init file"
-        self._logger.debug("modelsim.ini found, adding %s", library)
+        """
+        Adds a library to an existing ModelSim init file
+        """
+        if not self._iniFileExists():
+            self._createIniFile()
+        else:
+            self._logger.debug("modelsim.ini found, adding %s", library)
 
         self._subprocessRunner(['vlib', ] + self._vlib_args +
                                [p.join(self._target_folder, library)])
