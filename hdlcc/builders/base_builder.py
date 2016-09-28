@@ -278,7 +278,8 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             build_flags = source.flags + flags
             with self._lock:
                 for lib in source.getLibraries():
-                    self._createLibrary(lib)
+                    if lib not in self.getBuiltinLibraries():
+                        self._createLibrary(lib)
 
                 records, rebuilds = \
                         self._buildAndParse(source, flags=tuple(build_flags))

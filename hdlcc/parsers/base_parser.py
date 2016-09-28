@@ -25,8 +25,10 @@ from hdlcc.utils import getFileType
 _logger = logging.getLogger(__name__)
 
 class BaseSourceFile(object):
-    """Parses and stores information about a source file such as
-    design units it depends on and design units it provides"""
+    """
+    Parses and stores information about a source file such as design
+    units it depends on and design units it provides
+    """
 
     __metaclass__ = abc.ABCMeta
 
@@ -44,7 +46,9 @@ class BaseSourceFile(object):
         self.abspath = p.abspath(filename)
 
     def getState(self):
-        "Gets a dict that describes the current state of this object"
+        """
+        Gets a dict that describes the current state of this object
+        """
         state = {
             'filename' : self.filename,
             'abspath' : self.abspath,
@@ -60,7 +64,8 @@ class BaseSourceFile(object):
 
     @classmethod
     def recoverFromState(cls, state):
-        "Returns an object of cls based on a given state"
+        """
+        Returns an object of cls based on a given state"""
         # pylint: disable=protected-access
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
@@ -95,7 +100,6 @@ class BaseSourceFile(object):
                 #  _logger.warning("Attribute %s differs", attr)
                 return False
 
-
         #  _logger.warning("%s matches %s", repr(self), repr(other))
         return True
 
@@ -105,59 +109,26 @@ class BaseSourceFile(object):
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
 
-    #  def _parseIfChanged(self):
-    #      "Parses this source file if it has changed"
-    #      try:
-    #          if self._changed():
-    #              _logger.debug("Parsing %s", str(self))
-    #              self._mtime = self.getmtime()
-    #              #  self._doParse()
-    #              if self._deps:
-    #                  _logger.info("Source '%s' depends on: %s", str(self), \
-    #                      ", ".join(["%s.%s" % (x['library'], x['unit']) \
-    #                          for x in self._deps]))
-    #              else:
-    #                  _logger.info("Source '%s' has no dependencies", str(self))
-    #      except OSError: # pragma: no cover
-    #          _logger.warning("Couldn't parse '%s' at this moment", self)
-
     def _changed(self):
-        """Checks if the file changed based on the modification time provided
-        by p.getmtime"""
+        """
+        Checks if the file changed based on the modification time
+        provided by p.getmtime
+        """
         return self.getmtime() > self._mtime
 
     def getSourceContent(self):
+        """
+        Cached version of the _getSourceContent method
+        """
         if self._changed() or self._content is None:
             self._content = self._getSourceContent()
+            self._mtime = self.getmtime()
 
         return self._content
 
-    @abc.abstractmethod
-    def _getSourceContent(self):
-        """Replace everything from comment ('--') until a line break
-        and converts to lowercase"""
-
-    #  @abc.abstractmethod
-    #  def _getDependencies(self, libraries):
-
-    #  @abc.abstractmethod
-    #  def _doParse(self):
-    #      """Finds design units and dependencies then translate some design
-    #      units into information useful in the conext of the project"""
-
-    def getDesignUnitsDotted(self):
-        """Returns a list of dictionaries with the design units defined.
-        The dict defines the name (as defined in the source file) and
-        the type (package, entity, etc)"""
-        return set(["%s.%s" % (self.library, x['name']) \
-                    for x in self.getDesignUnits()])
-
-
     def getDesignUnits(self):
         """
-        Returns a list of dictionaries with the design units defined.
-        The dict defines the name (as defined in the source file) and
-        the type (package, entity, etc)
+        Cached version of the _getDesignUnits method
         """
         if not p.exists(self.filename):
             return []
@@ -166,17 +137,9 @@ class BaseSourceFile(object):
 
         return self._design_units
 
-    @abc.abstractmethod
-    def _getDesignUnits(self):
-        """
-        Finds design units and dependencies then translate some design
-        units into information useful in the conext of the project
-        """
-
     def getDependencies(self):
         """
-        Returns a list of dictionaries with the design units this source
-        file depends on. Dict defines library and unit
+        Cached version of the _getDependencies method
         """
         if not p.exists(self.filename):
             return []
@@ -188,6 +151,7 @@ class BaseSourceFile(object):
 
     def getLibraries(self):
         """
+        Cached version of the _getLibraries method
         """
         if not p.exists(self.filename):
             return []
@@ -197,17 +161,6 @@ class BaseSourceFile(object):
 
         return self._libs
 
-    @abc.abstractmethod
-    def _getLibraries(self):
-        "Parses the source file to find design units and dependencies"
-
-    @abc.abstractmethod
-    def _getDependencies(self):
-        """
-        Parses the source and returns a list of dictionaries that
-        describe its dependencies
-        """
-
     def getmtime(self):
         """
         Gets file modification time as defined in p.getmtime
@@ -215,4 +168,43 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return None
         return p.getmtime(self.filename)
+
+    def getDesignUnitsDotted(self):
+        """
+        Returns the design units using the <library>.<design_unit>
+        representation
+        """
+        return set(["%s.%s" % (self.library, x['name']) \
+                    for x in self.getDesignUnits()])
+
+
+    @abc.abstractmethod
+    def _getSourceContent(self):
+        """
+        Method that should implement pre parsing of the source file.
+        This includes removing comments and unnecessary or unimportant
+        chunks of text to make the life of the real parsing easier.
+        Should return a string and NOT a list of lines
+        """
+
+    @abc.abstractmethod
+    def _getDesignUnits(self):
+        """
+        Method that should implement the real parsing of the source file
+        to find design units defined. Use the output of the getSourceContent
+        method to avoid unnecessary I/O
+        """
+
+    @abc.abstractmethod
+    def _getLibraries(self):
+        """
+        Parses the source file to find libraries required by the file
+        """
+
+    @abc.abstractmethod
+    def _getDependencies(self):
+        """
+        Parses the source and returns a list of dictionaries that
+        describe its dependencies
+        """
 

@@ -102,6 +102,8 @@ class HdlCodeCheckerBase(object):
                  '_config' : self._config.getState()}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
+        if not p.exists(p.dirname(cache_fname)):
+            os.mkdir(p.dirname(cache_fname))
         _dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self, target_dir):
@@ -349,13 +351,13 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
 
-        records = []
+        #  records = []
         for _source in build_sequence:
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
-            _records, rebuilds = self.builder.build(_source, forced=False,
-                                                    flags=_flags)
-            records += _records
+            _, rebuilds = self.builder.build(_source, forced=False,
+                                             flags=_flags)
+            #  records += _records
             self._handleRebuilds(rebuilds, _source)
 
         source_records, rebuilds = self.builder.build(source, forced=True,
@@ -363,7 +365,8 @@ class HdlCodeCheckerBase(object):
 
         self._handleRebuilds(rebuilds, source)
 
-        return self._sortBuildMessages(records + source_records + remarks)
+        return self._sortBuildMessages(source_records + remarks)
+        #  return self._sortBuildMessages(records + source_records + remarks)
 
     def _handleRebuilds(self, rebuilds, source=None):
         if source is not None and rebuilds:

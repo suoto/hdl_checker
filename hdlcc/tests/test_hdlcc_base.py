@@ -115,7 +115,10 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         # Now recreate the project and ensure it has recovered from the cache
         del project
         project = StandaloneProjectBuilder(project_file)
+        time.sleep(0.5)
+
         found = False
+
         while not project._msg_queue.empty():
             severity, message = project._msg_queue.get()
             _logger.info("Message found: [%s] %s", severity, message)
@@ -494,7 +497,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
             fd.write(repr(cache_content))
 
         project = StandaloneProjectBuilder()
+        time.sleep(0.5)
 
+        found = True
         while not project._msg_queue.empty():
             severity, message = project._msg_queue.get()
             _logger.info("Message found: [%s] %s", severity, message)

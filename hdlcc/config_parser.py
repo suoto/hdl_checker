@@ -569,7 +569,6 @@ class ConfigParser(object):
         return p.abspath(path) in self._sources.keys()
 
     def findSourcesByDesignUnit(self, unit, library='work'):
-        #  self._logger.info("Searching for [%s] %s", library, unit)
         sources = []
         for source in self._sources.itervalues():
             if source.library == library and unit in [x['name'] for x in
@@ -580,11 +579,13 @@ class ConfigParser(object):
                 "%s.%s" % (library, unit))
         return sources
 
+    # TODO: This result can be cached while no source file has changed
     def discoverSourceDependencies(self, unit, library):
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same
         name, there is no guarantee that the right one was picked
+
         """
         return self.findSourcesByDesignUnit(unit, library)
 
