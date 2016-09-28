@@ -108,19 +108,6 @@ fi
 
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
-export BUILDER_NAME=ghdl
-if [ "${CI}" == "true" ]; then
-  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-else
-  if [ -f "${HOME}/.local/bin/ghdl" ]; then
-    export BUILDER_PATH=${HOME}/.local/bin/ghdl
-  else
-    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-  fi
-fi
-
-echo "BUILDER_PATH=$BUILDER_PATH"
-
 # ${TEST_RUNNER} "${ARGS[@]}"
 
 if [ -n "${STANDALONE}" ]; then
@@ -142,6 +129,19 @@ if [ -n "${FALLBACK}" ]; then
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
+
+export BUILDER_NAME=ghdl
+if [ "${CI}" == "true" ]; then
+  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+else
+  if [ -f "${HOME}/.local/bin/ghdl" ]; then
+    export BUILDER_PATH=${HOME}/.local/bin/ghdl
+  else
+    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+  fi
+fi
+
+echo "BUILDER_PATH=$BUILDER_PATH"
 
 if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim

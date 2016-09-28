@@ -23,6 +23,7 @@ import logging
 import re
 import subprocess as subp
 import shutil
+from unittest import skipUnless
 
 from nose2.tools import such
 from nose2.tools.params import params
@@ -83,9 +84,11 @@ with such.A("hdlcc standalone tool") as it:
                HDLCC_LOCATION, PROJECT_FILE,
                "--clean"]
 
-        shell(cmd)
-        if p.exists(p.join(p.dirname(PROJECT_FILE), '.build')):
-            shutil.rmtree(p.join(p.dirname(PROJECT_FILE), '.build'))
+        if PROJECT_FILE is not None:
+            shell(cmd)
+
+            if p.exists(p.join(p.dirname(PROJECT_FILE), '.build')):
+                shutil.rmtree(p.join(p.dirname(PROJECT_FILE), '.build'))
 
         if p.exists(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build")):
             shutil.rmtree(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build"))
@@ -124,6 +127,7 @@ with such.A("hdlcc standalone tool") as it:
             #      shell(cmd)
 
             @it.should("run debug arguments with '%s'" % BUILDER_NAME)
+            @skipUnless(PROJECT_FILE is not None, "This requires a project file")
             @params(
                 ("--debug-print-sources", ),
                 ("--debug-print-compile-order", ),
@@ -152,6 +156,7 @@ with such.A("hdlcc standalone tool") as it:
 
 
             @it.should("save profiling info if requested")
+            @skipUnless(PROJECT_FILE is not None, "This requires a project file")
             def test():
                 cmd = ["coverage", "run",
                        HDLCC_LOCATION, PROJECT_FILE,
@@ -166,6 +171,7 @@ with such.A("hdlcc standalone tool") as it:
                 os.remove("output.stats")
 
             @it.should("control debugging level")
+            @skipUnless(PROJECT_FILE is not None, "This requires a project file")
             def test():
                 cmd = ["coverage", "run",
                        HDLCC_LOCATION, PROJECT_FILE,
@@ -179,6 +185,5 @@ with such.A("hdlcc standalone tool") as it:
                     it.assertTrue(len(stdout) >= previous)
                     previous = len(stdout)
 
-if BUILDER_NAME is not None:
-    it.createTests(globals())
+it.createTests(globals())
 

@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 import shutil
-import unittest
+from unittest import skipUnless
 from nose2.tools import such
 from nose2.tools.params import params
 
@@ -59,7 +59,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
             it.builder.checkEnvironment()
 
         @it.should("parse MSim lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
+        @skipUnless(BUILDER_NAME == "msim", "MSim only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd',
@@ -127,7 +127,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_message'  : "Unknown expanded name."}])
 
         @it.should("parse GHDL builder lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "ghdl", "GHDL only test")
+        @skipUnless(BUILDER_NAME == "ghdl", "GHDL only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd',
@@ -146,7 +146,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
 
         @it.should("parse XVHDL builder lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "xvhdl", "XVHDL only test")
+        @skipUnless(BUILDER_NAME == "xvhdl", "XVHDL only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd')
@@ -172,7 +172,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
             it.assertEqual(rebuilds, [])
 
         @it.should('compile a Verilog source without errors')
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
+        @skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
             source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.v'))
             records, rebuilds = it.builder.build(source)
@@ -181,7 +181,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
             it.assertEqual(rebuilds, [])
 
         @it.should('compile a SystemVerilog source without errors')
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
+        @skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
             source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.sv'))
             records, rebuilds = it.builder.build(source)

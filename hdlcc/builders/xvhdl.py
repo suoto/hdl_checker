@@ -107,15 +107,15 @@ class XVHDL(BaseBuilder):
         return ['ieee', 'std', 'unisim', 'xilinxcorelib', 'synplify',
                 'synopsis', 'maxii', 'family_support']
 
-    def _createLibrary(self, source):
+    def _createLibrary(self, library):
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
             self._added_libraries = []
 
-        if source.library in self._added_libraries:
+        if library in self._added_libraries:
             return
 
-        self._added_libraries.append(source.library)
+        self._added_libraries.append(library)
 
         open(self._xvhdlini, 'w').write('\n'.join(\
                 ["%s=%s" % (x, p.join(self._target_folder, x)) \

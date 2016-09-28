@@ -191,8 +191,11 @@ def runner(args):
     #          assert not set(['-93', '-2008']).issubset(source.flags)
 
     for source in args.sources:
-        _logger.info("Building source '%s'", source)
-        for record in project.getMessagesByPath(source):
+        start = time.time()
+        records = project.getMessagesByPath(source)
+        end = time.time()
+        _logger.info("Building source '%s' took %.4fs", source, (end - start))
+        for record in records:
             if record['filename'] is not None:
                 message = [record['filename']]
             else:
