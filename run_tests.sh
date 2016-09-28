@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
+# VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 
 ARGS=()
 
-CLEAN_PIP=1
+# CLEAN_PIP=1
 
 while [ -n "$1" ]; do
   if [ "$1" == "-h" ]; then
@@ -33,8 +33,8 @@ while [ -n "$1" ]; do
     XVHDL=1
   elif [ "$1" == "fallback" ]; then
     FALLBACK=1
-  elif [ "$1" == "reuse-pip" ]; then
-    CLEAN_PIP=0
+  # elif [ "$1" == "reuse-pip" ]; then
+  #   CLEAN_PIP=0
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
   elif [ -f "$1" ]; then
@@ -63,7 +63,7 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   FALLBACK=1
   XVHDL=1
   STANDALONE=1
-  CLEAN_PIP=1
+  # CLEAN_PIP=1
 fi
 
 git clean -fdx && git submodule foreach --recursive git clean -fdx

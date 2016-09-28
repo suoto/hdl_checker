@@ -26,6 +26,8 @@ import time
 from multiprocessing import Queue, Process
 import shutil
 import requests
+from unittest import skipUnless
+
 from nose2.tools import such
 
 import hdlcc
@@ -148,17 +150,21 @@ with such.A("hdlcc server") as it:
             _logger.info(reply.text)
             it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
-        #  @it.should("get diagnose info with an existing project file before it has "
-        #             "parsed the configuration file")
-        #  def test():
-        #      reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-        #                            data={'project_file' : PROJECT_FILE})
-        #      info = reply.json()['info']
-        #      _logger.info(reply.text)
-        #      for expected in (
-        #              u'hdlcc version: %s' % hdlcc.__version__,
-        #              u'Builder: <unknown> (config file parsing is underway)'):
-        #          it.assertIn(expected, info)
+        @it.should("get diagnose info with an existing project file before it has "
+                   "parsed the configuration file")
+        def test():
+            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
+                                  data={'project_file' : PROJECT_FILE})
+            info = reply.json()['info']
+            _logger.info(reply.text)
+
+            if BUILDER_NAME is not None:
+                for expected in (
+                        u'hdlcc version: %s' % hdlcc.__version__,
+                        u'Builder: %s' % BUILDER_NAME):
+                    it.assertIn(expected, info)
+            else:
+                it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
 
         @it.should("get diagnose info with a non existing project file")
         def test():
@@ -215,6 +221,7 @@ with such.A("hdlcc server") as it:
             waitUntilBuildFinishes(data)
 
         @it.should("rebuild the project with directory cleanup")
+        @skipUnless(BUILDER_NAME is not None, "Test requires a builder")
         def test():
             # The main reason to rebuild is when the project data is corrupt
             # Test is as follows:
@@ -449,7 +456,5 @@ with such.A("hdlcc server") as it:
             with it.assertRaises(requests.ConnectionError):
                 requests.post('http://127.0.0.1:50000/get_diagnose_info', timeout=10)
 
-
-if BUILDER_NAME is not None:
-    it.createTests(globals())
+it.createTests(globals())
 

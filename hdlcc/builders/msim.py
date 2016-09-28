@@ -236,7 +236,6 @@ class MSim(BaseBuilder):
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
-        self._logger.fatal("Creating ini file")
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
