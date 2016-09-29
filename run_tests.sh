@@ -16,11 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
+# VIRTUAL_ENV_DEST=~/dev/hdlcc_venv
 
 ARGS=()
 
-CLEAN_PIP=1
+# CLEAN_PIP=1
 
 while [ -n "$1" ]; do
   if [ "$1" == "-h" ]; then
@@ -33,8 +33,8 @@ while [ -n "$1" ]; do
     XVHDL=1
   elif [ "$1" == "fallback" ]; then
     FALLBACK=1
-  elif [ "$1" == "reuse-pip" ]; then
-    CLEAN_PIP=0
+  # elif [ "$1" == "reuse-pip" ]; then
+  #   CLEAN_PIP=0
   elif [ "$1" == "standalone" ]; then
     STANDALONE=1
   elif [ -f "$1" ]; then
@@ -63,7 +63,7 @@ if [ -z "${GHDL}${MSIM}${FALLBACK}${STANDALONE}${XVHDL}" ]; then
   FALLBACK=1
   XVHDL=1
   STANDALONE=1
-  CLEAN_PIP=1
+  # CLEAN_PIP=1
 fi
 
 git clean -fdx && git submodule foreach --recursive git clean -fdx
@@ -108,19 +108,6 @@ fi
 
 TEST_RUNNER="./.ci/scripts/run_tests.py"
 
-export BUILDER_NAME=ghdl
-if [ "${CI}" == "true" ]; then
-  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-else
-  if [ -f "${HOME}/.local/bin/ghdl" ]; then
-    export BUILDER_PATH=${HOME}/.local/bin/ghdl
-  else
-    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
-  fi
-fi
-
-echo "BUILDER_PATH=$BUILDER_PATH"
-
 # ${TEST_RUNNER} "${ARGS[@]}"
 
 if [ -n "${STANDALONE}" ]; then
@@ -142,6 +129,19 @@ if [ -n "${FALLBACK}" ]; then
   RESULT=$(($? || RESULT))
   [ -n "${FAILFAST}" ] && [ "${RESULT}" != "0" ] && exit ${RESULT}
 fi
+
+export BUILDER_NAME=ghdl
+if [ "${CI}" == "true" ]; then
+  export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+else
+  if [ -f "${HOME}/.local/bin/ghdl" ]; then
+    export BUILDER_PATH=${HOME}/.local/bin/ghdl
+  else
+    export BUILDER_PATH=${HOME}/builders/ghdl/bin/
+  fi
+fi
+
+echo "BUILDER_PATH=$BUILDER_PATH"
 
 if [ -n "${MSIM}" ]; then
   export BUILDER_NAME=msim

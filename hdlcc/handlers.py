@@ -18,16 +18,16 @@
 
 import os
 import os.path as p
-import bottle
 import logging
 from multiprocessing import Queue
 import signal
-
-_logger = logging.getLogger(__name__)
+import bottle
 
 import hdlcc
 import hdlcc.utils as utils
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+
+_logger = logging.getLogger(__name__)
 
 app = bottle.Bottle() # pylint: disable=invalid-name
 
@@ -48,7 +48,7 @@ class HdlCodeCheckerSever(HdlCodeCheckerBase):
 
     def getQueuedMessages(self):
         "Returns queued UI messages"
-        while not self._msg_queue.empty():
+        while not self._msg_queue.empty():  # pragma: no cover
             yield self._msg_queue.get()
 
 def _getServerByProjectFile(project_file):
@@ -127,12 +127,12 @@ def getUiMessages():
 
     ui_messages = list(server.getQueuedMessages())
 
-    if not ui_messages:
+    if not ui_messages:  # pragma: no cover
         _logger.debug("Project '%s' has no UI messages", project_file)
-    else:
+    else:  # pragma: no cover
         _logger.info("Project '%s' UI messages:", project_file)
 
-    for msg in ui_messages:
+    for msg in ui_messages:  # pragma: no cover
         _logger.info(msg)
 
     response = {'ui_messages' : ui_messages}
