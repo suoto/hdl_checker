@@ -17,8 +17,8 @@
 "Top of the hdlcc.parsers submodule"
 
 import logging
-from multiprocessing import Pool
-#  from multiprocessing.pool import ThreadPool as Pool
+#  from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool as Pool
 
 from hdlcc.parsers.vhdl_parser import VhdlParser
 from hdlcc.parsers.verilog_parser import VerilogParser

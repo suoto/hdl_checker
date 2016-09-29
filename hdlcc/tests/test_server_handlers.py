@@ -23,26 +23,19 @@ import os
 import os.path as p
 import subprocess as subp
 import time
+import mock
 from multiprocessing import Queue, Process
 import shutil
 import requests
-from unittest import skipUnless
 
 from nose2.tools import such
 
 import hdlcc
 import hdlcc.utils as utils
 
-BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
-
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-
-if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
-else:
-    PROJECT_FILE = None
+HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
@@ -53,6 +46,21 @@ def doNothing(queue):
     _logger.debug("Ok, done")
 
 with such.A("hdlcc server") as it:
+
+    @it.has_setup
+    def setup():
+        it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
+        it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+        if it.BUILDER_NAME:
+            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+        else:
+            it.PROJECT_FILE = None
+
+    @it.has_teardown
+    def teardown():
+        build_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
+        if p.exists(build_folder):
+            shutil.rmtree(build_folder)
 
     def waitForServer():
         # Wait until the server is up and replying
@@ -108,7 +116,7 @@ with such.A("hdlcc server") as it:
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
                    '--host', it._host, '--port', it._port,
-                   '--log-level', 'DEBUG',
+                   '--log-level', HDLCC_SERVER_LOG_LEVEL,
                    '--attach-to-pid', str(os.getpid()),
                   ]
 
@@ -126,9 +134,13 @@ with such.A("hdlcc server") as it:
 
         @it.has_setup
         def setup():
-            _logger.info("Builder name: %s", BUILDER_NAME)
-            _logger.info("Builder path: %s", BUILDER_PATH)
-            utils.addToPath(BUILDER_PATH)
+            _logger.info("Builder name: %s", it.BUILDER_NAME)
+            _logger.info("Builder path: %s", it.BUILDER_PATH)
+            if it.BUILDER_PATH:
+                it.patch = mock.patch.dict(
+                    'os.environ',
+                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+                it.patch.start()
             setupPaths()
             startCodeCheckerServer()
 
@@ -140,7 +152,8 @@ with such.A("hdlcc server") as it:
             #      os.kill(it._server.pid, 9)
             it._server.terminate()
             utils.terminateProcess(it._server.pid)
-            utils.removeFromPath(BUILDER_PATH)
+            if it.BUILDER_PATH:
+                it.patch.stop()
             time.sleep(2)
 
         @it.should("get diagnose info without any project")
@@ -154,14 +167,14 @@ with such.A("hdlcc server") as it:
                    "parsed the configuration file")
         def test():
             reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                  data={'project_file' : PROJECT_FILE})
+                                  data={'project_file' : it.PROJECT_FILE})
             info = reply.json()['info']
             _logger.info(reply.text)
 
-            if BUILDER_NAME is not None:
+            if it.BUILDER_NAME:
                 for expected in (
                         u'hdlcc version: %s' % hdlcc.__version__,
-                        u'Builder: %s' % BUILDER_NAME):
+                        u'Builder: %s' % it.BUILDER_NAME):
                     it.assertIn(expected, info)
             else:
                 it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
@@ -178,7 +191,7 @@ with such.A("hdlcc server") as it:
                    "has finished")
         def test():
             data = {
-                'project_file' : PROJECT_FILE,
+                'project_file' : it.PROJECT_FILE,
                 'path'         : p.join(
                     VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
@@ -221,8 +234,10 @@ with such.A("hdlcc server") as it:
             waitUntilBuildFinishes(data)
 
         @it.should("rebuild the project with directory cleanup")
-        @skipUnless(BUILDER_NAME is not None, "Test requires a builder")
         def test():
+            if not it.BUILDER_NAME:
+                _logger.info("Test requires a builder")
+                return
             # The main reason to rebuild is when the project data is corrupt
             # Test is as follows:
             # 1) Check that a file builds OK
@@ -234,7 +249,7 @@ with such.A("hdlcc server") as it:
 
             def step_01_check_file_builds_ok():
                 data = {
-                    'project_file' : PROJECT_FILE,
+                    'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
 
@@ -276,12 +291,12 @@ with such.A("hdlcc server") as it:
                     raise
 
             def step_04_rebuild_project():
-                data = {'project_file' : PROJECT_FILE}
+                data = {'project_file' : it.PROJECT_FILE}
                 requests.post(it._url + '/rebuild_project', timeout=10,
                               data=data)
                 waitForServer()
                 data = {
-                    'project_file' : PROJECT_FILE,
+                    'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitForServer()
@@ -331,7 +346,7 @@ with such.A("hdlcc server") as it:
 
             def step_01_check_file_builds_ok():
                 data = {
-                    'project_file' : PROJECT_FILE,
+                    'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
                 _logger.info("Waiting for any previous process to finish")
@@ -346,12 +361,12 @@ with such.A("hdlcc server") as it:
                 return reply.json()['messages'] + ui_reply.json()['ui_messages']
 
             def step_02_rebuild_project():
-                data = {'project_file' : PROJECT_FILE}
+                data = {'project_file' : it.PROJECT_FILE}
                 requests.post(it._url + '/rebuild_project', timeout=10,
                               data=data)
                 waitForServer()
                 data = {
-                    'project_file' : PROJECT_FILE,
+                    'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
                 waitUntilBuildFinishes(data)
@@ -406,7 +421,7 @@ with such.A("hdlcc server") as it:
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
             cmd = ['coverage', 'run',
                    hdlcc_server_fname,
-                   '--log-level', 'ERROR',
+                   '--log-level', HDLCC_SERVER_LOG_LEVEL,
                    '--attach-to-pid', str(pid),
                   ]
 

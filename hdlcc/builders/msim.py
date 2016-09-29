@@ -91,9 +91,9 @@ class MSim(BaseBuilder):
         # - version <= 6.2: "Old" library organization
         # - 6.3 <= version <= 10.2: Has the switch but defaults to directory
         # version >= 10.2+: Has the switch and the default is not directory
-        if self._version >= '10.2':
+        if self._version >= '10.2':  # pragma: no cover
             self._vlib_args = ['-type', 'directory']
-        else:
+        else:  # pragma: no cover
             self._vlib_args = []
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
@@ -150,8 +150,6 @@ class MSim(BaseBuilder):
     def _getUnitsToRebuild(self, line):
         rebuilds = []
         for match in self._iter_rebuild_units(line):
-            if not match:
-                continue
             mdict = match.groupdict()
             library_name = mdict['lib_name_0'] or mdict['lib_name_1']
             unit_name = mdict['unit_name_0'] or mdict['unit_name_1']
@@ -169,8 +167,11 @@ class MSim(BaseBuilder):
     def _buildSource(self, source, flags=None):
         if source.filetype == 'vhdl':
             return self._buildVhdl(source, flags)
-        if source.filetype in ('verilog', 'systemverilog'):
+        elif source.filetype in ('verilog', 'systemverilog'):
             return self._buildVerilog(source, flags)
+        else:  # pragma: no cover
+            self._logger.error("Unknown file type %s for source %s",
+                               source.filetype, source)
 
     def _getExtraFlags(self, lang):
         libs = []
@@ -184,7 +185,7 @@ class MSim(BaseBuilder):
         "Builds a VHDL file"
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
                '-work', p.join(self._target_folder, source.library)]
-        if flags:
+        if flags:  # pragma: no cover
             cmd += flags
         cmd += [source.filename]
 
@@ -196,7 +197,7 @@ class MSim(BaseBuilder):
                '-work', p.join(self._target_folder, source.library)]
         if source.filetype == 'systemverilog':
             cmd += ['-sv']
-        if flags:
+        if flags:  # pragma: no cover
             cmd += flags
 
         cmd += self._getExtraFlags('verilog')
@@ -233,7 +234,7 @@ class MSim(BaseBuilder):
 
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
-        if not p.exists(self._target_folder):
+        if not p.exists(self._target_folder):  # pragma: no cover
             os.mkdir(self._target_folder)
 
         self._logger.info("modelsim.ini not found at '%s', creating",

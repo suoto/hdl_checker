@@ -59,9 +59,9 @@ install:
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
-      -vv -B --log-capture %EXTRA_ARGS%"
-
+  # - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\test_runner.py
+  #     -vv -B --log-capture %EXTRA_ARGS%"
+  - "python run_tests.py --%BUILDER_NAME% -v --log-level DEBUG"
   - coverage combine
   - coverage report
   - codecov

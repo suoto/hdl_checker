@@ -22,7 +22,6 @@ import os.path as p
 import shutil
 import time
 import logging
-import unittest
 
 from nose2.tools import such
 from nose2.tools.params import params
@@ -30,12 +29,7 @@ from nose2.tools.params import params
 import mock
 
 import hdlcc
-from hdlcc.utils import (writeListToFile,
-                         addToPath,
-                         removeFromPath,
-                         samefile,
-                         onCI,
-                         cleanProjectCache)
+from hdlcc.utils import writeListToFile, cleanProjectCache
 
 from hdlcc.tests.mocks import (StandaloneProjectBuilder,
                                MSimMock,
@@ -46,32 +40,30 @@ from hdlcc.parsers import VerilogParser, VhdlParser
 
 _logger = logging.getLogger(__name__)
 
-BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-BUILDER_PATH = p.expandvars(os.environ.get('BUILDER_PATH', \
-                            p.expanduser("~/ghdl/bin/")))
-
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES_PATH = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
-if BUILDER_NAME is not None:
-    PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, BUILDER_NAME + '.prj')
-else:
-    PROJECT_FILE = None
-
-with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
+with such.A("hdlcc project") as it:
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
     @it.has_setup
     def setup():
-        cleanProjectCache(PROJECT_FILE)
+        it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
+        it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+        if it.BUILDER_NAME:
+            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+        else:
+            it.PROJECT_FILE = None
 
-        _logger.info("Builder name: %s", BUILDER_NAME)
-        _logger.info("Builder path: %s", BUILDER_PATH)
+        cleanProjectCache(it.PROJECT_FILE)
+
+        _logger.info("Builder name: %s", it.BUILDER_NAME)
+        _logger.info("Builder path: %s", it.BUILDER_PATH)
 
     @it.has_teardown
     def teardown():
-        cleanProjectCache(PROJECT_FILE)
+        cleanProjectCache(it.PROJECT_FILE)
         if p.exists(it.DUMMY_PROJECT_FILE):
             shutil.rmtree(it.DUMMY_PROJECT_FILE)
 
@@ -519,18 +511,18 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     #                              p.abspath('modelsim.ini'))
     #              os.remove('modelsim.ini')
 
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-    #          cleanProjectCache(PROJECT_FILE)
+    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
+    #          cleanProjectCache(it.PROJECT_FILE)
 
-    #          builder = hdlcc.builders.getBuilderByName(BUILDER_NAME)
+    #          builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
 
-    #          if onCI() and BUILDER_NAME is not None:
+    #          if onCI() and it.BUILDER_NAME is not None:
     #              with it.assertRaises(hdlcc.exceptions.SanityCheckError):
     #                  builder(it.DUMMY_PROJECT_FILE)
 
     #          it.original_env = os.environ.copy()
 
-    #          addToPath(BUILDER_PATH)
+    #          addToPath(it.BUILDER_PATH)
 
     #          it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
 
@@ -541,13 +533,13 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     #                      "the builder path")
 
     #          _logger.info("Creating project builder object")
-    #          it.project = StandaloneProjectBuilder(PROJECT_FILE)
+    #          it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
     #      @it.has_teardown
     #      def teardown():
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(PROJECT_FILE)
-    #          cleanProjectCache(PROJECT_FILE)
-    #          removeFromPath(BUILDER_PATH)
+    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
+    #          cleanProjectCache(it.PROJECT_FILE)
+    #          removeFromPath(it.BUILDER_PATH)
     #          target_dir = it.project._config.getTargetDir()
     #          if p.exists(target_dir):
     #              shutil.rmtree(target_dir)
@@ -558,7 +550,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     #          del it.project
 
         #  @it.should("build project by dependency in background")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test001():
         #      _logger.info("Checking if msg queue is empty")
@@ -567,7 +559,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      it.assertFalse(it.project.hasFinishedBuilding())
 
         #  @it.should("notify if a build is already running")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test002():
         #      it.project.buildByDependency()
@@ -586,7 +578,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
         #  @it.should("warn when trying to build a source before the build "
         #             'thread completes')
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test003():
         #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
@@ -677,7 +669,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      it.assertTrue(it.project._msg_queue.empty())
 
         #  @it.should("get messages by path of a different source")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test007():
         #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
@@ -690,7 +682,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #          it.assertTrue(samefile(filename, record.pop('filename')))
         #          records += [record]
 
-        #      if BUILDER_NAME == 'msim':
+        #      if it.BUILDER_NAME == 'msim':
         #          expected_records = [{
         #              'checker': 'msim',
         #              'column': None,
@@ -700,9 +692,9 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #              'error_number': None,
         #              'error_type': 'W',
         #              'line_number': '45'}]
-        #      elif BUILDER_NAME == 'ghdl':
+        #      elif it.BUILDER_NAME == 'ghdl':
         #          expected_records = []
-        #      elif BUILDER_NAME == 'xvhdl':
+        #      elif it.BUILDER_NAME == 'xvhdl':
         #          expected_records = []
 
         #      it.assertEquals(records, expected_records)
@@ -710,7 +702,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      it.assertTrue(it.project._msg_queue.empty())
 
         #  @it.should("get updated messages of a different source")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test008():
         #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
@@ -738,7 +730,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      it.assertTrue(it.project._msg_queue.empty())
 
         #  @it.should("get messages from a source outside the project file")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test009():
         #      filename = 'some_file.vhd'
@@ -771,7 +763,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      it.assertTrue(it.project._msg_queue.empty())
 
         #  @it.should("rebuild sources when needed within the same library")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test010():
         #      # Count how many messages each source has
@@ -821,7 +813,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
         #      writeListToFile(very_common_pkg, code)
 
         #  @it.should("rebuild sources when needed for different libraries")
-        #  @unittest.skipUnless(PROJECT_FILE is not None,
+        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
         #  def test011():
         #      # Count how many messages each source has
@@ -875,14 +867,14 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
     #      @it.has_setup
     #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     #      def setup():
-    #          if BUILDER_NAME is None:
+    #          if it.BUILDER_NAME is None:
     #              return
     #          it.original_env = os.environ.copy()
 
-    #          addToPath(BUILDER_PATH)
+    #          addToPath(it.BUILDER_PATH)
 
     #          it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
-    #          it.project_file = p.join(it.vim_hdl_examples_path, BUILDER_NAME + '.prj')
+    #          it.project_file = p.join(it.vim_hdl_examples_path, it.BUILDER_NAME + '.prj')
     #          it.project = StandaloneProjectBuilder(it.project_file)
     #          it.project.buildByDependency()
     #          it.project.waitForBuild()
@@ -890,11 +882,11 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
     #      @it.has_teardown
     #      def teardown():
-    #          if BUILDER_NAME is None:
+    #          if it.BUILDER_NAME is None:
     #              return
     #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.project_file)
-    #          cleanProjectCache(PROJECT_FILE)
-    #          removeFromPath(BUILDER_PATH)
+    #          cleanProjectCache(it.PROJECT_FILE)
+    #          removeFromPath(it.BUILDER_PATH)
 
     #          target_dir = it.project._config.getTargetDir()
 
@@ -908,7 +900,7 @@ with such.A("hdlcc project with '%s' builder" % str(BUILDER_NAME)) as it:
 
 
     #      @it.should("rebuild sources when needed")
-    #      @unittest.skipUnless(PROJECT_FILE is not None,
+    #      @unittest.skipUnless(it.PROJECT_FILE is not None,
     #                           "Requires a valid project file")
     #      def test001():
     #          clk_en_generator = p.join(it.vim_hdl_examples_path,

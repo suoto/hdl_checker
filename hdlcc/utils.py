@@ -160,34 +160,18 @@ def writeListToFile(filename, _list): # pragma: no cover
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
 
-def addToPath(path):
-    "Adds path to the PATH environment variable"
-    path_value = os.pathsep.join([path, os.environ['PATH']])
-    os.environ['PATH'] = path_value
-    if onWindows():
-        os.putenv('PATH', path_value)
 
-def removeFromPath(path):
-    "Removes path to the PATH environment variable"
-    path_list = os.environ['PATH'].split(os.pathsep)
-    path_list.remove(path)
-    os.environ['PATH'] = os.pathsep.join(path_list)
-    if onWindows():
-        os.putenv('PATH', os.pathsep.join(path_list))
-
-# pylint: disable=missing-docstring
-def onWindows():
+def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'win32'
 
-def onMac(): # pragma: no cover
+def onMac():      # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'darwin'
 
-def onTravis(): # pragma: no cover
+def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
     return 'TRAVIS' in os.environ
 
-def onCI(): # pragma: no cover
+def onCI():       # pragma: no cover # pylint: disable=missing-docstring
     return 'CI' in os.environ
-# pylint: enable=missing-docstring
 
 def getFileType(filename):
     "Gets the file type of a source file"

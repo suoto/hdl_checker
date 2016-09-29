@@ -57,7 +57,6 @@ class BaseSourceFile(object):
             '_design_units' : self._design_units,
             '_deps' : self._deps,
             '_libs' : self._libs,
-            '_content' : self._content,
             '_mtime' : self._mtime,
             'filetype' : self.filetype}
         return state
@@ -75,7 +74,7 @@ class BaseSourceFile(object):
         obj._design_units = state['_design_units']
         obj._deps = state['_deps']
         obj._libs = state['_libs']
-        obj._content = state['_content']
+        obj._content = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
