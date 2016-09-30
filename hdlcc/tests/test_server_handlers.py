@@ -280,15 +280,7 @@ with such.A("hdlcc server") as it:
                 else:
                     _logger.info("Step 03 generated no messages")
 
-                try:
-                    it.assertNotEquals(step_01_msgs, step_03_msgs)
-                except:
-                    _logger.warning("=== xvhdl.init ===")
-                    with open('/home/asouto/dev/vim-hdl/dependencies/hdlcc/.xvhdl.init', 'r') as fd:
-                        for line in fd.read().split('\n'):
-                            _logger.info(line)
-                    _logger.warning("=== end of xvhdl.init ===")
-                    raise
+                it.assertNotEquals(step_01_msgs, step_03_msgs)
 
             def step_04_rebuild_project():
                 data = {'project_file' : it.PROJECT_FILE}

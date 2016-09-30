@@ -48,29 +48,3 @@ class UnknownParameterError(VimHdlBaseException):
     def __str__(self): # pragma: no cover
         return "Unknown parameter '%s'" % self._parameter
 
-class DesignUnitNotFoundError(VimHdlBaseException):
-    """
-    Exception raised when hdlcc_base.HdlCodeCheckerBase can't find
-    the source file that defines the given design unit
-    """
-
-    def __init__(self, design_unit):
-        self._design_unit = design_unit
-        super(DesignUnitNotFoundError, self).__init__()
-
-    def __str__(self): # pragma: no cover
-        return "No source file defining design unit '%s' found" % \
-                    self._design_unit
-
-class CircularDependencyFound(VimHdlBaseException):
-    """
-    """
-    def __init__(self, target, reference):
-        self._target = target
-        self._reference = reference
-        super(CircularDependencyFound, self).__init__()
-
-    def __str__(self): # pragma: no cover
-        return "Circular dependency found between %s and %s" % \
-                (self._target, self._reference)
-

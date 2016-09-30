@@ -33,8 +33,9 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
 _LIBRARY_SCANNER = re.compile(r"\blibrary\s+(?P<library_name>[^;]+)",
                               flags=re.M)
 
-_PACKAGE_BODY_SCANNER = re.compile(
-    r"\bpackage\s+body\s+(?P<package_name>\w+)\s+is\b", flags=re.M)
+_ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
+    r"\bpackage\s+body\s+(?P<package_name>\w+)\s+is\b",
+    r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
 
 _SUB_COMMENTS = re.compile(r"\s*--[^\n]*", flags=re.S).sub
 
@@ -74,9 +75,14 @@ class VhdlParser(BaseSourceFile):
                 dependency['library'] = self.library
             if dependency not in dependencies:
                 dependencies.append(dependency)
-        for match in _PACKAGE_BODY_SCANNER.finditer(self.getSourceContent()):
-            package_name = match.groupdict()['package_name']
-            dependencies += [{'library' : self.library, 'unit': package_name}]
+
+        for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
+            _dict = match.groupdict()
+            package_name = _dict.get('package_name', None)
+            component_name = _dict.get('component_name', None)
+            if package_name:
+                dependencies += [{'library' : self.library, 'unit': package_name}]
+
 
         return dependencies
 

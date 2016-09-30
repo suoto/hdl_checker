@@ -51,7 +51,7 @@ class GHDL(BaseBuilder):
         r"ghdl: compilation error", ])).match
 
     _iter_rebuild_units = re.compile(
-        r'((entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
+        r'((?P<unit_type>entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
         r'|'
         r'file (?P<rebuild_path>.*)\s+has changed and must be reanalysed)',
         flags=re.I).finditer
@@ -196,7 +196,7 @@ class GHDL(BaseBuilder):
             if 'rebuild_path' in mdict and mdict['rebuild_path'] is not None:
                 rebuilds.append(mdict)
             else:
-                rebuilds.append({'library_name' : 'work',
+                rebuilds.append({'unit_type' : mdict['unit_type'],
                                  'unit_name' : mdict['unit_name']})
 
         return rebuilds

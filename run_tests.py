@@ -162,7 +162,10 @@ def _parseArguments():
     parser.add_argument('--log-file', action='store',
                         default=p.abspath(p.expanduser("~/tests.log")))
 
-    parser.add_argument('--log-level', action='store', default='INFO')
+    parser.add_argument('--log-level', action='store', default='INFO',
+                        choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
+                                 'WARNING',))
+
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
@@ -226,14 +229,10 @@ def _getDefaultTestByEnv(env):
     assert False
 
 def main():
-    #  if '--clear' in sys.argv[1:]:
-    #      _clear()
-    #      sys.argv.pop(sys.argv.index('--clear'))
-
     _clear()
 
     args = _parseArguments()
-    print("Arguments: %s", args)
+    print("Arguments: %s" % args)
     nose_base_args = _getNoseCommandLineArgs(args)
 
     _setupLogging(sys.stdout, args.log_level)
@@ -294,13 +293,12 @@ def main():
         else:
             _logger.info("Skipping env '%s'", env)
 
-    if passed:
-        cov.stop()
-        cov.save()
-        for cmd in ('coverage combine',
-                    'coverage html'):
-            print(cmd)
-            print(os.popen(cmd).read())
+    cov.stop()
+    cov.save()
+    for cmd in ('coverage combine',
+                'coverage html'):
+        print(cmd)
+        print(os.popen(cmd).read())
 
     return 0 if passed else 1
 

@@ -267,5 +267,18 @@ with such.A("builder object") as it:
                 [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
                 it.builder._getUnitsToRebuild(line))
 
+        @it.should("catch GHDL rebuilds by messages")
+        @params(
+            "somefile.vhd:12:13: package \"leon3\" is obsoleted by package \"amba\"")
+        def test(case, line):
+            if it.BUILDER_NAME != 'ghdl':
+                _logger.warning("GHDL test only")
+                return
+            _logger.info("Running %s", case)
+
+            it.assertEquals(
+                [{'unit_type': 'package', 'unit_name': 'leon3'}],
+                it.builder._getUnitsToRebuild(line))
+
 it.createTests(globals())
 

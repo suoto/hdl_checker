@@ -29,7 +29,7 @@ from nose2.tools.params import params
 import mock
 
 import hdlcc
-from hdlcc.utils import writeListToFile, cleanProjectCache
+from hdlcc.utils import writeListToFile, cleanProjectCache, onCI
 
 from hdlcc.tests.mocks import (StandaloneProjectBuilder,
                                MSimMock,
@@ -316,7 +316,7 @@ with such.A("hdlcc project") as it:
         it.assertEqual([direct_dependency],
                        project.getBuildSequence(target_source))
 
-    @it.should("fail if the source file for a dependency is not found")
+    @it.should("handle cases where the source file for a dependency is not found")
     def test():
         target_source = SourceMock(
             library='some_lib',
@@ -330,8 +330,7 @@ with such.A("hdlcc project") as it:
         for source in (target_source, ):
             project._config._sources[str(source)] = source
 
-        with it.assertRaises(hdlcc.exceptions.DesignUnitNotFoundError):
-            project.getBuildSequence(target_source)
+        it.assertEqual([], project.getBuildSequence(target_source))
 
     @it.should("return empty list when the source has no dependencies")
     def test():
@@ -348,7 +347,7 @@ with such.A("hdlcc project") as it:
 
         it.assertEqual([], project.getBuildSequence(target_source))
 
-    @it.should("catch ciruclar dependencies")
+    @it.should("identify ciruclar dependencies")
     def test():
         target_source = SourceMock(
             library='some_lib',
@@ -369,8 +368,8 @@ with such.A("hdlcc project") as it:
         for source in (target_source, direct_dependency):
             project._config._sources[str(source)] = source
 
-        with it.assertRaises(hdlcc.exceptions.CircularDependencyFound):
-            project.getBuildSequence(target_source)
+        it.assertEqual([direct_dependency, ],
+                       project.getBuildSequence(target_source))
 
     @it.should("resolve conflicting dependencies by using signature")
     def test():
@@ -502,52 +501,59 @@ with such.A("hdlcc project") as it:
         it.assertTrue(found, "Failed to warn that cache recovering has failed")
         it.assertTrue(project.builder.builder_name, 'Fallback')
 
-    #  with it.having('vim-hdl-examples as reference and a valid project file'):
+    with it.having('vim-hdl-examples as reference and a valid project file'):
 
-    #      @it.has_setup
-    #      def setup():
-    #          if p.exists('modelsim.ini'):
-    #              _logger.warning("Modelsim ini found at %s",
-    #                              p.abspath('modelsim.ini'))
-    #              os.remove('modelsim.ini')
+        @it.has_setup
+        def setup():
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
 
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-    #          cleanProjectCache(it.PROJECT_FILE)
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
+            cleanProjectCache(it.PROJECT_FILE)
 
-    #          builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
+            builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
 
-    #          if onCI() and it.BUILDER_NAME is not None:
-    #              with it.assertRaises(hdlcc.exceptions.SanityCheckError):
-    #                  builder(it.DUMMY_PROJECT_FILE)
+            if onCI() and it.BUILDER_NAME is not None:
+                with it.assertRaises(hdlcc.exceptions.SanityCheckError):
+                    builder(it.DUMMY_PROJECT_FILE)
 
-    #          it.original_env = os.environ.copy()
+            it.original_env = os.environ.copy()
 
-    #          addToPath(it.BUILDER_PATH)
+            # Add the builder path to the environment so we can call it
+            if it.BUILDER_PATH:
+                it.patch = mock.patch.dict(
+                    'os.environ',
+                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+                it.patch.start()
 
-    #          it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
+            it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
 
-    #          try:
-    #              builder(it.DUMMY_PROJECT_FILE)
-    #          except hdlcc.exceptions.SanityCheckError:
-    #              it.fail("Builder creation failed even after configuring "
-    #                      "the builder path")
+            try:
+                builder(it.DUMMY_PROJECT_FILE)
+            except hdlcc.exceptions.SanityCheckError:
+                it.fail("Builder creation failed even after configuring "
+                        "the builder path")
 
-    #          _logger.info("Creating project builder object")
-    #          it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
+            _logger.info("Creating project builder object")
+            it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
-    #      @it.has_teardown
-    #      def teardown():
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-    #          cleanProjectCache(it.PROJECT_FILE)
-    #          removeFromPath(it.BUILDER_PATH)
-    #          target_dir = it.project._config.getTargetDir()
-    #          if p.exists(target_dir):
-    #              shutil.rmtree(target_dir)
-    #          if p.exists('modelsim.ini'):
-    #              _logger.warning("Modelsim ini found at %s",
-    #                              p.abspath('modelsim.ini'))
-    #              os.remove('modelsim.ini')
-    #          del it.project
+        @it.has_teardown
+        def teardown():
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
+            cleanProjectCache(it.PROJECT_FILE)
+            if it.BUILDER_PATH:
+                it.patch.stop()
+
+            target_dir = it.project._config.getTargetDir()
+            if p.exists(target_dir):
+                shutil.rmtree(target_dir)
+            if p.exists('modelsim.ini'):
+                _logger.warning("Modelsim ini found at %s",
+                                p.abspath('modelsim.ini'))
+                os.remove('modelsim.ini')
+            del it.project
 
         #  @it.should("build project by dependency in background")
         #  @unittest.skipUnless(it.PROJECT_FILE is not None,
@@ -812,55 +818,55 @@ with such.A("hdlcc project") as it:
         #      _logger.info("Restoring previous content")
         #      writeListToFile(very_common_pkg, code)
 
-        #  @it.should("rebuild sources when needed for different libraries")
+        @it.should("rebuild sources when needed for different libraries")
         #  @unittest.skipUnless(it.PROJECT_FILE is not None,
         #                       "Requires a valid project file")
-        #  def test011():
-        #      # Count how many messages each source has
-        #      source_msgs = {}
+        def test011():
+            # Count how many messages each source has
+            source_msgs = {}
 
-        #      for filename in (
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
+            for filename in (
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
 
-        #          _logger.info("Getting messages for '%s'", filename)
-        #          source_msgs[filename] = \
-        #              it.project.getMessagesByPath(filename)
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
 
-        #      _logger.info("Changing very_common_pkg to force rebuilding "
-        #                   "synchronizer and another one I don't recall "
-        #                   "right now")
-        #      very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
-        #                               'very_common_pkg.vhd')
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+                                     'very_common_pkg.vhd')
 
-        #      code = open(very_common_pkg, 'r').read().split('\n')
+            code = open(very_common_pkg, 'r').read().split('\n')
 
-        #      writeListToFile(very_common_pkg,
-        #                      code[:22] + \
-        #                      ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-        #                      code[22:])
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                            code[22:])
 
-        #      # The number of messages on all sources should not change
-        #      it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
+            # The number of messages on all sources should not change
+            it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
-        #      for filename in (
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
+            for filename in (
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
 
-        #          if source_msgs[filename]:
-        #              _logger.info("Source %s had the following messages:\n%s",
-        #                           filename,
-        #                           "\n".join([str(x) for x in
-        #                                      source_msgs[filename]]))
-        #          else:
-        #              _logger.info("Source %s has no previous messages",
-        #                           filename)
+                if source_msgs[filename]:
+                    _logger.info("Source %s had the following messages:\n%s",
+                                 filename,
+                                 "\n".join([str(x) for x in
+                                            source_msgs[filename]]))
+                else:
+                    _logger.info("Source %s has no previous messages",
+                                 filename)
 
-        #          it.assertEquals(source_msgs[filename],
-        #                          it.project.getMessagesByPath(filename))
+                it.assertEquals(source_msgs[filename],
+                                it.project.getMessagesByPath(filename))
 
-        #      _logger.info("Restoring previous content")
-        #      writeListToFile(very_common_pkg, code)
+            _logger.info("Restoring previous content")
+            writeListToFile(very_common_pkg, code)
 
     #  with it.having('vim-hdl-examples as reference and a valid project file'):
 

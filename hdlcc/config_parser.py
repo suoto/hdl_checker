@@ -443,9 +443,6 @@ class ConfigParser(object):
     def _handleParsedSource(self, language, library, path, flags):
         "Handles a parsed line that adds a source"
 
-        self._logger.debug("Found source with path '%s', "
-                           "library: '%s', language: '%s', flags: '%s'",
-                           path, library, language, flags)
 
         flags_set = _extractSet(flags)
 
@@ -576,8 +573,7 @@ class ConfigParser(object):
                                                       source.getDesignUnits()]:
                 sources += [source]
         if not sources:
-            raise hdlcc.exceptions.DesignUnitNotFoundError(
-                "%s.%s" % (library, unit))
+            self._logger.warning("No source file defining '%s'", unit)
         return sources
 
     # TODO: This result can be cached while no source file has changed

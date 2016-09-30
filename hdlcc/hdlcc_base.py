@@ -57,7 +57,7 @@ class HdlCodeCheckerBase(object):
     HDL Code Checker project builder class
     """
 
-    _USE_THREADS = True
+    _USE_THREADS = False
     MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -292,7 +292,7 @@ class HdlCodeCheckerBase(object):
         """
         Recursively finds out the dependencies of the given source file
         """
-        self._logger.info("Checking build sequence for %s", source)
+        self._logger.debug("Checking build sequence for %s", source)
         if build_sequence is None:
             build_sequence = []
         for library, unit in self._resolveRelativeNames(source):
@@ -300,6 +300,8 @@ class HdlCodeCheckerBase(object):
             dependencies_list = self._config.discoverSourceDependencies(
                 unit, library)
 
+            if not dependencies_list:
+                continue
             dependency = dependencies_list[0]
 
             # If we found more than a single file, then multiple files
@@ -317,8 +319,7 @@ class HdlCodeCheckerBase(object):
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
             if dependency == reference:
-                raise hdlcc.exceptions.CircularDependencyFound(
-                    source, dependency)
+                return removeDuplicates(build_sequence)
 
             if dependency not in build_sequence:
                 self._getBuildSequence(dependency, reference=source,

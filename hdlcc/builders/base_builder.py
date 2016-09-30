@@ -201,7 +201,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     def checkEnvironment(self):
         """
         Sanity environment check that should be implemented by child
-        classes.  Nothing is done with the return, the child class should
+        classes. Nothing is done with the return, the child class should
         raise an exception by itself
         """
 
@@ -236,7 +236,14 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             try:
                 for rebuild in self._getUnitsToRebuild(line):
                     if rebuild not in rebuilds:
-                        rebuilds += [rebuild]
+                        if 'unit_type' in rebuild and 'unit_name' in rebuild:
+                            for dependency in source.getDependencies():
+                                if dependency['unit'] == rebuild['unit_name']:
+                                    self._logger.fatal("Adding '%s'", rebuild)
+                                    rebuilds += [rebuild]
+                                    break
+                        else:
+                            rebuilds += [rebuild]
 
             except NotImplementedError: # pragma: no cover
                 pass
