@@ -26,7 +26,9 @@ from threading import Lock
 import hdlcc.options as options
 
 class BaseBuilder(object): # pylint: disable=abstract-class-not-used
-    "Class that implements the base builder flow"
+    """
+    Class that implements the base builder flow
+    """
 
     __metaclass__ = abc.ABCMeta
 
@@ -56,22 +58,33 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
+        """
+        Adds an external library so it may be referenced by the builder
+        directly
+        """
         assert lang in cls._external_libraries, "Uknown language '%s'" & lang
         if library_name not in cls._external_libraries[lang]:
             cls._external_libraries[lang].append(library_name)
 
     @classmethod
     def addIncludePath(cls, lang, path):
+        """
+        Adds an include path to be used by the builder where applicable
+        """
         if path not in cls._include_paths[lang]:
             cls._include_paths[lang].append(path)
 
     @abc.abstractproperty
     def builder_name(self):
-        "Defines the builder identification"
+        """
+        Defines the builder identification
+        """
 
     @abc.abstractproperty
     def file_types(self):
-        "Returns the file types supported by the builder"
+        """
+        Returns the file types supported by the builder
+        """
 
     def __init__(self, target_folder):
         # Shell accesses must be atomic
@@ -95,18 +108,20 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
         try:
             self._parseBuiltinLibraries()
-            if self._builtin_libraries: # pragma: no cover
-                self._logger.debug("Builtin libraries")
-                for lib in self._builtin_libraries:
-                    self._logger.debug("-> %s", lib)
-            else: # pragma: no cover
-                self._logger.info("No builtin libraries found")
+            if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                if self._builtin_libraries: # pragma: no cover
+                    self._logger.debug("Builtin libraries: %s",
+                                       ', '.join(self._builtin_libraries))
+                else: # pragma: no cover
+                    self._logger.info("No builtin libraries found")
         except NotImplementedError:
             pass
 
     @classmethod
     def recoverFromState(cls, state):
-        "Returns an object of cls based on a given state"
+        """
+        Returns an object of cls based on a given state
+        """
         # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
         obj._logger = logging.getLogger(state['_logger'])
@@ -118,7 +133,9 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         return obj
 
     def getState(self):
-        "Gets a dict that describes the current state of this object"
+        """
+        Gets a dict that describes the current state of this object
+        """
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
         del state['_lock']
@@ -127,29 +144,41 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     @abc.abstractmethod
     def _shouldIgnoreLine(self, line):
-        """Method called for each stdout output and should return True
-        if the given line should not be parsed using _makeMessageRecords
-        and _getUnitsToRebuild"""
+        """
+        Method called for each stdout output and should return True if
+        the given line should not be parsed using _makeMessageRecords
+        and _getUnitsToRebuild
+        """
 
     @abc.abstractmethod
     def _makeMessageRecords(self, message):
-        """Static method that converts a string into a dict that has
-        elements identifying its fields"""
+        """
+        Static method that converts a string into a dict that has
+        elements identifying its fields
+        """
 
     def _getUnitsToRebuild(self, line): # pragma: no cover
-        "Finds units that the builders is telling us to rebuild"
+        """
+        Finds units that the builders is telling us to rebuild
+        """
         raise NotImplementedError
 
     def _parseBuiltinLibraries(self):
-        "Discovers libraries that exist regardless before we do anything"
+        """
+        Discovers libraries that exist regardless before we do anything
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
     def getBuiltinLibraries(self):
-        "Return a list with the libraries this compiler currently knows"
+        """
+        Return a list with the libraries this compiler currently knows
+        """
 
     def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
-        "Runs a shell command and handles stdout catching"
+        """
+        Runs a shell command and handles stdout catching
+        """
         if env is not None: # pragma: no cover
             subp_env = env
         else:
@@ -166,33 +195,31 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-        # If we had an exception, print a warning to make easier to skim
-        # logs for errors
-        if exc is None:
-            log = self._logger.debug
-        else:
-            log = self._logger.warning
-
-        for line in stdout:
-            if line == '' or line.isspace(): # pragma: no cover
-                continue
-            log("> " + repr(line))
-
         return stdout
 
     @abc.abstractmethod
     def checkEnvironment(self):
-        """Sanity environment check that should be implemented by child
-        classes. Nothing is done with the return, the child class should
-        raise an exception by itself"""
+        """
+        Sanity environment check that should be implemented by child
+        classes.  Nothing is done with the return, the child class should
+        raise an exception by itself
+        """
 
     @abc.abstractmethod
     def _buildSource(self, source, flags=None):
-        """Callback called to actually build the source"""
+        """
+        Callback called to actually build the source
+        """
 
     def _buildAndParse(self, source, flags=None):
-        """Runs _buildSource method and parses the output to find message
-        records and units that should be rebuilt"""
+        """
+        Runs _buildSource method and parses the output to find message
+        records and units that should be rebuilt
+        """
+        for lib in source.getLibraries():
+            if lib not in self.getBuiltinLibraries():
+                self._createLibrary(lib)
+
         records = []
         rebuilds = []
         exc_lines = []
@@ -223,7 +250,9 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         return records, rebuilds
 
     def _logBuildResults(self, records, rebuilds): # pragma: no cover
-        "Logs records and rebuilds only for debugging purposes"
+        """
+        Logs records and rebuilds only for debugging purposes
+        """
         if not self._logger.isEnabledFor(logging.DEBUG):
             return
 
@@ -239,15 +268,21 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     @abc.abstractmethod
     def _createLibrary(self, source):
-        """Callback called to create a library"""
+        """
+        Callback called to create a library
+        """
 
     def _isFileTypeSupported(self, source):
-        "Checks if a given path is supported by this builder"
+        """
+        Checks if a given path is supported by this builder
+        """
         return source.filetype in self.file_types
 
     def build(self, source, forced=False, flags=None):
-        """Method that interfaces with parents and implements the
-        building chain"""
+        """
+        Method that interfaces with parents and implements the building
+        chain
+        """
 
         if not self._isFileTypeSupported(source):
             self._logger.fatal("Source '%s' with file type '%s' is not "
@@ -277,10 +312,6 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
             # Build a list of flags and pass it as tuple
             build_flags = source.flags + flags
             with self._lock:
-                for lib in source.getLibraries():
-                    if lib not in self.getBuiltinLibraries():
-                        self._createLibrary(lib)
-
                 records, rebuilds = \
                         self._buildAndParse(source, flags=tuple(build_flags))
 
