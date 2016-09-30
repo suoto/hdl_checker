@@ -69,7 +69,7 @@ class MSim(BaseBuilder):
 
         'single_build_flags' : {
             'vhdl' : ['-check_synthesis', '-lint', '-rangecheck',
-                      '-bindAtCompile', '-pedanticerrors'],
+                      '-pedanticerrors'],
             'verilog' : ['-lint', '-hazards', '-pedanticerrors'],
             'systemverilog' : ['-lint', '-hazards', '-pedanticerrors']},
 
