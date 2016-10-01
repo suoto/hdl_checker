@@ -30,8 +30,8 @@ class Fallback(BaseBuilder):
         super(Fallback, self).__init__(target_folder)
 
     # Since Fallback._buildSource returns nothing,
-    # Fallback._makeMessageRecords is never called
-    def _makeMessageRecords(self, _): # pragma: no cover
+    # Fallback._makeRecords is never called
+    def _makeRecords(self, _): # pragma: no cover
         return []
 
     def _shouldIgnoreLine(self, line): # pragma: no cover

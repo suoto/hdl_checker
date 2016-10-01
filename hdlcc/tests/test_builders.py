@@ -39,6 +39,12 @@ with such.A("builder object") as it:
         it.SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci',
                                  'test_support', 'test_builders')
 
+    @it.has_teardown
+    def teardown():
+        if it.BUILDER_NAME == 'xvhdl':
+            os.remove('.xvhdl.init')
+            os.remove('xvhdl.pb')
+
     with it.having('its binary executable'):
         @it.has_setup
         def setup():
@@ -76,7 +82,7 @@ with such.A("builder object") as it:
                 return
 
             _logger.info("Running '%s'", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: %s(21): near \"EOF\": (vcom-1576) expecting \';\'." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '21',
@@ -86,7 +92,7 @@ with such.A("builder object") as it:
                   'error_type'     : 'E',
                   'error_message'  : "near \"EOF\": expecting \';\'."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Warning: %s(23): (vcom-1320) Type of expression \"(OTHERS => '0')\" is ambiguous; using element type STD_LOGIC_VECTOR, not aggregate type register_type." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '23',
@@ -96,7 +102,7 @@ with such.A("builder object") as it:
                   'error_type'     : 'W',
                   'error_message'  : "Type of expression \"(OTHERS => '0')\" is ambiguous; using element type STD_LOGIC_VECTOR, not aggregate type register_type."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Warning: %s(39): (vcom-1514) Range choice direction (downto) does not determine aggregate index range direction (to)." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '39',
@@ -106,7 +112,7 @@ with such.A("builder object") as it:
                   'error_type'     : 'W',
                   'error_message'  : "Range choice direction (downto) does not determine aggregate index range direction (to)."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: (vcom-11) Could not find work.regfile_pkg."),
                 [{'checker'        : 'msim',
                   'line_number'    : None,
@@ -116,7 +122,7 @@ with such.A("builder object") as it:
                   'error_type'     : 'E',
                   'error_message'  : "Could not find work.regfile_pkg."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error (suppressible): %s(7): (vcom-1195) Cannot find expanded name \"work.regfile_pkg\"." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '7',
@@ -126,7 +132,7 @@ with such.A("builder object") as it:
                   'error_type'     : 'E',
                   'error_message'  : "Cannot find expanded name \"work.regfile_pkg\"."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: %s(7): Unknown expanded name." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '7',
@@ -146,7 +152,7 @@ with such.A("builder object") as it:
                 _logger.info("GHDL only test")
                 return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "%s:11:35: extra ';' at end of interface list" % path),
                 [{'checker'        : 'ghdl',
                   'line_number'    : '11',
@@ -167,7 +173,7 @@ with such.A("builder object") as it:
                 _logger.info("XVHDL only test")
                 return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path),
                 [{'checker'        : 'xvhdl',
                   'line_number'    : '12',
@@ -265,7 +271,7 @@ with such.A("builder object") as it:
 
             it.assertEquals(
                 [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
-                it.builder._getUnitsToRebuild(line))
+                it.builder._searchForRebuilds(line))
 
         @it.should("catch GHDL rebuilds by messages")
         @params(
@@ -278,7 +284,7 @@ with such.A("builder object") as it:
 
             it.assertEquals(
                 [{'unit_type': 'package', 'unit_name': 'leon3'}],
-                it.builder._getUnitsToRebuild(line))
+                it.builder._searchForRebuilds(line))
 
 it.createTests(globals())
 

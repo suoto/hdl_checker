@@ -67,7 +67,7 @@ class GHDL(BaseBuilder):
             return True
         return False
 
-    def _makeMessageRecords(self, line):
+    def _makeRecords(self, line):
         record = {
             'checker'       : self.builder_name,
             'line_number'   : None,
@@ -180,7 +180,7 @@ class GHDL(BaseBuilder):
         if not os.path.exists(workdir):
             os.mkdir(workdir)
 
-    def _getUnitsToRebuild(self, line):
+    def _searchForRebuilds(self, line):
         rebuilds = []
 
         for match in self._iter_rebuild_units(line):

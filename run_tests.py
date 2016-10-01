@@ -18,8 +18,8 @@
 # PYTHON_ARGCOMPLETE_OK
 from __future__ import print_function
 
-import os
 import sys
+import os
 import os.path as p
 import argparse
 import logging
@@ -81,7 +81,7 @@ def _clear():
 
 def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if type(stream) is str:
+    if isinstance(stream, str):
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
@@ -238,6 +238,7 @@ def main():
     _setupLogging(sys.stdout, args.log_level)
     logging.getLogger('nose2').setLevel(logging.FATAL)
     logging.getLogger('vunit').setLevel(logging.ERROR)
+    logging.getLogger('requests').setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
@@ -299,6 +300,9 @@ def main():
                 'coverage html'):
         print(cmd)
         print(os.popen(cmd).read())
+
+    if not passed:
+        _logger.warning("Some tests failed")
 
     return 0 if passed else 1
 

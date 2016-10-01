@@ -40,6 +40,15 @@ TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
 
 with such.A('config parser object') as it:
+    @it.has_teardown
+    def teardown():
+        for temp_path in ('.build', '.hdlcc'):
+            temp_path = p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                         temp_path))
+            if p.exists(temp_path):
+                shutil.rmtree(temp_path)
+
+
     @it.should("raise UnknownParameterError exception when an unknown "
                "parameter is found")
     def test():
@@ -70,14 +79,6 @@ with such.A('config parser object') as it:
 
         @it.has_teardown
         def teardown():
-            target_dir = p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                          '.build'))
-            if p.exists(target_dir):
-                _logger.info("Removing target dir '%s'", target_dir)
-                shutil.rmtree(target_dir)
-            else:
-                _logger.info("Target dir '%s' not found", target_dir)
-
             os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'))
             os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))
 

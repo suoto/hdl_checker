@@ -54,7 +54,7 @@ class XVHDL(BaseBuilder):
         super(XVHDL, self).__init__(target_folder)
         self._xvhdlini = '.xvhdl.init'
 
-    def _makeMessageRecords(self, line):
+    def _makeRecords(self, line):
         line_number = None
         column = None
         filename = None
@@ -131,7 +131,7 @@ class XVHDL(BaseBuilder):
         cmd += [source.filename]
         return self._subprocessRunner(cmd)
 
-    def _getUnitsToRebuild(self, line):
+    def _searchForRebuilds(self, line):
         rebuilds = []
 
         for match in self._iter_rebuild_units(line):

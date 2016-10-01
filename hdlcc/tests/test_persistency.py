@@ -33,7 +33,7 @@ import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
-CACHE_BUILD_SPEEDUP = 10
+CACHE_BUILD_SPEEDUP = 2
 
 VIM_HDL_EXAMPLES_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'vim-hdl-examples')
@@ -92,81 +92,92 @@ with such.A("hdlcc project with persistency") as it:
         if p.exists(target_dir):
             shutil.rmtree(target_dir)
 
-    #  with it.having('a performance requirement'):
+        if p.exists('xvhdl.pb'):
+            os.remove('xvhdl.pb')
+        if p.exists('.xvhdl.init'):
+            os.remove('.xvhdl.init')
 
-    #      @it.has_setup
-    #      def setup():
-    #          it.parse_times = []
-    #          it.build_times = []
+    with it.having('a performance requirement'):
 
-    #      @it.has_teardown
-    #      def teardown():
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-    #          utils.cleanProjectCache(it.PROJECT_FILE)
-    #          target_dir = hdlcc.config_parser.ConfigParser(it.PROJECT_FILE).getTargetDir()
-    #          if p.exists(target_dir):
-    #              shutil.rmtree(target_dir)
-    #          cache_fname = utils.getDefaultCachePath(it.PROJECT_FILE)
-    #          if p.exists(cache_fname):
-    #              os.remove(cache_fname)
+        @it.has_setup
+        def setup():
+            it.parse_times = []
+            it.build_times = []
 
-    #      @it.should('measure time taken to build a project without any cache')
-    #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-    #      def test_001():
-    #          for _ in range(5):
-    #              start = time.time()
-    #              project = StandaloneProjectBuilder(it.PROJECT_FILE)
-    #              project.clean()
-    #              parse_time = time.time() - start
-    #              project.buildByDependency()
-    #              project.waitForBuild()
-    #              build_time = time.time() - start - parse_time
+        @it.has_teardown
+        def teardown():
+            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
+            utils.cleanProjectCache(it.PROJECT_FILE)
+            target_dir = hdlcc.config_parser.ConfigParser(it.PROJECT_FILE).getTargetDir()
+            if p.exists(target_dir):
+                shutil.rmtree(target_dir)
+            cache_fname = utils.getDefaultCachePath(it.PROJECT_FILE)
+            if p.exists(cache_fname):
+                os.remove(cache_fname)
 
-    #              _logger.info("Parsing took %fs", parse_time)
-    #              _logger.info("Building took %fs", build_time)
+        @it.should('measure time taken to build a project without any cache')
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        def test_001():
+            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
+                _logger.info("Test requires a builder")
+                return
+            for _ in range(5):
+                start = time.time()
+                project = StandaloneProjectBuilder(it.PROJECT_FILE)
+                project.clean()
+                parse_time = time.time() - start
+                project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES_PATH,
+                                                 'another_library', 'foo.vhd'))
+                build_time = time.time() - start - parse_time
 
-    #              it.parse_times += [parse_time]
-    #              it.build_times += [build_time]
+                _logger.info("Parsing took %fs", parse_time)
+                _logger.info("Building took %fs", build_time)
 
-    #          _logger.info("Builds took between %f and %f",
-    #                       min(it.build_times), max(it.build_times))
+                it.parse_times += [parse_time]
+                it.build_times += [build_time]
 
-    #          # Remove spurious values we may have caught
-    #          it.build_times.remove(max(it.build_times))
-    #          it.build_times.remove(min(it.build_times))
+            _logger.info("Builds took between %f and %f",
+                         min(it.build_times), max(it.build_times))
 
-    #          # Maximum and minimum time shouldn't be too different
-    #          if max(it.build_times)/min(it.build_times) > 1.3:
-    #              _logger.warning(
-    #                  "Build times between %f and %f seems too different! "
-    #                  "Complete build times: %s",
-    #                  min(it.build_times), max(it.build_times), it.build_times)
+            # Remove spurious values we may have caught
+            it.build_times.remove(max(it.build_times))
+            it.build_times.remove(min(it.build_times))
 
-    #          project._saveCache()
+            # Maximum and minimum time shouldn't be too different
+            if max(it.build_times)/min(it.build_times) > 1.3:
+                _logger.warning(
+                    "Build times between %f and %f seems too different! "
+                    "Complete build times: %s",
+                    min(it.build_times), max(it.build_times), it.build_times)
 
-    #      @it.should('build at least %dx faster when recovering the info' %
-    #                 CACHE_BUILD_SPEEDUP)
-    #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-    #      def test_002():
-    #          _logger.info("Creating object")
-    #          start = time.time()
-    #          project = StandaloneProjectBuilder(it.PROJECT_FILE)
-    #          parse_time = time.time() - start
-    #          _logger.info("Building de facto")
-    #          project.buildByDependency()
-    #          project.waitForBuild()
-    #          _logger.info("Done")
-    #          build_time = time.time() - start - parse_time
+            project._saveCache()
 
-    #          _logger.info("Parsing took %fs", parse_time)
-    #          _logger.info("Building took %fs", build_time)
+        @it.should('build at least %dx faster when recovering the info' %
+                   CACHE_BUILD_SPEEDUP)
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        def test_002():
+            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
+                _logger.info("Test requires a builder")
+                return
+            _logger.info("Creating object")
+            start = time.time()
+            project = StandaloneProjectBuilder(it.PROJECT_FILE)
+            parse_time = time.time() - start
+            _logger.info("Building de facto")
+            project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES_PATH,
+                                             'another_library', 'foo.vhd'))
+            _logger.info("Done")
+            build_time = time.time() - start - parse_time
 
-    #          average = float(sum(it.build_times))/len(it.build_times)
+            _logger.info("Parsing took %fs", parse_time)
+            _logger.info("Building took %fs", build_time)
 
-    #          it.assertTrue(
-    #              build_time < average/CACHE_BUILD_SPEEDUP,
-    #              "Building with cache took %f (should be < %f)" % \
-    #                  (build_time, average/CACHE_BUILD_SPEEDUP))
+            average = float(sum(it.build_times))/len(it.build_times)
+
+            it.assertTrue(
+                build_time < average/CACHE_BUILD_SPEEDUP,
+                "Building with cache took %f (should be < %f)" % \
+                    (build_time, average/CACHE_BUILD_SPEEDUP))
 
     @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():

@@ -97,7 +97,7 @@ class MSim(BaseBuilder):
             self._vlib_args = []
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
-    def _makeMessageRecords(self, line):
+    def _makeRecords(self, line):
         records = []
 
         for match in self._stdout_message_scanner(line):
@@ -147,7 +147,7 @@ class MSim(BaseBuilder):
     def getBuiltinLibraries(self):
         return self._builtin_libraries
 
-    def _getUnitsToRebuild(self, line):
+    def _searchForRebuilds(self, line):
         rebuilds = []
         for match in self._iter_rebuild_units(line):
             mdict = match.groupdict()

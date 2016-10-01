@@ -19,6 +19,7 @@
 import abc
 import os.path as p
 import logging
+import re
 
 from hdlcc.utils import getFileType
 
@@ -206,4 +207,14 @@ class BaseSourceFile(object):
         Parses the source and returns a list of dictionaries that
         describe its dependencies
         """
+
+    def getMatchingLibrary(self, unit_type, unit_name):
+        if unit_type == 'package':
+            match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
+                              self.getSourceContent(), flags=re.S)
+            if match.groupdict()['library_name'] == 'work':
+                return self.library
+            else:
+                return match.groupdict()['library_name']
+        assert False, "%s, %s" % (unit_type, unit_name)
 

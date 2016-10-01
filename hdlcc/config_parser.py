@@ -106,7 +106,7 @@ class ConfigParser(object):
             self._parms['builder'] = 'fallback'
             self._parms['target_dir'] = '.fallback'
 
-            self._logger.warning("No configuration file given, using dummy")
+            self._logger.info("No configuration file given, using dummy")
 
         self._sources = {}
         self._timestamp = 0
@@ -143,7 +143,7 @@ class ConfigParser(object):
         import vunit
 
         self._logger.info("VUnit installation found")
-        logging.getLogger('vunit').setLevel(logging.WARNING)
+        logging.getLogger('vunit').setLevel(logging.ERROR)
 
         builder_class = getBuilderByName(self.getBuilder())
 

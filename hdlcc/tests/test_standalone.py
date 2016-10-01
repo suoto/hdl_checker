@@ -97,6 +97,11 @@ with such.A("hdlcc standalone tool") as it:
         if it.BUILDER_PATH:
             it.patch.stop()
 
+        if p.exists('xvhdl.pb'):
+            os.remove('xvhdl.pb')
+        if p.exists('.xvhdl.init'):
+            os.remove('.xvhdl.init')
+
     with it.having("a valid project file"):
 
         @it.has_setup

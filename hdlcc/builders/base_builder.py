@@ -146,18 +146,38 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
     def _shouldIgnoreLine(self, line):
         """
         Method called for each stdout output and should return True if
-        the given line should not be parsed using _makeMessageRecords
-        and _getUnitsToRebuild
+        the given line should not be parsed using _makeRecords
+        and _searchForRebuilds
         """
 
     @abc.abstractmethod
-    def _makeMessageRecords(self, message):
+    def _makeRecords(self, message):
         """
         Static method that converts a string into a dict that has
         elements identifying its fields
         """
 
-    def _getUnitsToRebuild(self, line): # pragma: no cover
+    def _getRebuilds(self, source, line):
+        try:
+            parse_results = self._searchForRebuilds(line)
+        except NotImplementedError:  # pragma: no cover
+            return []
+
+        rebuilds = []
+        for rebuild in parse_results:
+            if rebuild not in rebuilds:
+                if 'unit_type' in rebuild and 'unit_name' in rebuild:
+                    for dependency in source.getDependencies():
+                        if dependency['unit'] == rebuild['unit_name']:
+                            self._logger.info("Adding '%s'", rebuild)
+                            rebuilds += [rebuild]
+                            break
+                else:
+                    rebuilds += [rebuild]
+        return rebuilds
+
+
+    def _searchForRebuilds(self, line): # pragma: no cover
         """
         Finds units that the builders is telling us to rebuild
         """
@@ -222,35 +242,13 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
         records = []
         rebuilds = []
-        exc_lines = []
         for line in self._buildSource(source, flags):
             if self._shouldIgnoreLine(line):
                 continue
-            for record in self._makeMessageRecords(line):
-                if record['error_type'] not in ('W', 'E'): # pragma: no cover
-                    exc_lines += [line]
 
-                if record not in records:
-                    records += [record]
-
-            try:
-                for rebuild in self._getUnitsToRebuild(line):
-                    if rebuild not in rebuilds:
-                        if 'unit_type' in rebuild and 'unit_name' in rebuild:
-                            for dependency in source.getDependencies():
-                                if dependency['unit'] == rebuild['unit_name']:
-                                    self._logger.fatal("Adding '%s'", rebuild)
-                                    rebuilds += [rebuild]
-                                    break
-                        else:
-                            rebuilds += [rebuild]
-
-            except NotImplementedError: # pragma: no cover
-                pass
-
-        if exc_lines: # pragma: no cover
-            for exc_line in exc_lines:
-                self._logger.error(exc_line)
+            records += [x for x in self._makeRecords(line) if x not in records]
+            rebuilds += [x for x in self._getRebuilds(source, line) if x not in
+                         rebuilds]
 
         self._logBuildResults(records, rebuilds)
 

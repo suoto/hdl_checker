@@ -23,12 +23,13 @@ import os
 import os.path as p
 import subprocess as subp
 import time
-import mock
-from multiprocessing import Queue, Process
 import shutil
 import requests
 
+from multiprocessing import Queue, Process
 from nose2.tools import such
+
+import mock
 
 import hdlcc
 import hdlcc.utils as utils
@@ -61,6 +62,12 @@ with such.A("hdlcc server") as it:
         build_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
         if p.exists(build_folder):
             shutil.rmtree(build_folder)
+
+        if p.exists('xvhdl.pb'):
+            os.remove('xvhdl.pb')
+        if p.exists('.xvhdl.init'):
+            os.remove('.xvhdl.init')
+
 
     def waitForServer():
         # Wait until the server is up and replying
@@ -309,10 +316,14 @@ with such.A("hdlcc server") as it:
             step_01_msgs = step_01_check_file_builds_ok()
             if step_01_msgs:
                 _logger.info("Step 01 messages:")
-                for msg in step_01_msgs:
-                    _logger.info(msg)
             else:
                 _logger.info("Step 01 generated no messages")
+
+            for msg in step_01_msgs:
+                _logger.info(msg)
+                it.assertNotEquals(
+                    msg.get('error_type', None), 'E',
+                    "No errors should be found at this point")
 
             _logger.info("Step 02")
             step_02_erase_target_folder()

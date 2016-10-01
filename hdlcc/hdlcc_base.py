@@ -343,8 +343,8 @@ class HdlCodeCheckerBase(object):
         except KeyError:
             flags = []
 
-        self._logger.debug("Building '%s', batch_mode = %s",
-                           str(path), batch_mode)
+        self._logger.info("Building '%s', batch_mode = %s",
+                          str(path), batch_mode)
 
         build_sequence = []
         self._getBuildSequence(source, build_sequence=build_sequence)
@@ -352,19 +352,29 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
 
-        #  records = []
         for _source in build_sequence:
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
-            _, rebuilds = self.builder.build(_source, forced=False,
-                                             flags=_flags)
-            #  records += _records
-            self._handleRebuilds(rebuilds, _source)
 
-        source_records, rebuilds = self.builder.build(source, forced=True,
-                                                      flags=flags)
+            # Limit the amount of recursive calls to rebuilds to avoid
+            # circular cases
+            for _ in range(10):
+                _, rebuilds = self.builder.build(_source, forced=False,
+                                                 flags=_flags)
+                if rebuilds:
+                    self._handleRebuilds(rebuilds, _source)
+                else:
+                    break
 
-        self._handleRebuilds(rebuilds, source)
+        # Limit the amount of recursive calls to rebuilds to avoid
+        # circular cases
+        for _ in range(10):
+            source_records, rebuilds = self.builder.build(source, forced=True,
+                                                          flags=flags)
+            if rebuilds:
+                self._handleRebuilds(rebuilds, source)
+            else:
+                break
 
         return self._sortBuildMessages(source_records + remarks)
         #  return self._sortBuildMessages(records + source_records + remarks)
@@ -379,8 +389,16 @@ class HdlCodeCheckerBase(object):
                 self._getBuilderMessages(rebuild['rebuild_path'],
                                          batch_mode=True)
             else:
-                rebuild_sources = self._config.findSourcesByDesignUnit(
-                    rebuild['unit_name'], rebuild['library_name'])
+                if  'unit_name' in rebuild and 'library_name' in rebuild:
+                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                        rebuild['unit_name'], rebuild['library_name'])
+                elif 'unit_name' in rebuild and 'unit_type' in rebuild:
+                    library = source.getMatchingLibrary(
+                        rebuild['unit_type'], rebuild['unit_name'])
+                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                        rebuild['unit_name'], library)
+                    #  assert False, ', '.join([x.filename for x in rebuild_sources])
+
                 for rebuild_source in rebuild_sources:
                     self._getBuilderMessages(rebuild_source.abspath,
                                              batch_mode=True)

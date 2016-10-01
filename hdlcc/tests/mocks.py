@@ -78,7 +78,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
 
         super(MSimMock, self).__init__(target_folder)
 
-    def _makeMessageRecords(self, _): # pragma: no cover
+    def _makeRecords(self, _): # pragma: no cover
         return []
 
     def _shouldIgnoreLine(self, line): # pragma: no cover

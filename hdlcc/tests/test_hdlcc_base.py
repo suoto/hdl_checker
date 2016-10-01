@@ -519,16 +519,12 @@ with such.A("hdlcc project") as it:
                 with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                     builder(it.DUMMY_PROJECT_FILE)
 
-            it.original_env = os.environ.copy()
-
             # Add the builder path to the environment so we can call it
             if it.BUILDER_PATH:
                 it.patch = mock.patch.dict(
                     'os.environ',
                     {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
                 it.patch.start()
-
-            it.assertNotEquals(os.environ['PATH'], it.original_env['PATH'])
 
             try:
                 builder(it.DUMMY_PROJECT_FILE)
@@ -819,9 +815,11 @@ with such.A("hdlcc project") as it:
         #      writeListToFile(very_common_pkg, code)
 
         @it.should("rebuild sources when needed for different libraries")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
         def test011():
+            if not it.BUILDER_NAME:
+                _logger.info("Test requires a builder")
+                return
+
             # Count how many messages each source has
             source_msgs = {}
 
@@ -832,6 +830,8 @@ with such.A("hdlcc project") as it:
                 _logger.info("Getting messages for '%s'", filename)
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
+                it.assertNotIn(
+                    'E', [x['error_type'] for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -846,81 +846,29 @@ with such.A("hdlcc project") as it:
                             ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
                             code[22:])
 
-            # The number of messages on all sources should not change
-            it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
+            try:
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
-            for filename in (
-                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
+                for filename in (
+                        p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
+                        p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
 
-                if source_msgs[filename]:
-                    _logger.info("Source %s had the following messages:\n%s",
-                                 filename,
-                                 "\n".join([str(x) for x in
-                                            source_msgs[filename]]))
-                else:
-                    _logger.info("Source %s has no previous messages",
-                                 filename)
+                    if source_msgs[filename]:
+                        _logger.info("Source %s had the following messages:\n%s",
+                                     filename,
+                                     "\n".join([str(x) for x in
+                                                source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
 
-                it.assertEquals(source_msgs[filename],
-                                it.project.getMessagesByPath(filename))
-
-            _logger.info("Restoring previous content")
-            writeListToFile(very_common_pkg, code)
-
-    #  with it.having('vim-hdl-examples as reference and a valid project file'):
-
-    #      @it.has_setup
-    #      @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-    #      def setup():
-    #          if it.BUILDER_NAME is None:
-    #              return
-    #          it.original_env = os.environ.copy()
-
-    #          addToPath(it.BUILDER_PATH)
-
-    #          it.vim_hdl_examples_path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
-    #          it.project_file = p.join(it.vim_hdl_examples_path, it.BUILDER_NAME + '.prj')
-    #          it.project = StandaloneProjectBuilder(it.project_file)
-    #          it.project.buildByDependency()
-    #          it.project.waitForBuild()
-    #          it.assertNotEquals(it.project.builder.builder_name, 'fallback')
-
-    #      @it.has_teardown
-    #      def teardown():
-    #          if it.BUILDER_NAME is None:
-    #              return
-    #          #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.project_file)
-    #          cleanProjectCache(it.PROJECT_FILE)
-    #          removeFromPath(it.BUILDER_PATH)
-
-    #          target_dir = it.project._config.getTargetDir()
-
-    #          if p.exists(target_dir):
-    #              shutil.rmtree(target_dir)
-    #          if p.exists('modelsim.ini'):
-    #              _logger.warning("Modelsim ini found at %s",
-    #                              p.abspath('modelsim.ini'))
-    #              os.remove('modelsim.ini')
-    #          del it.project
-
-
-    #      @it.should("rebuild sources when needed")
-    #      @unittest.skipUnless(it.PROJECT_FILE is not None,
-    #                           "Requires a valid project file")
-    #      def test001():
-    #          clk_en_generator = p.join(it.vim_hdl_examples_path,
-    #                                    "basic_library", "clk_en_generator.vhd")
-
-    #          very_common_pkg = p.join(it.vim_hdl_examples_path,
-    #                                   "basic_library", "very_common_pkg.vhd")
-
-    #          for path in (clk_en_generator,
-    #                       very_common_pkg,
-    #                       clk_en_generator):
-    #              _logger.info("Building '%s'", path)
-    #              records = it.project.getMessagesByPath(path)
-    #              it.assertEqual(records, [])
+                    #  XXX: Include this again!!
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
 
 it.createTests(globals())
 

@@ -61,7 +61,7 @@ install:
 
   # - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\test_runner.py
   #     -vv -B --log-capture %EXTRA_ARGS%"
-  - "python run_tests.py --%BUILDER_NAME% -v --log-level DEBUG"
+  - "python run_tests.py --%BUILDER_NAME% -v"
   - coverage combine
   - coverage report
   - codecov
