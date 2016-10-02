@@ -220,7 +220,8 @@ def _getDefaultTestByEnv(env):
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',
-                'hdlcc.tests.test_misc')
+                'hdlcc.tests.test_misc',
+                'hdlcc.tests.test_static_check')
     elif env == 'fallback':
         return ('hdlcc.tests.test_builders',
                 'hdlcc.tests.test_hdlcc_base',

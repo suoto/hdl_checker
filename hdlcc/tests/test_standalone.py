@@ -91,8 +91,8 @@ with such.A("hdlcc standalone tool") as it:
             if p.exists(p.join(p.dirname(it.PROJECT_FILE), '.build')):
                 shutil.rmtree(p.join(p.dirname(it.PROJECT_FILE), '.build'))
 
-        if p.exists(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build")):
-            shutil.rmtree(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build"))
+        if p.exists(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build')):
+            shutil.rmtree(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build'))
 
         if it.BUILDER_PATH:
             it.patch.stop()
@@ -114,7 +114,7 @@ with such.A("hdlcc standalone tool") as it:
 
         def cleanUp():
             # Ensure there is no leftover files from previous runs
-            path = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/.build")
+            path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build')
             if p.exists(path):
                 shutil.rmtree(path)
 
@@ -123,34 +123,31 @@ with such.A("hdlcc standalone tool") as it:
 
             @it.should("print the tool's help")
             def test():
-                cmd = ["coverage", "run",
-                       HDLCC_LOCATION, "-h"]
+                cmd = ['coverage', 'run',
+                       HDLCC_LOCATION, '-h']
                 shell(cmd)
-
-            #  @it.should("build a project")
-            #  def test():
-            #      cmd = ["coverage", "run",
-            #             HDLCC_LOCATION, it.PROJECT_FILE,
-            #             "--build"]
-
-            #      shell(cmd)
 
             @it.should("run debug arguments")
             @params(
-                ("--debug-print-sources", ),
-                ("--debug-print-compile-order", ),
+                ('--debug-print-sources', ),
 
-                ("-vvv", "-s",
-                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
+                ('--debug-print-compile-order', ),
 
-                ("--debug-parse-source-file", "-s",
-                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/another_library/foo.vhd")),
+                ('-vvv', '-s',
+                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
+                        'another_library', 'foo.vhd')),
 
-                ("--debug-parse-source-file", "-s",
-                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/basic_library/clk_en_generator.vhd")),
+                ('--debug-parse-source-file', '-s',
+                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
+                        'another_library', 'foo.vhd')),
 
-                ("--debug-run-static-check", "-s",
-                 p.join(TEST_SUPPORT_PATH, "vim-hdl-examples/basic_library/clock_divider.vhd")),
+                ('--debug-parse-source-file', '-s',
+                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', 'basic_library',
+                        'clk_en_generator.vhd')),
+
+                ('--debug-run-static-check', '-s',
+                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
+                        'another_library', 'foo.vhd')),
                 )
 
             def test(case, *args):
@@ -171,28 +168,28 @@ with such.A("hdlcc standalone tool") as it:
                 if not it.PROJECT_FILE:
                     _logger.info("Test requires a project file")
                     return
-                cmd = ["coverage", "run",
+                cmd = ['coverage', 'run',
                        HDLCC_LOCATION, it.PROJECT_FILE,
-                       "--debug-profiling", "output.stats"]
+                       '--debug-profiling', 'output.stats']
 
-                if p.exists("output.stats"):
-                    os.remove("output.stats")
+                if p.exists('output.stats'):
+                    os.remove('output.stats')
 
                 shell(cmd)
 
-                it.assertTrue(p.exists("output.stats"))
-                os.remove("output.stats")
+                it.assertTrue(p.exists('output.stats'))
+                os.remove('output.stats')
 
             @it.should("control debugging level")
             def test():
                 if not it.PROJECT_FILE:
                     _logger.info("Test requires a project file")
                     return
-                cmd = ["coverage", "run",
+                cmd = ['coverage', 'run',
                        HDLCC_LOCATION, it.PROJECT_FILE,
-                       "--clean", ]
+                       '--clean', ]
 
-                it.assertEqual(shell(cmd), [""])
+                it.assertEqual(shell(cmd), [''])
 
                 previous = None
                 for level in range(1, 5):

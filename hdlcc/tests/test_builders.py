@@ -217,7 +217,7 @@ with such.A("builder object") as it:
         @it.should('catch a known error on a VHDL source')
         def test():
             if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
-                _logger.warning("Test requires a builder")
+                _logger.info("Test requires a builder")
                 return
 
             source = VhdlParser(p.join(it.SOURCES_PATH,
@@ -265,7 +265,7 @@ with such.A("builder object") as it:
             "foo_lib.foo_lib_pkg has changed.",)
         def test(case, line):
             if it.BUILDER_NAME != 'msim':
-                _logger.warning("ModelSim test only")
+                _logger.info("ModelSim test only")
                 return
             _logger.info("Running %s", case)
 
@@ -278,7 +278,7 @@ with such.A("builder object") as it:
             "somefile.vhd:12:13: package \"leon3\" is obsoleted by package \"amba\"")
         def test(case, line):
             if it.BUILDER_NAME != 'ghdl':
-                _logger.warning("GHDL test only")
+                _logger.info("GHDL test only")
                 return
             _logger.info("Running %s", case)
 

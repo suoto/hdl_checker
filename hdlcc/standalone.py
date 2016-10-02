@@ -63,7 +63,7 @@ def _fileExtentensionCompleter(extension): # pragma: no cover
 def parseArguments():
     "Argument parser for standalone hdlcc"
 
-    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):
+    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):  # pragma: no cover
         print(hdlcc.__version__)
         sys.exit(0)
 
