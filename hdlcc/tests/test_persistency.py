@@ -35,7 +35,7 @@ _logger = logging.getLogger(__name__)
 
 CACHE_BUILD_SPEEDUP = 2
 
-VIM_HDL_EXAMPLES_PATH = p.join(
+VIM_HDL_EXAMPLES = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'vim-hdl-examples')
 
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
@@ -66,7 +66,7 @@ with such.A("hdlcc project with persistency") as it:
         if not it.BUILDER_NAME:
             return
 
-        it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+        it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
 
         #  StandaloneProjectBuilder.cleanProjectCache(it.PROJECT_FILE)
         utils.cleanProjectCache(it.PROJECT_FILE)
@@ -106,6 +106,8 @@ with such.A("hdlcc project with persistency") as it:
 
         @it.has_teardown
         def teardown():
+            if not it.BUILDER_NAME:
+                return
             #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
             utils.cleanProjectCache(it.PROJECT_FILE)
             target_dir = hdlcc.config_parser.ConfigParser(it.PROJECT_FILE).getTargetDir()
@@ -126,7 +128,7 @@ with such.A("hdlcc project with persistency") as it:
                 project = StandaloneProjectBuilder(it.PROJECT_FILE)
                 project.clean()
                 parse_time = time.time() - start
-                project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES_PATH,
+                project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES,
                                                  'another_library', 'foo.vhd'))
                 build_time = time.time() - start - parse_time
 
@@ -150,7 +152,7 @@ with such.A("hdlcc project with persistency") as it:
                     "Complete build times: %s",
                     min(it.build_times), max(it.build_times), it.build_times)
 
-            project._saveCache()
+            #  project._saveCache()
 
         @it.should('build at least %dx faster when recovering the info' %
                    CACHE_BUILD_SPEEDUP)
@@ -164,7 +166,7 @@ with such.A("hdlcc project with persistency") as it:
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
             parse_time = time.time() - start
             _logger.info("Building de facto")
-            project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES_PATH,
+            project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES,
                                              'another_library', 'foo.vhd'))
             _logger.info("Done")
             build_time = time.time() - start - parse_time
@@ -182,8 +184,7 @@ with such.A("hdlcc project with persistency") as it:
     @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
-        it.project.waitForBuild()
-        it.project._saveCache()
+        #  it.project._saveCache()
 
         messages = []
         failed = False
@@ -202,7 +203,6 @@ with such.A("hdlcc project with persistency") as it:
         del it.project
 
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
-        it.project.waitForBuild()
 
         messages = []
         passed = False
@@ -262,8 +262,7 @@ with such.A("hdlcc project with persistency") as it:
             cache_fname = p.join(target_dir, '.hdlcc.cache')
             open(cache_fname, 'w').write("hello")
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
-            project.waitForBuild()
-            project._saveCache()
+            #  project._saveCache()
 
             messages = []
             passed = False
@@ -336,9 +335,7 @@ with such.A("hdlcc project with persistency") as it:
 
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
             time.sleep(1)
-            project.waitForBuild()
-            time.sleep(1)
-            project._saveCache()
+            #  project._saveCache()
             time.sleep(1)
 
             _logger.info("Searching UI messages")

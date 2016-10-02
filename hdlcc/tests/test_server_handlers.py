@@ -35,7 +35,7 @@ import hdlcc
 import hdlcc.utils as utils
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
-VIM_HDL_EXAMPLES_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
+VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
@@ -53,13 +53,13 @@ with such.A("hdlcc server") as it:
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
         if it.BUILDER_NAME:
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
 
     @it.has_teardown
     def teardown():
-        build_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
+        build_folder = p.join(VIM_HDL_EXAMPLES, '.build')
         if p.exists(build_folder):
             shutil.rmtree(build_folder)
 
@@ -200,7 +200,7 @@ with such.A("hdlcc server") as it:
             data = {
                 'project_file' : it.PROJECT_FILE,
                 'path'         : p.join(
-                    VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
+                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
 
             ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
                                         data=data)
@@ -258,7 +258,7 @@ with such.A("hdlcc server") as it:
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
-                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
+                        VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
 
                 ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
                                          data=data)
@@ -269,7 +269,7 @@ with such.A("hdlcc server") as it:
                 return reply.json()['messages'] + ui_reply.json()['ui_messages']
 
             def step_02_erase_target_folder():
-                target_folder = p.join(VIM_HDL_EXAMPLES_PATH, '.build')
+                target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
                 it.assertTrue(
                     p.exists(target_folder),
                     "Target folder '%s' doesn't exists" % target_folder)
@@ -297,7 +297,7 @@ with such.A("hdlcc server") as it:
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
-                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
+                        VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
                 waitForServer()
                 waitUntilBuildFinishes(data)
 
@@ -351,7 +351,7 @@ with such.A("hdlcc server") as it:
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
-                        VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')}
+                        VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
                 _logger.info("Waiting for any previous process to finish")
                 waitUntilBuildFinishes(data)
 
@@ -371,7 +371,7 @@ with such.A("hdlcc server") as it:
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
-                        VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd')}
+                        VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
                 waitUntilBuildFinishes(data)
 
             def step_03_check_messages_are_the_same(msgs):

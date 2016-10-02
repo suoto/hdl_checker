@@ -184,8 +184,6 @@ class GHDL(BaseBuilder):
         rebuilds = []
 
         for match in self._iter_rebuild_units(line):
-            if not match:
-                continue
             mdict = match.groupdict()
             # When compilers reports units out of date, they do this
             # by either

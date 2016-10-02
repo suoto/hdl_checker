@@ -29,7 +29,7 @@ from nose2.tools.params import params
 import mock
 
 import hdlcc
-from hdlcc.utils import writeListToFile, cleanProjectCache, onCI
+from hdlcc.utils import writeListToFile, cleanProjectCache, onCI, samefile
 
 from hdlcc.tests.mocks import (StandaloneProjectBuilder,
                                MSimMock,
@@ -41,7 +41,7 @@ from hdlcc.parsers import VerilogParser, VhdlParser
 _logger = logging.getLogger(__name__)
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
-VIM_HDL_EXAMPLES_PATH = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
+VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
 
@@ -52,7 +52,7 @@ with such.A("hdlcc project") as it:
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
         if it.BUILDER_NAME:
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
 
@@ -64,8 +64,17 @@ with such.A("hdlcc project") as it:
     @it.has_teardown
     def teardown():
         cleanProjectCache(it.PROJECT_FILE)
-        if p.exists(it.DUMMY_PROJECT_FILE):
-            shutil.rmtree(it.DUMMY_PROJECT_FILE)
+
+        _logger.debug("Cleaning up test files")
+        for path in (it.DUMMY_PROJECT_FILE, '.fallback', '.hdlcc',
+                     'myproject.prj', 'some_file.vhd', 'xvhdl.pb',
+                     '.xvhdl.init'):
+            if p.exists(path):
+                _logger.debug("Removing %s", path)
+                if p.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
 
     @it.should("get the path to the cache filename with no config file")
     def test():
@@ -162,7 +171,7 @@ with such.A("hdlcc project") as it:
 
     @it.should("provide a VHDL source code object given its path")
     def test():
-        path = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+        path = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                       'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
         source, remarks = project._getSourceByPath(path)
@@ -179,8 +188,8 @@ with such.A("hdlcc project") as it:
                                  p.abspath(path)}])
 
     @it.should("provide a Verilog source code object given a Verilog path")
-    @params(p.join(VIM_HDL_EXAMPLES_PATH, 'verilog', 'parity.v'),
-            p.join(VIM_HDL_EXAMPLES_PATH, 'verilog', 'parity.sv'))
+    @params(p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.v'),
+            p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.sv'))
     def test(_, path):
         project = StandaloneProjectBuilder()
         source, remarks = project._getSourceByPath(path)
@@ -542,291 +551,199 @@ with such.A("hdlcc project") as it:
             if it.BUILDER_PATH:
                 it.patch.stop()
 
-            target_dir = it.project._config.getTargetDir()
-            if p.exists(target_dir):
-                shutil.rmtree(target_dir)
-            if p.exists('modelsim.ini'):
-                _logger.warning("Modelsim ini found at %s",
-                                p.abspath('modelsim.ini'))
-                os.remove('modelsim.ini')
+            if p.exists(it.project._config.getTargetDir()):
+                shutil.rmtree(it.project._config.getTargetDir())
             del it.project
 
-        #  @it.should("build project by dependency in background")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test001():
-        #      _logger.info("Checking if msg queue is empty")
-        #      it.assertTrue(it.project._msg_queue.empty())
-        #      it.project.buildByDependency()
-        #      it.assertFalse(it.project.hasFinishedBuilding())
+        @it.should("get messages by path")
+        def test005():
+            filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+                              'foo.vhd')
 
-        #  @it.should("notify if a build is already running")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test002():
-        #      it.project.buildByDependency()
-        #      while it.project._msg_queue.empty():
-        #          time.sleep(0.1)
-        #      messages = []
-        #      while not it.project._msg_queue.empty():
-        #          messages.append(it.project._msg_queue.get())
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      try:
-        #          it.assertIn(('info', 'Build thread is already running'),
-        #                      messages)
-        #      except:
-        #          it.project.waitForBuild()
-        #          raise
+            records = it.project.getMessagesByPath(filename)
 
-        #  @it.should("warn when trying to build a source before the build "
-        #             'thread completes')
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test003():
-        #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
-        #                        'foo.vhd')
+            it.assertIn(
+                {'error_subtype' : 'Style',
+                 'line_number'   : 43,
+                 'checker'       : 'HDL Code Checker/static',
+                 'error_message' : "signal 'neat_signal' is never used",
+                 'column'        : 12,
+                 'error_type'    : 'W',
+                 'error_number'  : '0',
+                 'filename'      : None},
+                records)
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      it.project.getMessagesByPath(filename)
+        @it.should("get updated messages")
+        def test006():
+            filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+                              'foo.vhd')
 
-        #      _logger.info("Waiting for any message to arrive on message queue")
-        #      for _ in range(50):
-        #          if it.project._msg_queue.empty():
-        #              break
-        #          time.sleep(0.1)
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      messages = []
-        #      while not it.project._msg_queue.empty():
-        #          message = it.project._msg_queue.get()
-        #          _logger.info("Appending message '%s'", message)
-        #          messages.append(message)
+            code = open(filename, 'r').read().split('\n')
 
-        #      try:
-        #          it.assertIn(('warning', "Project hasn't finished building, "
-        #                                  "try again after it finishes."),
-        #                      messages)
-        #          _logger.info("OK, the mesage was found")
-        #      finally:
-        #          _logger.warning("Waiting until the project finishes building")
-        #          it.project.waitForBuild()
+            code[28] = '-- ' + code[28]
 
-        #  @it.should("wait until build has finished")
-        #  def test004():
-        #      it.project.waitForBuild()
+            writeListToFile(filename, code)
 
-        #  @it.should("get messages by path")
-        #  def test005():
-        #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
-        #                        'foo.vhd')
+            records = it.project.getMessagesByPath(filename)
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            try:
+                it.assertNotIn(
+                    {'error_subtype' : 'Style',
+                     'line_number'   : 29,
+                     'checker'       : 'HDL Code Checker/static',
+                     'error_message' : "constant 'ADDR_WIDTH' is never used",
+                     'column'        : 14,
+                     'error_type'    : 'W',
+                     'error_number'  : '0',
+                     'filename'      : None},
+                    records)
+            finally:
+                # Remove the comment we added
+                code[28] = code[28][3:]
+                writeListToFile(filename, code)
 
-        #      records = it.project.getMessagesByPath(filename)
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      it.assertIn(
-        #          {'error_subtype' : 'Style',
-        #           'line_number'   : 43,
-        #           'checker'       : 'HDL Code Checker/static',
-        #           'error_message' : "signal 'neat_signal' is never used",
-        #           'column'        : 12,
-        #           'error_type'    : 'W',
-        #           'error_number'  : '0',
-        #           'filename'      : None},
-        #          records)
+        @it.should("get messages by path of a different source")
+        def test007():
+            if not it.PROJECT_FILE:
+                _logger.info("Requires a valid project file")
+                return
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            filename = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                              'clock_divider.vhd')
 
-        #  @it.should("get updated messages")
-        #  def test006():
-        #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'another_library',
-        #                        'foo.vhd')
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            records = []
+            for record in it.project.getMessagesByPath(filename):
+                it.assertTrue(samefile(filename, record.pop('filename')))
+                records += [record]
 
-        #      code = open(filename, 'r').read().split('\n')
+            if it.BUILDER_NAME == 'msim':
+                expected_records = [{
+                    'checker': 'msim',
+                    'column': None,
+                    'error_message': "Synthesis Warning: Reset signal 'reset' "
+                                     "is not in the sensitivity list of process "
+                                     "'line__58'.",
+                    'error_number': None,
+                    'error_type': 'W',
+                    'line_number': '58'}]
+            elif it.BUILDER_NAME == 'ghdl':
+                expected_records = []
+            elif it.BUILDER_NAME == 'xvhdl':
+                expected_records = []
 
-        #      code[28] = '-- ' + code[28]
+            it.assertEquals(records, expected_records)
 
-        #      writeListToFile(filename, code)
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      records = it.project.getMessagesByPath(filename)
+        @it.should("get messages from a source outside the project file")
+        def test009():
+            if not it.PROJECT_FILE:
+                _logger.info("Requires a valid project file")
+                return
+            filename = 'some_file.vhd'
+            writeListToFile(filename, ['library some_lib;'])
 
-        #      try:
-        #          it.assertNotIn(
-        #              {'error_subtype' : 'Style',
-        #               'line_number'   : 29,
-        #               'checker'       : 'HDL Code Checker/static',
-        #               'error_message' : "constant 'ADDR_WIDTH' is never used",
-        #               'column'        : 14,
-        #               'error_type'    : 'W',
-        #               'error_number'  : '0',
-        #               'filename'      : None},
-        #              records)
-        #      finally:
-        #          # Remove the comment we added
-        #          code[28] = code[28][3:]
-        #          writeListToFile(filename, code)
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            records = it.project.getMessagesByPath(filename)
 
-        #  @it.should("get messages by path of a different source")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test007():
-        #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
-        #                        'clock_divider.vhd')
+            _logger.info("Records found:")
+            for record in records:
+                _logger.info(record)
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            it.assertIn(
+                {'checker'        : 'hdlcc',
+                 'line_number'    : '',
+                 'column'         : '',
+                 'filename'       : '',
+                 'error_number'   : '',
+                 'error_type'     : 'W',
+                 'error_message'  : 'Path "%s" not found in '
+                                    'project file' % p.abspath(filename)},
+                records)
 
-        #      records = []
-        #      for record in it.project.getMessagesByPath(filename):
-        #          it.assertTrue(samefile(filename, record.pop('filename')))
-        #          records += [record]
+            # The builder should find other issues as well...
+            it.assertTrue(len(records) > 1,
+                          "It was expected that the builder added some "
+                          "message here indicating an error")
 
-        #      if it.BUILDER_NAME == 'msim':
-        #          expected_records = [{
-        #              'checker': 'msim',
-        #              'column': None,
-        #              'error_message': "Synthesis Warning: Reset signal 'reset' "
-        #                               "is not in the sensitivity list of process "
-        #                               "'line__45'.",
-        #              'error_number': None,
-        #              'error_type': 'W',
-        #              'line_number': '45'}]
-        #      elif it.BUILDER_NAME == 'ghdl':
-        #          expected_records = []
-        #      elif it.BUILDER_NAME == 'xvhdl':
-        #          expected_records = []
+            it.assertTrue(it.project._msg_queue.empty())
 
-        #      it.assertEquals(records, expected_records)
+        @it.should("rebuild sources when needed within the same library")
+        def test010():
+            if not it.PROJECT_FILE:
+                _logger.info("Requires a valid project file")
+                return
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+            filenames = (
+                p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
+                p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clk_en_generator.vhd'))
 
-        #  @it.should("get updated messages of a different source")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test008():
-        #      filename = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
-        #                        'clock_divider.vhd')
-        #      it.assertTrue(it.project._msg_queue.empty())
+            # Count how many messages each source has
+            source_msgs = {}
 
-        #      code = open(filename, 'r').read().split('\n')
+            for filename in filenames:
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
 
-        #      _logger.info("Commenting line 28 should yield an error")
-        #      _logger.info(repr(code[28]))
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                                     'very_common_pkg.vhd')
 
-        #      code[28] = '-- ' + code[28]
+            code = open(very_common_pkg, 'r').read().split('\n')
 
-        #      writeListToFile(filename, code)
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant TESTING : integer := 4;"] + \
+                            code[22:])
 
-        #      records = it.project.getMessagesByPath(filename)
+            try:
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
-        #      try:
-        #          it.assertNotEquals(records, [])
-        #      finally:
-        #          # Remove the comment we added
-        #          code[28] = code[28][3:]
-        #          writeListToFile(filename, code)
+                for filename in filenames:
+                    if source_msgs[filename]:
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
 
-        #      it.assertTrue(it.project._msg_queue.empty())
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
 
-        #  @it.should("get messages from a source outside the project file")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test009():
-        #      filename = 'some_file.vhd'
-        #      writeListToFile(filename, ['library some_lib;'])
-
-        #      it.assertTrue(it.project._msg_queue.empty())
-
-        #      records = it.project.getMessagesByPath(filename)
-
-        #      _logger.info("Records found:")
-        #      for record in records:
-        #          _logger.info(record)
-
-        #      it.assertIn(
-        #          {'checker'        : 'hdlcc',
-        #           'line_number'    : '',
-        #           'column'         : '',
-        #           'filename'       : '',
-        #           'error_number'   : '',
-        #           'error_type'     : 'W',
-        #           'error_message'  : 'Path "%s" not found in '
-        #                              'project file' % p.abspath(filename)},
-        #          records)
-
-        #      # The builder should find other issues as well...
-        #      it.assertTrue(len(records) > 1,
-        #                    "It was expected that the builder added some "
-        #                    "message here indicating an error")
-
-        #      it.assertTrue(it.project._msg_queue.empty())
-
-        #  @it.should("rebuild sources when needed within the same library")
-        #  @unittest.skipUnless(it.PROJECT_FILE is not None,
-        #                       "Requires a valid project file")
-        #  def test010():
-        #      # Count how many messages each source has
-        #      source_msgs = {}
-
-        #      for filename in (
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clk_en_generator.vhd')):
-
-        #          _logger.info("Getting messages for '%s'", filename)
-        #          source_msgs[filename] = \
-        #              it.project.getMessagesByPath(filename)
-
-        #      _logger.info("Changing very_common_pkg to force rebuilding "
-        #                   "synchronizer and another one I don't recall "
-        #                   "right now")
-        #      very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
-        #                               'very_common_pkg.vhd')
-
-        #      code = open(very_common_pkg, 'r').read().split('\n')
-
-        #      writeListToFile(very_common_pkg,
-        #                      code[:22] + \
-        #                      ["    constant TESTING : integer := 4;"] + \
-        #                      code[22:])
-
-        #      # The number of messages on all sources should not change
-        #      it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
-
-        #      for filename in (
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clk_en_generator.vhd')):
-
-        #          if source_msgs[filename]:
-        #              _logger.info("Source %s had the following messages:\n%s",
-        #                           filename,
-        #                           "\n".join([str(x) for x in
-        #                                      source_msgs[filename]]))
-        #          else:
-        #              _logger.info("Source %s has no previous messages",
-        #                           filename)
-
-        #          it.assertEquals(source_msgs[filename],
-        #                          it.project.getMessagesByPath(filename))
-
-        #      _logger.info("Restoring previous content")
-        #      writeListToFile(very_common_pkg, code)
-
-        @it.should("rebuild sources when needed for different libraries")
+        @it.should("rebuild sources when changing a package on different libraries")
         def test011():
             if not it.BUILDER_NAME:
                 _logger.info("Test requires a builder")
                 return
 
+            filenames = (
+                p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
+                p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'))
+
             # Count how many messages each source has
             source_msgs = {}
 
-            for filename in (
-                    p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-                    p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
-
+            for filename in filenames:
                 _logger.info("Getting messages for '%s'", filename)
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
@@ -836,7 +753,7 @@ with such.A("hdlcc project") as it:
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
                          "right now")
-            very_common_pkg = p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library',
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                                      'very_common_pkg.vhd')
 
             code = open(very_common_pkg, 'r').read().split('\n')
@@ -850,20 +767,70 @@ with such.A("hdlcc project") as it:
                 # The number of messages on all sources should not change
                 it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
 
-                for filename in (
-                        p.join(VIM_HDL_EXAMPLES_PATH, 'basic_library', 'clock_divider.vhd'),
-                        p.join(VIM_HDL_EXAMPLES_PATH, 'another_library', 'foo.vhd')):
+                for filename in filenames:
 
                     if source_msgs[filename]:
-                        _logger.info("Source %s had the following messages:\n%s",
-                                     filename,
-                                     "\n".join([str(x) for x in
-                                                source_msgs[filename]]))
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
                     else:
                         _logger.info("Source %s has no previous messages",
                                      filename)
 
-                    #  XXX: Include this again!!
+                    it.assertEquals(source_msgs[filename],
+                                    it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
+
+        @it.should("rebuild sources when changing an entity on different libraries")
+        def test012():
+            if not it.BUILDER_NAME:
+                _logger.info("Test requires a builder")
+                return
+
+            filenames = (
+                p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
+                p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'))
+            # Count how many messages each source has
+            source_msgs = {}
+
+            for filename in filenames:
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
+                it.assertNotIn(
+                    'E', [x['error_type'] for x in source_msgs[filename]])
+
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                                     'very_common_pkg.vhd')
+
+            code = open(very_common_pkg, 'r').read().split('\n')
+
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                            code[22:])
+
+            try:
+                # The number of messages on all sources should not change
+                it.assertEquals(it.project.getMessagesByPath(very_common_pkg), [])
+
+                for filename in filenames:
+
+                    if source_msgs[filename]:
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
                     it.assertEquals(source_msgs[filename],
                                     it.project.getMessagesByPath(filename))
             finally:

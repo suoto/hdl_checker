@@ -280,7 +280,6 @@ def main():
                     {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
             patch.start()
-            #  tests = _noseRunner(args=nose_args)
             tests = nose2.discover(exit=False, argv=nose_args)
             patch.stop()
 

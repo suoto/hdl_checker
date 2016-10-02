@@ -24,9 +24,9 @@ if ($env:APPVEYOR -ne "True") {
     $env:PATH="C:\Program Files\7-zip;$env:PATH"
 }
 
-if ($env:BUILDER_NAME -eq "msim") {
+if ($env:BUILDER -eq "msim") {
     $env:BUILDER_PATH="$env:CI_WORK_PATH\\modelsim_ase\\win32aloem"
-} elseif ($env:BUILDER_NAME -eq "ghdl") {
+} elseif ($env:BUILDER -eq "ghdl") {
     # $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
     $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.33"
     $env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
@@ -49,6 +49,6 @@ if (!(Test-Path "$env:CACHE_PATH")) {
 "APPVEYOR               $env:APPVEYOR"
 "APPVEYOR_BUILD_FOLDER  $env:APPVEYOR_BUILD_FOLDER"
 "PATH                   $env:PATH"
-"BUILDER_NAME           $env:BUILDER_NAME"
+"BUILDER                $env:BUILDER"
 "CACHE_PATH             $env:CACHE_PATH"
 "INSTALL_DIR            $env:INSTALL_DIR"

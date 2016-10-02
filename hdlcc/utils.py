@@ -26,11 +26,27 @@ import subprocess as subp
 import shutil
 from threading import Lock
 
+# Make the serializer transparent
+try:
+    import json as serializer
+    def dump(*args, **kwargs):
+        """
+        Wrapper for json.dump
+        """
+        return serializer.dump(indent=True, *args, **kwargs)
+except ImportError:  # pragma: no cover
+    try:
+        import cPickle as serializer
+    except ImportError:
+        import pickle as serializer
+
+    dump = serializer.dump  # pylint: disable=invalid-name
+
 _logger = logging.getLogger(__name__)
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if type(stream) is str:
+    if isinstance(stream, str):
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
@@ -73,7 +89,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
         logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
-def terminateProcess(pid): # pragma: no cover
+def terminateProcess(pid):
     "Terminate a process given its PID"
     if onWindows():
         import ctypes
@@ -84,10 +100,6 @@ def terminateProcess(pid): # pragma: no cover
         ctypes.windll.kernel32.CloseHandle(handle)
     else:
         os.kill(pid, signal.SIGTERM)
-
-def interruptProcess(pid): # pragma: no cover
-    "Send SIGINT to PID"
-    os.kill(pid, signal.SIGINT)
 
 def isProcessRunning(pid):
     "Checks if a process is running given its PID"

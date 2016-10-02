@@ -158,6 +158,8 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         """
 
     def _getRebuilds(self, source, line):
+        """
+        """
         try:
             parse_results = self._searchForRebuilds(line)
         except NotImplementedError:  # pragma: no cover

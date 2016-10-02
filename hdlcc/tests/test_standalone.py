@@ -33,7 +33,7 @@ _logger = logging.getLogger(__name__)
 
 HDLCC_LOCATION = p.join("hdlcc", "standalone.py")
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
-VIM_HDL_EXAMPLES_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
+VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 def shell(cmd):
     """Dummy wrapper for running shell commands, checking the return value and
@@ -67,8 +67,8 @@ with such.A("hdlcc standalone tool") as it:
     def setup():
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
-        if it.BUILDER_NAME:
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES_PATH, it.BUILDER_NAME + '.prj')
+        if it.BUILDER_NAME in ('ghdl', 'msim', 'xvhdl'):
+            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
 

@@ -25,25 +25,9 @@ import traceback
 import threading
 from multiprocessing.pool import ThreadPool
 
-# Make the serializer transparent
-try:
-    import json as serializer
-    def _dump(*args, **kwargs):
-        """
-        Wrapper for json.dump
-        """
-        return serializer.dump(indent=True, *args, **kwargs)
-except ImportError:
-    try:
-        import cPickle as serializer
-    except ImportError:
-        import pickle as serializer
-
-    _dump = serializer.dump  # pylint: disable=invalid-name
-
 import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import getFileType, removeDuplicates
+from hdlcc.utils import getFileType, removeDuplicates, serializer, dump
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
@@ -57,7 +41,7 @@ class HdlCodeCheckerBase(object):
     HDL Code Checker project builder class
     """
 
-    _USE_THREADS = False
+    _USE_THREADS = True
     MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -74,6 +58,7 @@ class HdlCodeCheckerBase(object):
         self.builder = None
 
         self._setupEnvIfNeeded()
+        self._saveCache()
 
     def _getCacheFilename(self, target_dir=None):
         """
@@ -104,7 +89,7 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
             os.mkdir(p.dirname(cache_fname))
-        _dump(state, open(cache_fname, 'w'))
+        dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self, target_dir):
         """
@@ -403,35 +388,12 @@ class HdlCodeCheckerBase(object):
                     self._getBuilderMessages(rebuild_source.abspath,
                                              batch_mode=True)
 
-    def hasFinishedBuilding(self):
-        """
-        Returns whether a background build has finished running
-        """
-        if self._background_thread is None:
-            return True
-        return not self._background_thread.isAlive()
-
-    def waitForBuild(self):
-        """
-        Waits until the background build finishes
-        """
-        if self._background_thread is None:
-            return
-        try:
-            self._background_thread.join()
-            self._logger.debug("Background thread joined")
-        except RuntimeError:
-            self._logger.debug("Background thread was not active")
-
-        with self._lock:
-            self._logger.info("Build has finished")
-
     def _isBuilderCallable(self):
         """
         Checks if all preconditions for calling the builder have been
         met
         """
-        if self._config.filename is None or not self.hasFinishedBuilding():
+        if self._config.filename is None:
             return False
         return True
 
@@ -446,10 +408,6 @@ class HdlCodeCheckerBase(object):
             abspath = p.join(self._start_dir, path)
         else:
             abspath = path
-
-        if not self.hasFinishedBuilding():
-            self._handleUiWarning("Project hasn't finished building, try again "
-                                  "after it finishes.")
 
         # _USE_THREADS is for debug only, no need to cover
         # this
