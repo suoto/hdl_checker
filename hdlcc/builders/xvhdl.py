@@ -53,6 +53,9 @@ class XVHDL(BaseBuilder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
         self._xvhdlini = '.xvhdl.init'
+        self._builtin_libraries = ('ieee', 'std', 'unisim', 'xilinxcorelib',
+                                   'synplify', 'synopsis', 'maxii',
+                                   'family_support')
 
     def _makeRecords(self, line):
         line_number = None
@@ -104,10 +107,15 @@ class XVHDL(BaseBuilder):
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
         # like this. Review this at some point
-        return ['ieee', 'std', 'unisim', 'xilinxcorelib', 'synplify',
-                'synopsis', 'maxii', 'family_support']
+        return self._builtin_libraries
 
     def _createLibrary(self, library):
+        library = library.lower()
+        if library in self._builtin_libraries:
+            return
+
+        assert library != 'ieee'
+
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
             self._added_libraries = []
@@ -135,8 +143,6 @@ class XVHDL(BaseBuilder):
         rebuilds = []
 
         for match in self._iter_rebuild_units(line):
-            if not match:
-                continue
             mdict = match.groupdict()
             # When compilers reports units out of date, they do this
             # by either

@@ -55,7 +55,7 @@ def hasVunit():
     Checks if our env has VUnit installed
     """
     try:
-        import vunit
+        import vunit  # pylint: disable=unused-variable
         result = True
     except ImportError: # pragma: no cover
         result = False

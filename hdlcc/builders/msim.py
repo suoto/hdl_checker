@@ -272,11 +272,6 @@ class MSim(BaseBuilder):
         """
         Adds a library to an existing ModelSim init file
         """
-        if not self._iniFileExists():
-            self._createIniFile()
-        else:
-            self._logger.debug("modelsim.ini found, adding %s", library)
-
         self._subprocessRunner(['vlib', ] + self._vlib_args +
                                [p.join(self._target_folder, library)])
 

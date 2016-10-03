@@ -71,6 +71,15 @@ with such.A("builder object") as it:
         def test():
             it.builder.checkEnvironment()
 
+        @it.should('not fail when creating the same library multiple times')
+        def test():
+            it.builder._createLibrary('random_lib')
+            it.builder._createLibrary('random_lib')
+
+        @it.should('do nothing when trying to create builtin libraries')
+        def test():
+            it.builder._createLibrary('ieee')
+
         @it.should("parse MSim lines correctly")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',

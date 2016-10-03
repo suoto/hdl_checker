@@ -40,9 +40,7 @@ class HdlCodeCheckerBase(object):
     """
     HDL Code Checker project builder class
     """
-
     _USE_THREADS = True
-    MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
 
@@ -105,21 +103,22 @@ class HdlCodeCheckerBase(object):
 
         _logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
-        if p.exists(cache_fname):
-            try:
-                cache = serializer.load(open(cache_fname, 'r'))
-                self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
-                                   (cache_fname, serializer.__package__))
-                self._setState(cache)
-                self.builder.checkEnvironment()
-            except ValueError:
-                self._handleUiError(
-                    "Unable to recover cache from '%s' using '%s'\n"
-                    "Traceback:\n%s" % \
-                        (cache_fname, serializer.__package__,
-                         traceback.format_exc()))
-        else:
+        if not p.exists(cache_fname):  # pragma: no cover
             _logger.debug("File not found")
+            return
+
+        try:
+            cache = serializer.load(open(cache_fname, 'r'))
+            self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
+                               (cache_fname, serializer.__package__))
+            self._setState(cache)
+            self.builder.checkEnvironment()
+        except ValueError:
+            self._handleUiError(
+                "Unable to recover cache from '%s' using '%s'\n"
+                "Traceback:\n%s" % \
+                    (cache_fname, serializer.__package__,
+                     traceback.format_exc()))
 
     def _setupEnvIfNeeded(self):
         """
@@ -269,6 +268,10 @@ class HdlCodeCheckerBase(object):
                 (x['error_type'], x['line_number'], x['error_number']))
 
     def getBuildSequence(self, source):
+        """
+        Wrapper to _getBuildSequence passing the initial build sequence
+        list empty
+        """
         build_sequence = []
         self._getBuildSequence(source, build_sequence)
         return build_sequence
@@ -278,8 +281,6 @@ class HdlCodeCheckerBase(object):
         Recursively finds out the dependencies of the given source file
         """
         self._logger.debug("Checking build sequence for %s", source)
-        if build_sequence is None:
-            build_sequence = []
         for library, unit in self._resolveRelativeNames(source):
             # Get a list of source files that contains this design unit
             dependencies_list = self._config.discoverSourceDependencies(
@@ -341,30 +342,34 @@ class HdlCodeCheckerBase(object):
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
 
-            # Limit the amount of recursive calls to rebuilds to avoid
-            # circular cases
-            for _ in range(10):
-                _, rebuilds = self.builder.build(_source, forced=False,
-                                                 flags=_flags)
-                if rebuilds:
-                    self._handleRebuilds(rebuilds, _source)
-                else:
-                    break
+            _ = self._buildAndHandleRebuilds(_source, forced=False,
+                                             flags=_flags)
 
+        source_records = self._buildAndHandleRebuilds(source, forced=True,
+                                                      flags=flags)
+        return self._sortBuildMessages(source_records + remarks)
+
+    def _buildAndHandleRebuilds(self, source, *args, **kwargs):
+        """
+        Builds the given source and handle any files that might require
+        rebuilding until there is nothing to rebuild.
+        The number of iteractions is fixed in 10.
+        """
         # Limit the amount of recursive calls to rebuilds to avoid
         # circular cases
         for _ in range(10):
-            source_records, rebuilds = self.builder.build(source, forced=True,
-                                                          flags=flags)
+            records, rebuilds = self.builder.build(source, *args, **kwargs)
             if rebuilds:
                 self._handleRebuilds(rebuilds, source)
             else:
-                break
+                return records
 
-        return self._sortBuildMessages(source_records + remarks)
-        #  return self._sortBuildMessages(records + source_records + remarks)
 
     def _handleRebuilds(self, rebuilds, source=None):
+        """
+        Resolves hints found in the rebuild list into source objects
+        and rebuild them
+        """
         if source is not None and rebuilds:
             self._logger.info("Building '%s' triggers rebuilding: %s",
                               source, ", ".join([str(x) for x in rebuilds]))

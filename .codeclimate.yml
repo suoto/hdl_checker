@@ -2,9 +2,6 @@
 engines:
   duplication:
     enabled: true
-    exclude_fingerprints:
-      # Duplication on hdlcc.exceptions
-      - 0655784473047c89aa4f852195dfebd1
     config:
       languages:
         - python
@@ -24,3 +21,4 @@ exclude_paths:
   - hdlcc/tests/*
   - hdlcc/_version.py
   - versioneer.py
+  - run_tests.py
