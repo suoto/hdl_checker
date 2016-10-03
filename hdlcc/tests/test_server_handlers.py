@@ -125,13 +125,9 @@ with such.A("hdlcc server") as it:
                    '--host', it._host, '--port', it._port,
                    '--log-level', HDLCC_SERVER_LOG_LEVEL,
                    '--attach-to-pid', str(os.getpid()),
-                  ]
-
-            # Setup redirection if running on CI server
-            if utils.onCI():
-                cmd += ['--stdout', 'hdlcc-stdout.log',
-                        '--stderr', 'hdlcc-stderr.log',
-                        '--log-stream', 'hdlcc.log',]
+                   '--stdout', 'hdlcc-stdout.log',
+                   '--stderr', 'hdlcc-stderr.log',
+                   '--log-stream', 'hdlcc.log',]
 
             _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
@@ -426,13 +422,9 @@ with such.A("hdlcc server") as it:
                    hdlcc_server_fname,
                    '--log-level', HDLCC_SERVER_LOG_LEVEL,
                    '--attach-to-pid', str(pid),
-                  ]
-
-            # Setup redirection if running on CI server
-            if utils.onCI():
-                cmd += ['--stdout', 'hdlcc-stdout.log',
-                        '--stderr', 'hdlcc-stderr.log',
-                        '--log-stream', 'hdlcc.log',]
+                   '--stdout', 'hdlcc-stdout.log',
+                   '--stderr', 'hdlcc-stderr.log',
+                   '--log-stream', 'hdlcc.log',]
 
             _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 

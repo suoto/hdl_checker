@@ -72,12 +72,17 @@ def _noseRunner(args):
 
     return result
 
+def _shell(cmd):
+    _logger.info("$ %s", cmd)
+    for line in os.popen(cmd).read().split('\n'):
+        if line and not line.isspace():
+            _logger.info("> %s", line)
+
 def _clear():
     "Clears the current repo and submodules"
     for cmd in ('git clean -fdx',
                 'git submodule foreach --recursive git clean -fdx'):
-        print(cmd)
-        print(os.popen(cmd).read())
+        _shell(cmd)
 
 def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
@@ -166,6 +171,8 @@ def _parseArguments():
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
 
+    parser.add_argument('--log-stream', action='store', default=sys.stdout,
+                        help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
@@ -230,13 +237,13 @@ def _getDefaultTestByEnv(env):
     assert False
 
 def main():
-    _clear()
-
     args = _parseArguments()
-    print("Arguments: %s" % args)
-    nose_base_args = _getNoseCommandLineArgs(args)
+    _setupLogging(args.log_stream, args.log_level)
+    #  _clear()
 
-    _setupLogging(sys.stdout, args.log_level)
+    nose_base_args = _getNoseCommandLineArgs(args)
+    _logger.info("Arguments: %s", args)
+
     logging.getLogger('nose2').setLevel(logging.FATAL)
     logging.getLogger('vunit').setLevel(logging.ERROR)
     logging.getLogger('requests').setLevel(logging.WARNING)
@@ -244,9 +251,6 @@ def main():
     log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     file_handler.formatter = logging.Formatter(log_format)
     logging.root.addHandler(file_handler)
-
-    global _logger
-    _logger = logging.getLogger(__name__)
 
     _logger.info("Environment info:")
     _logger.info(" - CI:       %s", _CI)
@@ -298,11 +302,11 @@ def main():
     cov.save()
     for cmd in ('coverage combine',
                 'coverage html'):
-        print(cmd)
-        print(os.popen(cmd).read())
+        _shell(cmd)
 
     if not passed:
-        _logger.warning("Some tests failed")
+        _logger.warning("Some tests failed!")
+        print("Some tests failed!")
 
     return 0 if passed else 1
 

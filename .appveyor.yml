@@ -54,6 +54,8 @@ environment:
 
 # scripts that run after cloning repository
 install:
+  - git clone https://github.com/suoto/grlib
+    "%APPVEYOR_BUILD_FOLDER%\\.ci\\test_support\\grlib"
   - git submodule update --init --recursive
 
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"

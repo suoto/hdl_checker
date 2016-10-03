@@ -35,8 +35,8 @@ _logger = logging.getLogger(__name__)
 
 CACHE_BUILD_SPEEDUP = 2
 
-VIM_HDL_EXAMPLES = p.join(
-    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'vim-hdl-examples')
+BASE_PATH = p.join(
+    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
 
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
@@ -66,7 +66,7 @@ with such.A("hdlcc project with persistency") as it:
         if not it.BUILDER_NAME:
             return
 
-        it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
+        it.PROJECT_FILE = p.join(BASE_PATH, it.BUILDER_NAME + '.prj')
 
         #  StandaloneProjectBuilder.cleanProjectCache(it.PROJECT_FILE)
         utils.cleanProjectCache(it.PROJECT_FILE)
@@ -103,6 +103,10 @@ with such.A("hdlcc project with persistency") as it:
         def setup():
             it.parse_times = []
             it.build_times = []
+            #  it.target_file = p.join(BASE_PATH, 'another_library',
+            #                          'foo.vhd')
+            it.target_file = p.join(BASE_PATH, 'designs',
+                                    'leon3-ahbfile', 'leon3mp.vhd')
 
         @it.has_teardown
         def teardown():
@@ -128,8 +132,7 @@ with such.A("hdlcc project with persistency") as it:
                 project = StandaloneProjectBuilder(it.PROJECT_FILE)
                 project.clean()
                 parse_time = time.time() - start
-                project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES,
-                                                 'another_library', 'foo.vhd'))
+                project.getMessagesByPath(it.target_file)
                 build_time = time.time() - start - parse_time
 
                 _logger.info("Parsing took %fs", parse_time)
@@ -152,8 +155,6 @@ with such.A("hdlcc project with persistency") as it:
                     "Complete build times: %s",
                     min(it.build_times), max(it.build_times), it.build_times)
 
-            #  project._saveCache()
-
         @it.should('build at least %dx faster when recovering the info' %
                    CACHE_BUILD_SPEEDUP)
         @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
@@ -166,8 +167,7 @@ with such.A("hdlcc project with persistency") as it:
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
             parse_time = time.time() - start
             _logger.info("Building de facto")
-            project.getMessagesByPath(p.join(VIM_HDL_EXAMPLES,
-                                             'another_library', 'foo.vhd'))
+            project.getMessagesByPath(it.target_file)
             _logger.info("Done")
             build_time = time.time() - start - parse_time
 
@@ -178,13 +178,13 @@ with such.A("hdlcc project with persistency") as it:
 
             it.assertTrue(
                 build_time < average/CACHE_BUILD_SPEEDUP,
-                "Building with cache took %f (should be < %f)" % \
-                    (build_time, average/CACHE_BUILD_SPEEDUP))
+                "Building with cache took %f (should be < %f). "
+                "Builder used was '%s'" % \
+                    (build_time, average/CACHE_BUILD_SPEEDUP, it.BUILDER_NAME))
 
     @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
-        #  it.project._saveCache()
 
         messages = []
         failed = False
@@ -262,7 +262,6 @@ with such.A("hdlcc project with persistency") as it:
             cache_fname = p.join(target_dir, '.hdlcc.cache')
             open(cache_fname, 'w').write("hello")
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
-            #  project._saveCache()
 
             messages = []
             passed = False
@@ -335,7 +334,6 @@ with such.A("hdlcc project with persistency") as it:
 
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
             time.sleep(1)
-            #  project._saveCache()
             time.sleep(1)
 
             _logger.info("Searching UI messages")

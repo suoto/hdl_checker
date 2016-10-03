@@ -67,3 +67,4 @@ tags
 # .coverage
 # htmlcov/
 source.vhd
+.ci/test_support/grlib/
