@@ -26,6 +26,7 @@ _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
 # Design unit scanner
 _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
+    r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
     ]), flags=re.S)
 
 class VerilogParser(BaseSourceFile):
@@ -56,10 +57,16 @@ class VerilogParser(BaseSourceFile):
         design_units = []
 
         for match in self._iterDesignUnitMatches():
-            if match['module_name'] not in design_units:
+            if match.get('module_name', None):
                 design_units += [{
                     'name' : match['module_name'],
                     'type' : 'entity'}]
+            elif match.get('package_name', None):
+                design_units += [{
+                    'name' : match['package_name'],
+                    'type' : 'package'}]
+            else:  # pragma: no cover
+                assert False
 
         return design_units
 

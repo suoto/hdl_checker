@@ -236,12 +236,38 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_standalone')
     assert False
 
+def runTestsForEnv(env, args):
+    nose_base_args = _getNoseCommandLineArgs(args)
+    nose_args = list(nose_base_args)
+
+    if args.tests:
+        nose_args += args.tests
+    else:
+        nose_args += _getDefaultTestByEnv(env)
+
+    if env in TEST_ENVS and not _ON_WINDOWS:
+        test_env = TEST_ENVS[env]
+        test_env.update(
+            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+
+        patch = mock.patch.dict('os.environ', test_env)
+    else:
+        patch = mock.patch.dict(
+            'os.environ',
+            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+
+    patch.start()
+    tests = nose2.discover(exit=False, argv=nose_args)
+    patch.stop()
+
+    return tests.result.wasSuccessful()
+
+
 def main():
     args = _parseArguments()
     _setupLogging(args.log_stream, args.log_level)
     #  _clear()
 
-    nose_base_args = _getNoseCommandLineArgs(args)
     _logger.info("Arguments: %s", args)
 
     logging.getLogger('nose2').setLevel(logging.FATAL)
@@ -266,29 +292,7 @@ def main():
         if getattr(args, env):
             _logger.info("Running env '%s'", env)
 
-            nose_args = list(nose_base_args)
-
-            if args.tests:
-                nose_args += args.tests
-            else:
-                nose_args += _getDefaultTestByEnv(env)
-
-            if env in TEST_ENVS and not _ON_WINDOWS:
-                test_env = TEST_ENVS[env]
-                test_env.update(
-                    {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
-
-                patch = mock.patch.dict('os.environ', test_env)
-            else:
-                patch = mock.patch.dict(
-                    'os.environ',
-                    {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
-
-            patch.start()
-            tests = nose2.discover(exit=False, argv=nose_args)
-            patch.stop()
-
-            if not tests.result.wasSuccessful():
+            if not runTestsForEnv(env, args):
                 if passed:
                     _logger.warning("Some tests failed while running '%s'", env)
                 passed = False
