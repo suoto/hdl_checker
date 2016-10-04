@@ -573,7 +573,8 @@ class ConfigParser(object):
                                                       source.getDesignUnits()]:
                 sources += [source]
         if not sources:
-            self._logger.warning("No source file defining '%s'", unit)
+            self._logger.warning("No source file defining '%s.%s'",
+                                 library, unit)
         return sources
 
     # TODO: This result can be cached while no source file has changed

@@ -21,7 +21,7 @@ import os.path as p
 import logging
 import re
 
-from hdlcc.utils import getFileType
+from hdlcc.utils import getFileType, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
@@ -37,9 +37,7 @@ class BaseSourceFile(object):
         self.filename = p.normpath(filename)
         self.library = library
         self.flags = flags if flags is not None else []
-        self._design_units = None
-        self._deps = None
-        self._libs = None
+        self._cache = {}
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
@@ -55,9 +53,7 @@ class BaseSourceFile(object):
             'abspath' : self.abspath,
             'library' : self.library,
             'flags' : self.flags,
-            '_design_units' : self._design_units,
-            '_deps' : self._deps,
-            '_libs' : self._libs,
+            '_cache' : self._cache,
             '_mtime' : self._mtime,
             'filetype' : self.filetype}
         return state
@@ -72,9 +68,7 @@ class BaseSourceFile(object):
         obj.abspath = state['abspath']
         obj.library = state['library']
         obj.flags = state['flags']
-        obj._design_units = state['_design_units']
-        obj._deps = state['_deps']
-        obj._libs = state['_libs']
+        obj._cache = state['_cache']
         obj._content = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
@@ -132,10 +126,10 @@ class BaseSourceFile(object):
         """
         if not p.exists(self.filename):
             return []
-        if self._changed() or self._design_units is None:
-            self._design_units = self._getDesignUnits()
+        if self._changed() or 'design_units' not in self._cache:
+            self._cache['design_units'] = self._getDesignUnits()
 
-        return self._design_units
+        return self._cache['design_units']
 
     def getDependencies(self):
         """
@@ -144,10 +138,10 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or self._deps is None:
-            self._deps = self._getDependencies()
+        if self._changed() or 'dependencies' not in self._cache:
+            self._cache['dependencies'] = self._getDependencies()
 
-        return self._deps
+        return self._cache['dependencies']
 
     def getLibraries(self):
         """
@@ -156,10 +150,21 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or self._libs is None:
-            self._libs = self._getLibraries()
+        if self._changed() or 'libraries' not in self._cache:
+            self._cache['libraries'] = removeDuplicates(self._getLibraries())
 
-        return self._libs
+        return self._cache['libraries']
+
+    def getMatchingLibrary(self, unit_type, unit_name):
+        """
+        Cached version of the _getMatchingLibrary method
+        """
+        key = ','.join(['getMatchingLibrary', unit_name, unit_type])
+        if self._changed() or key not in self._cache:
+            self._cache[key] = self._getMatchingLibrary(
+                unit_type, unit_name)
+        return self._cache[key]
+
 
     def getmtime(self):
         """
@@ -176,7 +181,6 @@ class BaseSourceFile(object):
         """
         return set(["%s.%s" % (self.library, x['name']) \
                     for x in self.getDesignUnits()])
-
 
     @abc.abstractmethod
     def _getSourceContent(self):
@@ -208,7 +212,7 @@ class BaseSourceFile(object):
         describe its dependencies
         """
 
-    def getMatchingLibrary(self, unit_type, unit_name):
+    def _getMatchingLibrary(self, unit_type, unit_name):
         if unit_type == 'package':
             match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
                               self.getSourceContent(), flags=re.S)

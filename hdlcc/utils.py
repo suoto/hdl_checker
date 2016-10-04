@@ -154,14 +154,14 @@ def _isProcessRunningOnWindows(pid):
 
 def writeListToFile(filename, _list): # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
-    _logger.info("Writing to %s", filename)
+    _logger.debug("Writing to %s", filename)
     open(filename, 'w').write('\n'.join([str(x) for x in _list]))
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 
     if onWindows():
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
-        _logger.info(cmd)
+        _logger.debug(cmd)
         subp.check_call(cmd, shell=True)
     else:
         subp.check_call(['touch', filename])

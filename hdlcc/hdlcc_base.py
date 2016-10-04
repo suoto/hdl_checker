@@ -41,6 +41,7 @@ class HdlCodeCheckerBase(object):
     HDL Code Checker project builder class
     """
     _USE_THREADS = True
+    _MAX_REBUILD_ATTEMPTS = 20
 
     __metaclass__ = abc.ABCMeta
 
@@ -355,22 +356,24 @@ class HdlCodeCheckerBase(object):
         rebuilding until there is nothing to rebuild.
         The number of iteractions is fixed in 10.
         """
-        # Limit the amount of recursive calls to rebuilds to avoid
-        # circular cases
-        for _ in range(10):
+        # Limit the amount of calls to rebuild the same file to avoid
+        # hanging the server
+        for _ in range(self._MAX_REBUILD_ATTEMPTS):
             records, rebuilds = self.builder.build(source, *args, **kwargs)
             if rebuilds:
                 self._handleRebuilds(rebuilds, source)
             else:
                 return records
 
+        self._handleUiError("Unable to build '%s' after %d attempts" %
+                            (source, self._MAX_REBUILD_ATTEMPTS))
 
     def _handleRebuilds(self, rebuilds, source=None):
         """
         Resolves hints found in the rebuild list into source objects
         and rebuild them
         """
-        if source is not None and rebuilds:
+        if source is not None:
             self._logger.info("Building '%s' triggers rebuilding: %s",
                               source, ", ".join([str(x) for x in rebuilds]))
         for rebuild in rebuilds:
@@ -379,15 +382,21 @@ class HdlCodeCheckerBase(object):
                 self._getBuilderMessages(rebuild['rebuild_path'],
                                          batch_mode=True)
             else:
-                if  'unit_name' in rebuild and 'library_name' in rebuild:
+                unit_name = rebuild.get('unit_name', None)
+                library_name = rebuild.get('library_name', None)
+                unit_type = rebuild.get('unit_type', None)
+
+
+                if library_name is not None:
                     rebuild_sources = self._config.findSourcesByDesignUnit(
-                        rebuild['unit_name'], rebuild['library_name'])
-                elif 'unit_name' in rebuild and 'unit_type' in rebuild:
+                        unit_name, library_name)
+                elif unit_type is not None:
                     library = source.getMatchingLibrary(
-                        rebuild['unit_type'], rebuild['unit_name'])
+                        unit_type, unit_name)
                     rebuild_sources = self._config.findSourcesByDesignUnit(
-                        rebuild['unit_name'], library)
-                    #  assert False, ', '.join([x.filename for x in rebuild_sources])
+                        unit_name, library)
+                else:  # pragma: no cover
+                    assert False, ', '.join([x.filename for x in rebuild_sources])
 
                 for rebuild_source in rebuild_sources:
                     self._getBuilderMessages(rebuild_source.abspath,
@@ -414,9 +423,7 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
-        # _USE_THREADS is for debug only, no need to cover
-        # this
-        if self._USE_THREADS: # pragma: no cover
+        if self._USE_THREADS:
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \
