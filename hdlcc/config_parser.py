@@ -40,8 +40,10 @@ _configFileScan = re.compile("|".join([
 # pylint: enable=invalid-name
 
 def _extractSet(entry):
-    '''Extract a list by splitting a string at whitespaces, removing
-    empty values caused by leading/trailing/multiple whitespaces'''
+    """
+    Extract a list by splitting a string at whitespaces, removing
+    empty values caused by leading/trailing/multiple whitespaces
+    """
     entry = str(entry).strip()
     if not entry:
         return []
@@ -49,9 +51,11 @@ def _extractSet(entry):
     return [value for value in _splitAtWhitespaces(entry)]
 
 def hasVunit():
-    "Checks if our env has VUnit installed"
+    """
+    Checks if our env has VUnit installed
+    """
     try:
-        import vunit
+        import vunit  # pylint: disable=unused-variable
         result = True
     except ImportError: # pragma: no cover
         result = False
@@ -102,7 +106,7 @@ class ConfigParser(object):
             self._parms['builder'] = 'fallback'
             self._parms['target_dir'] = '.fallback'
 
-            self._logger.warning("No configuration file given, using dummy")
+            self._logger.info("No configuration file given, using dummy")
 
         self._sources = {}
         self._timestamp = 0
@@ -139,7 +143,7 @@ class ConfigParser(object):
         import vunit
 
         self._logger.info("VUnit installation found")
-        logging.getLogger('vunit').setLevel(logging.WARNING)
+        logging.getLogger('vunit').setLevel(logging.ERROR)
 
         builder_class = getBuilderByName(self.getBuilder())
 
@@ -324,6 +328,8 @@ class ConfigParser(object):
         """
         target_dir = '.dummy'
         builder_class = None
+        self._logger.debug("Searching for builder among %s",
+                           AVAILABLE_BUILDERS)
         for builder_class in AVAILABLE_BUILDERS:
             if builder_class.builder_name == 'fallback':
                 continue
@@ -437,9 +443,6 @@ class ConfigParser(object):
     def _handleParsedSource(self, language, library, path, flags):
         "Handles a parsed line that adds a source"
 
-        self._logger.debug("Found source with path '%s', "
-                           "library: '%s', language: '%s', flags: '%s'",
-                           path, library, language, flags)
 
         flags_set = _extractSet(flags)
 
@@ -471,6 +474,7 @@ class ConfigParser(object):
 
     @staticmethod
     def simpleParse(filename):
+        assert p.exists(filename), "Filename '%s' doesn't exists" % filename
         target_dir = None
         builder_name = None
         for _line in open(filename, 'r').readlines():
@@ -504,7 +508,7 @@ class ConfigParser(object):
         self._parseIfNeeded()
         return self._parms['target_dir']
 
-    def getSingleBuildFlagsByPath(self, path):
+    def _getSingleBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
@@ -515,7 +519,7 @@ class ConfigParser(object):
                self._parms['single_build_flags'][lang] + \
                self._sources[p.abspath(path)].flags
 
-    def getBatchBuildFlagsByPath(self, path):
+    def _getBatchBuildFlagsByPath(self, path):
         "Return a list of flags configured to build a single source"
         self._parseIfNeeded()
         if self.filename is None:
@@ -525,6 +529,20 @@ class ConfigParser(object):
         return self._parms['global_build_flags'][lang] + \
                self._parms['batch_build_flags'][lang] + \
                self._sources[p.abspath(path)].flags
+
+    def getBuildFlags(self, path, batch_mode):
+        lang = self.getSourceByPath(path).filetype
+        flags = list(self._parms['global_build_flags'][lang])
+
+        if batch_mode:
+            flags += self._parms['batch_build_flags'][lang]
+        else:
+            flags += self._parms['single_build_flags'][lang]
+
+        if path not in self._sources:
+            return flags
+
+        return flags + self._sources[p.abspath(path)].flags
 
     def getSources(self):
         "Returns a list of VhdlParser/VerilogParser objects parsed"
@@ -547,4 +565,24 @@ class ConfigParser(object):
         if self.filename is None:
             return True
         return p.abspath(path) in self._sources.keys()
+
+    def findSourcesByDesignUnit(self, unit, library='work'):
+        sources = []
+        for source in self._sources.itervalues():
+            if source.library == library and unit in [x['name'] for x in
+                                                      source.getDesignUnits()]:
+                sources += [source]
+        if not sources:
+            self._logger.warning("No source file defining '%s'", unit)
+        return sources
+
+    # TODO: This result can be cached while no source file has changed
+    def discoverSourceDependencies(self, unit, library):
+        """
+        Searches for sources that implement the given design unit. If
+        more than one file implements an entity or package with the same
+        name, there is no guarantee that the right one was picked
+
+        """
+        return self.findSourcesByDesignUnit(unit, library)
 

@@ -26,11 +26,27 @@ import subprocess as subp
 import shutil
 from threading import Lock
 
+# Make the serializer transparent
+try:
+    import json as serializer
+    def dump(*args, **kwargs):
+        """
+        Wrapper for json.dump
+        """
+        return serializer.dump(indent=True, *args, **kwargs)
+except ImportError:  # pragma: no cover
+    try:
+        import cPickle as serializer
+    except ImportError:
+        import pickle as serializer
+
+    dump = serializer.dump  # pylint: disable=invalid-name
+
 _logger = logging.getLogger(__name__)
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if type(stream) is str:
+    if isinstance(stream, str):
         class Stream(file):
             """File subclass that allows RainbowLoggingHandler to write
             with colors"""
@@ -73,7 +89,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
         logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
-def terminateProcess(pid): # pragma: no cover
+def terminateProcess(pid):
     "Terminate a process given its PID"
     if onWindows():
         import ctypes
@@ -84,10 +100,6 @@ def terminateProcess(pid): # pragma: no cover
         ctypes.windll.kernel32.CloseHandle(handle)
     else:
         os.kill(pid, signal.SIGTERM)
-
-def interruptProcess(pid): # pragma: no cover
-    "Send SIGINT to PID"
-    os.kill(pid, signal.SIGINT)
 
 def isProcessRunning(pid):
     "Checks if a process is running given its PID"
@@ -160,34 +172,18 @@ def writeListToFile(filename, _list): # pragma: no cover
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
 
-def addToPath(path):
-    "Adds path to the PATH environment variable"
-    path_value = os.pathsep.join([path, os.environ['PATH']])
-    os.environ['PATH'] = path_value
-    if onWindows():
-        os.putenv('PATH', path_value)
 
-def removeFromPath(path):
-    "Removes path to the PATH environment variable"
-    path_list = os.environ['PATH'].split(os.pathsep)
-    path_list.remove(path)
-    os.environ['PATH'] = os.pathsep.join(path_list)
-    if onWindows():
-        os.putenv('PATH', os.pathsep.join(path_list))
-
-# pylint: disable=missing-docstring
-def onWindows():
+def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'win32'
 
-def onMac(): # pragma: no cover
+def onMac():      # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'darwin'
 
-def onTravis(): # pragma: no cover
+def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
     return 'TRAVIS' in os.environ
 
-def onCI(): # pragma: no cover
+def onCI():       # pragma: no cover # pylint: disable=missing-docstring
     return 'CI' in os.environ
-# pylint: enable=missing-docstring
 
 def getFileType(filename):
     "Gets the file type of a source file"
@@ -232,4 +228,9 @@ def handlePathPlease(*args):
     Join args with pathsep, gets the absolute path and normalizes
     """
     return p.normpath(p.abspath(p.join(*args)))
+
+def removeDuplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
 

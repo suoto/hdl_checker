@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-write-host "Configured builder is $env:BUILDER_NAME"
+write-host "Configured builder is $env:BUILDER"
 
 $env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
                                     { 'C:\Python27-x64' }
@@ -41,17 +41,16 @@ if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 #     new-item "$env:CACHE_PATH" -type directory -force
 # }
 
-if ("$env:BUILDER_NAME" -eq "msim") {
+if ("$env:BUILDER" -eq "msim") {
     echo "Installing MSIM"
     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
     if (!$?) {write-error "Something went wrong, exiting"; exit -1}
-} elseif ("$env:BUILDER_NAME" -eq "ghdl") {
+} elseif ("$env:BUILDER" -eq "ghdl") {
     echo "Installing GHDL"
     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
     if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 } else {
     echo "No builder selected"
-    exit -1
 }
 
 pip install -U -e $env:APPVEYOR_BUILD_FOLDER

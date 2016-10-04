@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 import shutil
-import unittest
+import mock
 from nose2.tools import such
 from nose2.tools.params import params
 
@@ -29,44 +29,69 @@ import hdlcc.builders
 import hdlcc.utils as utils
 from hdlcc.parsers import VhdlParser
 
-
-BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-BUILDER_PATH = os.environ.get('BUILDER_PATH', p.expanduser("~/builders/ghdl/bin/"))
-SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support',
-                      'test_builders')
-
 _logger = logging.getLogger(__name__)
 
-with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
+with such.A("builder object") as it:
+    @it.has_setup
+    def setup():
+        it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
+        it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+        it.SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci',
+                                 'test_support', 'test_builders')
+
+    @it.has_teardown
+    def teardown():
+        if it.BUILDER_NAME == 'xvhdl':
+            os.remove('.xvhdl.init')
+            os.remove('xvhdl.pb')
+
     with it.having('its binary executable'):
         @it.has_setup
         def setup():
             it.original_env = os.environ.copy()
 
-            utils.addToPath(BUILDER_PATH)
+            # Add the builder path to the environment so we can call it
+            if it.BUILDER_PATH:
+                it.patch = mock.patch.dict(
+                    'os.environ',
+                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+                it.patch.start()
 
-            cls = hdlcc.builders.getBuilderByName(BUILDER_NAME)
-            it.builder = cls('._%s' % BUILDER_NAME)
+            cls = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
+            it.builder = cls('._%s' % it.BUILDER_NAME)
 
         @it.has_teardown
         def teardown():
-            utils.removeFromPath(BUILDER_PATH)
-            if p.exists('._%s' % BUILDER_NAME):
-                shutil.rmtree('._%s' % BUILDER_NAME)
+            if it.BUILDER_PATH:
+                it.patch.stop()
+            if p.exists('._%s' % it.BUILDER_NAME):
+                shutil.rmtree('._%s' % it.BUILDER_NAME)
 
         @it.should('pass environment check')
         def test():
             it.builder.checkEnvironment()
 
+        @it.should('not fail when creating the same library multiple times')
+        def test():
+            it.builder._createLibrary('random_lib')
+            it.builder._createLibrary('random_lib')
+
+        @it.should('do nothing when trying to create builtin libraries')
+        def test():
+            it.builder._createLibrary('ieee')
+
         @it.should("parse MSim lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd',
                 r'C:\some\file\on\windows.vhd')
         def test(case, path):
+            if it.BUILDER_NAME != "msim":
+                _logger.info("MSim only test")
+                return
+
             _logger.info("Running '%s'", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: %s(21): near \"EOF\": (vcom-1576) expecting \';\'." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '21',
@@ -76,7 +101,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_type'     : 'E',
                   'error_message'  : "near \"EOF\": expecting \';\'."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Warning: %s(23): (vcom-1320) Type of expression \"(OTHERS => '0')\" is ambiguous; using element type STD_LOGIC_VECTOR, not aggregate type register_type." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '23',
@@ -86,7 +111,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_type'     : 'W',
                   'error_message'  : "Type of expression \"(OTHERS => '0')\" is ambiguous; using element type STD_LOGIC_VECTOR, not aggregate type register_type."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Warning: %s(39): (vcom-1514) Range choice direction (downto) does not determine aggregate index range direction (to)." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '39',
@@ -96,7 +121,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_type'     : 'W',
                   'error_message'  : "Range choice direction (downto) does not determine aggregate index range direction (to)."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: (vcom-11) Could not find work.regfile_pkg."),
                 [{'checker'        : 'msim',
                   'line_number'    : None,
@@ -106,7 +131,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_type'     : 'E',
                   'error_message'  : "Could not find work.regfile_pkg."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error (suppressible): %s(7): (vcom-1195) Cannot find expanded name \"work.regfile_pkg\"." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '7',
@@ -116,7 +141,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_type'     : 'E',
                   'error_message'  : "Cannot find expanded name \"work.regfile_pkg\"."}])
 
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "** Error: %s(7): Unknown expanded name." % path),
                 [{'checker'        : 'msim',
                   'line_number'    : '7',
@@ -127,14 +152,16 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                   'error_message'  : "Unknown expanded name."}])
 
         @it.should("parse GHDL builder lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "ghdl", "GHDL only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd',
                 r'C:\some\file\on\windows.vhd')
         def test(case, path):
+            if it.BUILDER_NAME != "GHDL":
+                _logger.info("GHDL only test")
+                return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 "%s:11:35: extra ';' at end of interface list" % path),
                 [{'checker'        : 'ghdl',
                   'line_number'    : '11',
@@ -146,14 +173,16 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
 
         @it.should("parse XVHDL builder lines correctly")
-        @unittest.skipUnless(BUILDER_NAME == "xvhdl", "XVHDL only test")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
                 'some_file_on_same_level.vhd')
                 #  r'C:\some\file\on\windows.vhd')
         def test(case, path):
+            if it.BUILDER_NAME != "XVHDL":
+                _logger.info("XVHDL only test")
+                return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeMessageRecords(
+            it.assertEquals(it.builder._makeRecords(
                 'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path),
                 [{'checker'        : 'xvhdl',
                   'line_number'    : '12',
@@ -165,25 +194,29 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
         @it.should('compile a VHDL source without errors')
         def test():
-            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.vhd'))
+            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.vhd'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 
         @it.should('compile a Verilog source without errors')
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
-            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.v'))
+            if it.BUILDER_NAME != "msim":
+                _logger.info("MSim only test")
+                return
+            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.v'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 
         @it.should('compile a SystemVerilog source without errors')
-        @unittest.skipUnless(BUILDER_NAME == "msim", "MSim only test")
         def test():
-            source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.sv'))
+            if it.BUILDER_NAME != "msim":
+                _logger.info("MSim only test")
+                return
+            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.sv'))
             records, rebuilds = it.builder.build(source)
             it.assertNotIn('E', [x['error_type'] for x in records],
                            'This source should not generate errors.')
@@ -192,14 +225,18 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
         @it.should('catch a known error on a VHDL source')
         def test():
-            source = VhdlParser(p.join(SOURCES_PATH,
-                                           'source_with_error.vhd'))
-            records, rebuilds = it.builder.build(source)
+            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
+                _logger.info("Test requires a builder")
+                return
+
+            source = VhdlParser(p.join(it.SOURCES_PATH,
+                                       'source_with_error.vhd'))
+            records, rebuilds = it.builder.build(source, forced=True)
 
             for record in records:
                 _logger.info(record)
 
-            if BUILDER_NAME == 'msim':
+            if it.BUILDER_NAME == 'msim':
                 expected = [{
                     'line_number': '4',
                     'error_number': '1136',
@@ -207,7 +244,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                     'column': None,
                     'error_type': 'E',
                     'checker': 'msim'}]
-            elif BUILDER_NAME == 'ghdl':
+            elif it.BUILDER_NAME == 'ghdl':
                 expected = [{
                     'line_number': '4',
                     'error_number': None,
@@ -215,7 +252,7 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
                     'column': '5',
                     'error_type': 'E',
                     'checker': 'ghdl'}]
-            elif BUILDER_NAME == 'xvhdl':
+            elif it.BUILDER_NAME == 'xvhdl':
                 expected = [{
                     'line_number': '4',
                     'error_number': 'VRFC 10-91',
@@ -231,6 +268,32 @@ with such.A("'%s' builder object" % str(BUILDER_NAME)) as it:
 
             it.assertEqual(rebuilds, [])
 
-if BUILDER_NAME is not None:
-    it.createTests(globals())
+        @it.should("catch MSim rebuilds by messages")
+        @params(
+            "** Error: (vcom-13) Recompile foo_lib.bar_component because "
+            "foo_lib.foo_lib_pkg has changed.",)
+        def test(case, line):
+            if it.BUILDER_NAME != 'msim':
+                _logger.info("ModelSim test only")
+                return
+            _logger.info("Running %s", case)
+
+            it.assertEquals(
+                [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
+                it.builder._searchForRebuilds(line))
+
+        @it.should("catch GHDL rebuilds by messages")
+        @params(
+            "somefile.vhd:12:13: package \"leon3\" is obsoleted by package \"amba\"")
+        def test(case, line):
+            if it.BUILDER_NAME != 'ghdl':
+                _logger.info("GHDL test only")
+                return
+            _logger.info("Running %s", case)
+
+            it.assertEquals(
+                [{'unit_type': 'package', 'unit_name': 'leon3'}],
+                it.builder._searchForRebuilds(line))
+
+it.createTests(globals())
 

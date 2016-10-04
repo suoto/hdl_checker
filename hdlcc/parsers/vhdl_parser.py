@@ -24,88 +24,103 @@ _logger = logging.getLogger(__name__)
 
 # Design unit scanner
 _DESIGN_UNIT_SCANNER = re.compile('|'.join([
-    r"^\s*package\s+(?P<package_name>\w+)\s+is\b",
-    r"^\s*package\s+body\s+(?P<package_body_name>\w+)\s+is\b",
-    r"^\s*entity\s+(?P<entity_name>\w+)\s+is\b",
-    r"^\s*library\s+(?P<library_name>[\w,\s]+)\b",
-    r"^\s*context\s+(?P<context_name>\w+)\s+is\b",
-    ]), flags=re.I)
+    r"\bpackage\s+(?P<package_name>\w+)\s+is\b",
+    r"\bentity\s+(?P<entity_name>\w+)\s+is\b",
+    r"\blibrary\s+(?P<library_name>[\w,\s]+)\b",
+    r"\bcontext\s+(?P<context_name>\w+)\s+is\b",
+    ]), flags=re.M)
+
+_LIBRARY_SCANNER = re.compile(r"\blibrary\s+(?P<library_name>[^;]+)",
+                              flags=re.M)
+
+_ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
+    r"\bpackage\s+body\s+(?P<package_name>\w+)\s+is\b",
+    r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
+
+_SUB_COMMENTS = re.compile(r"\s*--[^\n]*", flags=re.S).sub
 
 class VhdlParser(BaseSourceFile):
-    """Parses and stores information about a source file such as
-    design units it depends on and design units it provides"""
+    """
+    Parses and stores information about a source file such as design
+    units it depends on and design units it provides
+    """
 
     def _getSourceContent(self):
-        """Replace everything from comment ('--') until a line break
-        and converts to lowercase"""
-        lines = list([re.sub(r"\s*--.*", "", x).lower() for x in \
-                open(self.filename, 'r').read().split("\n")])
-        return lines
+        """
+        Replace everything from comment ('--') until a line break and
+        converts to lowercase
+        """
+        return _SUB_COMMENTS("", open(self.filename, 'r').read()).lower()
 
     def _iterDesignUnitMatches(self):
-        """Iterates over the matches of _DESIGN_UNIT_SCANNER against
-        source's lines"""
-        for line in self._getSourceContent():
-            for match in _DESIGN_UNIT_SCANNER.finditer(line):
-                yield match.groupdict()
+        """
+        Iterates over the matches of _DESIGN_UNIT_SCANNER against
+        source's lines
+        """
+        for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
+            yield match.groupdict()
 
-    def _getDependencies(self, libraries):
-        """Parses the source and returns a list of dictionaries that
-        describe its dependencies"""
+    def _getDependencies(self):
+        libs = self._getLibraries() + ['work']
         lib_deps_regex = re.compile(r'|'.join([ \
-                r"%s\.\w+" % x for x in libraries]), flags=re.I)
+                r"%s\.\w+" % x for x in libs]), flags=re.I)
+
         dependencies = []
-        for line in self._getSourceContent():
-            for match in lib_deps_regex.finditer(line):
-                dependency = {}
-                dependency['library'], dependency['unit'] = match.group().split('.')[:2]
-                # Library 'work' means 'this' library, so we replace it
-                # by the library name itself
-                if dependency['library'] == 'work':
-                    dependency['library'] = self.library
-                if dependency not in dependencies:
-                    dependencies.append(dependency)
+        for match in lib_deps_regex.finditer(self.getSourceContent()):
+            dependency = {}
+            dependency['library'], dependency['unit'] = match.group().split('.')[:2]
+            # Library 'work' means 'this' library, so we replace it
+            # by the library name itself
+            if dependency['library'] == 'work':
+                dependency['library'] = self.library
+            if dependency not in dependencies:
+                dependencies.append(dependency)
+
+        for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
+            _dict = match.groupdict()
+            package_name = _dict.get('package_name', None)
+            component_name = _dict.get('component_name', None)
+            if package_name:
+                dependencies += [{'library' : self.library, 'unit': package_name}]
+
 
         return dependencies
 
-    def _getParsedData(self):
-        "Parses the source file to find design units and dependencies"
+    def _getLibraries(self):
+        """
+        Parses the source file to find design units and dependencies
+        """
+        libs = ['work']
+
+        for match in _LIBRARY_SCANNER.finditer(self.getSourceContent()):
+            match = match.groupdict()
+            if match['library_name'] is not None:
+                libs += re.split(r"\s*,\s*", match['library_name'])
+
+        libs.remove('work')
+        libs.append(self.library)
+        return libs
+
+    def _getDesignUnits(self):
+        """
+        Parses the source file to find design units and dependencies
+        """
         design_units = []
-        libraries = ['work']
 
         for match in self._iterDesignUnitMatches():
             unit = None
             if match['package_name'] is not None:
                 unit = {'name' : match['package_name'],
                         'type' : 'package'}
-            elif match['package_body_name'] is not None:
-                unit = {'name' : match['package_body_name'],
-                        'type' : 'package body'}
             elif match['entity_name'] is not None:
                 unit = {'name' : match['entity_name'],
                         'type' : 'entity'}
             elif match['context_name'] is not None:
                 unit = {'name' : match['context_name'],
                         'type' : 'context'}
-            if match['library_name'] is not None:
-                libraries += re.split(r"\s*,\s*", match['library_name'])
 
             if unit:
                 design_units.append(unit)
 
-        return design_units, self._getDependencies(libraries)
-
-    def _doParse(self):
-        """Finds design units and dependencies then translate some design
-        units into information useful in the conext of the project"""
-        design_units, dependencies = self._getParsedData()
-
-        self._design_units = []
-        for design_unit in design_units:
-            if design_unit['type'] == 'package body':
-                dependencies += [{'library' : self.library, 'unit': design_unit['name']}]
-            else:
-                self._design_units += [design_unit]
-
-        self._deps = dependencies
+        return design_units
 

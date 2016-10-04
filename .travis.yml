@@ -21,7 +21,8 @@ env:
   matrix:
     - BUILDER=msim
     - BUILDER=ghdl
-    - BUILDER=fallback standalone
+    - BUILDER=fallback
+    - BUILDER=standalone
     - BUILDER=xvhdl
 
 # This should work but it doesn't!
@@ -42,6 +43,7 @@ before_install:
     fi
 
 before_script:
+  - "git clone https://github.com/suoto/grlib .ci/test_support/grlib"
   - "git submodule update"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
@@ -53,7 +55,8 @@ install:
   - pip install git+https://github.com/suoto/rainbow_logging_handler
   - pip install -e .
 # command to run tests
-script: "./run_tests.sh ${BUILDER} -vv --log-capture"
+# script: "./run_tests.sh ${BUILDER} -vv --log-capture"
+script: "./run_tests.py --${BUILDER} -v"
 after_failure:
   - "cat tests.log"
 after_success:

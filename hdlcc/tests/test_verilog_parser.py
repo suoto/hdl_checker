@@ -71,5 +71,39 @@ module clock_divider
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
+        @it.should('return no libraries')
+        def test():
+            it.assertEqual([], it.source.getLibraries())
+
+    with it.having('a package code'):
+        @it.has_setup
+        def setup():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
+            it._code = """
+package msgPkg;
+  integer  errCnt  = 0;
+  integer  warnCnt = 0;
+endpackage
+""".splitlines()
+
+            writeListToFile(_FILENAME, it._code)
+
+        @it.has_teardown
+        def teardown():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
+
+        @it.should('return its design units')
+        def test():
+            design_units = list(it.source.getDesignUnits())
+            _logger.debug("Design units: %s", design_units)
+            it.assertItemsEqual([{'type' : 'package', 'name' : 'msgPkg'}],
+                                design_units)
+
+        @it.should('return no libraries')
+        def test():
+            it.assertEqual([], it.source.getLibraries())
+
 it.createTests(globals())
 

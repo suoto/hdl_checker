@@ -17,33 +17,39 @@
 "Base source file parser"
 
 import abc
-import os
+import os.path as p
 import logging
+import re
 
 from hdlcc.utils import getFileType
 
 _logger = logging.getLogger(__name__)
 
 class BaseSourceFile(object):
-    """Parses and stores information about a source file such as
-    design units it depends on and design units it provides"""
+    """
+    Parses and stores information about a source file such as design
+    units it depends on and design units it provides
+    """
 
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, filename, library='work', flags=None):
-        self.filename = os.path.normpath(filename)
+        self.filename = p.normpath(filename)
         self.library = library
         self.flags = flags if flags is not None else []
-        self._design_units = []
-        self._deps = []
+        self._design_units = None
+        self._deps = None
+        self._libs = None
+        self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
 
-        self.abspath = os.path.abspath(filename)
-        self._parseIfChanged()
+        self.abspath = p.abspath(filename)
 
     def getState(self):
-        "Gets a dict that describes the current state of this object"
+        """
+        Gets a dict that describes the current state of this object
+        """
         state = {
             'filename' : self.filename,
             'abspath' : self.abspath,
@@ -51,13 +57,15 @@ class BaseSourceFile(object):
             'flags' : self.flags,
             '_design_units' : self._design_units,
             '_deps' : self._deps,
+            '_libs' : self._libs,
             '_mtime' : self._mtime,
             'filetype' : self.filetype}
         return state
 
     @classmethod
     def recoverFromState(cls, state):
-        "Returns an object of cls based on a given state"
+        """
+        Returns an object of cls based on a given state"""
         # pylint: disable=protected-access
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
@@ -66,6 +74,8 @@ class BaseSourceFile(object):
         obj.flags = state['flags']
         obj._design_units = state['_design_units']
         obj._deps = state['_deps']
+        obj._libs = state['_libs']
+        obj._content = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
@@ -90,7 +100,6 @@ class BaseSourceFile(object):
                 #  _logger.warning("Attribute %s differs", attr)
                 return False
 
-
         #  _logger.warning("%s matches %s", repr(self), repr(other))
         return True
 
@@ -100,67 +109,112 @@ class BaseSourceFile(object):
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
 
-    def _parseIfChanged(self):
-        "Parses this source file if it has changed"
-        try:
-            if self._changed():
-                _logger.debug("Parsing %s", str(self))
-                self._mtime = self.getmtime()
-                self._doParse()
-                if self._deps:
-                    _logger.info("Source '%s' depends on: %s", str(self), \
-                        ", ".join(["%s.%s" % (x['library'], x['unit']) \
-                            for x in self._deps]))
-                else:
-                    _logger.info("Source '%s' has no dependencies", str(self))
-        except OSError: # pragma: no cover
-            _logger.warning("Couldn't parse '%s' at this moment", self)
-
     def _changed(self):
-        """Checks if the file changed based on the modification time provided
-        by os.path.getmtime"""
+        """
+        Checks if the file changed based on the modification time
+        provided by p.getmtime
+        """
         return self.getmtime() > self._mtime
 
-    @abc.abstractmethod
-    def _getSourceContent(self):
-        """Replace everything from comment ('--') until a line break
-        and converts to lowercase"""
+    def getSourceContent(self):
+        """
+        Cached version of the _getSourceContent method
+        """
+        if self._changed() or self._content is None:
+            self._content = self._getSourceContent()
+            self._mtime = self.getmtime()
 
-    @abc.abstractmethod
-    def _getDependencies(self, libraries):
-        """Parses the source and returns a list of dictionaries that
-        describe its dependencies"""
-
-    @abc.abstractmethod
-    def _doParse(self):
-        """Finds design units and dependencies then translate some design
-        units into information useful in the conext of the project"""
+        return self._content
 
     def getDesignUnits(self):
-        """Returns a list of dictionaries with the design units defined.
-        The dict defines the name (as defined in the source file) and
-        the type (package, entity, etc)"""
-        self._parseIfChanged()
+        """
+        Cached version of the _getDesignUnits method
+        """
+        if not p.exists(self.filename):
+            return []
+        if self._changed() or self._design_units is None:
+            self._design_units = self._getDesignUnits()
+
         return self._design_units
 
+    def getDependencies(self):
+        """
+        Cached version of the _getDependencies method
+        """
+        if not p.exists(self.filename):
+            return []
+
+        if self._changed() or self._deps is None:
+            self._deps = self._getDependencies()
+
+        return self._deps
+
+    def getLibraries(self):
+        """
+        Cached version of the _getLibraries method
+        """
+        if not p.exists(self.filename):
+            return []
+
+        if self._changed() or self._libs is None:
+            self._libs = self._getLibraries()
+
+        return self._libs
+
+    def getmtime(self):
+        """
+        Gets file modification time as defined in p.getmtime
+        """
+        if not p.exists(self.filename):
+            return None
+        return p.getmtime(self.filename)
+
     def getDesignUnitsDotted(self):
-        """Returns a list of dictionaries with the design units defined.
-        The dict defines the name (as defined in the source file) and
-        the type (package, entity, etc)"""
+        """
+        Returns the design units using the <library>.<design_unit>
+        representation
+        """
         return set(["%s.%s" % (self.library, x['name']) \
                     for x in self.getDesignUnits()])
 
-    def getDependencies(self):
-        """Returns a list of dictionaries with the design units this
-        source file depends on. Dict defines library and unit"""
-        self._parseIfChanged()
-        return self._deps
 
-    def getmtime(self):
-        """Gets file modification time as defined in os.path.getmtime"""
-        try:
-            mtime = os.path.getmtime(self.filename)
-        except OSError: # pragma: no cover
-            mtime = None
-        return mtime
+    @abc.abstractmethod
+    def _getSourceContent(self):
+        """
+        Method that should implement pre parsing of the source file.
+        This includes removing comments and unnecessary or unimportant
+        chunks of text to make the life of the real parsing easier.
+        Should return a string and NOT a list of lines
+        """
+
+    @abc.abstractmethod
+    def _getDesignUnits(self):
+        """
+        Method that should implement the real parsing of the source file
+        to find design units defined. Use the output of the getSourceContent
+        method to avoid unnecessary I/O
+        """
+
+    @abc.abstractmethod
+    def _getLibraries(self):
+        """
+        Parses the source file to find libraries required by the file
+        """
+
+    @abc.abstractmethod
+    def _getDependencies(self):
+        """
+        Parses the source and returns a list of dictionaries that
+        describe its dependencies
+        """
+
+    def getMatchingLibrary(self, unit_type, unit_name):
+        if unit_type == 'package':
+            match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
+                              self.getSourceContent(), flags=re.S)
+            if match.groupdict()['library_name'] == 'work':
+                return self.library
+            else:
+                return match.groupdict()['library_name']
+        assert False, "%s, %s" % (unit_type, unit_name)
 

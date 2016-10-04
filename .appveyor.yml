@@ -41,12 +41,12 @@ clone_depth: 5
 environment:
   ARCH: 32
   matrix:
-    - BUILDER_NAME: ghdl
+    - BUILDER: other
+    - BUILDER: ghdl
       # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
       URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip
-    - BUILDER_NAME: msim
+    - BUILDER: msim
       URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
-
 
 # # build cache to preserve files/folders between builds
 # cache:
@@ -54,14 +54,16 @@ environment:
 
 # scripts that run after cloning repository
 install:
+  - git clone https://github.com/suoto/grlib
+    "%APPVEYOR_BUILD_FOLDER%\\.ci\\test_support\\grlib"
   - git submodule update --init --recursive
 
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
-  - "python %APPVEYOR_BUILD_FOLDER%\\.ci\\scripts\\run_tests.py
-      -vv -F -B --log-capture %EXTRA_ARGS%"
-
+  - if "%BUILDER%" == "msim" (python run_tests.py --msim -v)
+  - if "%BUILDER%" == "ghdl" (python run_tests.py --ghdl -v)
+  - if "%BUILDER%" == "other" (python run_tests.py --fallback --standalone -v)
   - coverage combine
   - coverage report
   - codecov

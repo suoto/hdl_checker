@@ -25,35 +25,22 @@ import traceback
 import threading
 from multiprocessing.pool import ThreadPool
 
-# Make the serializer transparent
-try:
-    import json as serializer
-    def _dump(*args, **kwargs):
-        "Wrapper for json.dump"
-        return serializer.dump(indent=True, *args, **kwargs)
-except ImportError:
-    try:
-        import cPickle as serializer
-    except ImportError:
-        import pickle as serializer
-
-    _dump = serializer.dump # pylint: disable=invalid-name
-
 import hdlcc.exceptions
 import hdlcc.builders
-import hdlcc.utils as utils
+from hdlcc.utils import getFileType, removeDuplicates, serializer, dump
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
 
-# pylint: disable=too-many-instance-attributes,abstract-class-not-used
+# pylint: disable=too-many-instance-attributes
+# pylint: disable=abstract-class-not-used
 class HdlCodeCheckerBase(object):
-    "HDL Code Checker project builder class"
-
+    """
+    HDL Code Checker project builder class
+    """
     _USE_THREADS = True
-    MAX_BUILD_STEPS = 20
 
     __metaclass__ = abc.ABCMeta
 
@@ -61,231 +48,31 @@ class HdlCodeCheckerBase(object):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
-        self._background_thread = threading.Thread(
-            target=self._buildByDependency, name='_buildByDependency')
-
-        self._units_built = []
+        self._background_thread = None
 
         self.project_file = project_file
 
         self._config = None
         self.builder = None
 
-        self.setupEnvIfNeeded()
-        #  self.buildByDependency()
+        self._setupEnvIfNeeded()
+        self._saveCache()
 
     def _getCacheFilename(self, target_dir=None):
-        "Returns the cache file name for a given project file"
+        """
+        Returns the cache file name for a given project file
+        """
         if target_dir is None:
-            if self._config is None:
+            if self._config is None or self._config.getBuilder() == 'fallback':
                 return None
             else:
                 target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
 
-    def clean(self):
-        "Clean up generated files"
-        cache_fname = self._getCacheFilename()
-        if cache_fname is not None and p.exists(cache_fname):
-            _logger.debug("Removing cached info in '%s'", cache_fname)
-            os.remove(cache_fname)
-
-        target_dir = self._config.getTargetDir()
-        if p.exists(target_dir):
-            _logger.debug("Removing target dir '%s'", target_dir)
-            shutil.rmtree(target_dir)
-
-        del self._config
-        del self.builder
-        self._config = None
-        self.builder = None
-
-    def _setState(self, state):
-        "serializer load implementation"
-        self._logger = logging.getLogger(state['_logger']['name'])
-        self._logger.setLevel(state['_logger']['level'])
-        del state['_logger']
-        self._lock = threading.Lock()
-        self._background_thread = threading.Thread(target=self._buildByDependency)
-
-        self._config = ConfigParser.recoverFromState(state['_config'])
-
-        builder_name = self._config.getBuilder()
-        self._logger.debug("Recovered builder is '%s'", builder_name)
-        builder_class = hdlcc.builders.getBuilderByName(builder_name)
-        self.builder = builder_class.recoverFromState(state['builder'])
-
-    @abc.abstractmethod
-    def _handleUiInfo(self, message):
-        """Method that should be overriden to handle info messages from
-        HDL Code Checker to the user"""
-
-    @abc.abstractmethod
-    def _handleUiWarning(self, message):
-        """Method that should be overriden to handle warning messages
-        from HDL Code Checker to the user"""
-
-    @abc.abstractmethod
-    def _handleUiError(self, message):
-        """Method that should be overriden to handle errors messages
-        from HDL Code Checker to the user"""
-
-    def _findSourceByDesignUnit(self, design_unit):
-        "Finds the source files that have 'design_unit' defined"
-        sources = []
-        for source in self._config.getSources():
-            if design_unit in source.getDesignUnitsDotted():
-                sources += [source]
-        if not sources:
-            raise hdlcc.exceptions.DesignUnitNotFoundError(design_unit)
-        return sources
-
-    def _translateSourceDependencies(self, source):
-        """Translate raw dependency list parsed from a given source to the
-        project name space"""
-        for dependency in source.getDependencies():
-            if dependency['library'] in self.builder.getBuiltinLibraries() or \
-               dependency['unit'] == 'all' or \
-               (dependency['library'] == source.library and \
-                dependency['unit'] in [x['name'] for x in source.getDesignUnits()]):
-                continue
-            yield dependency
-
-    def _getSourceDependenciesSet(self, source):
-        "Returns a set containing the dependencies of a given source"
-        return set(["%s.%s" % (x['library'], x['unit']) \
-                for x in self._translateSourceDependencies(source)])
-
-    def _getBuildSteps(self):
-        "Yields source objects that can be built given the units already built"
-        sources_built = []
-        for step in range(self.MAX_BUILD_STEPS):
-            empty_step = True
-            for source in self._config.getSources():
-                dependencies = self._getSourceDependenciesSet(source)
-
-                missing_dependencies = dependencies - set(self._units_built)
-
-                # Skip current file if it has missing dependencies or if it was
-                # already built
-                if missing_dependencies:
-                    self._logger.debug("Skipping %s for now because it has "
-                                       "missing dependencies: %s", source,
-                                       list(missing_dependencies))
-                    continue
-
-                if source.abspath in sources_built:
-                    continue
-
-                self._units_built += list(source.getDesignUnitsDotted())
-                sources_built += [source.abspath]
-                empty_step = False
-                yield source
-
-            if empty_step:
-                missing_paths = list(set(
-                    self._config.getSourcesPaths()) - set(sources_built))
-                for missing_path in missing_paths: # pragma: no cover
-                    source = self._config.getSourceByPath(missing_path)
-                    dependencies = self._getSourceDependenciesSet(source)
-                    missing_dependencies = dependencies - set(self._units_built)
-                    if missing_dependencies:
-                        self._logger.warning(
-                            "Couldn't build source '%s'. Missing dependencies: %s",
-                            str(source),
-                            ", ".join([str(x) for x in missing_dependencies]))
-                    #  else:
-                    #      self._logger.warning(
-                    #          "Source %s wasn't built but has no missing "
-                    #          "dependencies", str(source))
-                    #      yield source
-
-                self._logger.debug("Breaking at step %d. Units built: %s",
-                                   step, ", ".join(sorted(self._units_built)))
-
-                raise StopIteration()
-
-    def _sortBuildMessages(self, records): # pylint: disable=no-self-use
-        "Sorts a given set of build records"
-        return sorted(records, key=lambda x: \
-                (x['error_type'], x['line_number'], x['error_number']))
-
-    def _getSourceByPath(self, path, batch_mode):
+    def _saveCache(self):
         """
-        Get the source object, flags and any additional info to be displayed
+        Dumps project object to a file to recover its state later
         """
-        source = None
-        flags = []
-        remarks = []
-
-        if self._config is not None:
-            try:
-                source = self._config.getSourceByPath(path)
-            except KeyError:
-                pass
-
-        # If the source file was not found on the configuration file, add this
-        # as a remark.
-        # Also, create a source parser object with some library so the user can
-        # at least have some info on the source
-        if source is None:
-            remarks += [{
-                'checker'        : 'hdlcc',
-                'line_number'    : '',
-                'column'         : '',
-                'filename'       : '',
-                'error_number'   : '',
-                'error_type'     : 'W',
-                'error_message'  : 'Path "%s" not found in project file' %
-                                   p.abspath(path)}]
-            self._logger.info("Path %s not found in the project file", path)
-            cls = VhdlParser if utils.getFileType(path) == 'vhdl' else \
-                  VerilogParser
-            source = cls(path, library='undefined')
-        else:
-            flags = self._config.getBatchBuildFlagsByPath(path) if batch_mode else \
-                    self._config.getSingleBuildFlagsByPath(path)
-
-        return source, flags, remarks
-
-    def _getBuilderMessages(self, path, batch_mode=False):
-        """
-        Builds a given source file handling rebuild of units reported
-        by the compiler
-        """
-        source, flags, remarks = self._getSourceByPath(path, batch_mode)
-        if source is None:
-            self._logger.info("Returning '%s'", repr(remarks))
-            return remarks
-
-        self._logger.debug("Building '%s', batch_mode = %s",
-                           str(path), batch_mode)
-
-        records, rebuilds = self.builder.build(source, forced=True, flags=flags)
-
-        if rebuilds:
-            source = self._config.getSourceByPath(path)
-            self._logger.info("Building '%s' triggers rebuilding: %s",
-                              source, ", ".join([str(x) for x in rebuilds]))
-
-            for rebuild in rebuilds:
-                self._logger.debug("Rebuild hint: '%s'", rebuild)
-                if 'rebuild_path' in rebuild:
-                    self._getBuilderMessages(rebuild['rebuild_path'],
-                                             batch_mode=True)
-                else:
-                    design_unit = '%s.%s' % (rebuild['library_name'],
-                                             rebuild['unit_name'])
-                    for rebuild_source in \
-                            self._findSourceByDesignUnit(design_unit):
-                        self._getBuilderMessages(rebuild_source.abspath,
-                                                 batch_mode=True)
-            return self._getBuilderMessages(path)
-
-        return self._sortBuildMessages(records + remarks)
-
-    def saveCache(self):
-        "Dumps project object to a file to recover its state later"
         cache_fname = self._getCacheFilename()
         if self.builder.builder_name == 'fallback' or cache_fname is None:
             self._logger.debug("Skipping cache save")
@@ -298,7 +85,9 @@ class HdlCodeCheckerBase(object):
                  '_config' : self._config.getState()}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
-        _dump(state, open(cache_fname, 'w'))
+        if not p.exists(p.dirname(cache_fname)):
+            os.mkdir(p.dirname(cache_fname))
+        dump(state, open(cache_fname, 'w'))
 
     def _recoverCache(self, target_dir):
         """
@@ -314,56 +103,24 @@ class HdlCodeCheckerBase(object):
 
         _logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
-        if p.exists(cache_fname):
-            try:
-                cache = serializer.load(open(cache_fname, 'r'))
-                self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
-                                   (cache_fname, serializer.__package__))
-                self._setState(cache)
-                self.builder.checkEnvironment()
-            except ValueError:
-                self._handleUiError(
-                    "Unable to recover cache from '%s' using '%s'\n"
-                    "Traceback:\n%s" % \
-                        (cache_fname, serializer.__package__,
-                         traceback.format_exc()))
-        else:
+        if not p.exists(cache_fname):  # pragma: no cover
             _logger.debug("File not found")
+            return
 
-    def getCompilationOrder(self):
-        "Returns the build order needed by the _buildByDependency method"
-        self._units_built = []
-        return self._getBuildSteps()
-
-    def buildByDependency(self):
-        "Build the project by checking source file dependencies"
-        if self._USE_THREADS: # pragma: no cover
-            if not self._background_thread.isAlive():
-                self._background_thread = \
-                        threading.Thread(target=self._buildByDependency,
-                                         name='_buildByDependency')
-                self._background_thread.start()
-            else:
-                self._handleUiInfo("Build thread is already running")
-        else: # pragma: no cover
-            self._buildByDependency()
-
-    def finishedBuilding(self):
-        "Returns whether a background build has finished running"
-        return not self._background_thread.isAlive()
-
-    def waitForBuild(self):
-        "Waits until the background build finishes"
         try:
-            self._background_thread.join()
-            self._logger.debug("Background thread joined")
-        except RuntimeError:
-            self._logger.debug("Background thread was not active")
+            cache = serializer.load(open(cache_fname, 'r'))
+            self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
+                               (cache_fname, serializer.__package__))
+            self._setState(cache)
+            self.builder.checkEnvironment()
+        except ValueError:
+            self._handleUiError(
+                "Unable to recover cache from '%s' using '%s'\n"
+                "Traceback:\n%s" % \
+                    (cache_fname, serializer.__package__,
+                     traceback.format_exc()))
 
-        with self._lock:
-            self._logger.info("Build has finished")
-
-    def setupEnvIfNeeded(self):
+    def _setupEnvIfNeeded(self):
         """
         Updates or creates the environment, which includes checking
         if the configuration file should be parsed and creating the
@@ -389,8 +146,8 @@ class HdlCodeCheckerBase(object):
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
                 self.builder = builder_class(self._config.getTargetDir())
 
-            self._logger.info("Selected builder is '%s'",
-                              self.builder.builder_name)
+                self._logger.info("Selected builder is '%s'",
+                                  self.builder.builder_name)
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:
@@ -399,42 +156,250 @@ class HdlCodeCheckerBase(object):
             self._handleUiError(_msg)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
-    def _buildByDependency(self):
-        "Build the project by checking source file dependencies"
-        with self._lock:
-            self.setupEnvIfNeeded()
-            built = 0
-            errors = 0
-            warnings = 0
-            self._units_built = []
-            for source in self._getBuildSteps():
-                records, _ = self.builder.build(source, \
-                        flags=self._config.getBatchBuildFlagsByPath(source.filename))
-                self._units_built += list(source.getDesignUnitsDotted())
-                for record in self._sortBuildMessages(records):
-                    if record['error_type'] == 'E':
-                        _logger.debug(str(record))
-                        errors += 1
-                    elif record['error_type'] == 'W':
-                        _logger.debug(str(record))
-                        warnings += 1
-                    elif self.builder.builder_name != 'xvhdl': # pragma: no cover
-                        _logger.error("Invalid record: %s", str(record))
-                        raise ValueError("Record '%s' is invalid" % record)
-                built += 1
-            self._logger.info("Done. Built %d sources, %d errors and %d warnings", \
-                    built, errors, warnings)
+    def clean(self):
+        """
+        Clean up generated files
+        """
+        cache_fname = self._getCacheFilename()
+        if cache_fname is not None and p.exists(cache_fname):
+            _logger.debug("Removing cached info in '%s'", cache_fname)
+            os.remove(cache_fname)
+
+        target_dir = self._config.getTargetDir()
+        if p.exists(target_dir):
+            _logger.debug("Removing target dir '%s'", target_dir)
+            shutil.rmtree(target_dir)
+
+        del self._config
+        del self.builder
+        self._config = None
+        self.builder = None
+
+    def _setState(self, state):
+        """
+        Serializer load implementation
+        """
+        self._logger = logging.getLogger(state['_logger']['name'])
+        self._logger.setLevel(state['_logger']['level'])
+        del state['_logger']
+        self._lock = threading.Lock()
+        self._background_thread = None
+
+        self._config = ConfigParser.recoverFromState(state['_config'])
+
+        builder_name = self._config.getBuilder()
+        self._logger.debug("Recovered builder is '%s'", builder_name)
+        builder_class = hdlcc.builders.getBuilderByName(builder_name)
+        self.builder = builder_class.recoverFromState(state['builder'])
+
+    @abc.abstractmethod
+    def _handleUiInfo(self, message):
+        """
+        Method that should be overriden to handle info messages from
+        HDL Code Checker to the user
+        """
+
+    @abc.abstractmethod
+    def _handleUiWarning(self, message):
+        """
+        Method that should be overriden to handle warning messages
+        from HDL Code Checker to the user
+        """
+
+    @abc.abstractmethod
+    def _handleUiError(self, message):
+        """
+        Method that should be overriden to handle errors messages
+        from HDL Code Checker to the user
+        """
+
+    def _getSourceByPath(self, path):
+        """
+        Get the source object, flags and any additional info to be displayed
+        """
+        source = None
+        remarks = []
+
+        if self._config is not None:
+            try:
+                source = self._config.getSourceByPath(path)
+            except KeyError:
+                pass
+
+        # If the source file was not found on the configuration file, add this
+        # as a remark.
+        # Also, create a source parser object with some library so the user can
+        # at least have some info on the source
+        if source is None:
+            remarks += [{
+                'checker'        : 'hdlcc',
+                'line_number'    : '',
+                'column'         : '',
+                'filename'       : '',
+                'error_number'   : '',
+                'error_type'     : 'W',
+                'error_message'  : 'Path "%s" not found in project file' %
+                                   p.abspath(path)}]
+            self._logger.info("Path %s not found in the project file", path)
+            cls = VhdlParser if getFileType(path) == 'vhdl' else VerilogParser
+            source = cls(path, library='undefined')
+
+        return source, remarks
+
+    def _resolveRelativeNames(self, source):
+        """
+        Translate raw dependency list parsed from a given source to the
+        project name space
+        """
+        for dependency in source.getDependencies():
+            if dependency['library'] in self.builder.getBuiltinLibraries() or \
+               dependency['unit'] == 'all' or \
+               (dependency['library'] == source.library and \
+                dependency['unit'] in [x['name'] for x in source.getDesignUnits()]):
+                continue
+            yield dependency['library'], dependency['unit']
+
+    @staticmethod
+    def _sortBuildMessages(records):
+        """
+        Sorts a given set of build records
+        """
+        return sorted(records, key=lambda x: \
+                (x['error_type'], x['line_number'], x['error_number']))
+
+    def getBuildSequence(self, source):
+        """
+        Wrapper to _getBuildSequence passing the initial build sequence
+        list empty
+        """
+        build_sequence = []
+        self._getBuildSequence(source, build_sequence)
+        return build_sequence
+
+    def _getBuildSequence(self, source, build_sequence, reference=None):
+        """
+        Recursively finds out the dependencies of the given source file
+        """
+        self._logger.debug("Checking build sequence for %s", source)
+        for library, unit in self._resolveRelativeNames(source):
+            # Get a list of source files that contains this design unit
+            dependencies_list = self._config.discoverSourceDependencies(
+                unit, library)
+
+            if not dependencies_list:
+                continue
+            dependency = dependencies_list[0]
+
+            # If we found more than a single file, then multiple files
+            # have the same entity or package name and we failed to
+            # identify the real file
+            if len(dependencies_list) != 1:
+                self._handleUiWarning(
+                    "Returning dependency '%s' for %s.%s in file '%s', but "
+                    "there were %d other matches: %s. The selected option may "
+                    "be sub-optimal" % (
+                        dependency.filename, library, unit, source.filename,
+                        len(dependencies_list),
+                        ', '.join([x.filename for x in dependencies_list])))
+
+            # Check if we found out that a dependency is the same we
+            # found in the previous call to break the circular loop
+            if dependency == reference:
+                return removeDuplicates(build_sequence)
+
+            if dependency not in build_sequence:
+                self._getBuildSequence(dependency, reference=source,
+                                       build_sequence=build_sequence)
+
+            if dependency not in build_sequence:
+                build_sequence.append(dependency)
+
+        build_sequence = removeDuplicates(build_sequence)
+
+    def _getBuilderMessages(self, path, batch_mode=False):
+        """
+        Builds a given source file handling rebuild of units reported
+        by the compiler
+        Builds the given source taking care of recursively building its
+        dependencies first
+        """
+        source, remarks = self._getSourceByPath(path)
+        try:
+            flags = self._config.getBuildFlags(path, batch_mode)
+        except KeyError:
+            flags = []
+
+        self._logger.info("Building '%s', batch_mode = %s",
+                          str(path), batch_mode)
+
+        build_sequence = []
+        self._getBuildSequence(source, build_sequence=build_sequence)
+
+        self._logger.debug("Compilation build_sequence is:\n%s",
+                           "\n".join([x.filename for x in build_sequence]))
+
+        for _source in build_sequence:
+            _flags = self._config.getBuildFlags(_source.filename,
+                                                batch_mode=False)
+
+            _ = self._buildAndHandleRebuilds(_source, forced=False,
+                                             flags=_flags)
+
+        source_records = self._buildAndHandleRebuilds(source, forced=True,
+                                                      flags=flags)
+        return self._sortBuildMessages(source_records + remarks)
+
+    def _buildAndHandleRebuilds(self, source, *args, **kwargs):
+        """
+        Builds the given source and handle any files that might require
+        rebuilding until there is nothing to rebuild.
+        The number of iteractions is fixed in 10.
+        """
+        # Limit the amount of recursive calls to rebuilds to avoid
+        # circular cases
+        for _ in range(10):
+            records, rebuilds = self.builder.build(source, *args, **kwargs)
+            if rebuilds:
+                self._handleRebuilds(rebuilds, source)
+            else:
+                return records
+
+
+    def _handleRebuilds(self, rebuilds, source=None):
+        """
+        Resolves hints found in the rebuild list into source objects
+        and rebuild them
+        """
+        if source is not None and rebuilds:
+            self._logger.info("Building '%s' triggers rebuilding: %s",
+                              source, ", ".join([str(x) for x in rebuilds]))
+        for rebuild in rebuilds:
+            self._logger.debug("Rebuild hint: '%s'", rebuild)
+            if 'rebuild_path' in rebuild:
+                self._getBuilderMessages(rebuild['rebuild_path'],
+                                         batch_mode=True)
+            else:
+                if  'unit_name' in rebuild and 'library_name' in rebuild:
+                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                        rebuild['unit_name'], rebuild['library_name'])
+                elif 'unit_name' in rebuild and 'unit_type' in rebuild:
+                    library = source.getMatchingLibrary(
+                        rebuild['unit_type'], rebuild['unit_name'])
+                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                        rebuild['unit_name'], library)
+                    #  assert False, ', '.join([x.filename for x in rebuild_sources])
+
+                for rebuild_source in rebuild_sources:
+                    self._getBuilderMessages(rebuild_source.abspath,
+                                             batch_mode=True)
 
     def _isBuilderCallable(self):
         """
-        Checks if all preconditions for calling the builder have been met
+        Checks if all preconditions for calling the builder have been
+        met
         """
         if self._config.filename is None:
             return False
-
-        if not self.finishedBuilding():
-            return False
-
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -443,15 +408,11 @@ class HdlCodeCheckerBase(object):
         from the import configured builder (if available) and static
         checks
         """
-        self.setupEnvIfNeeded()
+        self._setupEnvIfNeeded()
         if not p.isabs(path): # pragma: no cover
             abspath = p.join(self._start_dir, path)
         else:
             abspath = path
-
-        if not self.finishedBuilding():
-            self._handleUiWarning("Project hasn't finished building, try again "
-                                  "after it finishes.")
 
         # _USE_THREADS is for debug only, no need to cover
         # this
@@ -477,10 +438,12 @@ class HdlCodeCheckerBase(object):
                 records += self._getBuilderMessages(
                     abspath, list(args), **kwargs)
 
-        self.saveCache()
+        self._saveCache()
         return self._sortBuildMessages(records)
 
     def getSources(self):
-        "Returns a list of VhdlSourceFile objects parsed"
+        """
+        Returns a list of VhdlSourceFile objects parsed
+        """
         return self._config.getSources()
 

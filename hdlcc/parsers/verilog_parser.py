@@ -26,7 +26,8 @@ _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
 # Design unit scanner
 _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
-    ]),)
+    r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
+    ]), flags=re.S)
 
 class VerilogParser(BaseSourceFile):
     """Parses and stores information about a source file such as
@@ -35,38 +36,42 @@ class VerilogParser(BaseSourceFile):
     def _getSourceContent(self):
         """Replace everything from comment ('--') until a line break
         and converts to lowercase"""
-        # Remove block comments before splitting
+        # Remove multiline comments
         lines = re.sub(r'/\*.*\*/|//[^(\r\n?|\n)]*', '',
                        open(self.filename, 'r').read(), flags=re.S)
-        return [re.sub(r'\r\n?|\n', ' ', lines, flags=re.S)]
+        return re.sub(r'\r\n?|\n', ' ', lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
         """Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines"""
-        for line in self._getSourceContent():
-            for match in _DESIGN_UNIT_SCANNER.finditer(line):
-                yield match.groupdict()
+        for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
+            yield match.groupdict()
 
-    def _getDependencies(self, libraries):
+    def _getDependencies(self):
         """Parses the source and returns a list of dictionaries that
         describe its dependencies"""
         return []
 
-    def _getParsedData(self):
+    def _getDesignUnits(self):
         "Parses the source file to find design units and dependencies"
         design_units = []
 
         for match in self._iterDesignUnitMatches():
-            if match['module_name'] not in design_units:
+            if match.get('module_name', None):
                 design_units += [{
                     'name' : match['module_name'],
                     'type' : 'entity'}]
+            elif match.get('package_name', None):
+                design_units += [{
+                    'name' : match['package_name'],
+                    'type' : 'package'}]
+            else:  # pragma: no cover
+                assert False
 
         return design_units
 
-    def _doParse(self):
-        """Finds design units and dependencies then translate some design
-        units into information useful in the conext of the project"""
+    def _getLibraries(self):
+        return []
 
-        self._design_units = self._getParsedData()
+
 

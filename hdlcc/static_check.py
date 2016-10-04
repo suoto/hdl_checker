@@ -46,6 +46,7 @@ _ARCH_OBJECTS = re.compile('|'.join([
     ]), flags=re.I).finditer
 
 _SHOULD_END_SCAN = re.compile('|'.join([
+    r"\bgeneric\s+map",
     r"\bport\s+map",
     r"\bgenerate\b",
     r"\w+\s*:\s*entity",
@@ -53,8 +54,9 @@ _SHOULD_END_SCAN = re.compile('|'.join([
     ])).search
 
 def _getObjectsFromText(vbuffer):
-    """Returns a dict containing the objects found at the given text
-    buffer"""
+    """
+    Returns a dict containing the objects found at the given text buffer
+    """
     objects = {}
     lnum = 0
     area = None
@@ -70,6 +72,8 @@ def _getObjectsFromText(vbuffer):
                 area = 'package'
             elif _dict['package_body_name'] is not None:
                 area = 'package_body'
+            else:  # pragma: no cover
+                assert False
 
         matches = []
         if area is None:
