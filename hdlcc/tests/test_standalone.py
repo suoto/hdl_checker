@@ -131,8 +131,6 @@ with such.A("hdlcc standalone tool") as it:
             @params(
                 ('--debug-print-sources', ),
 
-                ('--debug-print-compile-order', ),
-
                 ('-vvv', '-s',
                  p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
                         'another_library', 'foo.vhd')),

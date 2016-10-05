@@ -85,7 +85,6 @@ def parseArguments():
                             .completer = _fileExtentensionCompleter('vhd')
 
     parser.add_argument('--debug-print-sources', action='store_true')
-    parser.add_argument('--debug-print-compile-order', action='store_true')
     parser.add_argument('--debug-parse-source-file', action='store_true')
     parser.add_argument('--debug-run-static-check', action='store_true')
     parser.add_argument('--debug-profiling', action='store', nargs='?',
@@ -163,6 +162,38 @@ def runStandaloneStaticCheck(fname):
     for record in getStaticMessages(open(fname, 'r').read().split('\n')):
         print(record)
 
+def buildSource(project, source):
+    start = time.time()
+    records = project.getMessagesByPath(source)
+    end = time.time()
+    _logger.info("Building source '%s' took %.4fs", source, (end - start))
+    for record in records:
+        if record['filename'] is not None:
+            message = [record['filename']]
+        else:
+            message = [source]
+
+        location = []
+        if record['line_number'] is not None:
+            location += ["line %s" % record['line_number']]
+
+        if record['column'] is not None:
+            location += ["column %s" % record['column']]
+
+        if location:
+            message += ["(%s)" % ', '.join(location)]
+
+        if record['error_number'] is None:
+            message += ["(%s):" % record['error_type']]
+        else:
+            message += ["(%s-%s):" % (record['error_type'],
+                                      record['error_number'])]
+
+        message += [record['error_message']]
+
+        print(' '.join(message))
+
+
 def runner(args):
     "Main runner command processing"
 
@@ -173,7 +204,6 @@ def runner(args):
     if args.clean:
         _logger.info("Cleaning up")
         project.clean()
-        #  project.setupEnvIfNeeded()
 
     if args.debug_print_sources:
         sources = PrettyTable(['Filename', 'Library', 'Flags'])
@@ -183,43 +213,8 @@ def runner(args):
             sources.add_row([source.filename, source.library, " ".join(source.flags)])
         print(sources)
 
-    #  if args.debug_print_compile_order:
-    #      for source in project.getCompilationOrder():
-    #          print("{lang} {library} {path} {flags}".format(
-    #              lang='vhdl', library=source.library, path=source.filename,
-    #              flags=' '.join(source.flags)))
-    #          assert not set(['-93', '-2008']).issubset(source.flags)
-
     for source in args.sources:
-        start = time.time()
-        records = project.getMessagesByPath(source)
-        end = time.time()
-        _logger.info("Building source '%s' took %.4fs", source, (end - start))
-        for record in records:
-            if record['filename'] is not None:
-                message = [record['filename']]
-            else:
-                message = [source]
-
-            location = []
-            if record['line_number'] is not None:
-                location += ["line %s" % record['line_number']]
-
-            if record['column'] is not None:
-                location += ["column %s" % record['column']]
-
-            if location:
-                message += ["(%s)" % ', '.join(location)]
-
-            if record['error_number'] is None:
-                message += ["(%s):" % record['error_type']]
-            else:
-                message += ["(%s-%s):" % (record['error_type'],
-                                          record['error_number'])]
-
-            message += [record['error_message']]
-
-            print(' '.join(message))
+        buildSource(project, source)
 
     if args.debug_parse_source_file:
         for source in args.sources:
@@ -228,9 +223,6 @@ def runner(args):
     if args.debug_run_static_check:
         for source in args.sources:
             runStandaloneStaticCheck(source)
-
-    #  if args.debug_print_sources or args.debug_print_compile_order or args.build:
-    #      project.saveCache()
 
 def main():
     "Main hook for standalone usage"

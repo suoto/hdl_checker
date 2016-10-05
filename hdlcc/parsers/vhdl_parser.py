@@ -30,11 +30,11 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     r"\bcontext\s+(?P<context_name>\w+)\s+is\b",
     ]), flags=re.M)
 
-_LIBRARY_SCANNER = re.compile(r"\blibrary\s+(?P<library_name>[^;]+)",
-                              flags=re.M)
+_LIBRARY_SCANNER = re.compile(
+    r"\blibrary\s+(?P<library_name>[^;]+)", flags=re.M)
 
 _ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
-    r"\bpackage\s+body\s+(?P<package_name>\w+)\s+is\b",
+    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
     r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
 
 _SUB_COMMENTS = re.compile(r"\s*--[^\n]*", flags=re.S).sub
@@ -61,7 +61,7 @@ class VhdlParser(BaseSourceFile):
             yield match.groupdict()
 
     def _getDependencies(self):
-        libs = self._getLibraries() + ['work']
+        libs = self.getLibraries() + ['work']
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
@@ -78,11 +78,11 @@ class VhdlParser(BaseSourceFile):
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             _dict = match.groupdict()
-            package_name = _dict.get('package_name', None)
-            component_name = _dict.get('component_name', None)
-            if package_name:
-                dependencies += [{'library' : self.library, 'unit': package_name}]
-
+            package_body_name = _dict['package_body_name']
+            if package_body_name is not None:
+                dependencies.append(
+                    {'library' : self.library,
+                     'unit': package_body_name})
 
         return dependencies
 
@@ -95,7 +95,8 @@ class VhdlParser(BaseSourceFile):
         for match in _LIBRARY_SCANNER.finditer(self.getSourceContent()):
             match = match.groupdict()
             if match['library_name'] is not None:
-                libs += re.split(r"\s*,\s*", match['library_name'])
+                for lib in re.split(r"\s*,\s*", match['library_name']):
+                    libs.append(lib.strip())
 
         libs.remove('work')
         libs.append(self.library)

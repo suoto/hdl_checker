@@ -21,3 +21,4 @@ exclude_paths:
   - hdlcc/tests/*
   - hdlcc/_version.py
   - versioneer.py
+  - run_tests.py
