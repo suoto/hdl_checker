@@ -26,7 +26,8 @@ from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import getFileType, removeDuplicates, serializer, dump
+from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump,
+                         samefile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
@@ -278,12 +279,14 @@ class HdlCodeCheckerBase(object):
         # sequence
         key = 'getBuildSequence'
         if key in self._cache:
-            sequence = self._cache[key]['sequence']
-            cache_mtime = self._cache[key]['cache_mtime']
-            last_mtime = max([x.getmtime() for x in sequence])
+            path = self._cache[key]['path']
+            if samefile(path, source.filename):
+                sequence = self._cache[key]['sequence']
+                cache_mtime = self._cache[key]['cache_mtime']
+                last_mtime = max([x.getmtime() for x in sequence])
 
-            if cache_mtime == last_mtime:
-                return self._cache[key]['sequence']
+                if cache_mtime == last_mtime:
+                    return self._cache[key]['sequence']
 
         build_sequence = []
         self._getBuildSequence(source, build_sequence)
@@ -466,6 +469,7 @@ class HdlCodeCheckerBase(object):
         Returns a list of VhdlSourceFile objects parsed
         """
         return self._config.getSources()
+
     def onBufferVisit(self, path):
         """
         Runs tasks whenever a buffer is being visited. Currently this
@@ -477,6 +481,7 @@ class HdlCodeCheckerBase(object):
         sequence = self.getBuildSequence(source)
         cache_mtime = max([x.getmtime() for x in sequence])
         self._cache[key] = {
+            'path': path,
             'sequence': sequence,
             'cache_mtime': cache_mtime}
 

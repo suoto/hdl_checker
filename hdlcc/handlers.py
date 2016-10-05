@@ -59,11 +59,13 @@ def _getServerByProjectFile(project_file):
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
-    if project_file not in _hdlcc_objects:
+    try:
+        return _hdlcc_objects[project_file]
+    except KeyError:
         _logger.debug("Created new project server for '%s'", project_file)
         project = HdlCodeCheckerSever(project_file)
         _hdlcc_objects[project_file] = project
-    return _hdlcc_objects[project_file]
+        return project
 
 def setupSignalHandlers():
     """
