@@ -529,7 +529,6 @@ class ConfigParser(object):
         return self._parms['global_build_flags'][lang] + \
                self._parms['batch_build_flags'][lang] + \
                self._sources[p.abspath(path)].flags
-
     def getBuildFlags(self, path, batch_mode):
         lang = self.getSourceByPath(path).filetype
         flags = list(self._parms['global_build_flags'][lang])
@@ -565,7 +564,6 @@ class ConfigParser(object):
         if self.filename is None:
             return True
         return p.abspath(path) in self._sources.keys()
-
     def findSourcesByDesignUnit(self, unit, library='work'):
         sources = []
         for source in self._sources.itervalues():
@@ -573,7 +571,8 @@ class ConfigParser(object):
                                                       source.getDesignUnits()]:
                 sources += [source]
         if not sources:
-            self._logger.warning("No source file defining '%s'", unit)
+            self._logger.warning("No source file defining '%s.%s'",
+                                 library, unit)
         return sources
 
     # TODO: This result can be cached while no source file has changed

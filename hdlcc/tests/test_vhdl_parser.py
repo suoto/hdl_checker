@@ -20,6 +20,7 @@
 import os
 import logging
 from nose2.tools import such
+from nose2.tools.params import params
 
 from hdlcc.parsers import VhdlParser
 
@@ -36,12 +37,15 @@ with such.A('VHDL source file object') as it:
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
             it._code = [
-                "library ieee;",
+                "library ieee ;",
                 "use ieee.std_logic_1164.all;",
                 "USE IEEE.STD_LOGIC_ARITH.ALL;",
                 "",
                 "library work;",
                 "use work.package_with_constants;",
+                "",
+                "library lib1,lib2;",
+                "library lib3, lib4;",
                 "",
                 "entity clock_divider is",
                 "    generic (",
@@ -71,14 +75,23 @@ with such.A('VHDL source file object') as it:
         def test():
             it.source = VhdlParser(_FILENAME)
 
-
         @it.should('return its entities')
         def test():
             design_units = list(it.source.getDesignUnits())
-            _logger.debug("Design units: %s", design_units)
+            _logger.info("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
             it.assertItemsEqual([{'type' : 'entity', 'name' : 'clock_divider'}],
                                 design_units)
+
+        @it.should('parse its libraries')
+        def test():
+            libraries = it.source.getLibraries()
+            _logger.info("Libraries found: %s",
+                         ", ".join([repr(x) for x in libraries]))
+
+            it.assertItemsEqual(
+                ['work', 'ieee', 'lib1', 'lib2', 'lib3', 'lib4'],
+                libraries)
 
         @it.should('return its dependencies')
         def test():
@@ -94,6 +107,19 @@ with such.A('VHDL source file object') as it:
         @it.should('return source modification time')
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
+
+        @it.should('find the matching library of a package')
+        @params(
+            ('package', 'std_logic_1164', 'ieee'),
+            ('package', 'package_with_constants', 'work'))
+        def test(case, unit_type, unit_name, result):
+            _logger.info("Running test %s", case)
+            _logger.info("Unit: '%s' is a '%s'. Expected result is '%s'",
+                         unit_name, unit_type, result)
+
+            it.assertEqual(
+                result,
+                it.source.getMatchingLibrary(unit_type, unit_name))
 
         @it.should('return updated dependencies')
         def test():
@@ -189,7 +215,7 @@ with such.A('VHDL source file object') as it:
         @it.should('return the names of the packages found')
         def test():
             design_units = list(it.source.getDesignUnits())
-            _logger.debug("Design units: %s", design_units)
+            _logger.info("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
             it.assertItemsEqual(
                 [{'type' : 'package', 'name' : 'package_with_constants'}],

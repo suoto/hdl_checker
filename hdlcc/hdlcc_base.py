@@ -22,7 +22,6 @@ import os.path as p
 import shutil
 import logging
 import traceback
-import threading
 from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
@@ -40,15 +39,16 @@ class HdlCodeCheckerBase(object):
     """
     HDL Code Checker project builder class
     """
+
     _USE_THREADS = True
+    _MAX_REBUILD_ATTEMPTS = 20
 
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, project_file=None):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
-        self._lock = threading.Lock()
-        self._background_thread = None
+        self._cache = {}
 
         self.project_file = project_file
 
@@ -68,7 +68,6 @@ class HdlCodeCheckerBase(object):
             else:
                 target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
-
     def _saveCache(self):
         """
         Dumps project object to a file to recover its state later
@@ -182,8 +181,6 @@ class HdlCodeCheckerBase(object):
         self._logger = logging.getLogger(state['_logger']['name'])
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
-        self._lock = threading.Lock()
-        self._background_thread = None
 
         self._config = ConfigParser.recoverFromState(state['_config'])
 
@@ -270,8 +267,23 @@ class HdlCodeCheckerBase(object):
     def getBuildSequence(self, source):
         """
         Wrapper to _getBuildSequence passing the initial build sequence
-        list empty
+        list empty and caching the result
         """
+        # Despite we parse and invalidade the cache when entering/leaving
+        # buffers, we must also check if any file has been changed by
+        # some background process that the editor might be unaware of.
+        # To cope with this, we'll check if the newest modification time
+        # of the build sequence hasn't changed since we cached the build
+        # sequence
+        key = 'getBuildSequence'
+        if key in self._cache:
+            sequence = self._cache[key]['sequence']
+            cache_mtime = self._cache[key]['cache_mtime']
+            last_mtime = max([x.getmtime() for x in sequence])
+
+            if cache_mtime == last_mtime:
+                return self._cache[key]['sequence']
+
         build_sequence = []
         self._getBuildSequence(source, build_sequence)
         return build_sequence
@@ -332,8 +344,7 @@ class HdlCodeCheckerBase(object):
         self._logger.info("Building '%s', batch_mode = %s",
                           str(path), batch_mode)
 
-        build_sequence = []
-        self._getBuildSequence(source, build_sequence=build_sequence)
+        build_sequence = self.getBuildSequence(source)
 
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
@@ -355,22 +366,24 @@ class HdlCodeCheckerBase(object):
         rebuilding until there is nothing to rebuild.
         The number of iteractions is fixed in 10.
         """
-        # Limit the amount of recursive calls to rebuilds to avoid
-        # circular cases
-        for _ in range(10):
+        # Limit the amount of calls to rebuild the same file to avoid
+        # hanging the server
+        for _ in range(self._MAX_REBUILD_ATTEMPTS):
             records, rebuilds = self.builder.build(source, *args, **kwargs)
             if rebuilds:
                 self._handleRebuilds(rebuilds, source)
             else:
                 return records
 
+        self._handleUiError("Unable to build '%s' after %d attempts" %
+                            (source, self._MAX_REBUILD_ATTEMPTS))
 
     def _handleRebuilds(self, rebuilds, source=None):
         """
         Resolves hints found in the rebuild list into source objects
         and rebuild them
         """
-        if source is not None and rebuilds:
+        if source is not None:
             self._logger.info("Building '%s' triggers rebuilding: %s",
                               source, ", ".join([str(x) for x in rebuilds]))
         for rebuild in rebuilds:
@@ -379,15 +392,21 @@ class HdlCodeCheckerBase(object):
                 self._getBuilderMessages(rebuild['rebuild_path'],
                                          batch_mode=True)
             else:
-                if  'unit_name' in rebuild and 'library_name' in rebuild:
+                unit_name = rebuild.get('unit_name', None)
+                library_name = rebuild.get('library_name', None)
+                unit_type = rebuild.get('unit_type', None)
+
+
+                if library_name is not None:
                     rebuild_sources = self._config.findSourcesByDesignUnit(
-                        rebuild['unit_name'], rebuild['library_name'])
-                elif 'unit_name' in rebuild and 'unit_type' in rebuild:
+                        unit_name, library_name)
+                elif unit_type is not None:
                     library = source.getMatchingLibrary(
-                        rebuild['unit_type'], rebuild['unit_name'])
+                        unit_type, unit_name)
                     rebuild_sources = self._config.findSourcesByDesignUnit(
-                        rebuild['unit_name'], library)
-                    #  assert False, ', '.join([x.filename for x in rebuild_sources])
+                        unit_name, library)
+                else:  # pragma: no cover
+                    assert False, ', '.join([x.filename for x in rebuild_sources])
 
                 for rebuild_source in rebuild_sources:
                     self._getBuilderMessages(rebuild_source.abspath,
@@ -400,6 +419,8 @@ class HdlCodeCheckerBase(object):
         """
         if self._config.filename is None:
             return False
+
+
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -414,9 +435,7 @@ class HdlCodeCheckerBase(object):
         else:
             abspath = path
 
-        # _USE_THREADS is for debug only, no need to cover
-        # this
-        if self._USE_THREADS: # pragma: no cover
+        if self._USE_THREADS:
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \
@@ -446,4 +465,25 @@ class HdlCodeCheckerBase(object):
         Returns a list of VhdlSourceFile objects parsed
         """
         return self._config.getSources()
+    def onBufferVisit(self, path):
+        """
+        Runs tasks whenever a buffer is being visited. Currently this
+        means caching the build sequence before the file is actually
+        checked, so the overall wait time is reduced
+        """
+        source = self._config.getSourceByPath(path)
+        key = 'getBuildSequence'
+        sequence = self.getBuildSequence(source)
+        cache_mtime = max([x.getmtime() for x in sequence])
+        self._cache[key] = {
+            'sequence': sequence,
+            'cache_mtime': cache_mtime}
+
+    def onBufferLeave(self, _):
+        """
+        Runs actions when leaving a buffer. Currently this means clearing
+        the build sequence cache only.
+        """
+        key = 'getBuildSequence'
+        del self._cache[key]
 
