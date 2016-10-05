@@ -55,13 +55,12 @@ def _getServerByProjectFile(project_file):
     """Returns the HdlCodeCheckerSever object that corresponds to the
     given project file. If the object doesn't exists yet it gets created
     and then returned"""
-    if project_file is None or p.isabs(project_file):
-        if project_file not in _hdlcc_objects:
-            _logger.debug("Created new project server for '%s'", project_file)
-            project = HdlCodeCheckerSever(project_file)
-            #  project.buildByDependency()
-            _hdlcc_objects[project_file] = project
-        return _hdlcc_objects[project_file]
+    if project_file not in _hdlcc_objects:
+        _logger.debug("Created new project server for '%s'", project_file)
+        project = HdlCodeCheckerSever(project_file)
+        #  project.buildByDependency()
+        _hdlcc_objects[project_file] = project
+    return _hdlcc_objects[project_file]
 
 def setupSignalHandlers():
     def signalHandler(sig, _):
