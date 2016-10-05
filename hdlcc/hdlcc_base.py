@@ -22,7 +22,6 @@ import os.path as p
 import shutil
 import logging
 import traceback
-import threading
 from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
@@ -40,6 +39,7 @@ class HdlCodeCheckerBase(object):
     """
     HDL Code Checker project builder class
     """
+
     _USE_THREADS = True
     _MAX_REBUILD_ATTEMPTS = 20
 
@@ -48,8 +48,7 @@ class HdlCodeCheckerBase(object):
     def __init__(self, project_file=None):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
-        self._lock = threading.Lock()
-        self._background_thread = None
+        self._cache = {}
 
         self.project_file = project_file
 
@@ -69,7 +68,6 @@ class HdlCodeCheckerBase(object):
             else:
                 target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
-
     def _saveCache(self):
         """
         Dumps project object to a file to recover its state later
@@ -183,8 +181,6 @@ class HdlCodeCheckerBase(object):
         self._logger = logging.getLogger(state['_logger']['name'])
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
-        self._lock = threading.Lock()
-        self._background_thread = None
 
         self._config = ConfigParser.recoverFromState(state['_config'])
 
@@ -271,8 +267,23 @@ class HdlCodeCheckerBase(object):
     def getBuildSequence(self, source):
         """
         Wrapper to _getBuildSequence passing the initial build sequence
-        list empty
+        list empty and caching the result
         """
+        # Despite we parse and invalidade the cache when entering/leaving
+        # buffers, we must also check if any file has been changed by
+        # some background process that the editor might be unaware of.
+        # To cope with this, we'll check if the newest modification time
+        # of the build sequence hasn't changed since we cached the build
+        # sequence
+        key = 'getBuildSequence'
+        if key in self._cache:
+            sequence = self._cache[key]['sequence']
+            cache_mtime = self._cache[key]['cache_mtime']
+            last_mtime = max([x.getmtime() for x in sequence])
+
+            if cache_mtime == last_mtime:
+                return self._cache[key]['sequence']
+
         build_sequence = []
         self._getBuildSequence(source, build_sequence)
         return build_sequence
@@ -333,8 +344,7 @@ class HdlCodeCheckerBase(object):
         self._logger.info("Building '%s', batch_mode = %s",
                           str(path), batch_mode)
 
-        build_sequence = []
-        self._getBuildSequence(source, build_sequence=build_sequence)
+        build_sequence = self.getBuildSequence(source)
 
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
@@ -409,6 +419,8 @@ class HdlCodeCheckerBase(object):
         """
         if self._config.filename is None:
             return False
+
+
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -453,4 +465,25 @@ class HdlCodeCheckerBase(object):
         Returns a list of VhdlSourceFile objects parsed
         """
         return self._config.getSources()
+    def onBufferVisit(self, path):
+        """
+        Runs tasks whenever a buffer is being visited. Currently this
+        means caching the build sequence before the file is actually
+        checked, so the overall wait time is reduced
+        """
+        source = self._config.getSourceByPath(path)
+        key = 'getBuildSequence'
+        sequence = self.getBuildSequence(source)
+        cache_mtime = max([x.getmtime() for x in sequence])
+        self._cache[key] = {
+            'sequence': sequence,
+            'cache_mtime': cache_mtime}
+
+    def onBufferLeave(self, _):
+        """
+        Runs actions when leaving a buffer. Currently this means clearing
+        the build sequence cache only.
+        """
+        key = 'getBuildSequence'
+        del self._cache[key]
 

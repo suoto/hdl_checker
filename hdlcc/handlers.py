@@ -102,6 +102,24 @@ def getDiagnoseInfo():
 
     return {'info' : response}
 
+@app.post('/on_buffer_visit')
+def onBufferVisit():
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+    _logger.debug("Buffer visited is ('%s') '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    server.onBufferVisit(path)
+
+@app.post('/on_buffer_leave')
+def onBufferVisit():
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+    _logger.debug("Left buffer ('%s') '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    server.onBufferLeave(path)
+
 @app.post('/get_messages_by_path')
 def getMessagesByPath():
     "Get messages for a given projec_file/path pair"
