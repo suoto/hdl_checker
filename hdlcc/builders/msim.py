@@ -20,7 +20,6 @@ import os
 import os.path as p
 import re
 from .base_builder import BaseBuilder
-from hdlcc.exceptions import SanityCheckError
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
@@ -121,20 +120,14 @@ class MSim(BaseBuilder):
 
         return records
 
-    def checkEnvironment(self):
-        try:
-            stdout = self._subprocessRunner(['vcom', '-version'])
-            self._version = \
-                    re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
-                    stdout[0])[0]
-            self._logger.debug("vcom version string: '%s'. " + \
-                    "Version number is '%s'", \
-                    stdout, self._version)
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s",
-                                 traceback.format_exc())
-            raise SanityCheckError(self.builder_name, str(exc))
+    def _checkEnvironment(self):
+        stdout = self._subprocessRunner(['vcom', '-version'])
+        self._version = \
+                re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
+                stdout[0])[0]
+        self._logger.debug("vcom version string: '%s'. " + \
+                "Version number is '%s'", \
+                stdout, self._version)
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"

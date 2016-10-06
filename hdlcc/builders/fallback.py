@@ -37,8 +37,8 @@ class Fallback(BaseBuilder):
     def _shouldIgnoreLine(self, line): # pragma: no cover
         return True
 
-    def checkEnvironment(self):
-        return True
+    def _checkEnvironment(self):
+        return
 
     def _buildSource(self, source, flags=None): # pragma: no cover
         return [], []

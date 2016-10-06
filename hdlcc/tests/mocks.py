@@ -84,8 +84,8 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
     def _shouldIgnoreLine(self, line): # pragma: no cover
         return True
 
-    def checkEnvironment(self):
-        return True
+    def _checkEnvironment(self):
+        return
 
     def _buildSource(self, source, flags=None): # pragma: no cover
         return [], []
@@ -100,7 +100,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
 class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
     builder_name = 'FailingBuilder'
-    def checkEnvironment(self):
+    def _checkEnvironment(self):
         raise hdlcc.exceptions.SanityCheckError(
             self.builder_name, "Fake error")
 
