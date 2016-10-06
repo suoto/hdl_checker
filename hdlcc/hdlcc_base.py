@@ -483,10 +483,16 @@ class HdlCodeCheckerBase(object):
         means caching the build sequence before the file is actually
         checked, so the overall wait time is reduced
         """
-        source = self._config.getSourceByPath(path)
+        try:
+            source = self._config.getSourceByPath(path)
+        except KeyError:
+            return
         key = 'getBuildSequence'
         sequence = self.getBuildSequence(source)
-        cache_mtime = max([x.getmtime() for x in sequence])
+        try:
+            cache_mtime = max([x.getmtime() for x in sequence])
+        except ValueError:
+            self._logger.exception("Failed to get cache mtime for '%s'", path)
         self._cache[key] = {
             'path': path,
             'sequence': sequence,
