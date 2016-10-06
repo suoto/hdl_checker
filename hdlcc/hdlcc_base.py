@@ -34,7 +34,6 @@ from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
 
-# pylint: disable=too-many-instance-attributes
 # pylint: disable=abstract-class-not-used
 class HdlCodeCheckerBase(object):
     """
@@ -152,9 +151,7 @@ class HdlCodeCheckerBase(object):
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:
-            _msg = "Failed to create builder '%s'" % exc.builder
-            self._logger.warning(_msg)
-            self._handleUiError(_msg)
+            self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
     def clean(self):
@@ -271,14 +268,26 @@ class HdlCodeCheckerBase(object):
         Wrapper to _getBuildSequence passing the initial build sequence
         list empty and caching the result
         """
-        # Despite we parse and invalidade the cache when entering/leaving
-        # buffers, we must also check if any file has been changed by
-        # some background process that the editor might be unaware of.
-        # To cope with this, we'll check if the newest modification time
-        # of the build sequence hasn't changed since we cached the build
-        # sequence
+        # Despite we renew the cache when on buffer enter, we must also
+        # check if:
+        #
+        #   1) Any file has been changed by some background process that
+        #      the editor is unaware of (Vivado maybe?)
+        #      To cope with this, we'll check if the newest modification
+        #      time of the build sequence hasn't changed since we cached
+        #      the build sequence
+        #
+        #   2) The source being currently requested is the same that was
+        #      cached previously
+        #
+        # In any case, the cached build sequence will always match the
+        # source file that was visited (i.e., it won't be replaced if
+        # the item (2) above is true)
+        #
         key = 'getBuildSequence'
         if key in self._cache:
+            # We can only use the cached build sequence if the source
+            # is the same that was cached before
             path = self._cache[key]['path']
             if samefile(path, source.filename):
                 sequence = self._cache[key]['sequence']
@@ -423,8 +432,6 @@ class HdlCodeCheckerBase(object):
         """
         if self._config.filename is None:
             return False
-
-
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -487,9 +494,7 @@ class HdlCodeCheckerBase(object):
 
     def onBufferLeave(self, _):
         """
-        Runs actions when leaving a buffer. Currently this means clearing
-        the build sequence cache only.
+        Runs actions when leaving a buffer.
         """
-        key = 'getBuildSequence'
-        del self._cache[key]
+        pass
 

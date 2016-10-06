@@ -43,7 +43,7 @@ before_install:
     fi
 
 before_script:
-  - "git clone https://github.com/suoto/grlib .ci/test_support/grlib"
+  - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
   - "git submodule update"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
