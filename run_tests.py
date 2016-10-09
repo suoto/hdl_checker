@@ -37,6 +37,7 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _ON_WINDOWS = sys.platform == 'win32'
+HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
@@ -225,15 +226,16 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_standalone')
     elif env == 'standalone':
         return ('hdlcc.tests.test_config_parser',
-                'hdlcc.tests.test_vhdl_parser',
-                'hdlcc.tests.test_verilog_parser',
-                'hdlcc.tests.test_misc',
                 'hdlcc.tests.test_static_check')
     elif env == 'fallback':
         return ('hdlcc.tests.test_builders',
+                'hdlcc.tests.test_vhdl_parser',
+                'hdlcc.tests.test_verilog_parser',
                 'hdlcc.tests.test_hdlcc_base',
                 'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_standalone')
+                'hdlcc.tests.test_hdlcc_server',
+                'hdlcc.tests.test_standalone',
+                'hdlcc.tests.test_misc')
     assert False
 
 def runTestsForEnv(env, args):
@@ -262,10 +264,23 @@ def runTestsForEnv(env, args):
 
     return tests.result.wasSuccessful()
 
+def _setupPaths():
+    "Add our dependencies to sys.path"
+    for path in (
+            p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
+            p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
+        ):
+        path = p.abspath(path)
+        if path not in sys.path:
+            _logger.info("Adding '%s'", path)
+            sys.path.insert(0, path)
+        else:
+            _logger.warning("WARNING: '%s' was already on sys.path!", path)
 
 def main():
     args = _parseArguments()
     _setupLogging(args.log_stream, args.log_level)
+    _setupPaths()
     #  _clear()
 
     _logger.info("Arguments: %s", args)

@@ -108,7 +108,7 @@ def main(): # pylint: disable=missing-docstring
                 else:
                     _logger.warning("Process %d is not running anymore", source_pid)
                     utils.terminateProcess(target_pid)
-            except (TypeError, AttributeError):
+            except (TypeError, AttributeError):  # pragma: no cover
                 return
 
         _logger.debug("Setting up PID attachment from %s to %s", source_pid,
@@ -121,7 +121,7 @@ def main(): # pylint: disable=missing-docstring
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),
         "no parent PID to attach to" if args.attach_to_pid is None else \
-        "our parent is %s." % args.attach_to_pid,
+        "our parent is %s" % args.attach_to_pid,
         hdlcc.__version__)
 
     if args.attach_to_pid is not None:
