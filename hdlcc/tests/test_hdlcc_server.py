@@ -34,12 +34,9 @@ import hdlcc
 import hdlcc.handlers as handlers
 import hdlcc.utils as utils
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
-VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-GRLIB_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "grlib"))
-HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
-
 _logger = logging.getLogger(__name__)
+
+HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 def doNothing(queue):
@@ -59,7 +56,6 @@ with such.A("hdlcc server") as it:
                hdlcc_server_fname,
                '--host', it._host, '--port', it._port,
                '--log-level', HDLCC_SERVER_LOG_LEVEL,
-               #  '--attach-to-pid', str(os.getpid()),
                '--stdout', 'hdlcc-stdout.log',
                '--stderr', 'hdlcc-stderr.log',
                '--log-stream', 'hdlcc.log',]

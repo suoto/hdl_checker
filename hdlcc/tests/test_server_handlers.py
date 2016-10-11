@@ -32,7 +32,6 @@ import hdlcc.handlers as handlers
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-GRLIB_PATH = p.abspath(p.join(TEST_SUPPORT_PATH, "grlib"))
 HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
@@ -320,17 +319,17 @@ with such.A("hdlcc bottle app") as it:
             it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
             it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
             if it.BUILDER_NAME:
-                it.PROJECT_FILE = p.join(GRLIB_PATH, it.BUILDER_NAME + '.prj')
+                it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
             else:
                 it.PROJECT_FILE = None
 
-            cache = p.join(GRLIB_PATH, '.hdlcc')
+            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
 
             if p.exists(cache):
                 shutil.rmtree(cache)
 
-            it.test_file = p.join(
-                GRLIB_PATH, 'designs', 'leon3-ahbfile', 'leon3mp.vhd')
+            it.test_file = p.join(VIM_HDL_EXAMPLES, 'another_library',
+                                  'foo.vhd')
 
             if it.BUILDER_PATH:
                 it.patch = mock.patch.dict(
@@ -345,12 +344,9 @@ with such.A("hdlcc bottle app") as it:
             if it.BUILDER_PATH:
                 it.patch.stop()
 
-            cache = p.join(GRLIB_PATH, '.hdlcc')
+            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
             if p.exists(cache):
                 shutil.rmtree(cache)
-
-            #  it._server.terminate()
-            #  utils.terminateProcess(it._server.pid)
 
         @it.should("handle buffer visits without crashing")
         @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)

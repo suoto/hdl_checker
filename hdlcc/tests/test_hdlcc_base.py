@@ -61,6 +61,9 @@ with such.A("hdlcc project") as it:
         _logger.info("Builder name: %s", it.BUILDER_NAME)
         _logger.info("Builder path: %s", it.BUILDER_PATH)
 
+        it._patch = mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        it._patch.start()
+
     @it.has_teardown
     def teardown():
         cleanProjectCache(it.PROJECT_FILE)
@@ -75,6 +78,8 @@ with such.A("hdlcc project") as it:
                     shutil.rmtree(path)
                 else:
                     os.remove(path)
+
+        it._patch.stop()
 
     @it.should("get the path to the cache filename with no config file")
     def test():
@@ -101,7 +106,6 @@ with such.A("hdlcc project") as it:
     @it.should("recover from cache when recreating a project object")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def test():
         # First create a project file with something in it
         project_file = 'myproject.prj'
@@ -135,7 +139,6 @@ with such.A("hdlcc project") as it:
     @it.should("warn when failing to recover from cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
     def test():
         # First create a project file with something in it
         project_file = 'myproject.prj'
