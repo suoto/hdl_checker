@@ -34,7 +34,6 @@ from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
 
-# pylint: disable=abstract-class-not-used
 class HdlCodeCheckerBase(object):
     """
     HDL Code Checker project builder class

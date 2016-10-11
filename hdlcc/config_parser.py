@@ -73,7 +73,9 @@ _VUNIT_FLAGS = {
     }
 
 class ConfigParser(object):
-    "Configuration info provider"
+    """
+    Configuration info provider
+    """
 
     _list_parms = ('batch_build_flags', 'single_build_flags',
                    'global_build_flags',)
@@ -96,6 +98,11 @@ class ConfigParser(object):
                 'vhdl'          : [],
                 'verilog'       : [],
                 'systemverilog' : [], }}
+
+        #  self._parms = {
+        #      'batch_build_flags' : {},
+        #      'single_build_flags' : {},
+        #      'global_build_flags' : {}}
 
         if filename is not None:
             self.filename = p.abspath(filename)
@@ -136,7 +143,9 @@ class ConfigParser(object):
         return not self.__eq__(other)
 
     def _addVunitIfFound(self):
-        "Tries to import files to support VUnit right out of the box"
+        """
+        Tries to import files to support VUnit right out of the box
+        """
         if not hasVunit() or self._parms['builder'] == 'fallback':
             return
 
@@ -161,7 +170,9 @@ class ConfigParser(object):
         self._importVunitFiles(VUnit)
 
     def _importVunitFiles(self, vunit_module):
-        "Imports VUnit sources from a VUnit module"
+        """
+        Imports VUnit sources from a VUnit module
+        """
 
         # I'm not sure how this would work because VUnit specifies a
         # single VHDL revision for a whole project, so there can be
@@ -217,7 +228,9 @@ class ConfigParser(object):
         return "\n".join(_repr)
 
     def getState(self):
-        "Gets a dict that describes the current state of this object"
+        """
+        Gets a dict that describes the current state of this object
+        """
         state = {}
         state['filename'] = self.filename
         state['_timestamp'] = self._timestamp
@@ -237,7 +250,9 @@ class ConfigParser(object):
 
     @classmethod
     def recoverFromState(cls, state):
-        "Returns an object of cls based on a given state"
+        """
+        Returns an object of cls based on a given state
+        """
         obj = super(ConfigParser, cls).__new__(cls)
 
         # pylint: disable=protected-access
@@ -262,23 +277,31 @@ class ConfigParser(object):
         return obj
 
     def _shouldParse(self):
-        "Checks if we should parse the configuration file"
+        """
+        Checks if we should parse the configuration file
+        """
         if self.filename is None:
             return False
         return p.getmtime(self.filename) > self._timestamp
 
     def _updateTimestamp(self):
-        "Updates our timestamp with the configuration file"
+        """
+        Updates our timestamp with the configuration file
+        """
         self._timestamp = p.getmtime(self.filename)
 
     def _parseIfNeeded(self):
-        "Parses the configuration file"
+        """
+        Parses the configuration file
+        """
         if self._shouldParse():
             with self._lock:
                 self._doParseConfigFile()
 
     def _doParseConfigFile(self):
-        "Parse the configuration file without any previous checking"
+        """
+        Parse the configuration file without any previous checking
+        """
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
         source_path_list = []
@@ -356,7 +379,9 @@ class ConfigParser(object):
 
     # TODO: Add a test for this
     def _setDefaultBuildFlagsIfNeeded(self):
-        "Tries to get a default set of flags if none were specified"
+        """
+        Tries to get a default set of flags if none were specified
+        """
         if self.getBuilder() == 'fallback':
             return
 
@@ -379,8 +404,10 @@ class ConfigParser(object):
                         context, lang, self._parms[context][lang])
 
     def _cleanUpSourcesList(self, sources):
-        """Removes sources we had found earlier and leave only the ones
-        whose path are found in the 'sources' argument"""
+        """
+        Removes sources we had found earlier and leave only the ones
+        whose path are found in the 'sources' argument
+        """
 
         rm_list = []
         for path in self._sources:
@@ -393,7 +420,9 @@ class ConfigParser(object):
             del self._sources[rm_path]
 
     def _parseLine(self, line):
-        "Parses a line a calls the appropriate extraction methods"
+        """
+        Parses a line a calls the appropriate extraction methods
+        """
         source_path_list = []
         source_build_list = []
 
@@ -415,7 +444,9 @@ class ConfigParser(object):
         return source_path_list, source_build_list
 
     def _handleParsedParameter(self, parameter, lang, value):
-        "Handles a parsed line that sets a parameter"
+        """
+        Handles a parsed line that sets a parameter
+        """
         self._logger.debug("Found parameter '%s' for '%s' with value '%s'",
                            parameter, lang, value)
         if parameter in self._single_value_parms:
@@ -430,7 +461,9 @@ class ConfigParser(object):
             raise hdlcc.exceptions.UnknownParameterError(parameter)
 
     def _getSourcePath(self, path):
-        "Normalizes and handles absolute/relative paths"
+        """
+        Normalizes and handles absolute/relative paths
+        """
         source_path = p.normpath(p.expanduser(path))
         # If the path to the source file was not absolute, we assume
         # it was relative to the config file base path
@@ -441,9 +474,9 @@ class ConfigParser(object):
         return source_path
 
     def _handleParsedSource(self, language, library, path, flags):
-        "Handles a parsed line that adds a source"
-
-
+        """
+        Handles a parsed line that adds a source
+        """
         flags_set = _extractSet(flags)
 
         # If the source should be built, return the build info for it
@@ -452,8 +485,10 @@ class ConfigParser(object):
             return {'filename' : path, 'library' : library, 'flags' : flags_set}
 
     def _shouldAddSource(self, source_path, library, flags):
-        """Checks if the source with the given parameters should be
-        created/updated"""
+        """
+        Checks if the source with the given parameters should be
+        created/updated
+        """
         # If the path can't be found, just add it
         if source_path not in self._sources:
             return  True
@@ -468,12 +503,16 @@ class ConfigParser(object):
         return False
 
     def getBuilder(self):
-        "Returns the builder name"
+        """
+        Returns the builder name
+        """
         self._parseIfNeeded()
         return self._parms['builder']
 
     @staticmethod
     def simpleParse(filename):
+        """
+        """
         assert p.exists(filename), "Filename '%s' doesn't exists" % filename
         target_dir = None
         builder_name = None
@@ -504,12 +543,16 @@ class ConfigParser(object):
         return target_dir, builder_name
 
     def getTargetDir(self):
-        "Returns the target folder that should be used by the builder"
+        """
+        Returns the target folder that should be used by the builder
+        """
         self._parseIfNeeded()
         return self._parms['target_dir']
 
     def _getSingleBuildFlagsByPath(self, path):
-        "Return a list of flags configured to build a single source"
+        """
+        Return a list of flags configured to build a single source
+        """
         self._parseIfNeeded()
         if self.filename is None:
             return []
@@ -520,7 +563,9 @@ class ConfigParser(object):
                self._sources[p.abspath(path)].flags
 
     def _getBatchBuildFlagsByPath(self, path):
-        "Return a list of flags configured to build a single source"
+        """
+        Return a list of flags configured to build a single source
+        """
         self._parseIfNeeded()
         if self.filename is None:
             return []
@@ -545,22 +590,30 @@ class ConfigParser(object):
         return flags + self._sources[p.abspath(path)].flags
 
     def getSources(self):
-        "Returns a list of VhdlParser/VerilogParser objects parsed"
+        """
+        Returns a list of VhdlParser/VerilogParser objects parsed
+        """
         self._parseIfNeeded()
         return self._sources.values()
 
     def getSourcesPaths(self):
-        "Returns a list of absolute paths to the sources found"
+        """
+        Returns a list of absolute paths to the sources found
+        """
         self._parseIfNeeded()
         return self._sources.keys()
 
     def getSourceByPath(self, path):
-        "Returns a source object given its path"
+        """
+        Returns a source object given its path
+        """
         self._parseIfNeeded()
         return self._sources[p.abspath(path)]
 
     def hasSource(self, path):
-        "Checks if a given path exists in the configuration file"
+        """
+        Checks if a given path exists in the configuration file
+        """
         self._parseIfNeeded()
         if self.filename is None:
             return True
@@ -577,13 +630,11 @@ class ConfigParser(object):
                                  library, unit)
         return sources
 
-    # TODO: This result can be cached while no source file has changed
     def discoverSourceDependencies(self, unit, library):
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same
         name, there is no guarantee that the right one was picked
-
         """
         return self.findSourcesByDesignUnit(unit, library)
 

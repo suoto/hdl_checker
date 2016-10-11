@@ -21,7 +21,6 @@ import logging
 import os
 import os.path as p
 import subprocess as subp
-import shutil
 import time
 
 from multiprocessing import Queue, Process
@@ -30,8 +29,6 @@ from nose2.tools import such
 import mock
 
 import requests
-import hdlcc
-import hdlcc.handlers as handlers
 import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
