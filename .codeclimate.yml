@@ -2,6 +2,11 @@
 engines:
   duplication:
     enabled: true
+    exclude_fingerprints:
+      - be25b50f65f7d1d73b895954c17a1653 # Similarities in ConfigParser.__eq__
+      - 8e97134e2ae2a1faa9c912d3e7583338 # Similarities in ConfigParser.__repr__
+      - 11b280166ae74b93f35ed80447cb987d # Similarities in BaseParser._eq__
+      - 984471f8c7654015ed802edbb5f079b2 # Similarities in BaseBuilder._logBuildResults
     config:
       languages:
         - python

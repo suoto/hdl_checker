@@ -99,11 +99,6 @@ class ConfigParser(object):
                 'verilog'       : [],
                 'systemverilog' : [], }}
 
-        #  self._parms = {
-        #      'batch_build_flags' : {},
-        #      'single_build_flags' : {},
-        #      'global_build_flags' : {}}
-
         if filename is not None:
             self.filename = p.abspath(filename)
             self._logger.debug("Creating config parser for filename '%s'",
@@ -131,10 +126,8 @@ class ConfigParser(object):
         for attr in ('_parms', '_list_parms', '_single_value_parms',
                      '_sources', 'filename'):
             if not hasattr(other, attr):
-                #  self._logger.warning("Other has no %s attribute", attr)
                 return False
             if getattr(self, attr) != getattr(other, attr):
-                #  self._logger.warning("Attribute %s differs", attr)
                 return False
 
         return True
