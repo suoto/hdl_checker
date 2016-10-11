@@ -23,19 +23,17 @@ CACHE_DIR="${HOME}/cache/"
 
 INSTALLATION_DIR="${HOME}/builders/"
 
-mkdir -p ${CACHE_DIR}
-mkdir -p ${INSTALLATION_DIR}
+mkdir -p "${CACHE_DIR}"
+mkdir -p "${INSTALLATION_DIR}"
 
 XVHDL_TGZ="${CACHE_DIR}/xvhdl.tar.bz2"
 
 if [ ! -f "${XVHDL_TGZ}.gpg" -a -n "${XVHDL_URL}" ]; then
   trap "rm -f -- '$PASS_FILE'" EXIT
-  wget --no-check-certificate --verbose ${XVHDL_URL} -O ${XVHDL_TGZ}.gpg
+  wget --no-check-certificate --verbose "${XVHDL_URL}" -O "${XVHDL_TGZ}.gpg"
   trap - EXIT
 fi
 
-echo "==============================="
-du -csb ${CACHE_DIR}/*
 echo "==============================="
 
 if [ ! -f "${XVHDL_TGZ}" ]; then
@@ -45,25 +43,25 @@ if [ ! -f "${XVHDL_TGZ}" ]; then
   trap "rm -f -- '$PASS_FILE'" EXIT
   set +x
   if [ ! -z "$PASS" ]; then
-    echo $PASS >> $PASS_FILE
+    echo "$PASS" >> "$PASS_FILE"
   else
-    rm $PASS_FILE
+    rm "$PASS_FILE"
     trap - EXIT
   fi
   set -x
   # --------
 
-  cat $PASS_FILE | gpg --batch --passphrase-fd 0 ${XVHDL_TGZ}.gpg
+  gpg --batch --passphrase-fd 0 "${XVHDL_TGZ}.gpg" < "$PASS_FILE"
 
 fi
 
-ls -ltra ${CACHE_DIR}
+ls -ltra "${CACHE_DIR}"
 
 if [ ! -d "${INSTALLATION_DIR}/xvhdl/bin" ]; then
-  tar xvf ${XVHDL_TGZ} --directory ${INSTALLATION_DIR}
+  tar xvf "${XVHDL_TGZ}" --directory "${INSTALLATION_DIR}"
 fi
 
-rm ${XVHDL_TGZ}
+rm "${XVHDL_TGZ}"
 
-${INSTALLATION_DIR}/xvhdl/bin/xvhdl --version
+"${INSTALLATION_DIR}/xvhdl/bin/xvhdl" --version
 

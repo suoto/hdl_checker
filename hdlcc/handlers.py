@@ -32,7 +32,9 @@ _logger = logging.getLogger(__name__)
 app = bottle.Bottle() # pylint: disable=invalid-name
 
 class HdlCodeCheckerSever(HdlCodeCheckerBase):
-    "HDL Code Checker project builder class"
+    """
+    HDL Code Checker project builder class
+    """
     def __init__(self, *args, **kwargs):
         self._msg_queue = Queue()
         super(HdlCodeCheckerSever, self).__init__(*args, **kwargs)
@@ -52,18 +54,24 @@ class HdlCodeCheckerSever(HdlCodeCheckerBase):
             yield self._msg_queue.get()
 
 def _getServerByProjectFile(project_file):
-    """Returns the HdlCodeCheckerSever object that corresponds to the
-    given project file. If the object doesn't exists yet it gets created
-    and then returned"""
-    if project_file is None or p.isabs(project_file):
-        if project_file not in _hdlcc_objects:
-            _logger.debug("Created new project server for '%s'", project_file)
-            project = HdlCodeCheckerSever(project_file)
-            #  project.buildByDependency()
-            _hdlcc_objects[project_file] = project
+    """
+    Returns the HdlCodeCheckerSever object that corresponds to the given
+    project file. If the object doesn't exists yet it gets created and
+    then returned
+    """
+    try:
         return _hdlcc_objects[project_file]
+    except KeyError:
+        _logger.debug("Created new project server for '%s'", project_file)
+        project = HdlCodeCheckerSever(project_file)
+        _hdlcc_objects[project_file] = project
+        return project
 
 def setupSignalHandlers():
+    """
+    Configures signal handlers that will be called when exiting Python
+    shell
+    """
     def signalHandler(sig, _):
         "Handle to disable hdlcc server"
         _logger.info("Handling signal %s", repr(sig))
@@ -75,7 +83,9 @@ def setupSignalHandlers():
         signal.signal(sig, signalHandler)
 
 def _getProjectDiags(project_file):
-    "Get project specific diagnose"
+    """
+    Get project specific diagnose
+    """
     diags = []
     server = _getServerByProjectFile(project_file)
     if server.builder is not None:
@@ -87,7 +97,9 @@ def _getProjectDiags(project_file):
 
 @app.post('/get_diagnose_info')
 def getDiagnoseInfo():
-    "Collects misc diagnose info for the clients"
+    """
+    Collects misc diagnose info for the clients
+    """
     _logger.info("Collecting diagnose info")
     project_file = bottle.request.forms.get('project_file')
     response = ["hdlcc version: %s" % hdlcc.__version__,
@@ -111,8 +123,10 @@ def onBufferVisit():
     server = _getServerByProjectFile(project_file)
     server.onBufferVisit(path)
 
+    return {}
+
 @app.post('/on_buffer_leave')
-def onBufferVisit():
+def onBufferLeave():
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     _logger.debug("Left buffer ('%s') '%s'", project_file, path)
@@ -120,9 +134,13 @@ def onBufferVisit():
     server = _getServerByProjectFile(project_file)
     server.onBufferLeave(path)
 
+    return {}
+
 @app.post('/get_messages_by_path')
 def getMessagesByPath():
-    "Get messages for a given projec_file/path pair"
+    """
+    Get messages for a given projec_file/path pair
+    """
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     _logger.debug("Getting messages for '%s', '%s'", project_file, path)
@@ -138,7 +156,9 @@ def getMessagesByPath():
 
 @app.post('/get_ui_messages')
 def getUiMessages():
-    "Get messages for a given projec_file/path pair"
+    """
+    Get messages for a given projec_file/path pair
+    """
 
     project_file = bottle.request.forms.get('project_file')
     server = _getServerByProjectFile(project_file)
@@ -159,7 +179,9 @@ def getUiMessages():
 
 @app.post('/rebuild_project')
 def rebuildProject():
-    "Rebuilds the current project"
+    """
+    Rebuilds the current project
+    """
 
     _logger.info("Rebuilding project")
     project_file = bottle.request.forms.get('project_file')
@@ -171,7 +193,9 @@ def rebuildProject():
 
 @app.post('/shutdown')
 def shutdownServer():
-    "Terminates the current process to shutdown the server"
+    """
+    Terminates the current process to shutdown the server
+    """
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
 

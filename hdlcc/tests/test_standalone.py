@@ -31,8 +31,9 @@ from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
-HDLCC_LOCATION = p.join("hdlcc", "standalone.py")
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+HDLCC_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
+HDLCC_STANDALONE = p.join(HDLCC_PATH, "hdlcc", "standalone.py")
+TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 def shell(cmd):
@@ -72,17 +73,21 @@ with such.A("hdlcc standalone tool") as it:
         else:
             it.PROJECT_FILE = None
 
-        it.assertTrue(p.exists(HDLCC_LOCATION))
+        it.assertTrue(p.exists(HDLCC_STANDALONE))
+
+        env_patch = {'PYTHONPATH': HDLCC_PATH}
+
         if it.BUILDER_PATH:
-            it.patch = mock.patch.dict(
-                'os.environ',
-                {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-            it.patch.start()
+            env_patch['PATH'] = os.pathsep.join(
+                [it.BUILDER_PATH, os.environ['PATH']])
+
+        it.patch = mock.patch.dict('os.environ', env_patch)
+        it.patch.start()
 
     @it.has_teardown
     def teardown():
         cmd = ["coverage", "run",
-               HDLCC_LOCATION, it.PROJECT_FILE,
+               HDLCC_STANDALONE, it.PROJECT_FILE,
                "--clean"]
 
         if it.PROJECT_FILE is not None:
@@ -94,8 +99,7 @@ with such.A("hdlcc standalone tool") as it:
         if p.exists(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build')):
             shutil.rmtree(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build'))
 
-        if it.BUILDER_PATH:
-            it.patch.stop()
+        it.patch.stop()
 
         if p.exists('xvhdl.pb'):
             os.remove('xvhdl.pb')
@@ -124,7 +128,7 @@ with such.A("hdlcc standalone tool") as it:
             @it.should("print the tool's help")
             def test():
                 cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, '-h']
+                       HDLCC_STANDALONE, '-h']
                 shell(cmd)
 
             @it.should("run debug arguments")
@@ -154,7 +158,7 @@ with such.A("hdlcc standalone tool") as it:
                     return
                 _logger.info("Running '%s'", case)
                 cmd = ["coverage", "run",
-                       HDLCC_LOCATION, it.PROJECT_FILE]
+                       HDLCC_STANDALONE, it.PROJECT_FILE]
                 for arg in args:
                     cmd.append(arg)
 
@@ -167,7 +171,7 @@ with such.A("hdlcc standalone tool") as it:
                     _logger.info("Test requires a project file")
                     return
                 cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, it.PROJECT_FILE,
+                       HDLCC_STANDALONE, it.PROJECT_FILE,
                        '--debug-profiling', 'output.stats']
 
                 if p.exists('output.stats'):
@@ -184,7 +188,7 @@ with such.A("hdlcc standalone tool") as it:
                     _logger.info("Test requires a project file")
                     return
                 cmd = ['coverage', 'run',
-                       HDLCC_LOCATION, it.PROJECT_FILE,
+                       HDLCC_STANDALONE, it.PROJECT_FILE,
                        '--clean', ]
 
                 it.assertEqual(shell(cmd), [''])

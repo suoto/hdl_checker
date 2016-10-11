@@ -17,22 +17,18 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import sys
 import logging
 import os
 import os.path as p
-import subprocess as subp
-import time
 import shutil
-import requests
 
-from multiprocessing import Queue, Process
+from webtest import TestApp
 from nose2.tools import such
 
 import mock
 
 import hdlcc
-import hdlcc.utils as utils
+import hdlcc.handlers as handlers
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
@@ -41,12 +37,7 @@ HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
-def doNothing(queue):
-    _logger.debug("I'm ready")
-    queue.get()
-    _logger.debug("Ok, done")
-
-with such.A("hdlcc server") as it:
+with such.A("hdlcc bottle app") as it:
 
     @it.has_setup
     def setup():
@@ -68,73 +59,7 @@ with such.A("hdlcc server") as it:
         if p.exists('.xvhdl.init'):
             os.remove('.xvhdl.init')
 
-
-    def waitForServer():
-        # Wait until the server is up and replying
-        for i in range(30):
-            _logger.info("Elapsed %ds", i)
-            try:
-                reply = requests.post('http://127.0.0.1:50000/get_diagnose_info')
-                if reply.ok:
-                    return
-            except requests.ConnectionError:
-                pass
-            time.sleep(1)
-
-        assert False, "Server is not replying after 30s"
-
-    def waitUntilBuildFinishes(data):
-        _logger.info("Waiting for 30s until build is finished")
-        for i in range(30):
-            time.sleep(1)
-            _logger.info("Elapsed %ds", i)
-            _ = requests.post(it._url + '/get_messages_by_path',
-                              timeout=10, data=data)
-            ui_messages = requests.post(it._url + '/get_ui_messages',
-                                        timeout=10, data=data)
-            _logger.debug("==> %s", ui_messages.json())
-            if ui_messages.json()['ui_messages'] == []:
-                _logger.info("Ok, done")
-                return
-
-        assert False, "Server is still building after 30s"
-
     with it.having("no PID attachment"):
-        def setupPaths():
-            "Add our dependencies to sys.path"
-            for path in (
-                    p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
-                    p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
-                ):
-                path = p.abspath(path)
-                if path not in sys.path:
-                    _logger.info("Adding '%s'", path)
-                    sys.path.insert(0, path)
-                else:
-                    _logger.warning("WARNING: '%s' was already on sys.path!", path)
-
-        def startCodeCheckerServer():
-            hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
-                                        'hdlcc_server.py')
-
-            it._host = '127.0.0.1'
-            it._port = '50000'
-            it._url = 'http://{0}:{1}'.format(it._host, it._port)
-            cmd = ['coverage', 'run',
-                   hdlcc_server_fname,
-                   '--host', it._host, '--port', it._port,
-                   '--log-level', HDLCC_SERVER_LOG_LEVEL,
-                   '--attach-to-pid', str(os.getpid()),
-                   '--stdout', 'hdlcc-stdout.log',
-                   '--stderr', 'hdlcc-stderr.log',
-                   '--log-stream', 'hdlcc.log',]
-
-            _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
-
-            it._server = subp.Popen(cmd, env=os.environ.copy())
-
-            time.sleep(2)
-
         @it.has_setup
         def setup():
             _logger.info("Builder name: %s", it.BUILDER_NAME)
@@ -144,99 +69,82 @@ with such.A("hdlcc server") as it:
                     'os.environ',
                     {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
                 it.patch.start()
-            setupPaths()
-            startCodeCheckerServer()
+            it.app = TestApp(handlers.app)
 
         @it.has_teardown
         def teardown():
-            #  if it._server.poll() is not None:
-            #      _logger.info("Server was alive, terminating it")
-            #      it._server.terminate()
-            #      os.kill(it._server.pid, 9)
-            it._server.terminate()
-            utils.terminateProcess(it._server.pid)
             if it.BUILDER_PATH:
                 it.patch.stop()
-            time.sleep(2)
 
         @it.should("get diagnose info without any project")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
-            reply = requests.post(it._url + '/get_diagnose_info', timeout=10)
-            info = reply.json()['info']
-            _logger.info(reply.text)
-            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
+            reply = it.app.post_json('/get_diagnose_info')
+            it.assertItemsEqual(
+                reply.json['info'],
+                [u'hdlcc version: %s' % hdlcc.__version__,
+                 u'Server PID: %d' % os.getpid()])
 
-        @it.should("get diagnose info with an existing project file before it has "
-                   "parsed the configuration file")
+        @it.should("get diagnose info with an existing project file")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
-            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                  data={'project_file' : it.PROJECT_FILE})
-            info = reply.json()['info']
-            _logger.info(reply.text)
+            reply = it.app.post(
+                '/get_diagnose_info',
+                {'project_file' : it.PROJECT_FILE})
+
+            _logger.info("Reply is %s", reply.json['info'])
 
             if it.BUILDER_NAME:
-                for expected in (
-                        u'hdlcc version: %s' % hdlcc.__version__,
-                        u'Builder: %s' % it.BUILDER_NAME):
-                    it.assertIn(expected, info)
+                it.assertItemsEqual(
+                    reply.json['info'],
+                    [u'hdlcc version: %s' % hdlcc.__version__,
+                     u'Server PID: %d' % os.getpid(),
+                     u'Builder: %s' % it.BUILDER_NAME])
             else:
-                it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
+                it.assertItemsEqual(
+                    reply.json['info'],
+                    [u'hdlcc version: %s' % hdlcc.__version__,
+                     u'Server PID: %d' % os.getpid()])
+
+        @it.should("get diagnose info while still not found out the builder name")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        def test():
+            def _getServerByProjectFile(_):
+                server = mock.MagicMock()
+                server.builder = None
+                return server
+            with mock.patch('hdlcc.handlers._getServerByProjectFile',
+                            _getServerByProjectFile):
+                reply = it.app.post(
+                    '/get_diagnose_info',
+                    {'project_file' : it.PROJECT_FILE})
+                if it.BUILDER_NAME in ('msim', 'ghdl', 'xvhdl'):
+                    it.assertItemsEqual(
+                        reply.json['info'],
+                        [u'hdlcc version: %s' % hdlcc.__version__,
+                         u'Server PID: %d' % os.getpid(),
+                         u'Builder: <unknown> (config file parsing is underway)'])
+                else:
+                    it.assertItemsEqual(
+                        reply.json['info'],
+                        [u'hdlcc version: %s' % hdlcc.__version__,
+                         u'Server PID: %d' % os.getpid()])
 
         @it.should("get diagnose info with a non existing project file")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
-            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                  data={'project_file' : 'some_project'})
-            info = reply.json()['info']
-            _logger.info(reply.text)
-            it.assertIn(u'hdlcc version: %s' % hdlcc.__version__, info)
+            reply = it.app.post(
+                '/get_diagnose_info',
+                {'project_file' : 'some_project'})
 
-        @it.should("get UI warning when getting messages before project build "
-                   "has finished")
-        def test():
-            data = {
-                'project_file' : it.PROJECT_FILE,
-                'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
-
-            ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                        data=data)
-
-            build_messages = requests.post(it._url + '/get_messages_by_path',
-                                           timeout=10, data=data)
-
-            _logger.info(build_messages.text)
-            if build_messages.json()['messages']:
-                _logger.info("Messages:")
-                for message in build_messages.json()['messages']:
-                    _logger.info(message)
-            else:
-                _logger.warning("OMG! No message to log!")
-
-            # async_fifo_tb has changed; this is no longer valid
-            #  it.assertEquals(
-            #      build_messages.json(),
-            #      {u'messages': [
-            #          {u'checker'       : u'HDL Code Checker/static',
-            #           u'column'        : 14,
-            #           u'error_message' : u"constant 'ADDR_WIDTH' is never used",
-            #           u'error_number'  : u'0',
-            #           u'error_subtype' : u'Style',
-            #           u'error_type'    : u'W',
-            #           u'filename'      : None,
-            #           u'line_number'   : 29}]})
-
-            ui_messages = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                        data=data)
-
-            _logger.info(ui_messages.text)
-            #  it.assertEquals(
-            #      ui_messages.json(),
-            #      {'ui_messages': [['warning', "Project hasn't finished building, "
-            #                                   "try again after it finishes."]]})
-
-            waitUntilBuildFinishes(data)
+            _logger.info("Reply is %s", reply.json['info'])
+            it.assertItemsEqual(
+                reply.json['info'],
+                [u'hdlcc version: %s' % hdlcc.__version__,
+                 u'Server PID: %d' % os.getpid()])
 
         @it.should("rebuild the project with directory cleanup")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
             if not it.BUILDER_NAME:
                 _logger.info("Test requires a builder")
@@ -256,13 +164,10 @@ with such.A("hdlcc server") as it:
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
 
-                ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                         data=data)
+                ui_reply = it.app.post('/get_ui_messages', data)
+                reply = it.app.post('/get_messages_by_path', data)
 
-                reply = requests.post(it._url + '/get_messages_by_path',
-                                      timeout=10, data=data)
-
-                return reply.json()['messages'] + ui_reply.json()['ui_messages']
+                return reply.json['messages'] + ui_reply.json['ui_messages']
 
             def step_02_erase_target_folder():
                 target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
@@ -287,15 +192,11 @@ with such.A("hdlcc server") as it:
 
             def step_04_rebuild_project():
                 data = {'project_file' : it.PROJECT_FILE}
-                requests.post(it._url + '/rebuild_project', timeout=10,
-                              data=data)
-                waitForServer()
+                it.app.post('/rebuild_project', data)
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
-                waitForServer()
-                waitUntilBuildFinishes(data)
 
             def step_05_check_messages_are_the_same(msgs):
                 step_05_msgs = step_01_check_file_builds_ok()
@@ -334,7 +235,11 @@ with such.A("hdlcc server") as it:
             step_05_check_messages_are_the_same(step_01_msgs)
 
         @it.should("rebuild the project without directory cleanup")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
+            if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
+                _logger.info("Test requires a builder, except fallback")
+                return
             # If the user doesn't knows if the project data is corrupt, he/she
             # should be able to rebuild even if everything is OK.
             # Test is as follows:
@@ -349,26 +254,19 @@ with such.A("hdlcc server") as it:
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
                 _logger.info("Waiting for any previous process to finish")
-                waitUntilBuildFinishes(data)
 
-                ui_reply = requests.post(it._url + '/get_ui_messages', timeout=10,
-                                         data=data)
+                ui_reply = it.app.post('/get_ui_messages', data)
+                reply = it.app.post('/get_messages_by_path', data)
 
-                reply = requests.post(it._url + '/get_messages_by_path',
-                                      timeout=10, data=data)
-
-                return reply.json()['messages'] + ui_reply.json()['ui_messages']
+                return reply.json['messages'] + ui_reply.json['ui_messages']
 
             def step_02_rebuild_project():
                 data = {'project_file' : it.PROJECT_FILE}
-                requests.post(it._url + '/rebuild_project', timeout=10,
-                              data=data)
-                waitForServer()
+                it.app.post('/rebuild_project', data)
                 data = {
                     'project_file' : it.PROJECT_FILE,
                     'path'         : p.join(
                         VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
-                waitUntilBuildFinishes(data)
 
             def step_03_check_messages_are_the_same(msgs):
                 step_03_msgs = step_01_check_file_builds_ok()
@@ -397,74 +295,87 @@ with such.A("hdlcc server") as it:
             step_03_check_messages_are_the_same(step_01_msgs)
 
         @it.should("shutdown the server when requested")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
             # Ensure the server is active
-            reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                  data={'project_file' : 'some_project'})
-            it.assertTrue(reply.ok)
+            reply = it.app.post('/get_diagnose_info',
+                                {'project_file' : 'some_project'})
+            it.assertEqual(reply.status, '200 OK')
 
-            # Send a request to the shutdown addr
-            with it.assertRaises(requests.ConnectionError):
-                reply = requests.post(it._url + '/shutdown', timeout=10)
+            # Send a request to shutdown the server and check if it
+            # calls the terminate process method
+            pids = []
+            def terminateProcess(pid):
+                _logger.info("Terminating PID %d", pid)
+                pids.append(pid)
 
-            # Ensure the server no longer active
-            with it.assertRaises(requests.ConnectionError):
-                reply = requests.post(it._url + '/get_diagnose_info', timeout=10,
-                                      data={'project_file' : 'some_project'})
+            with mock.patch('hdlcc.utils.terminateProcess', terminateProcess):
+                reply = it.app.post('/shutdown')
+                it.assertEqual(pids, [os.getpid(),])
 
-    with it.having("PID attachment"):
-        def startCodeCheckerServerAttachedToPid(pid):
-            hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
-                                        'hdlcc_server.py')
+    with it.having("GRLIB as reference library"):
+        @it.has_setup
+        def setup():
+            it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
+            it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+            if it.BUILDER_NAME:
+                it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
+            else:
+                it.PROJECT_FILE = None
 
-            it._url = 'http://{0}:{1}'.format(it._host, it._port)
-            cmd = ['coverage', 'run',
-                   hdlcc_server_fname,
-                   '--log-level', HDLCC_SERVER_LOG_LEVEL,
-                   '--attach-to-pid', str(pid),
-                   '--stdout', 'hdlcc-stdout.log',
-                   '--stderr', 'hdlcc-stderr.log',
-                   '--log-stream', 'hdlcc.log',]
+            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
 
-            _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
+            if p.exists(cache):
+                shutil.rmtree(cache)
 
-            it._server = subp.Popen(cmd, env=os.environ.copy())
+            it.test_file = p.join(VIM_HDL_EXAMPLES, 'another_library',
+                                  'foo.vhd')
 
-            waitForServer()
+            if it.BUILDER_PATH:
+                it.patch = mock.patch.dict(
+                    'os.environ',
+                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+                it.patch.start()
+
+            #  startCodeCheckerServer()
 
         @it.has_teardown
         def teardown():
-            it._server.terminate()
-            utils.terminateProcess(it._server.pid)
+            if it.BUILDER_PATH:
+                it.patch.stop()
 
-        @it.should("terminate when the parent PID is not running anymore")
+            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
+            if p.exists(cache):
+                shutil.rmtree(cache)
+
+        @it.should("handle buffer visits without crashing")
+        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def test():
+            if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
+                _logger.info("Test requires a builder, except fallback")
+                return
 
-            queue = Queue()
+            def build_without_buffer_visit():
+                data = {'project_file' : it.PROJECT_FILE,
+                        'path'         : it.test_file}
 
-            proc = Process(target=doNothing, args=(queue, ))
-            proc.start()
+                _ = it.app.post('/get_messages_by_path', data)
 
-            _logger.info("Started dummy process with PID %d", proc.pid)
-            startCodeCheckerServerAttachedToPid(proc.pid)
-            time.sleep(3)
-            _logger.info("Allowing the dummy process to finish")
-            queue.put(1)
-            proc.join()
+            def build_with_buffer_visit():
+                data = {'project_file' : it.PROJECT_FILE,
+                        'path'         : it.test_file}
 
-            if utils.isProcessRunning(proc.pid):
-                _logger.warning("Dummy process %d was still running", proc.pid)
-                proc.terminate()
-                time.sleep(1)
-                it.assertFalse(utils.isProcessRunning(proc.pid),
-                               "Process %d is still running after terminating "
-                               "it!" % proc.pid)
+                _ = it.app.post('/on_buffer_visit', data)
 
-            time.sleep(1)
-            _logger.info("Server should have died by now")
+            def build_with_buffer_leave():
+                data = {'project_file' : it.PROJECT_FILE,
+                        'path'         : it.test_file}
 
-            with it.assertRaises(requests.ConnectionError):
-                requests.post('http://127.0.0.1:50000/get_diagnose_info', timeout=10)
+                _ = it.app.post('/on_buffer_leave', data)
+
+            build_without_buffer_visit()
+            build_with_buffer_leave()
+            build_with_buffer_visit()
 
 it.createTests(globals())
 

@@ -20,7 +20,6 @@ import os
 import os.path as p
 import re
 from .base_builder import BaseBuilder
-from hdlcc.exceptions import SanityCheckError
 
 class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''
@@ -90,19 +89,13 @@ class XVHDL(BaseBuilder):
             'error_message'  : error_message,
         }]
 
-    def checkEnvironment(self):
-        try:
-            stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
-            self._version = \
-                    re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
-            self._logger.info("xvhdl version string: '%s'. " + \
-                    "Version number is '%s'", \
-                    stdout[:-1], self._version)
-        except Exception as exc:
-            import traceback
-            self._logger.warning("Sanity check failed:\n%s",
-                                 traceback.format_exc())
-            raise SanityCheckError(self.builder_name, str(exc))
+    def _checkEnvironment(self):
+        stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
+        self._version = \
+                re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
+        self._logger.info("xvhdl version string: '%s'. " + \
+                "Version number is '%s'", \
+                stdout[:-1], self._version)
 
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined

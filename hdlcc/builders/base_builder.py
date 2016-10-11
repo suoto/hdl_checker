@@ -16,16 +16,17 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base class that implements the base builder flow"
 
-import logging
 import os
 import os.path as p
 import abc
+import logging
 import subprocess as subp
 from threading import Lock
 
 import hdlcc.options as options
+from hdlcc.exceptions import SanityCheckError
 
-class BaseBuilder(object): # pylint: disable=abstract-class-not-used
+class BaseBuilder(object):
     """
     Class that implements the base builder flow
     """
@@ -34,19 +35,9 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
 
     # Set an empty container for the default flags
     default_flags = {
-        'batch_build_flags' : {
-            'vhdl' : [],
-            'verilog' : [],
-            'systemverilog' : []},
-        'single_build_flags' : {
-            'vhdl' : [],
-            'verilog' : [],
-            'systemverilog' : []},
-        'global_build_flags' : {
-            'vhdl' : [],
-            'verilog' : [],
-            'systemverilog' : []}
-        }
+        'batch_build_flags' : {},
+        'single_build_flags' : {},
+        'global_build_flags' : {}}
 
     _external_libraries = {
         'vhdl' : [],
@@ -141,6 +132,15 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         del state['_lock']
         return state
 
+    def checkEnvironment(self):
+        """
+        Sanity environment check for child classes. Any exception raised
+        is translated to SanityCheckError exception.
+        """
+        try:
+            self._checkEnvironment()
+        except Exception as exc:
+            raise SanityCheckError(self.builder_name, str(exc))
 
     @abc.abstractmethod
     def _shouldIgnoreLine(self, line):
@@ -220,7 +220,7 @@ class BaseBuilder(object): # pylint: disable=abstract-class-not-used
         return stdout
 
     @abc.abstractmethod
-    def checkEnvironment(self):
+    def _checkEnvironment(self):
         """
         Sanity environment check that should be implemented by child
         classes. Nothing is done with the return, the child class should

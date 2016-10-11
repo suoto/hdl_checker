@@ -26,15 +26,14 @@ from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import getFileType, removeDuplicates, serializer, dump
+from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump,
+                         samefile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
 
 _logger = logging.getLogger('build messages')
 
-# pylint: disable=too-many-instance-attributes
-# pylint: disable=abstract-class-not-used
 class HdlCodeCheckerBase(object):
     """
     HDL Code Checker project builder class
@@ -68,6 +67,7 @@ class HdlCodeCheckerBase(object):
             else:
                 target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
+
     def _saveCache(self):
         """
         Dumps project object to a file to recover its state later
@@ -150,9 +150,7 @@ class HdlCodeCheckerBase(object):
             assert self.builder is not None
 
         except hdlcc.exceptions.SanityCheckError as exc:
-            _msg = "Failed to create builder '%s'" % exc.builder
-            self._logger.warning(_msg)
-            self._handleUiError(_msg)
+            self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
 
     def clean(self):
@@ -269,20 +267,34 @@ class HdlCodeCheckerBase(object):
         Wrapper to _getBuildSequence passing the initial build sequence
         list empty and caching the result
         """
-        # Despite we parse and invalidade the cache when entering/leaving
-        # buffers, we must also check if any file has been changed by
-        # some background process that the editor might be unaware of.
-        # To cope with this, we'll check if the newest modification time
-        # of the build sequence hasn't changed since we cached the build
-        # sequence
+        # Despite we renew the cache when on buffer enter, we must also
+        # check if:
+        #
+        #   1) Any file has been changed by some background process that
+        #      the editor is unaware of (Vivado maybe?)
+        #      To cope with this, we'll check if the newest modification
+        #      time of the build sequence hasn't changed since we cached
+        #      the build sequence
+        #
+        #   2) The source being currently requested is the same that was
+        #      cached previously
+        #
+        # In any case, the cached build sequence will always match the
+        # source file that was visited (i.e., it won't be replaced if
+        # the item (2) above is true)
+        #
         key = 'getBuildSequence'
         if key in self._cache:
-            sequence = self._cache[key]['sequence']
-            cache_mtime = self._cache[key]['cache_mtime']
-            last_mtime = max([x.getmtime() for x in sequence])
+            # We can only use the cached build sequence if the source
+            # is the same that was cached before
+            path = self._cache[key]['path']
+            if samefile(path, source.filename):
+                sequence = self._cache[key]['sequence']
+                cache_mtime = self._cache[key]['cache_mtime']
+                last_mtime = max([x.getmtime() for x in sequence])
 
-            if cache_mtime == last_mtime:
-                return self._cache[key]['sequence']
+                if cache_mtime == last_mtime:
+                    return self._cache[key]['sequence']
 
         build_sequence = []
         self._getBuildSequence(source, build_sequence)
@@ -419,8 +431,6 @@ class HdlCodeCheckerBase(object):
         """
         if self._config.filename is None:
             return False
-
-
         return True
 
     def getMessagesByPath(self, path, *args, **kwargs):
@@ -465,25 +475,31 @@ class HdlCodeCheckerBase(object):
         Returns a list of VhdlSourceFile objects parsed
         """
         return self._config.getSources()
+
     def onBufferVisit(self, path):
         """
         Runs tasks whenever a buffer is being visited. Currently this
         means caching the build sequence before the file is actually
         checked, so the overall wait time is reduced
         """
-        source = self._config.getSourceByPath(path)
+        try:
+            source = self._config.getSourceByPath(path)
+        except KeyError:
+            return
         key = 'getBuildSequence'
         sequence = self.getBuildSequence(source)
-        cache_mtime = max([x.getmtime() for x in sequence])
+        try:
+            cache_mtime = max([x.getmtime() for x in sequence])
+        except ValueError:
+            self._logger.exception("Failed to get cache mtime for '%s'", path)
         self._cache[key] = {
+            'path': path,
             'sequence': sequence,
             'cache_mtime': cache_mtime}
 
     def onBufferLeave(self, _):
         """
-        Runs actions when leaving a buffer. Currently this means clearing
-        the build sequence cache only.
+        Runs actions when leaving a buffer.
         """
-        key = 'getBuildSequence'
-        del self._cache[key]
+        pass
 

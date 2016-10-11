@@ -305,6 +305,10 @@ with such.A('config parser object') as it:
                 parser = ConfigParser(project_filename)
             sources = parser.getSources()
 
+            _logger.info("Sources found:")
+            for source in sources:
+                _logger.info("- %s", source)
+
             vunit_files = 0
             for source in sources:
                 if 'vunit' in source.filename.lower():
