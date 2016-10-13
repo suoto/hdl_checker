@@ -80,6 +80,19 @@ with such.A("builder object") as it:
         def test():
             it.builder._createLibrary('ieee')
 
+        @it.should("find GHDL builtin libraries")
+        def test():
+            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
+                _logger.info("Test requires a builder")
+                return
+            expected = ['ieee', 'std']
+
+            if it.BUILDER_NAME == "msim":
+                expected += ['modelsim_lib']
+
+            for lib in expected:
+                it.assertIn(lib, it.builder.getBuiltinLibraries())
+
         @it.should("parse MSim lines correctly")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',
@@ -157,7 +170,7 @@ with such.A("builder object") as it:
                 'some_file_on_same_level.vhd',
                 r'C:\some\file\on\windows.vhd')
         def test(case, path):
-            if it.BUILDER_NAME != "GHDL":
+            if it.BUILDER_NAME != "ghdl":
                 _logger.info("GHDL only test")
                 return
             _logger.info("Running %s", case)
@@ -170,7 +183,6 @@ with such.A("builder object") as it:
                   'error_number'   : None,
                   'error_type'     : 'E',
                   'error_message'  : "extra ';' at end of interface list"}])
-
 
         @it.should("parse XVHDL builder lines correctly")
         @params('/some/file/with/abs/path.vhd',
