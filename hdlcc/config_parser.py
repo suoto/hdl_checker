@@ -614,7 +614,7 @@ class ConfigParser(object):
 
     def findSourcesByDesignUnit(self, unit, library='work'):
         sources = []
-        for source in self._sources.itervalues():
+        for source in self._sources.values():
             if source.library == library and unit in [x['name'] for x in
                                                       source.getDesignUnits()]:
                 sources += [source]

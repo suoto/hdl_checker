@@ -210,14 +210,15 @@ class BaseBuilder(object):
 
         exc = None
         try:
-            stdout = list(subp.check_output(cmd_with_args, \
-                    stderr=subp.STDOUT, shell=shell, env=subp_env).splitlines())
+            stdout = list(
+                subp.check_output(cmd_with_args, stderr=subp.STDOUT,
+                                  shell=shell, env=subp_env).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             self._logger.debug("Command '%s' failed with error code %d",
                                cmd_with_args, exc.returncode)
 
-        return stdout
+        return [x.decode() for x in stdout]
 
     @abc.abstractmethod
     def _checkEnvironment(self):

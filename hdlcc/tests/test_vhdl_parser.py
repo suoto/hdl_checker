@@ -31,6 +31,9 @@ _logger = logging.getLogger(__name__)
 _FILENAME = 'source.vhd'
 
 with such.A('VHDL source file object') as it:
+    # Workaround for Python 2.x and 3.x differences
+    it.assertItemsEqual = it.assertCountEqual
+
     with it.having('an entity code'):
         @it.has_setup
         def setup():

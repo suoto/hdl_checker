@@ -38,11 +38,11 @@ def _setupPaths():
             p.join(hdlcc_base_path, 'dependencies', 'bottle')):
         path = p.abspath(path)
         if path not in sys.path:
-            print "Adding '%s'" % path
+            print("Adding '%s'" % path)
             sys.path.insert(0, path)
         else:
             msg = "WARNING: '%s' was already on sys.path!" % path
-            print msg
+            print(msg)
             _logger.warning(msg)
 
 def parseArguments():

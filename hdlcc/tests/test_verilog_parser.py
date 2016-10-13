@@ -30,6 +30,8 @@ _logger = logging.getLogger(__name__)
 _FILENAME = 'source.v'
 
 with such.A('Verilog source file object') as it:
+    # Workaround for Python 2.x and 3.x differences
+    it.assertItemsEqual = it.assertCountEqual
     with it.having('a module code'):
         @it.has_setup
         def setup():

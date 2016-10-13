@@ -1,3 +1,4 @@
+# encoding: utf-8
 # This file is part of HDL Code Checker.
 #
 # Copyright (c) 2016 Andre Souto
@@ -24,10 +25,13 @@ import re
 import subprocess as subp
 import shutil
 
-import mock
-
 from nose2.tools import such
 from nose2.tools.params import params
+
+try:  # Python 3.x
+    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+except ImportError:  # Python 2.x
+    import mock
 
 _logger = logging.getLogger(__name__)
 
@@ -37,29 +41,32 @@ TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 def shell(cmd):
-    """Dummy wrapper for running shell commands, checking the return value and
-    logging"""
-
+    """
+    Dummy wrapper for running shell commands, checking the return value
+    and logging
+    """
     _logger.debug(cmd)
-    exc = None
     stdout = []
     try:
-        stdout += list(subp.check_output(
-            cmd, stderr=subp.STDOUT).split("\n"))
+        stdout = [x.decode() for x in subp.check_output(
+            cmd, stderr=subp.STDOUT).split(b'\n')]
+
+        for line in stdout:
+            if re.match(r"^\s*$", line):
+                continue
+            else:
+                _logger.debug("%s", line)
     except subp.CalledProcessError as exc:
-        stdout += list(exc.output.split("\n"))
+        stdout = [x.decode() for x in exc.output.split(b'\n')]
 
-    for line in stdout:
-        if re.match(r"^\s*$", line):
-            continue
-        if exc:
-            _logger.fatal(line)
-        else:
-            _logger.debug(line)
+        for line in stdout:
+            if re.match(r"^\s*$", line):
+                continue
+            _logger.fatal("%s", line)
 
-    if exc:
         _logger.warning("os.path: %s", os.environ["PATH"])
-        raise exc   # pylint: disable=raising-bad-type
+
+        raise
 
     return stdout
 
@@ -162,6 +169,7 @@ with such.A("hdlcc standalone tool") as it:
                 for arg in args:
                     cmd.append(arg)
 
+                _logger.warning(' '.join(cmd))
                 shell(cmd)
 
 
@@ -193,7 +201,7 @@ with such.A("hdlcc standalone tool") as it:
 
                 it.assertEqual(shell(cmd), [''])
 
-                previous = None
+                previous = 0
                 for level in range(1, 5):
                     stdout = shell(cmd + ["-" + "v"*level])
                     it.assertTrue(len(stdout) >= previous)
