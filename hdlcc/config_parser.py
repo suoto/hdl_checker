@@ -299,8 +299,8 @@ class ConfigParser(object):
         self._updateTimestamp()
         source_path_list = []
         source_build_list = []
-        for _line in open(self.filename, 'r').readlines():
-            line = _replaceCfgComments("", _line)
+        for _line in open(self.filename, mode='rb').readlines():
+            line = _replaceCfgComments("", _line.decode(errors='ignore'))
             line_source_list, line_build_list = self._parseLine(line)
             source_path_list += line_source_list
             source_build_list += line_build_list
@@ -509,8 +509,8 @@ class ConfigParser(object):
         assert p.exists(filename), "Filename '%s' doesn't exists" % filename
         target_dir = None
         builder_name = None
-        for _line in open(filename, 'r').readlines():
-            line = _replaceCfgComments("", _line)
+        for _line in open(filename, mode='rb').readlines():
+            line = _replaceCfgComments("", _line.decode(errors='ignore'))
             for match in re.finditer(
                     r"^\s*target_dir\s*=\s*(?P<target_dir>.+)\s*$"
                     r"|"
@@ -587,14 +587,14 @@ class ConfigParser(object):
         Returns a list of VhdlParser/VerilogParser objects parsed
         """
         self._parseIfNeeded()
-        return self._sources.values()
+        return list(self._sources.values())
 
     def getSourcesPaths(self):
         """
         Returns a list of absolute paths to the sources found
         """
         self._parseIfNeeded()
-        return self._sources.keys()
+        return list(self._sources.keys())
 
     def getSourceByPath(self, path):
         """

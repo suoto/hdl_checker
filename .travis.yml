@@ -20,11 +20,11 @@ python:
 
 env:
   matrix:
-    # - BUILDER=msim
+    - BUILDER=msim
     - BUILDER=ghdl
-    # - BUILDER=fallback
-    # - BUILDER=standalone
-    # - BUILDER=xvhdl
+    - BUILDER=fallback
+    - BUILDER=standalone
+    - BUILDER=xvhdl
 
 # This should work but it doesn't!
 # addons:

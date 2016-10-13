@@ -46,7 +46,7 @@ class GHDL(BaseBuilder):
         r"^\s*(actual prefix|library directory):"
         r"\s*(?P<library_path>.*)\s*").search
 
-    _should_ignore = re.compile('|'.join([
+    _shouldIgnoreLine = re.compile('|'.join([
         r"^\s*$",
         r"ghdl: compilation error", ])).match
 
@@ -61,11 +61,6 @@ class GHDL(BaseBuilder):
         super(GHDL, self).__init__(target_folder)
         self._builtin_libraries = []
         self._parseBuiltinLibraries()
-
-    def _shouldIgnoreLine(self, line):
-        if self._should_ignore(line):
-            return True
-        return False
 
     def _makeRecords(self, line):
         record = {
@@ -129,6 +124,9 @@ class GHDL(BaseBuilder):
             if library_name_scan is not None:
                 for match in library_name_scan.finditer(line):
                     self._builtin_libraries.append(match.groupdict()['library_name'])
+
+        self._logger.debug("Builtin libraries found: %s",
+                           " ".join(self._builtin_libraries))
 
     def _getGhdlArgs(self, source, flags=None):
         "Return the GHDL arguments that are common to most calls"

@@ -60,7 +60,7 @@ with such.A("hdlcc server") as it:
         _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
         it._server = subp.Popen(cmd, env=os.environ.copy())
-        time.sleep(1)
+        waitForServer()
 
     def startCodeCheckerServerAttachedToPid(pid):
         hdlcc_server_fname = p.join(HDLCC_BASE_PATH, 'hdlcc',
@@ -78,7 +78,6 @@ with such.A("hdlcc server") as it:
         _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
         it._server = subp.Popen(cmd, env=os.environ.copy())
-
         waitForServer()
 
     def waitForServer():
@@ -90,7 +89,7 @@ with such.A("hdlcc server") as it:
                     _logger.info("Server replied OK after %d attempts", i)
                     return
             except requests.ConnectionError:
-                pass
+                _logger.debug("Attempt %d raised requests.ConnectionError", i)
             time.sleep(1)
 
         assert False, "Server is not replying after 30s"

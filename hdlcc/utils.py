@@ -24,6 +24,7 @@ import signal
 import time
 import subprocess as subp
 import shutil
+import six
 from threading import Lock
 
 # Make the serializer transparent
@@ -42,26 +43,45 @@ except ImportError:  # pragma: no cover
 
     dump = serializer.dump  # pylint: disable=invalid-name
 
+#  if six.PY3:
+#      import io
+#      file = io.TextIOBase
+
 _logger = logging.getLogger(__name__)
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, str):
-        class Stream(file):
-            """File subclass that allows RainbowLoggingHandler to write
-            with colors"""
-            _lock = Lock()
-            def isatty(self):
-                return color
-            def write(self, *args, **kwargs):
-                with self._lock:
-                    super(Stream, self).write(*args, **kwargs)
+    #  if isinstance(stream, str):
+    #      stream = open(stream, mode='ab', buffering=1)
+    #      def isatty(*args, **kwargs):
+    #          return color
+    #      #  assert not hasattr(stream, 'isatty')
+    #      #  stream.isatty = isatty
+    #      #  class Stream(file):
+    #      #      """File subclass that allows RainbowLoggingHandler to write
+    #      #      with colors"""
+    #      #      _lock = Lock()
+    #      #      def isatty(self):
+    #      #          return color
+    #      #      def write(self, *args, **kwargs):
+    #      #          with self._lock:
+    #      #              super(Stream, self).write(*args, **kwargs)
 
-        stream = Stream(stream, 'ab', buffering=1)
+    #      #  #  stream = Stream(stream, mode='ab', buffering=1)
+    #      #  stream = Stream(stream, mode='wb') #, buffering=1)
+    #      #  stream.write('testing\n')
+    #      #  assert False
 
-    try:
-        from rainbow_logging_handler import RainbowLoggingHandler
-        rainbow_stream_handler = RainbowLoggingHandler(
+    color_logger = False
+    if six.PY2:
+        try:
+            from rainbow_logging_handler import RainbowLoggingHandler
+            color_logger = True
+        except ImportError: # pragma: no cover
+            pass
+
+    if color_logger:
+        log_handler = RainbowLoggingHandler(
             stream,
             #  Customizing each column's color
             # pylint: disable=bad-whitespace
@@ -77,16 +97,16 @@ def setupLogging(stream, level, color=True): # pragma: no cover
             color_message_error    = ('red',        None),
             color_message_critical = ('bold white', 'red'))
             # pylint: enable=bad-whitespace
+    else:
+        if isinstance(stream, str):
+            log_handler = logging.FileHandler(stream)
+        else:
+            log_handler = logging.StreamHandler(stream)
+        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
+        log_handler.formatter = logging.Formatter(log_format)
 
-        logging.root.addHandler(rainbow_stream_handler)
-        logging.root.setLevel(level)
-    except ImportError: # pragma: no cover
-        file_handler = logging.StreamHandler(stream)
-        #  log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        #  file_handler.formatter = logging.Formatter(log_format)
-        file_handler.formatter = logging.Formatter()
-        logging.root.addHandler(file_handler)
-        logging.root.setLevel(level)
+    logging.root.addHandler(log_handler)
+    logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
 def terminateProcess(pid):
@@ -155,7 +175,10 @@ def _isProcessRunningOnWindows(pid):
 def writeListToFile(filename, _list): # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     _logger.debug("Writing to %s", filename)
-    open(filename, 'w').write('\n'.join([str(x) for x in _list]))
+
+    open(filename, mode='w').write(
+        '\n'.join([str(x) for x in _list]))
+
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 

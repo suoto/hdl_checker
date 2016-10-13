@@ -159,7 +159,8 @@ def runStandaloneStaticCheck(fname):
     """Standalone source_file.VhdlParser run"""
     from hdlcc.static_check import getStaticMessages
 
-    for record in getStaticMessages(open(fname, 'r').read().split('\n')):
+    lines = [x.decode(errors='ignore') for x in open(fname, mode='rb').readlines()]
+    for record in getStaticMessages(lines):
         print(record)
 
 def buildSource(project, source):

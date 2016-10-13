@@ -260,7 +260,7 @@ class HdlCodeCheckerBase(object):
         Sorts a given set of build records
         """
         return sorted(records, key=lambda x: \
-                (x['error_type'], x['line_number'], x['error_number']))
+                (x['error_type'], str(x['line_number']), str(x['error_number'])))
 
     def getBuildSequence(self, source):
         """

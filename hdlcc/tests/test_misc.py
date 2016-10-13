@@ -79,11 +79,11 @@ with such.A("hdlcc sources") as it:
     def getFiles(func):
         for filename in subp.check_output(
                 ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
-            if func(filename):
-                yield p.abspath(filename)
+            if func(filename.decode()):
+                yield p.abspath(filename).decode()
 
     def checkFile(filename):
-        lines = open(filename, 'r').read()
+        lines = open(filename, mode='rb').read().decode(errors='replace')
 
         match = _HEADER.search(lines)
         return match is not None

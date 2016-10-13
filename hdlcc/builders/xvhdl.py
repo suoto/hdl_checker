@@ -118,9 +118,11 @@ class XVHDL(BaseBuilder):
 
         self._added_libraries.append(library)
 
-        open(self._xvhdlini, 'w').write('\n'.join(\
-                ["%s=%s" % (x, p.join(self._target_folder, x)) \
-                for x in self._added_libraries]))
+        with open(self._xvhdlini, mode='w') as fd:
+            content = '\n'.join(
+                ["%s=%s" % (x, p.join(self._target_folder, x))
+                 for x in self._added_libraries])
+            fd.write(content)
 
     def _buildSource(self, source, flags=None):
         cmd = ['xvhdl',

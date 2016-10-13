@@ -41,7 +41,6 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _ON_WINDOWS = sys.platform == 'win32'
-TRAVIS_PYTHON_VERSION = os.environ["TRAVIS_PYTHON_VERSION"]
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
@@ -329,5 +328,4 @@ def main():
     return 0 if passed else 1
 
 if __name__ == '__main__':
-    print("TRAVIS_PYTHON_VERSION: %s" % TRAVIS_PYTHON_VERSION)
     sys.exit(main())

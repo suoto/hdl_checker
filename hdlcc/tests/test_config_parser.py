@@ -20,13 +20,13 @@
 import os
 import os.path as p
 import sys
-import six
 import shutil
 import logging
 
 from nose2.tools import such
 from nose2.tools.params import params
 
+import six
 import mock
 
 import hdlcc

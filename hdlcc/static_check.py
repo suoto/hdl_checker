@@ -213,7 +213,8 @@ def standalone(): # pragma: no cover
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
         print(arg)
-        for message in getStaticMessages(open(arg, 'r').read().split('\n')):
+        lines = [x.decode(errors='ignore') for x in open(arg, mode='rb').readlines()]
+        for message in getStaticMessages(lines):
             print(message)
         print("="*10)
 
