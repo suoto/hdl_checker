@@ -169,9 +169,7 @@ with such.A("hdlcc standalone tool") as it:
                 for arg in args:
                     cmd.append(arg)
 
-                _logger.warning(' '.join(cmd))
                 shell(cmd)
-
 
             @it.should("save profiling info if requested")
             def test():

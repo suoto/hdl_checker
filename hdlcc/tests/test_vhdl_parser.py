@@ -21,9 +21,9 @@ import os
 import logging
 from nose2.tools import such
 from nose2.tools.params import params
+import six
 
 from hdlcc.parsers import VhdlParser
-
 from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
@@ -32,7 +32,8 @@ _FILENAME = 'source.vhd'
 
 with such.A('VHDL source file object') as it:
     # Workaround for Python 2.x and 3.x differences
-    it.assertItemsEqual = it.assertCountEqual
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
 
     with it.having('an entity code'):
         @it.has_setup

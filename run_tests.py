@@ -41,6 +41,7 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _ON_WINDOWS = sys.platform == 'win32'
+TRAVIS_PYTHON_VERSION = os.environ["TRAVIS_PYTHON_VERSION"]
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
@@ -102,7 +103,6 @@ def _setupLogging(stream, level, color=True): # pragma: no cover
 
         stream = Stream(stream, 'ab', buffering=1)
 
-    #  try:
     from rainbow_logging_handler import RainbowLoggingHandler
     rainbow_stream_handler = RainbowLoggingHandler(
         stream,
@@ -123,13 +123,6 @@ def _setupLogging(stream, level, color=True): # pragma: no cover
 
     logging.root.addHandler(rainbow_stream_handler)
     logging.root.setLevel(level)
-    #  except ImportError: # pragma: no cover
-    #      file_handler = logging.StreamHandler(stream)
-    #      #  log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-    #      #  file_handler.formatter = logging.Formatter(log_format)
-    #      file_handler.formatter = logging.Formatter()
-    #      logging.root.addHandler(file_handler)
-    #      logging.root.setLevel(level)
 
 def _uploadAppveyorArtifact(path):
     "Uploads 'path' to Appveyor artifacts"
@@ -336,4 +329,5 @@ def main():
     return 0 if passed else 1
 
 if __name__ == '__main__':
+    print("TRAVIS_PYTHON_VERSION: %s" % TRAVIS_PYTHON_VERSION)
     sys.exit(main())

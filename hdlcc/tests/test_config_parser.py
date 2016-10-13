@@ -20,6 +20,7 @@
 import os
 import os.path as p
 import sys
+import six
 import shutil
 import logging
 
@@ -40,6 +41,10 @@ TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
 
 with such.A('config parser object') as it:
+    # Workaround for Python 2.x and 3.x differences
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
+
     @it.has_teardown
     def teardown():
         for temp_path in ('.build', '.hdlcc'):
