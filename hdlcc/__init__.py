@@ -21,6 +21,7 @@ be used to populate syntax checkers and linters of text editors. It
 takes into account the sources dependencies when building so you don't
 need to provide a source list ordered by hand.
 """
+from __future__ import print_function
 
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from ._version import get_versions

@@ -76,10 +76,6 @@ class BaseSourceFile(object):
 
         return obj
 
-    def __repr__(self):
-        return "BaseSourceFile('%s', library='%s', flags=%s)" % \
-                (self.abspath, self.library, self.flags)
-
     # We'll use Python data model to make easier to check if a recovered object
     # matches its original counterpart
     def __eq__(self, other):
@@ -100,8 +96,15 @@ class BaseSourceFile(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __repr__(self):
+        return "BaseSourceFile('%s', library='%s', flags=%s)" % \
+                (self.abspath, self.library, self.flags)
+
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
+
+    def __hash__(self):
+        return hash(repr(self))
 
     def _changed(self):
         """

@@ -50,7 +50,8 @@ class VhdlParser(BaseSourceFile):
         Replace everything from comment ('--') until a line break and
         converts to lowercase
         """
-        return _SUB_COMMENTS("", open(self.filename, 'r').read()).lower()
+        content = open(self.filename, mode='rb').read().decode(errors='ignore')
+        return _SUB_COMMENTS('', content).lower()
 
     def _iterDesignUnitMatches(self):
         """

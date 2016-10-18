@@ -212,10 +212,11 @@ def standalone(): # pragma: no cover
     import sys
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
-        print arg
-        for message in getStaticMessages(open(arg, 'r').read().split('\n')):
-            print message
-        print "="*10
+        print(arg)
+        lines = [x.decode(errors='ignore') for x in open(arg, mode='rb').readlines()]
+        for message in getStaticMessages(lines):
+            print(message)
+        print("="*10)
 
 if __name__ == '__main__':
     standalone()

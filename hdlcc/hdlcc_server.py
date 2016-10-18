@@ -25,6 +25,7 @@ import os.path as p
 import logging
 import argparse
 from threading import Timer
+import six
 
 _logger = logging.getLogger(__name__)
 
@@ -38,11 +39,11 @@ def _setupPaths():
             p.join(hdlcc_base_path, 'dependencies', 'bottle')):
         path = p.abspath(path)
         if path not in sys.path:
-            print "Adding '%s'" % path
+            print("Adding '%s'" % path)
             sys.path.insert(0, path)
         else:
             msg = "WARNING: '%s' was already on sys.path!" % path
-            print msg
+            print(msg)
             _logger.warning(msg)
 
 def parseArguments():
@@ -82,14 +83,16 @@ def parseArguments():
 def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     "Redirect stdout and stderr to files"
     if stdout is not None:
-        sys.stdout = open(stdout, 'ab', buffering=1)
+        sys.stdout = open(stdout, 'ab') #, buffering=1)
     if stderr is not None:
-        sys.stderr = open(stderr, 'ab', buffering=1)
+        sys.stderr = open(stderr, 'ab') #, buffering=1)
 
 def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
-    _setupPipeRedirection(args.stdout, args.stderr)
+    # TODO: Fix this for Python3
+    if six.PY2:
+        _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
     # Call it again to log the paths we added

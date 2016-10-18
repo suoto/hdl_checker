@@ -19,15 +19,19 @@
 
 import re
 import logging
-
 from nose2.tools import such
 from nose2.tools.params import params
+
+import six
 
 import hdlcc.static_check as static_check
 
 _logger = logging.getLogger(__name__)
 
 with such.A("hdlcc project") as it:
+    # Workaround for Python 2.x and 3.x differences
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
 
     @it.has_setup
     def setup():

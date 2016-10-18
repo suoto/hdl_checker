@@ -25,7 +25,12 @@ import shutil
 from webtest import TestApp
 from nose2.tools import such
 
-import mock
+import six
+
+try:  # Python 3.x
+    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+except ImportError:  # Python 2.x
+    import mock
 
 import hdlcc
 import hdlcc.handlers as handlers
@@ -38,6 +43,9 @@ _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 with such.A("hdlcc bottle app") as it:
+    # Workaround for Python 2.x and 3.x differences
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
 
     @it.has_setup
     def setup():

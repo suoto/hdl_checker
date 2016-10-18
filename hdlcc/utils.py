@@ -26,6 +26,7 @@ import subprocess as subp
 import shutil
 from threading import Lock
 
+
 # Make the serializer transparent
 try:
     import json as serializer
@@ -42,27 +43,47 @@ except ImportError:  # pragma: no cover
 
     dump = serializer.dump  # pylint: disable=invalid-name
 
+import six
+
+
 _logger = logging.getLogger(__name__)
+
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, str):
-        class Stream(file):
-            """File subclass that allows RainbowLoggingHandler to write
-            with colors"""
+    if isinstance(stream, six.string_types):
+        class Stream(object):
+            """
+            File subclass that allows RainbowLoggingHandler to write
+            with colors
+            """
             _lock = Lock()
-            def isatty(self):
-                return color
-            def write(self, *args, **kwargs):
-                with self._lock:
-                    super(Stream, self).write(*args, **kwargs)
+            _color = color
 
-        stream = Stream(stream, 'ab', buffering=1)
+            def __init__(self, *args, **kwargs):
+                self._fd = open(*args, **kwargs)
+
+            def isatty(self):
+                """
+                Tells if this stream accepts control chars
+                """
+                return self._color
+
+            def write(self, text):
+                """
+                Writes to the stream
+                """
+                with self._lock:
+                    self._fd.write(text.encode('utf-8', errors='replace'))
+
+        _stream = Stream(stream, 'ab', buffering=1)
+    else:
+        _stream = stream
 
     try:
         from rainbow_logging_handler import RainbowLoggingHandler
-        rainbow_stream_handler = RainbowLoggingHandler(
-            stream,
+        handler = RainbowLoggingHandler(
+            _stream,
             #  Customizing each column's color
             # pylint: disable=bad-whitespace
             color_asctime          = ('dim white',  'black'),
@@ -77,16 +98,13 @@ def setupLogging(stream, level, color=True): # pragma: no cover
             color_message_error    = ('red',        None),
             color_message_critical = ('bold white', 'red'))
             # pylint: enable=bad-whitespace
-
-        logging.root.addHandler(rainbow_stream_handler)
-        logging.root.setLevel(level)
     except ImportError: # pragma: no cover
-        file_handler = logging.StreamHandler(stream)
-        #  log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        #  file_handler.formatter = logging.Formatter(log_format)
-        file_handler.formatter = logging.Formatter()
-        logging.root.addHandler(file_handler)
-        logging.root.setLevel(level)
+        handler = logging.StreamHandler(_stream)  # pylint: disable=redefined-variable-type
+        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
+        handler.formatter = logging.Formatter(log_format)
+
+    logging.root.addHandler(handler)
+    logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
 def terminateProcess(pid):
@@ -138,7 +156,7 @@ def _isProcessRunningOnWindows(pid):
 
     arr = c_ulong * 256
     list_of_pids = arr()
-    cb = sizeof(list_of_pids)
+    cb = sizeof(list_of_pids)  # pylint: disable=invalid-name
     cb_needed = c_ulong()
 
     #Call Enumprocesses to get hold of process id's
@@ -155,7 +173,10 @@ def _isProcessRunningOnWindows(pid):
 def writeListToFile(filename, _list): # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     _logger.debug("Writing to %s", filename)
-    open(filename, 'w').write('\n'.join([str(x) for x in _list]))
+
+    open(filename, mode='w').write(
+        '\n'.join([str(x) for x in _list]))
+
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 
@@ -227,9 +248,12 @@ def handlePathPlease(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
     """
-    return p.normpath(p.abspath(p.join(*args)))
+    return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 def removeDuplicates(seq):
+    """
+    Fast removal of duplicates within an iterable
+    """
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]

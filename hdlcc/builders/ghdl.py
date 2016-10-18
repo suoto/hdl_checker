@@ -17,13 +17,15 @@
 "GHDL builder implementation"
 
 import os
+import os.path as p
 import re
 
 from .base_builder import BaseBuilder
-import hdlcc.utils as utils
 
 class GHDL(BaseBuilder):
-    '''Builder implementation of the GHDL compiler'''
+    """
+    Builder implementation of the GHDL compiler
+    """
 
     # Implementation of abstract class properties
     builder_name = 'ghdl'
@@ -46,7 +48,7 @@ class GHDL(BaseBuilder):
         r"^\s*(actual prefix|library directory):"
         r"\s*(?P<library_path>.*)\s*").search
 
-    _should_ignore = re.compile('|'.join([
+    _shouldIgnoreLine = re.compile('|'.join([
         r"^\s*$",
         r"ghdl: compilation error", ])).match
 
@@ -61,11 +63,6 @@ class GHDL(BaseBuilder):
         super(GHDL, self).__init__(target_folder)
         self._builtin_libraries = []
         self._parseBuiltinLibraries()
-
-    def _shouldIgnoreLine(self, line):
-        if self._should_ignore(line):
-            return True
-        return False
 
     def _makeRecords(self, line):
         record = {
@@ -106,29 +103,16 @@ class GHDL(BaseBuilder):
         "Discovers libraries that exist regardless before we do anything"
         library_name_scan = None
         for line in self._subprocessRunner(['ghdl', '--dispconfig']):
+            self._logger.info(repr(line))
             library_path_match = self._scan_library_paths(line)
             if library_path_match:
-                library_path = \
-                    repr(library_path_match.groupdict()['library_path'])[1:-1]
+                library_path = library_path_match.groupdict()['library_path']
 
-                # TODO: We should find a better way to parse this
-                if utils.onWindows():
-                    library_name_scan = re.compile( \
-                        r"^\s*" + library_path +
-                        r"\\(?P<vhdl_standard>\w+)\\(?P<library_name>\w+).*")
-                else:
-                    library_name_scan = re.compile( \
-                        r"^\s*" + library_path +
-                        r"/(?P<vhdl_standard>\w+)/(?P<library_name>\w+).*")
+                for library in os.listdir(p.join(library_path, 'v93', '')):
+                    self._builtin_libraries.append(library.strip().lower())
 
-                self._logger.info("Library path: %s",
-                                  library_path_match.groupdict())
-                self._logger.info("Library name scan: %s",
-                                  library_name_scan.pattern)
-
-            if library_name_scan is not None:
-                for match in library_name_scan.finditer(line):
-                    self._builtin_libraries.append(match.groupdict()['library_name'])
+        self._logger.debug("Builtin libraries found: %s",
+                           " ".join(self._builtin_libraries))
 
     def _getGhdlArgs(self, source, flags=None):
         "Return the GHDL arguments that are common to most calls"
@@ -170,8 +154,8 @@ class GHDL(BaseBuilder):
         return stdout
 
     def _createLibrary(self, _):
-        workdir = os.path.join(self._target_folder)
-        if not os.path.exists(workdir):
+        workdir = p.join(self._target_folder)
+        if not p.exists(workdir):
             os.mkdir(workdir)
 
     def _searchForRebuilds(self, line):

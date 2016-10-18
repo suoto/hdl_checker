@@ -25,7 +25,11 @@ import argparse
 import logging
 import nose2
 import coverage
-import mock
+
+try:  # Python 3.x
+    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+except ImportError:  # Python 2.x
+    import mock
 
 try:
     import argcomplete
@@ -89,41 +93,35 @@ def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
     if isinstance(stream, str):
         class Stream(file):
-            """File subclass that allows RainbowLoggingHandler to write
-            with colors"""
+            """
+            File subclass that allows RainbowLoggingHandler to write
+            with colors
+            """
             def isatty(self):
                 return color
 
         stream = Stream(stream, 'ab', buffering=1)
 
-    try:
-        from rainbow_logging_handler import RainbowLoggingHandler
-        rainbow_stream_handler = RainbowLoggingHandler(
-            stream,
-            #  Customizing each column's color
-            # pylint: disable=bad-whitespace
-            color_asctime          = ('dim white',  'black'),
-            color_name             = ('dim white',  'black'),
-            color_funcName         = ('green',      'black'),
-            color_lineno           = ('dim white',  'black'),
-            color_pathname         = ('black',      'red'),
-            color_module           = ('yellow',     None),
-            color_message_debug    = ('color_59',   None),
-            color_message_info     = (None,         None),
-            color_message_warning  = ('color_226',  None),
-            color_message_error    = ('red',        None),
-            color_message_critical = ('bold white', 'red'))
-            # pylint: enable=bad-whitespace
+    from rainbow_logging_handler import RainbowLoggingHandler
+    rainbow_stream_handler = RainbowLoggingHandler(
+        stream,
+        #  Customizing each column's color
+        # pylint: disable=bad-whitespace
+        color_asctime          = ('dim white',  'black'),
+        color_name             = ('dim white',  'black'),
+        color_funcName         = ('green',      'black'),
+        color_lineno           = ('dim white',  'black'),
+        color_pathname         = ('black',      'red'),
+        color_module           = ('yellow',     None),
+        color_message_debug    = ('color_59',   None),
+        color_message_info     = (None,         None),
+        color_message_warning  = ('color_226',  None),
+        color_message_error    = ('red',        None),
+        color_message_critical = ('bold white', 'red'))
+        # pylint: enable=bad-whitespace
 
-        logging.root.addHandler(rainbow_stream_handler)
-        logging.root.setLevel(level)
-    except ImportError: # pragma: no cover
-        file_handler = logging.StreamHandler(stream)
-        #  log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        #  file_handler.formatter = logging.Formatter(log_format)
-        file_handler.formatter = logging.Formatter()
-        logging.root.addHandler(file_handler)
-        logging.root.setLevel(level)
+    logging.root.addHandler(rainbow_stream_handler)
+    logging.root.setLevel(level)
 
 def _uploadAppveyorArtifact(path):
     "Uploads 'path' to Appveyor artifacts"

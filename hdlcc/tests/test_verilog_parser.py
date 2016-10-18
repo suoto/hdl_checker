@@ -20,9 +20,9 @@
 import os
 import logging
 from nose2.tools import such
+import six
 
 from hdlcc.parsers import VerilogParser
-
 from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
@@ -30,6 +30,10 @@ _logger = logging.getLogger(__name__)
 _FILENAME = 'source.v'
 
 with such.A('Verilog source file object') as it:
+    # Workaround for Python 2.x and 3.x differences
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
+
     with it.having('a module code'):
         @it.has_setup
         def setup():
