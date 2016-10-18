@@ -24,8 +24,8 @@ import signal
 import time
 import subprocess as subp
 import shutil
-import six
 from threading import Lock
+
 
 # Make the serializer transparent
 try:
@@ -43,46 +43,47 @@ except ImportError:  # pragma: no cover
 
     dump = serializer.dump  # pylint: disable=invalid-name
 
-#  if six.PY3:
-#      import io
-#      file = io.TextIOBase
+import six
+
 
 _logger = logging.getLogger(__name__)
 
+
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    #  if isinstance(stream, str):
-    #      stream = open(stream, mode='ab', buffering=1)
-    #      def isatty(*args, **kwargs):
-    #          return color
-    #      #  assert not hasattr(stream, 'isatty')
-    #      #  stream.isatty = isatty
-    #      #  class Stream(file):
-    #      #      """File subclass that allows RainbowLoggingHandler to write
-    #      #      with colors"""
-    #      #      _lock = Lock()
-    #      #      def isatty(self):
-    #      #          return color
-    #      #      def write(self, *args, **kwargs):
-    #      #          with self._lock:
-    #      #              super(Stream, self).write(*args, **kwargs)
+    if isinstance(stream, six.string_types):
+        class Stream(object):
+            """
+            File subclass that allows RainbowLoggingHandler to write
+            with colors
+            """
+            _lock = Lock()
+            _color = color
 
-    #      #  #  stream = Stream(stream, mode='ab', buffering=1)
-    #      #  stream = Stream(stream, mode='wb') #, buffering=1)
-    #      #  stream.write('testing\n')
-    #      #  assert False
+            def __init__(self, *args, **kwargs):
+                self._fd = open(*args, **kwargs)
 
-    color_logger = False
-    if six.PY2:
-        try:
-            from rainbow_logging_handler import RainbowLoggingHandler
-            color_logger = True
-        except ImportError: # pragma: no cover
-            pass
+            def isatty(self):
+                """
+                Tells if this stream accepts control chars
+                """
+                return self._color
 
-    if color_logger:
-        log_handler = RainbowLoggingHandler(
-            stream,
+            def write(self, text):
+                """
+                Writes to the stream
+                """
+                with self._lock:
+                    self._fd.write(text.encode('utf-8', errors='replace'))
+
+        _stream = Stream(stream, 'ab', buffering=1)
+    else:
+        _stream = stream
+
+    try:
+        from rainbow_logging_handler import RainbowLoggingHandler
+        handler = RainbowLoggingHandler(
+            _stream,
             #  Customizing each column's color
             # pylint: disable=bad-whitespace
             color_asctime          = ('dim white',  'black'),
@@ -97,15 +98,12 @@ def setupLogging(stream, level, color=True): # pragma: no cover
             color_message_error    = ('red',        None),
             color_message_critical = ('bold white', 'red'))
             # pylint: enable=bad-whitespace
-    else:
-        if isinstance(stream, str):
-            log_handler = logging.FileHandler(stream)
-        else:
-            log_handler = logging.StreamHandler(stream)
+    except ImportError: # pragma: no cover
+        handler = logging.StreamHandler(_stream)  # pylint: disable=redefined-variable-type
         log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        log_handler.formatter = logging.Formatter(log_format)
+        handler.formatter = logging.Formatter(log_format)
 
-    logging.root.addHandler(log_handler)
+    logging.root.addHandler(handler)
     logging.root.setLevel(level)
 
 # From here: http://stackoverflow.com/a/8536476/1672783
@@ -158,7 +156,7 @@ def _isProcessRunningOnWindows(pid):
 
     arr = c_ulong * 256
     list_of_pids = arr()
-    cb = sizeof(list_of_pids)
+    cb = sizeof(list_of_pids)  # pylint: disable=invalid-name
     cb_needed = c_ulong()
 
     #Call Enumprocesses to get hold of process id's
@@ -250,9 +248,12 @@ def handlePathPlease(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
     """
-    return p.normpath(p.abspath(p.join(*args)))
+    return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 def removeDuplicates(seq):
+    """
+    Fast removal of duplicates within an iterable
+    """
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
