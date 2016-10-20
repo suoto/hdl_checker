@@ -470,6 +470,46 @@ class HdlCodeCheckerBase(object):
         self._saveCache()
         return self._sortBuildMessages(records)
 
+    def getMessagesWithText(self, path, content):
+        """
+        """
+        self._logger.fatal("Getting messages for '%s' with content:", path)
+
+        self._setupEnvIfNeeded()
+        if not p.isabs(path): # pragma: no cover
+            abspath = p.join(self._start_dir, path)
+        else:
+            abspath = path
+
+        file_type = getFileType(path)
+        if file_type == 'vhdl':
+            temp_filename = 'temp.vhd'
+        elif file_type == 'verilog':
+            temp_filename = 'temp.v'
+        elif file_type == 'systemverilog':
+            temp_filename = 'temp.sv'
+        else:
+            assert False, "Unknown file type %s" % file_type
+
+        if p.exists(temp_filename):
+            os.remove(temp_filename)
+
+        open(temp_filename, 'w').write(content)
+        messages = []
+        for message in self.getMessagesByPath(temp_filename):
+            self._logger.warning("- %s", message)
+            if not message['filename'] or samefile(message['filename'], temp_filename):
+                message['filename'] = path
+
+                if message['error_message'].startswith('Path ') and \
+                   message['error_message'].endswith(' not found in project file'):
+                    continue
+
+
+            messages.append(message)
+
+        return messages
+
     def getSources(self):
         """
         Returns a list of VhdlSourceFile objects parsed

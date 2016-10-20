@@ -27,6 +27,7 @@ from nose2.tools import such
 from nose2.tools.params import params
 
 import mock
+import six
 
 import hdlcc
 from hdlcc.utils import writeListToFile, cleanProjectCache, onCI, samefile
@@ -44,6 +45,8 @@ TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support
 VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
@@ -559,7 +562,7 @@ with such.A("hdlcc project") as it:
             del it.project
 
         @it.should("get messages by path")
-        def test005():
+        def test005a():
             filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
                               'foo.vhd')
 
@@ -579,6 +582,51 @@ with such.A("hdlcc project") as it:
                 records)
 
             it.assertTrue(it.project._msg_queue.empty())
+
+        @it.should("get messages with text")
+        def test005b():
+            filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+                              'foo.vhd')
+
+            original_content = open(filename, 'r').read().split('\n')
+
+            content = '\n'.join(original_content[:43] +
+                                ['signal another_signal : std_logic;'] +
+                                original_content[43:])
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+            records = it.project.getMessagesWithText(filename, content)
+
+            _logger.debug("Records received:")
+            for record in records:
+                _logger.debug("- %s", record)
+
+            # Check that all records point to the original filename and
+            # remove them from the records so it's easier to compare
+            # the remaining fields
+            for record in records:
+                it.assertTrue(samefile(filename, record.pop('filename')))
+
+            it.assertItemsEqual(
+                [{'error_subtype' : 'Style',
+                  'line_number'   : 43,
+                  'checker'       : 'HDL Code Checker/static',
+                  'error_message' : "signal 'neat_signal' is never used",
+                  'column'        : 12,
+                  'error_type'    : 'W',
+                  'error_number'  : '0'},
+                 {'error_subtype' : 'Style',
+                  'line_number'   : 44,
+                  'checker'       : 'HDL Code Checker/static',
+                  'error_message' : "signal 'another_signal' is never used",
+                  'column'        : 8,
+                  'error_type'    : 'W',
+                  'error_number'  : '0'}],
+                records)
+
+            it.assertTrue(it.project._msg_queue.empty())
+
 
         @it.should("get updated messages")
         def test006():
