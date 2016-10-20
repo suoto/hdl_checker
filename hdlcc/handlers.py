@@ -141,18 +141,22 @@ def getMessagesByPath():
     """
     Get messages for a given projec_file/path pair
     """
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
-    _logger.debug("Getting messages for '%s', '%s'", project_file, path)
+    try:
+        project_file = bottle.request.forms.get('project_file')
+        path = bottle.request.forms.get('path')
+        _logger.debug("Getting messages for '%s', '%s'", project_file, path)
 
-    server = _getServerByProjectFile(project_file)
-    response = {}
-    response['messages'] = []
+        server = _getServerByProjectFile(project_file)
+        response = {}
+        response['messages'] = []
 
-    for msg in server.getMessagesByPath(path):
-        response['messages'] += [msg]
+        for msg in server.getMessagesByPath(path):
+            response['messages'] += [msg]
 
-    return response
+        return response
+    except:
+        _logger.exception("Caught exception while getting messages by path")
+        raise
 
 @app.post('/get_ui_messages')
 def getUiMessages():
