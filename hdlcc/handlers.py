@@ -67,6 +67,19 @@ def _getServerByProjectFile(project_file):
         _hdlcc_objects[project_file] = project
         return project
 
+def _exceptionWrapper(f):
+    """
+    Wraps f to log exception to the standard logger
+    """
+    def _wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except:  # pragma: no cover
+            _logger.exception("Error running '%s'", f.__name__)
+            raise
+
+    return _wrapper
+
 def setupSignalHandlers():
     """
     Configures signal handlers that will be called when exiting Python
@@ -96,6 +109,7 @@ def _getProjectDiags(project_file):
     return diags
 
 @app.post('/get_diagnose_info')
+@_exceptionWrapper
 def getDiagnoseInfo():
     """
     Collects misc diagnose info for the clients
@@ -115,6 +129,7 @@ def getDiagnoseInfo():
     return {'info' : response}
 
 @app.post('/on_buffer_visit')
+@_exceptionWrapper
 def onBufferVisit():
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
@@ -126,6 +141,7 @@ def onBufferVisit():
     return {}
 
 @app.post('/on_buffer_leave')
+@_exceptionWrapper
 def onBufferLeave():
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
@@ -137,28 +153,31 @@ def onBufferLeave():
     return {}
 
 @app.post('/get_messages_by_path')
+@_exceptionWrapper
 def getMessagesByPath():
     """
     Get messages for a given projec_file/path pair
     """
-    try:
-        project_file = bottle.request.forms.get('project_file')
-        path = bottle.request.forms.get('path')
-        _logger.debug("Getting messages for '%s', '%s'", project_file, path)
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+    content = bottle.request.forms.get('content', None)
+    _logger.fatal(content)
 
-        server = _getServerByProjectFile(project_file)
-        response = {}
-        response['messages'] = []
+    _logger.debug("Getting messages for '%s', '%s', %s", project_file, path,
+                  "no content" if content is None else "with content")
 
-        for msg in server.getMessagesByPath(path):
-            response['messages'] += [msg]
 
-        return response
-    except:
-        _logger.exception("Caught exception while getting messages by path")
-        raise
+    server = _getServerByProjectFile(project_file)
+    response = {}
+    if content is None:
+        response['messages'] = server.getMessagesByPath(path)
+    else:
+        response['messages'] = server.getMessagesWithText(path, content)
+
+    return response
 
 @app.post('/get_ui_messages')
+@_exceptionWrapper
 def getUiMessages():
     """
     Get messages for a given projec_file/path pair
@@ -182,6 +201,7 @@ def getUiMessages():
     return response
 
 @app.post('/rebuild_project')
+@_exceptionWrapper
 def rebuildProject():
     """
     Rebuilds the current project
@@ -196,6 +216,7 @@ def rebuildProject():
     _getServerByProjectFile(project_file)
 
 @app.post('/shutdown')
+@_exceptionWrapper
 def shutdownServer():
     """
     Terminates the current process to shutdown the server
