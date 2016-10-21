@@ -161,7 +161,6 @@ def getMessagesByPath():
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     content = bottle.request.forms.get('content', None)
-    _logger.fatal(content)
 
     _logger.debug("Getting messages for '%s', '%s', %s", project_file, path,
                   "no content" if content is None else "with content")

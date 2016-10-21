@@ -284,21 +284,12 @@ class HdlCodeCheckerBase(object):
         # the item (2) above is true)
         #
         key = 'getBuildSequence'
-        if key in self._cache:
-            # We can only use the cached build sequence if the source
-            # is the same that was cached before
-            path = self._cache[key]['path']
-            if samefile(path, source.filename):
-                sequence = self._cache[key]['sequence']
-                cache_mtime = self._cache[key]['cache_mtime']
-                last_mtime = max([x.getmtime() for x in sequence])
+        if key not in self._cache:
+            build_sequence = []
+            self._getBuildSequence(source, build_sequence)
+            self._cache[key] = build_sequence
 
-                if cache_mtime == last_mtime:
-                    return self._cache[key]['sequence']
-
-        build_sequence = []
-        self._getBuildSequence(source, build_sequence)
-        return build_sequence
+        return self._cache[key]
 
     def _getBuildSequence(self, source, build_sequence, reference=None):
         """
@@ -340,21 +331,18 @@ class HdlCodeCheckerBase(object):
 
         build_sequence = removeDuplicates(build_sequence)
 
-    def _getBuilderMessages(self, path, batch_mode=False):
+    def _getBuilderMessages(self, source, batch_mode=False):
         """
-        Builds a given source file handling rebuild of units reported
-        by the compiler
         Builds the given source taking care of recursively building its
         dependencies first
         """
-        source, remarks = self._getSourceByPath(path)
         try:
-            flags = self._config.getBuildFlags(path, batch_mode)
+            flags = self._config.getBuildFlags(source.filename, batch_mode)
         except KeyError:
             flags = []
 
         self._logger.info("Building '%s', batch_mode = %s",
-                          str(path), batch_mode)
+                          str(source.filename), batch_mode)
 
         build_sequence = self.getBuildSequence(source)
 
@@ -370,13 +358,13 @@ class HdlCodeCheckerBase(object):
 
         source_records = self._buildAndHandleRebuilds(source, forced=True,
                                                       flags=flags)
-        return self._sortBuildMessages(source_records + remarks)
+        return self._sortBuildMessages(source_records)
 
     def _buildAndHandleRebuilds(self, source, *args, **kwargs):
         """
         Builds the given source and handle any files that might require
-        rebuilding until there is nothing to rebuild.
-        The number of iteractions is fixed in 10.
+        rebuilding until there is nothing to rebuild. The number of iteractions
+        is fixed in 10.
         """
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
@@ -439,21 +427,22 @@ class HdlCodeCheckerBase(object):
         from the import configured builder (if available) and static
         checks
         """
+        source, remarks = self._getSourceByPath(path)
+        return self._sortBuildMessages(
+                self.getMessagesBySource(source, *args, **kwargs) + remarks)
+
+    def getMessagesBySource(self, source, *args, **kwargs):
         self._setupEnvIfNeeded()
-        if not p.isabs(path): # pragma: no cover
-            abspath = p.join(self._start_dir, path)
-        else:
-            abspath = path
 
         if self._USE_THREADS:
             records = []
             pool = ThreadPool()
             static_check = pool.apply_async(getStaticMessages, \
-                    args=(open(abspath, 'r').read().split('\n'), ))
+                    args=(source.getSourceContent().split('\n'), ))
             if self._isBuilderCallable():
                 builder_check = pool.apply_async(
                     self._getBuilderMessages,
-                    args=[abspath, ] + list(args),
+                    args=[source, ] + list(args),
                     kwds=kwargs)
                 records += builder_check.get()
 
@@ -462,49 +451,53 @@ class HdlCodeCheckerBase(object):
             pool.terminate()
             pool.join()
         else:
-            records = getStaticMessages(open(abspath, 'r').read().split('\n'))
+            records = getStaticMessages(source.getSourceContent().split('\n'))
             if self._isBuilderCallable():
                 records += self._getBuilderMessages(
-                    abspath, list(args), **kwargs)
+                    source, list(args), **kwargs)
 
         self._saveCache()
-        return self._sortBuildMessages(records)
+        return records
 
     def getMessagesWithText(self, path, content):
         """
         """
-        self._logger.fatal("Getting messages for '%s' with content:", path)
+        self._logger.debug("Getting messages for '%s' with content", path)
 
         self._setupEnvIfNeeded()
-        if not p.isabs(path): # pragma: no cover
-            abspath = p.join(self._start_dir, path)
-        else:
-            abspath = path
 
         file_type = getFileType(path)
         if file_type == 'vhdl':
+            cls = VhdlParser
             temp_filename = 'temp.vhd'
         elif file_type == 'verilog':
             temp_filename = 'temp.v'
+            cls = VerilogParser
         elif file_type == 'systemverilog':
             temp_filename = 'temp.sv'
+            cls = VerilogParser
         else:
             assert False, "Unknown file type %s" % file_type
 
         if p.exists(temp_filename):
             os.remove(temp_filename)
-
         open(temp_filename, 'w').write(content)
+
+        # Try to find a source with this path so we can copy most of its
+        # properties set in the configuration process and change only
+        # the path (and thus its content)
+        try:
+            state = self._config.getSourceByPath(path).getState()
+            source = cls.recoverFromState(state)
+            source.filename = temp_filename
+        except KeyError:
+            source = cls(temp_filename)
+
         messages = []
-        for message in self.getMessagesByPath(temp_filename):
+        for message in self.getMessagesBySource(source):
             self._logger.warning("- %s", message)
             if not message['filename'] or samefile(message['filename'], temp_filename):
                 message['filename'] = path
-
-                if message['error_message'].startswith('Path ') and \
-                   message['error_message'].endswith(' not found in project file'):
-                    continue
-
 
             messages.append(message)
 
@@ -528,14 +521,7 @@ class HdlCodeCheckerBase(object):
             return
         key = 'getBuildSequence'
         sequence = self.getBuildSequence(source)
-        try:
-            cache_mtime = max([x.getmtime() for x in sequence])
-        except ValueError:
-            self._logger.exception("Failed to get cache mtime for '%s'", path)
-        self._cache[key] = {
-            'path': path,
-            'sequence': sequence,
-            'cache_mtime': cache_mtime}
+        self._cache[key] = sequence
 
     def onBufferLeave(self, _):
         """
