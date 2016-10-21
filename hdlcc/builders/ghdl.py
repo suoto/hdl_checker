@@ -100,10 +100,10 @@ class GHDL(BaseBuilder):
         return self._builtin_libraries
 
     def _parseBuiltinLibraries(self):
-        "Discovers libraries that exist regardless before we do anything"
-        library_name_scan = None
+        """
+        Discovers libraries that exist regardless before we do anything
+        """
         for line in self._subprocessRunner(['ghdl', '--dispconfig']):
-            self._logger.info(repr(line))
             library_path_match = self._scan_library_paths(line)
             if library_path_match:
                 library_path = library_path_match.groupdict()['library_path']
@@ -115,7 +115,9 @@ class GHDL(BaseBuilder):
                            " ".join(self._builtin_libraries))
 
     def _getGhdlArgs(self, source, flags=None):
-        "Return the GHDL arguments that are common to most calls"
+        """
+        Return the GHDL arguments that are common to most calls
+        """
         cmd = ['-P%s' % self._target_folder,
                '--work=%s' % source.library,
                '--workdir=%s' % self._target_folder]
@@ -125,7 +127,9 @@ class GHDL(BaseBuilder):
         return cmd
 
     def _importSource(self, source, flags=None):
-        "Runs GHDL with import source switch"
+        """
+        Runs GHDL with import source switch
+        """
         vhdl_std = []
         for flag in flags:
             if flag.startswith('--std='):
@@ -136,11 +140,16 @@ class GHDL(BaseBuilder):
         return cmd
 
     def _analyzeSource(self, source, flags=None):
-        "Runs GHDL with analyze source switch"
+        """
+        Runs GHDL with analyze source switch
+        """
+
         return ['ghdl', '-a'] + self._getGhdlArgs(source, flags)
 
     def _checkSyntax(self, source, flags=None):
-        "Runs GHDL with syntax check switch"
+        """
+        Runs GHDL with syntax check switch
+        """
         return ['ghdl', '-s'] + self._getGhdlArgs(source, flags)
 
     def _buildSource(self, source, flags=None):
