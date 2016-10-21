@@ -25,7 +25,7 @@ from hdlcc.utils import getFileType, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
-class BaseSourceFile(object):
+class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
     """
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
@@ -113,11 +113,21 @@ class BaseSourceFile(object):
         """
         return self.getmtime() > self._mtime
 
+    def _clearCachesIfChanged(self):
+        """
+        Clears all the caches if the file has changed to force updating
+        every parsed info
+        """
+        if self._changed:
+            self._content = None
+            self._cache = {}
+
     def getSourceContent(self):
         """
         Cached version of the _getSourceContent method
         """
-        if self._changed() or self._content is None:
+        self._clearCachesIfChanged()
+        if self._content is None:
             self._content = self._getSourceContent()
             self._mtime = self.getmtime()
 
@@ -129,7 +139,8 @@ class BaseSourceFile(object):
         """
         if not p.exists(self.filename):
             return []
-        if self._changed() or 'design_units' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'design_units' not in self._cache:
             self._cache['design_units'] = self._getDesignUnits()
 
         return self._cache['design_units']
@@ -141,7 +152,8 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or 'dependencies' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'dependencies' not in self._cache:
             self._cache['dependencies'] = self._getDependencies()
 
         return self._cache['dependencies']
@@ -153,7 +165,8 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or 'libraries' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'libraries' not in self._cache:
             self._cache['libraries'] = removeDuplicates(self._getLibraries())
 
         return self._cache['libraries']
@@ -163,7 +176,8 @@ class BaseSourceFile(object):
         Cached version of the _getMatchingLibrary method
         """
         key = ','.join(['getMatchingLibrary', unit_name, unit_type])
-        if self._changed() or key not in self._cache:
+        self._clearCachesIfChanged()
+        if key not in self._cache:
             self._cache[key] = self._getMatchingLibrary(
                 unit_type, unit_name)
         return self._cache[key]
