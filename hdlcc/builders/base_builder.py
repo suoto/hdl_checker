@@ -167,17 +167,33 @@ class BaseBuilder(object):
 
         rebuilds = []
         for rebuild in parse_results:
-            if rebuild not in rebuilds:
-                if 'unit_type' in rebuild and 'unit_name' in rebuild:
-                    for dependency in source.getDependencies():
-                        if dependency['unit'] == rebuild['unit_name']:
-                            self._logger.info("Adding '%s'", rebuild)
-                            rebuilds += [rebuild]
-                            break
-                else:
-                    rebuilds += [rebuild]
-        return rebuilds
+            unit_type = rebuild.get('unit_type', None)
+            library_name = rebuild.get('library_name', None)
+            unit_name = rebuild.get('unit_name', None)
+            rebuild_path = rebuild.get('rebuild_path', None)
 
+            rebuild_info = None
+            if None not in (unit_type, unit_name):
+                for dependency in source.getDependencies():
+                    if dependency['unit'] == rebuild['unit_name']:
+                        rebuild_info = {'unit_type' : unit_type,
+                                        'unit_name' : unit_name}
+                        break
+            elif None not in (library_name, unit_name):
+                rebuild_info = {'library_name' : library_name,
+                                'unit_name' : unit_name}
+            elif rebuild_path is not None:
+                # GHDL sometimes gives the full path of the file that
+                # should be recompiled
+                rebuild_info = {'rebuild_path' : rebuild_path}
+            else:  # pragma: no cover
+                self._logger.warning("Don't know what to do with %s",
+                                     rebuild)
+
+            if rebuild_info is not None and rebuild_info not in rebuilds:
+                rebuilds.append(rebuild_info)
+
+        return rebuilds
 
     def _searchForRebuilds(self, line): # pragma: no cover
         """
