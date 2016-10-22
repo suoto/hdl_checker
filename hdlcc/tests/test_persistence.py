@@ -55,7 +55,7 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._ui_handler.error(message)
         self._msg_queue.put(('error', message))
 
-with such.A("hdlcc project with persistency") as it:
+with such.A("hdlcc project with persistence") as it:
 
     @it.has_setup
     def setup():
