@@ -486,9 +486,12 @@ class HdlCodeCheckerBase(object):
         else:
             assert False, "Unknown file type %s" % file_type
 
-        _, tmp_filename = tempfile.mkstemp(suffix=tmp_extension)
+        tmp_fd, tmp_filename = tempfile.mkstemp(suffix=tmp_extension)
         try:
-            open(tmp_filename, 'w').write(content)
+            fd = open(tmp_filename, 'w')
+            fd.write(content)
+            fd.close()
+            os.close(tmp_fd)
 
             # Try to find a source with this path so we can copy most of its
             # properties set in the configuration process and change only
@@ -506,10 +509,11 @@ class HdlCodeCheckerBase(object):
                 if not message['filename'] or samefile(message['filename'],
                                                        tmp_filename):
                     message['filename'] = path
-
                 messages.append(message)
+
         finally:
             os.remove(tmp_filename)
+
         return messages
 
     def getSources(self):
