@@ -17,11 +17,11 @@
 
 write-host "Configured builder is $env:BUILDER"
 
-$env:python = if ($env:arch -eq 32) { 'C:\Python27' } else
-                                    { 'C:\Python27-x64' }
+$env:python_path = if ($env:arch -eq 32) { "C:\Python$env:PYTHON_VERSION" } else
+                                         { "C:\Python$env:PYTHON_VERSION-x64" }
 
-write-host "Python selected is $env:python"
-$env:PATH="$env:PYTHON;$env:PYTHON\Scripts;$env:PATH"
+write-host "Python selected is $env:python_path"
+$env:PATH="$env:python_path;$env:python_path\Scripts;$env:PATH"
 
 Start-Process "git" -RedirectStandardError git.log -Wait -NoNewWindow -ArgumentList `
     "submodule update --init --recursive"
