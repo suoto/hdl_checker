@@ -216,26 +216,26 @@ class HdlCodeCheckerBase(object):
         source = None
         remarks = []
 
-        if self._config is not None:
-            try:
-                source = self._config.getSourceByPath(path)
-            except KeyError:
-                pass
+        try:
+            source = self._config.getSourceByPath(path)
+        except KeyError:
+            pass
 
         # If the source file was not found on the configuration file, add this
         # as a remark.
         # Also, create a source parser object with some library so the user can
         # at least have some info on the source
         if source is None:
-            remarks += [{
-                'checker'        : 'hdlcc',
-                'line_number'    : '',
-                'column'         : '',
-                'filename'       : '',
-                'error_number'   : '',
-                'error_type'     : 'W',
-                'error_message'  : 'Path "%s" not found in project file' %
-                                   p.abspath(path)}]
+            if self.builder.builder_name != 'fallback':
+                remarks += [{
+                    'checker'        : 'hdlcc',
+                    'line_number'    : '',
+                    'column'         : '',
+                    'filename'       : '',
+                    'error_number'   : '',
+                    'error_type'     : 'W',
+                    'error_message'  : 'Path "%s" not found in project file' %
+                                       p.abspath(path)}]
             self._logger.info("Path %s not found in the project file",
                               p.abspath(path))
             cls = VhdlParser if getFileType(path) == 'vhdl' else VerilogParser
@@ -436,7 +436,12 @@ class HdlCodeCheckerBase(object):
         return self._sortBuildMessages(
             self.getMessagesBySource(source, *args, **kwargs) + remarks)
 
-    def getMessagesBySource(self, source, *args, **kwargs):
+    def getMessagesBySource(self, source, batch_mode=False):
+        """
+        Returns the messages for the given source, including messages
+        from the configured builder (if available) and static checks
+        Extra arguments are
+        """
         self._setupEnvIfNeeded()
 
         if self._USE_THREADS:
@@ -447,10 +452,8 @@ class HdlCodeCheckerBase(object):
                 getStaticMessages, args=(source.getSourceContent().split('\n'), ))
 
             if self._isBuilderCallable():
-                builder_check = pool.apply_async(
-                    self._getBuilderMessages,
-                    args=[source, ] + list(args),
-                    kwds=kwargs)
+                builder_check = pool.apply_async(self._getBuilderMessages,
+                                                 args=[source, batch_mode])
                 records += builder_check.get()
 
             records += static_check.get()
@@ -460,14 +463,14 @@ class HdlCodeCheckerBase(object):
         else:
             records = getStaticMessages(source.getSourceContent().split('\n'))
             if self._isBuilderCallable():
-                records += self._getBuilderMessages(
-                    source, list(args), **kwargs)
+                records += self._getBuilderMessages(source, batch_mode)
 
         self._saveCache()
         return records
 
     def getMessagesWithText(self, path, content):
         """
+        Get
         """
         self._logger.debug("Getting messages for '%s' with content", path)
 
@@ -497,7 +500,8 @@ class HdlCodeCheckerBase(object):
             # properties set in the configuration process and change only
             # the path (and thus its content)
             try:
-                state = self._config.getSourceByPath(path).getState()
+                original_source, remarks = self._getSourceByPath(path)
+                state = original_source.getState()
                 source = cls.recoverFromState(state)
                 source.filename = tmp_filename
             except KeyError:
@@ -514,7 +518,7 @@ class HdlCodeCheckerBase(object):
         finally:
             os.remove(tmp_filename)
 
-        return messages
+        return messages + remarks
 
     def getSources(self):
         """

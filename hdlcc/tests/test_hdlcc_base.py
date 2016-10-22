@@ -182,16 +182,19 @@ with such.A("hdlcc project") as it:
         project = StandaloneProjectBuilder()
         source, remarks = project._getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
-        it.assertEquals(
-            remarks,
-            [{'checker'        : 'hdlcc',
-              'line_number'    : '',
-              'column'         : '',
-              'filename'       : '',
-              'error_number'   : '',
-              'error_type'     : 'W',
-              'error_message'  : 'Path "%s" not found in project file' %
-                                 p.abspath(path)}])
+        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
+            it.assertEquals(
+                remarks,
+                [{'checker'        : 'hdlcc',
+                  'line_number'    : '',
+                  'column'         : '',
+                  'filename'       : '',
+                  'error_number'   : '',
+                  'error_type'     : 'W',
+                  'error_message'  : 'Path "%s" not found in project file' %
+                                     p.abspath(path)}])
+        else:
+            it.assertEquals(remarks, [])
 
     @it.should("provide a Verilog source code object given a Verilog path")
     @params(p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.v'),
@@ -200,16 +203,19 @@ with such.A("hdlcc project") as it:
         project = StandaloneProjectBuilder()
         source, remarks = project._getSourceByPath(path)
         it.assertEquals(source, VerilogParser(path, library='undefined'))
-        it.assertEquals(
-            remarks,
-            [{'checker'        : 'hdlcc',
-              'line_number'    : '',
-              'column'         : '',
-              'filename'       : '',
-              'error_number'   : '',
-              'error_type'     : 'W',
-              'error_message'  : 'Path "%s" not found in project file' %
-                                 p.abspath(path)}])
+        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
+            it.assertEquals(
+                remarks,
+                [{'checker'        : 'hdlcc',
+                  'line_number'    : '',
+                  'column'         : '',
+                  'filename'       : '',
+                  'error_number'   : '',
+                  'error_type'     : 'W',
+                  'error_message'  : 'Path "%s" not found in project file' %
+                                     p.abspath(path)}])
+        else:
+            it.assertEquals(remarks, [])
 
     @it.should("resolve dependencies into a list of libraries and units")
     def test():
@@ -442,16 +448,20 @@ with such.A("hdlcc project") as it:
 
         project = StandaloneProjectBuilder()
         path = sources[0].filename
-        it.assertEquals(
-            project.getMessagesByPath(path),
-            [{'checker'        : 'hdlcc',
-              'line_number'    : '',
-              'column'         : '',
-              'filename'       : '',
-              'error_number'   : '',
-              'error_type'     : 'W',
-              'error_message'  : 'Path "%s" not found in project file' %
-                                 p.abspath(path)}])
+        messages = project.getMessagesByPath(path)
+        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
+            it.assertEquals(
+                messages,
+                [{'checker'        : 'hdlcc',
+                  'line_number'    : '',
+                  'column'         : '',
+                  'filename'       : '',
+                  'error_number'   : '',
+                  'error_type'     : 'W',
+                  'error_message'  : 'Path "%s" not found in project file' %
+                                     p.abspath(path)}])
+        else:
+            it.assertEquals(messages, [])
 
     @it.should("warn when unable to recreate a builder described in cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: FailingBuilder)
@@ -601,7 +611,9 @@ with such.A("hdlcc project") as it:
             # remove them from the records so it's easier to compare
             # the remaining fields
             for record in records:
-                it.assertTrue(samefile(filename, record.pop('filename')))
+                record_filename = record.pop('filename')
+                if record_filename:
+                    it.assertTrue(samefile(filename, record_filename))
 
             it.assertItemsEqual(
                 [{'error_subtype' : 'Style',
@@ -619,6 +631,61 @@ with such.A("hdlcc project") as it:
                   'error_type'    : 'W',
                   'error_number'  : '0'}],
                 records)
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+        @it.should("get messages with text for file outside the project file")
+        def test005c():
+            filename = 'some_file.vhd'
+            writeListToFile(filename, ["entity some_entity is end;", ])
+
+            content = "\n".join(["library work;",
+                                 "use work.all;",
+                                 "entity some_entity is end;"])
+
+            it.assertTrue(it.project._msg_queue.empty())
+
+            records = it.project.getMessagesWithText(filename, content)
+
+            _logger.debug("Records received:")
+            for record in records:
+                _logger.debug("- %s", record)
+
+            # Check that all records point to the original filename and
+            # remove them from the records so it's easier to compare
+            # the remaining fields
+            for record in records:
+                record_filename = record.pop('filename')
+                if record_filename:
+                    it.assertTrue(samefile(filename, record_filename))
+
+            if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
+                it.assertItemsEqual(
+                    [{'error_type'    : 'W',
+                      'checker'       : 'HDL Code Checker/static',
+                      'error_message' : "Declaration of library 'work' can be omitted",
+                      'column'        : 9,
+                      'error_subtype' : 'Style',
+                      'error_number'  : '0',
+                      'line_number'   : 1},
+                     {'error_type'    : 'W',
+                      'checker'       : 'hdlcc',
+                      'error_message' : 'Path "%s" not found in project file' %
+                                        p.abspath(filename),
+                      'column'        : '',
+                      'error_number'  : '',
+                      'line_number'   : ''}],
+                    records)
+            else:
+                it.assertItemsEqual(
+                    [{'error_type'    : 'W',
+                      'checker'       : 'HDL Code Checker/static',
+                      'error_message' : "Declaration of library 'work' can be omitted",
+                      'column'        : 9,
+                      'error_subtype' : 'Style',
+                      'error_number'  : '0',
+                      'line_number'   : 1}],
+                    records)
 
             it.assertTrue(it.project._msg_queue.empty())
 
