@@ -19,6 +19,7 @@
 
 import os
 import os.path as p
+import time
 import logging
 from multiprocessing import Queue
 
@@ -51,12 +52,43 @@ class SourceMock(object):
             self.filename = filename
         else:
             self.filename = library + '_' + design_units[0]['name'] + '.vhd'
+
+        self.filetype = hdlcc.utils.getFileType(self.filename)
+        self.abspath = p.abspath(self.filename)
+        self.flags = []
+
         self.library = library
         self._design_units = design_units
         if dependencies is not None:
             self._dependencies = dependencies
         else:
             self._dependencies = []
+
+        self._createMockFile()
+
+    def _createMockFile(self):
+        with open(self.filename, 'w') as fd:
+            libs = hdlcc.utils.removeDuplicates(
+                [x['library'] for x in self._dependencies])
+
+            for lib in libs:
+                fd.write("library {0};\n".format(lib))
+
+            for dependency in self._dependencies:
+                fd.write("use {0}.{1};\n".format(dependency['library'],
+                                                 dependency['unit']))
+
+            for design_unit in self._design_units:
+                fd.write("{0} is {1} end {0} {1};\n".
+                         format(design_unit['type'],
+                                design_unit['name']))
+
+    def __del__(self):
+        if p.exists(self.filename):
+            os.remove(self.filename)
+
+    def getmtime(self):
+        return p.getmtime(self.filename)
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
@@ -66,6 +98,12 @@ class SourceMock(object):
 
     def getDependencies(self):
         return self._dependencies
+
+    #  def getLibraries(self):
+    #      return []
+
+    #  def getSourceContent(self):
+    #      return ''
 
 class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger('MSimMock')

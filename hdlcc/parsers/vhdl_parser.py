@@ -37,7 +37,7 @@ _ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
     r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
     r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
 
-_SUB_COMMENTS = re.compile(r"\s*--[^\n]*", flags=re.S).sub
+_SUB_COMMENTS = re.compile(r"--[^\n\r]*", flags=re.S).sub
 
 class VhdlParser(BaseSourceFile):
     """

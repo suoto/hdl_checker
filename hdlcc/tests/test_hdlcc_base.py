@@ -441,13 +441,9 @@ with such.A("hdlcc project") as it:
             )
 
         project = StandaloneProjectBuilder()
-        project._config._sources = {}
-        for source in sources:
-            project._config._sources[source.filename] = source
-
         path = sources[0].filename
         it.assertEquals(
-            project._getBuilderMessages(path),
+            project.getMessagesByPath(path),
             [{'checker'        : 'hdlcc',
               'line_number'    : '',
               'column'         : '',
@@ -456,7 +452,6 @@ with such.A("hdlcc project") as it:
               'error_type'     : 'W',
               'error_message'  : 'Path "%s" not found in project file' %
                                  p.abspath(path)}])
-
 
     @it.should("warn when unable to recreate a builder described in cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: FailingBuilder)

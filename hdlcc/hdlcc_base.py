@@ -22,6 +22,7 @@ import os.path as p
 import shutil
 import logging
 import traceback
+import tempfile
 from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
@@ -47,7 +48,7 @@ class HdlCodeCheckerBase(object):
     def __init__(self, project_file=None):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
-        self._cache = {}
+        self._build_sequence_cache = {}
 
         self.project_file = project_file
 
@@ -235,7 +236,8 @@ class HdlCodeCheckerBase(object):
                 'error_type'     : 'W',
                 'error_message'  : 'Path "%s" not found in project file' %
                                    p.abspath(path)}]
-            self._logger.info("Path %s not found in the project file", path)
+            self._logger.info("Path %s not found in the project file",
+                              p.abspath(path))
             cls = VhdlParser if getFileType(path) == 'vhdl' else VerilogParser
             source = cls(path, library='undefined')
 
@@ -268,28 +270,35 @@ class HdlCodeCheckerBase(object):
         list empty and caching the result
         """
         # Despite we renew the cache when on buffer enter, we must also
-        # check if:
-        #
-        #   1) Any file has been changed by some background process that
-        #      the editor is unaware of (Vivado maybe?)
-        #      To cope with this, we'll check if the newest modification
-        #      time of the build sequence hasn't changed since we cached
-        #      the build sequence
-        #
-        #   2) The source being currently requested is the same that was
-        #      cached previously
-        #
-        # In any case, the cached build sequence will always match the
-        # source file that was visited (i.e., it won't be replaced if
-        # the item (2) above is true)
-        #
-        key = 'getBuildSequence'
-        if key not in self._cache:
+        # check if any file has been changed by some background process
+        # that the editor is unaware of (Vivado maybe?) To cope with
+        # this, we'll check if the newest modification time of the build
+        # sequence hasn't changed since we cached the build sequence
+        key = str(source.filename)
+        if key not in self._build_sequence_cache:
             build_sequence = []
             self._getBuildSequence(source, build_sequence)
-            self._cache[key] = build_sequence
+            if build_sequence:
+                timestamp = max([x.getmtime() for x in build_sequence])
+            else:
+                timestamp = 0
+            self._build_sequence_cache[key] = {
+                'sequence': build_sequence,
+                'timestamp' : timestamp}
+        else:
+            cached_sequence = self._build_sequence_cache[key]['sequence']
+            cached_timestamp = self._build_sequence_cache[key]['timestamp']
+            if cached_sequence:
+                current_timestamp = max([x.getmtime() for x in cached_sequence])
+            else:
+                current_timestamp = 0
+            if current_timestamp > cached_timestamp:
+                build_sequence = []
+                self._build_sequence_cache[key] = {
+                    'sequence': build_sequence,
+                    'timestamp' : current_timestamp}
 
-        return self._cache[key]
+        return self._build_sequence_cache[key]['sequence']
 
     def _getBuildSequence(self, source, build_sequence, reference=None):
         """
@@ -378,24 +387,21 @@ class HdlCodeCheckerBase(object):
         self._handleUiError("Unable to build '%s' after %d attempts" %
                             (source, self._MAX_REBUILD_ATTEMPTS))
 
-    def _handleRebuilds(self, rebuilds, source=None):
+    def _handleRebuilds(self, rebuilds, source):
         """
         Resolves hints found in the rebuild list into source objects
         and rebuild them
         """
-        if source is not None:
-            self._logger.info("Building '%s' triggers rebuilding: %s",
-                              source, ", ".join([str(x) for x in rebuilds]))
+        self._logger.info("Building '%s' triggers rebuilding: %s",
+                          source, ", ".join([str(x) for x in rebuilds]))
         for rebuild in rebuilds:
             self._logger.debug("Rebuild hint: '%s'", rebuild)
             if 'rebuild_path' in rebuild:
-                self._getBuilderMessages(rebuild['rebuild_path'],
-                                         batch_mode=True)
+                rebuild_sources = [self._getSourceByPath(rebuild['rebuild_path'])[0]]
             else:
                 unit_name = rebuild.get('unit_name', None)
                 library_name = rebuild.get('library_name', None)
                 unit_type = rebuild.get('unit_type', None)
-
 
                 if library_name is not None:
                     rebuild_sources = self._config.findSourcesByDesignUnit(
@@ -408,9 +414,9 @@ class HdlCodeCheckerBase(object):
                 else:  # pragma: no cover
                     assert False, ', '.join([x.filename for x in rebuild_sources])
 
-                for rebuild_source in rebuild_sources:
-                    self._getBuilderMessages(rebuild_source.abspath,
-                                             batch_mode=True)
+            for rebuild_source in rebuild_sources:
+                self._getBuilderMessages(rebuild_source,
+                                         batch_mode=True)
 
     def _isBuilderCallable(self):
         """
@@ -424,12 +430,11 @@ class HdlCodeCheckerBase(object):
     def getMessagesByPath(self, path, *args, **kwargs):
         """
         Returns the messages for the given path, including messages
-        from the import configured builder (if available) and static
-        checks
+        from the configured builder (if available) and static checks
         """
         source, remarks = self._getSourceByPath(path)
         return self._sortBuildMessages(
-                self.getMessagesBySource(source, *args, **kwargs) + remarks)
+            self.getMessagesBySource(source, *args, **kwargs) + remarks)
 
     def getMessagesBySource(self, source, *args, **kwargs):
         self._setupEnvIfNeeded()
@@ -437,8 +442,10 @@ class HdlCodeCheckerBase(object):
         if self._USE_THREADS:
             records = []
             pool = ThreadPool()
-            static_check = pool.apply_async(getStaticMessages, \
-                    args=(source.getSourceContent().split('\n'), ))
+
+            static_check = pool.apply_async(
+                getStaticMessages, args=(source.getSourceContent().split('\n'), ))
+
             if self._isBuilderCallable():
                 builder_check = pool.apply_async(
                     self._getBuilderMessages,
@@ -469,38 +476,40 @@ class HdlCodeCheckerBase(object):
         file_type = getFileType(path)
         if file_type == 'vhdl':
             cls = VhdlParser
-            temp_filename = 'temp.vhd'
+            tmp_extension = '.vhd'
         elif file_type == 'verilog':
-            temp_filename = 'temp.v'
+            tmp_extension = '.v'
             cls = VerilogParser
         elif file_type == 'systemverilog':
-            temp_filename = 'temp.sv'
+            tmp_extension = '.sv'
             cls = VerilogParser
         else:
             assert False, "Unknown file type %s" % file_type
 
-        if p.exists(temp_filename):
-            os.remove(temp_filename)
-        open(temp_filename, 'w').write(content)
-
-        # Try to find a source with this path so we can copy most of its
-        # properties set in the configuration process and change only
-        # the path (and thus its content)
+        _, tmp_filename = tempfile.mkstemp(suffix=tmp_extension)
         try:
-            state = self._config.getSourceByPath(path).getState()
-            source = cls.recoverFromState(state)
-            source.filename = temp_filename
-        except KeyError:
-            source = cls(temp_filename)
+            open(tmp_filename, 'w').write(content)
 
-        messages = []
-        for message in self.getMessagesBySource(source):
-            self._logger.warning("- %s", message)
-            if not message['filename'] or samefile(message['filename'], temp_filename):
-                message['filename'] = path
+            # Try to find a source with this path so we can copy most of its
+            # properties set in the configuration process and change only
+            # the path (and thus its content)
+            try:
+                state = self._config.getSourceByPath(path).getState()
+                source = cls.recoverFromState(state)
+                source.filename = tmp_filename
+            except KeyError:
+                source = cls(tmp_filename)
 
-            messages.append(message)
+            messages = []
+            for message in self.getMessagesBySource(source):
+                self._logger.warning("- %s", message)
+                if not message['filename'] or samefile(message['filename'],
+                                                       tmp_filename):
+                    message['filename'] = path
 
+                messages.append(message)
+        finally:
+            os.remove(tmp_filename)
         return messages
 
     def getSources(self):
@@ -515,13 +524,8 @@ class HdlCodeCheckerBase(object):
         means caching the build sequence before the file is actually
         checked, so the overall wait time is reduced
         """
-        try:
-            source = self._config.getSourceByPath(path)
-        except KeyError:
-            return
-        key = 'getBuildSequence'
-        sequence = self.getBuildSequence(source)
-        self._cache[key] = sequence
+        source, _ = self._getSourceByPath(path)
+        _ = self.getBuildSequence(source)
 
     def onBufferLeave(self, _):
         """
