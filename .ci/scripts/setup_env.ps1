@@ -17,10 +17,12 @@
 
 write-host "Configured builder is $env:BUILDER"
 
-$env:python_path = if ($env:arch -eq 32) { "C:\Python$env:PYTHON_VERSION" } else
-                                         { "C:\Python$env:PYTHON_VERSION-x64" }
+if ($env:ARCH -eq 32) {
+    $env:python_path = "C:\Python$env:PYTHON_VERSION"
+} else {
+    $env:python_path = "C:\Python$env:PYTHON_VERSION-x64"
+}
 
-write-host "Python selected is $env:python_path"
 $env:PATH="$env:python_path;$env:python_path\Scripts;$env:PATH"
 
 Start-Process "git" -RedirectStandardError git.log -Wait -NoNewWindow -ArgumentList `
@@ -55,4 +57,6 @@ if ("$env:BUILDER" -eq "msim") {
 
 pip install -U -e $env:APPVEYOR_BUILD_FOLDER
 if (!$?) {write-error "Something went wrong, exiting"; exit -1}
+
+write-host "Arch is $env:ARCH, Python selected is $env:python_path"
 

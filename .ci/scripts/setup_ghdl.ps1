@@ -20,15 +20,23 @@ write-host "Setting up GHDL..."
 $env:GHDL_PREFIX="$env:INSTALL_DIR\\lib"
 
 if (!(Test-Path "$env:CACHE_PATH\\ghdl.zip")) {
-    write-host "Downloading $env:BUILDER_NAME from $env:URL to $env:CACHE_PATH\\ghdl.zip"
-    if ($env:APPVEYOR -eq "True") {
-        "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
-        cmd /c "appveyor DownloadFile `"$env:URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
-    } else {
-        "curl -fsSL `"$env:URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
-        curl -fsSL "$env:URL" --output "$env:CACHE_PATH\\ghdl.zip"
-    }
-    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
+    write-host "Downloading $env:BUILDER_NAME from $env:GHDL_URL to $env:CACHE_PATH\\ghdl.zip"
+
+    do {
+        if ($env:APPVEYOR -eq "True") {
+            "appveyor DownloadFile `"$env:GHDL_URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+            cmd /c "appveyor DownloadFile `"$env:GHDL_URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+        } else {
+            "curl -fsSL `"$env:GHDL_URL`" --output `"$env:CACHE_PATH\\ghdl.zip`""
+            curl -fsSL "$env:GHDL_URL" --output "$env:CACHE_PATH\\ghdl.zip"
+        }
+        $failed = 0
+        if (!$?) {
+            write-error "Something went wrong, retrying"
+            exit -1
+            $failed = 1
+        }
+    } while ($failed)
     write-host "Download finished"
 }
 
