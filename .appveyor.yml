@@ -1,9 +1,3 @@
-# Notes:
-#   - Minimal appveyor.yml file is an empty file. All sections are optional.
-#   - Indent each level of configuration with 2 spaces. Do not use tabs!
-#   - All section names are case-sensitive.
-#   - Section names should be unique on each level.
-
 ---
 # ---------------------------------#
 #       general configuration      #
@@ -20,6 +14,9 @@ branches:
 
 # Do not build on tags (GitHub only)
 skip_tags: true
+
+# Maximum number of concurrent jobs for the project
+max_jobs: 3
 
 # ---------------------------------#
 #    environment configuration    #
@@ -41,44 +38,20 @@ clone_depth: 5
 environment:
   GHDL_URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip
   MSIM_URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
+  ARCH: 32
 
   matrix:
-    # - BUILDER: other
-    #   ARCH: 32
-    #   PYTHON_VERSION: 27
-    # - BUILDER: ghdl
-    #   ARCH: 32
-    #   PYTHON_VERSION: 27
-    # - BUILDER: msim
-    #   ARCH: 32
-    #   PYTHON_VERSION: 27
     - BUILDER: other
-      ARCH: 64
       PYTHON_VERSION: 27
     - BUILDER: ghdl
-      ARCH: 64
       PYTHON_VERSION: 27
     - BUILDER: msim
-      ARCH: 64
       PYTHON_VERSION: 27
-
-    # - BUILDER: other
-    #   ARCH: 32
-    #   PYTHON_VERSION: 35
-    # - BUILDER: ghdl
-    #   ARCH: 32
-    #   PYTHON_VERSION: 35
-    # - BUILDER: msim
-    #   ARCH: 32
-    #   PYTHON_VERSION: 35
     - BUILDER: other
-      ARCH: 64
       PYTHON_VERSION: 35
     - BUILDER: ghdl
-      ARCH: 64
       PYTHON_VERSION: 35
     - BUILDER: msim
-      ARCH: 64
       PYTHON_VERSION: 35
 
 # # build cache to preserve files/folders between builds

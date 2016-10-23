@@ -33,7 +33,6 @@ if ($env:BUILDER -eq "msim") {
 }
 
 $env:CACHE_PATH="$env:CI_WORK_PATH\\cache"
-$env:ARCH="32"
 
 if (!(Test-Path "$env:CI_WORK_PATH")) {
     cmd /c "mkdir `"$env:CI_WORK_PATH`""
