@@ -20,6 +20,7 @@ import abc
 import os.path as p
 import logging
 import re
+import time
 
 from hdlcc.utils import getFileType, removeDuplicates
 
@@ -33,10 +34,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, filename, library='work', flags=None,
-                 real_filename=None):
+    def __init__(self, filename, library='work', flags=None):
         self.filename = p.normpath(filename)
-        self._real_filename = None
         self.library = library
         self.flags = flags if flags is not None else []
         self._cache = {}
@@ -44,17 +43,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self._mtime = 0
         self.filetype = getFileType(self.filename)
 
+        self._buffer_time = None
+        self._buffer_content = None
+
         self.abspath = p.abspath(filename)
-
-    @property
-    def real_filename(self):
-        if self._real_filename is None:
-            return self.filename
-        return self._real_filename
-
-    @real_filename.setter
-    def real_filename(self, value):
-        self._real_filename = value
 
     def getState(self):
         """
@@ -82,6 +74,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         obj.flags = state['flags']
         obj._cache = state['_cache']
         obj._content = None
+        obj._buffer_time = None
+        obj._buffer_content = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
@@ -130,15 +124,52 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         Clears all the caches if the file has changed to force updating
         every parsed info
         """
-        if self._changed:
+        if self._changed():
             self._content = None
             self._cache = {}
+
+    def getmtime(self):
+        """
+        Gets file modification time as defined in p.getmtime
+        """
+        if self._buffer_time is not None:
+            return self._buffer_time
+        if not p.exists(self.filename):
+            return None
+        return p.getmtime(self.filename)
+
+    def setBufferContent(self, content):
+        self._buffer_content = content
+        self._buffer_time = time.time()
+
+    def getBufferContent(self):
+        return self._buffer_content
+
+    def hasBufferContent(self):
+        return self._buffer_content is not None
+
+    def dumpBufferContentToFile(self):
+        buffer_dump_path = p.join(p.dirname(self.filename), '.dump_' +
+                                  p.basename(self.filename))
+        #  assert not p.exists(buffer_dump_path)
+        open(buffer_dump_path, 'w').write(self._buffer_content)
+        return buffer_dump_path
+
+    def clearBufferContent(self):
+        self._buffer_time = None
+        self._buffer_content = None
 
     def getSourceContent(self):
         """
         Cached version of the _getSourceContent method
         """
+        if self._buffer_content is not None:
+            if self._changed():
+                self._cache = {}
+            return self._buffer_content
+
         self._clearCachesIfChanged()
+
         if self._content is None:
             self._content = self._getSourceContent()
             self._mtime = self.getmtime()
@@ -193,15 +224,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
             self._cache[key] = self._getMatchingLibrary(
                 unit_type, unit_name)
         return self._cache[key]
-
-
-    def getmtime(self):
-        """
-        Gets file modification time as defined in p.getmtime
-        """
-        if not p.exists(self.filename):
-            return None
-        return p.getmtime(self.filename)
 
     def getDesignUnitsDotted(self):
         """

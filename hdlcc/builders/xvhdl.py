@@ -124,14 +124,14 @@ class XVHDL(BaseBuilder):
                  for x in self._added_libraries])
             fd.write(content)
 
-    def _buildSource(self, source, flags=None):
+    def _buildSource(self, path, library, flags=None):
         cmd = ['xvhdl',
                '--nolog',
                '--verbose', '0',
                '--initfile', p.abspath(self._xvhdlini),
-               '--work', source.library]
+               '--work', library]
         cmd += flags
-        cmd += [source.filename]
+        cmd += [path]
         return self._subprocessRunner(cmd)
 
     def _searchForRebuilds(self, line):

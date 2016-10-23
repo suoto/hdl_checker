@@ -40,7 +40,7 @@ class Fallback(BaseBuilder):
     def _checkEnvironment(self):
         return
 
-    def _buildSource(self, source, flags=None): # pragma: no cover
+    def _buildSource(self, path, library, flags=None): # pragma: no cover
         return [], []
 
     def _createLibrary(self, source): # pragma: no cover

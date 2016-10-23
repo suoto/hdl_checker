@@ -114,19 +114,19 @@ class GHDL(BaseBuilder):
         self._logger.debug("Builtin libraries found: %s",
                            " ".join(self._builtin_libraries))
 
-    def _getGhdlArgs(self, source, flags=None):
+    def _getGhdlArgs(self, path, library, flags=None):
         """
         Return the GHDL arguments that are common to most calls
         """
         cmd = ['-P%s' % self._target_folder,
-               '--work=%s' % source.library,
+               '--work=%s' % library,
                '--workdir=%s' % self._target_folder]
         if flags:
             cmd += flags
-        cmd += [source.filename]
+        cmd += [path]
         return cmd
 
-    def _importSource(self, source, flags=None):
+    def _importSource(self, path, library, flags=None):
         """
         Runs GHDL with import source switch
         """
@@ -136,28 +136,28 @@ class GHDL(BaseBuilder):
                 vhdl_std = [flag]
                 break
         self._logger.debug("Importing source with std '%s'", vhdl_std)
-        cmd = ['ghdl', '-i'] + self._getGhdlArgs(source, tuple(vhdl_std))
+        cmd = ['ghdl', '-i'] + self._getGhdlArgs(path, library, tuple(vhdl_std))
         return cmd
 
-    def _analyzeSource(self, source, flags=None):
+    def _analyzeSource(self, path, library, flags=None):
         """
         Runs GHDL with analyze source switch
         """
 
-        return ['ghdl', '-a'] + self._getGhdlArgs(source, flags)
+        return ['ghdl', '-a'] + self._getGhdlArgs(path, library, flags)
 
-    def _checkSyntax(self, source, flags=None):
+    def _checkSyntax(self, path, library, flags=None):
         """
         Runs GHDL with syntax check switch
         """
-        return ['ghdl', '-s'] + self._getGhdlArgs(source, flags)
+        return ['ghdl', '-s'] + self._getGhdlArgs(path, library, flags)
 
-    def _buildSource(self, source, flags=None):
-        self._importSource(source, flags)
+    def _buildSource(self, path, library, flags=None):
+        self._importSource(path, library, flags)
 
         stdout = []
-        for cmd in (self._analyzeSource(source, flags),
-                    self._checkSyntax(source, flags)):
+        for cmd in (self._analyzeSource(path, library, flags),
+                    self._checkSyntax(path, library, flags)):
             stdout += self._subprocessRunner(cmd)
 
         return stdout

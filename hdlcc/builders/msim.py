@@ -20,6 +20,7 @@ import os
 import os.path as p
 import re
 from .base_builder import BaseBuilder
+from hdlcc.utils import getFileType
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
@@ -157,14 +158,15 @@ class MSim(BaseBuilder):
 
         return rebuilds
 
-    def _buildSource(self, source, flags=None):
-        if source.filetype == 'vhdl':
-            return self._buildVhdl(source, flags)
-        elif source.filetype in ('verilog', 'systemverilog'):
-            return self._buildVerilog(source, flags)
+    def _buildSource(self, path, library, flags=None):
+        filetype = getFileType(path)
+        if filetype == 'vhdl':
+            return self._buildVhdl(path, library, flags)
+        elif filetype in ('verilog', 'systemverilog'):
+            return self._buildVerilog(path, library, flags)
         else:  # pragma: no cover
-            self._logger.error("Unknown file type %s for source %s",
-                               source.filetype, source)
+            self._logger.error("Unknown file type %s for path '%s'",
+                               filetype, path)
 
     def _getExtraFlags(self, lang):
         libs = []
@@ -174,27 +176,27 @@ class MSim(BaseBuilder):
             libs += ['+incdir+' + str(path)]
         return libs
 
-    def _buildVhdl(self, source, flags=None):
+    def _buildVhdl(self, path, library, flags=None):
         "Builds a VHDL file"
         cmd = ['vcom', '-modelsimini', self._modelsim_ini, '-quiet',
-               '-work', p.join(self._target_folder, source.library)]
+               '-work', p.join(self._target_folder, library)]
         if flags:  # pragma: no cover
             cmd += flags
-        cmd += [source.filename]
+        cmd += [path]
 
         return self._subprocessRunner(cmd)
 
-    def _buildVerilog(self, source, flags=None):
+    def _buildVerilog(self, path, library, flags=None):
         "Builds a Verilog/SystemVerilog file"
         cmd = ['vlog', '-modelsimini', self._modelsim_ini, '-quiet',
-               '-work', p.join(self._target_folder, source.library)]
-        if source.filetype == 'systemverilog':
+               '-work', p.join(self._target_folder, library)]
+        if getFileType(path) == 'systemverilog':
             cmd += ['-sv']
         if flags:  # pragma: no cover
             cmd += flags
 
         cmd += self._getExtraFlags('verilog')
-        cmd += [source.filename]
+        cmd += [path]
 
         return self._subprocessRunner(cmd)
 

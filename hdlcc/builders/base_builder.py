@@ -245,7 +245,7 @@ class BaseBuilder(object):
         """
 
     @abc.abstractmethod
-    def _buildSource(self, source, flags=None):
+    def _buildSource(self, path, library, flags=None):
         """
         Callback called to actually build the source
         """
@@ -261,9 +261,21 @@ class BaseBuilder(object):
 
         records = []
         rebuilds = []
-        for line in self._buildSource(source, flags):
+        # We must give precedence to the buffer content over the file
+        # content, so we dump the buffer content to a temporary file
+        # and tell the compiler to compile it instead
+        if source.hasBufferContent():
+            build_path = source.dumpBufferContentToFile()
+            self._logger.debug("Source has buffered content, using %s",
+                               build_path)
+        else:
+            build_path = source.filename
+
+        for line in self._buildSource(build_path, source.library, flags):
             if self._shouldIgnoreLine(line):
                 continue
+
+            line = line.replace(build_path, source.filename)
 
             records += [x for x in self._makeRecords(line) if x not in records]
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in

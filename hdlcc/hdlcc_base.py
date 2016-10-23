@@ -22,13 +22,11 @@ import os.path as p
 import shutil
 import logging
 import traceback
-import tempfile
 from multiprocessing.pool import ThreadPool
 
 import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump,
-                         samefile)
+from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
@@ -40,7 +38,7 @@ class HdlCodeCheckerBase(object):
     HDL Code Checker project builder class
     """
 
-    _USE_THREADS = True
+    _USE_THREADS = False
     _MAX_REBUILD_ATTEMPTS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -274,7 +272,7 @@ class HdlCodeCheckerBase(object):
         # that the editor is unaware of (Vivado maybe?) To cope with
         # this, we'll check if the newest modification time of the build
         # sequence hasn't changed since we cached the build sequence
-        key = str(source.real_filename)
+        key = str(source.filename)
         if key not in self._build_sequence_cache:
             build_sequence = []
             self._getBuildSequence(source, build_sequence)
@@ -477,49 +475,10 @@ class HdlCodeCheckerBase(object):
 
         self._setupEnvIfNeeded()
 
-        file_type = getFileType(path)
-        if file_type == 'vhdl':
-            cls = VhdlParser
-            tmp_extension = '.vhd'
-        elif file_type == 'verilog':
-            tmp_extension = '.v'
-            cls = VerilogParser
-        elif file_type == 'systemverilog':
-            tmp_extension = '.sv'
-            cls = VerilogParser
-        else:
-            assert False, "Unknown file type %s" % file_type
-
-        tmp_fd, tmp_filename = tempfile.mkstemp(suffix=tmp_extension)
-        try:
-            fd = open(tmp_filename, 'w')
-            fd.write(content)
-            fd.close()
-            os.close(tmp_fd)
-
-            # Try to find a source with this path so we can copy most of its
-            # properties set in the configuration process and change only
-            # the path (and thus its content)
-            try:
-                original_source, remarks = self._getSourceByPath(path)
-                state = original_source.getState()
-                source = cls.recoverFromState(state)
-                source.real_filename = source.filename
-                source.filename = tmp_filename
-            except KeyError:
-                source = cls(tmp_filename)
-
-
-            messages = []
-            for message in self.getMessagesBySource(source):
-                self._logger.warning("- %s", message)
-                if not message['filename'] or samefile(message['filename'],
-                                                       tmp_filename):
-                    message['filename'] = path
-                messages.append(message)
-
-        finally:
-            os.remove(tmp_filename)
+        source, remarks = self._getSourceByPath(path)
+        source.setBufferContent(content)
+        messages = self.getMessagesBySource(source)
+        source.clearBufferContent()
 
         return messages + remarks
 
