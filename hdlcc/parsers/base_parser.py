@@ -33,8 +33,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, filename, library='work', flags=None):
+    def __init__(self, filename, library='work', flags=None,
+                 real_filename=None):
         self.filename = p.normpath(filename)
+        self._real_filename = None
         self.library = library
         self.flags = flags if flags is not None else []
         self._cache = {}
@@ -43,6 +45,16 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self.filetype = getFileType(self.filename)
 
         self.abspath = p.abspath(filename)
+
+    @property
+    def real_filename(self):
+        if self._real_filename is None:
+            return self.filename
+        return self._real_filename
+
+    @real_filename.setter
+    def real_filename(self, value):
+        self._real_filename = value
 
     def getState(self):
         """

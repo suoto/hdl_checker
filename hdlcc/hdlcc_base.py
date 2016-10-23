@@ -274,7 +274,7 @@ class HdlCodeCheckerBase(object):
         # that the editor is unaware of (Vivado maybe?) To cope with
         # this, we'll check if the newest modification time of the build
         # sequence hasn't changed since we cached the build sequence
-        key = str(source.filename)
+        key = str(source.real_filename)
         if key not in self._build_sequence_cache:
             build_sequence = []
             self._getBuildSequence(source, build_sequence)
@@ -470,7 +470,8 @@ class HdlCodeCheckerBase(object):
 
     def getMessagesWithText(self, path, content):
         """
-        Get
+        Gets messages from a given path with a different content, for
+        the cases when the buffer content has been modified
         """
         self._logger.debug("Getting messages for '%s' with content", path)
 
@@ -503,9 +504,11 @@ class HdlCodeCheckerBase(object):
                 original_source, remarks = self._getSourceByPath(path)
                 state = original_source.getState()
                 source = cls.recoverFromState(state)
+                source.real_filename = source.filename
                 source.filename = tmp_filename
             except KeyError:
                 source = cls(tmp_filename)
+
 
             messages = []
             for message in self.getMessagesBySource(source):
