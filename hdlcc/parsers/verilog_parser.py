@@ -30,30 +30,31 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     ]), flags=re.S)
 
 class VerilogParser(BaseSourceFile):
-    """Parses and stores information about a source file such as
-    design units it depends on and design units it provides"""
+    """
+    Parses and stores information about a Verilog or SystemVerilog
+    source file
+    """
+
+    _comment = re.compile(r'/\*.*\*/|//[^(\r\n?|\n)]*', flags=re.S)
 
     def _getSourceContent(self):
-        """Replace everything from comment ('--') until a line break
-        and converts to lowercase"""
         # Remove multiline comments
-        lines = re.sub(r'/\*.*\*/|//[^(\r\n?|\n)]*', '',
-                       open(self.filename, 'r').read(), flags=re.S)
+        content = open(self.filename, mode='rb').read().decode(errors='ignore')
+        lines = self._comment.sub('', content)
         return re.sub(r'\r\n?|\n', ' ', lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
-        """Iterates over the matches of _DESIGN_UNIT_SCANNER against
-        source's lines"""
+        """
+        Iterates over the matches of _DESIGN_UNIT_SCANNER against
+        source's lines
+        """
         for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
             yield match.groupdict()
 
     def _getDependencies(self):
-        """Parses the source and returns a list of dictionaries that
-        describe its dependencies"""
         return []
 
     def _getDesignUnits(self):
-        "Parses the source file to find design units and dependencies"
         design_units = []
 
         for match in self._iterDesignUnitMatches():
@@ -72,6 +73,4 @@ class VerilogParser(BaseSourceFile):
 
     def _getLibraries(self):
         return []
-
-
 

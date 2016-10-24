@@ -37,7 +37,6 @@ _ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
     r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
     r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
 
-_SUB_COMMENTS = re.compile(r"--[^\n\r]*", flags=re.S).sub
 
 class VhdlParser(BaseSourceFile):
     """
@@ -45,13 +44,15 @@ class VhdlParser(BaseSourceFile):
     units it depends on and design units it provides
     """
 
+    _comment = re.compile(r"--[^\n\r]*", flags=re.S)
+
     def _getSourceContent(self):
         """
         Replace everything from comment ('--') until a line break and
         converts to lowercase
         """
         content = open(self.filename, mode='rb').read().decode(errors='ignore')
-        return _SUB_COMMENTS('', content).lower()
+        return self._comment.sub('', content).lower()
 
     def _iterDesignUnitMatches(self):
         """

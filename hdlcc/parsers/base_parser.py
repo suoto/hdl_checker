@@ -34,6 +34,13 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
 
     __metaclass__ = abc.ABCMeta
 
+    @abc.abstractproperty
+    def _comment(self):
+        """
+        Should return a regex object that matches a comment (or comments)
+        used by the language
+        """
+
     def __init__(self, filename, library='work', flags=None):
         self.filename = p.normpath(filename)
         self.library = library
@@ -142,16 +149,12 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self._buffer_content = content
         self._buffer_time = time.time()
 
-    def getBufferContent(self):
-        return self._buffer_content
-
     def hasBufferContent(self):
         return self._buffer_content is not None
 
     def dumpBufferContentToFile(self):
         buffer_dump_path = p.join(p.dirname(self.filename), '.dump_' +
                                   p.basename(self.filename))
-        #  assert not p.exists(buffer_dump_path)
         open(buffer_dump_path, 'w').write(self._buffer_content)
         return buffer_dump_path
 
