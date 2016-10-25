@@ -151,7 +151,7 @@ def _isProcessRunningOnWindows(pid):
     """
     from ctypes import windll, c_ulong, sizeof, byref
 
-    #PSAPI.DLL
+    # PSAPI.DLL
     psapi = windll.psapi
 
     arr = c_ulong * 256
@@ -159,13 +159,13 @@ def _isProcessRunningOnWindows(pid):
     cb = sizeof(list_of_pids)  # pylint: disable=invalid-name
     cb_needed = c_ulong()
 
-    #Call Enumprocesses to get hold of process id's
+    # Call Enumprocesses to get hold of process id's
     psapi.EnumProcesses(byref(list_of_pids),
                         cb,
                         byref(cb_needed))
 
-    #Number of processes returned
-    number_of_pids = cb_needed.value/sizeof(c_ulong())
+    # Number of processes returned
+    number_of_pids = int(cb_needed.value/sizeof(c_ulong()))
 
     pid_list = [i for i in list_of_pids][:number_of_pids]
     return int(pid) in pid_list
