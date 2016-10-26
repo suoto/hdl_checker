@@ -119,7 +119,7 @@ with such.A("hdlcc project with persistence") as it:
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
@@ -135,7 +135,7 @@ with such.A("hdlcc project with persistence") as it:
                        "Project shouldn't have recovered from cache. "
                        "Messages found:\n%s" % "\n".join(messages))
 
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def _buildWithCache():
         del it.project
 
@@ -190,7 +190,7 @@ with such.A("hdlcc project with persistence") as it:
             _buildWithCache()
 
         @it.should('build without cache if cache is invalid')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test_003():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")
@@ -256,7 +256,7 @@ with such.A("hdlcc project with persistence") as it:
             utils.cleanProjectCache(it.PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test_001():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")

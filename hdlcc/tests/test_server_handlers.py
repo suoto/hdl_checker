@@ -80,7 +80,7 @@ with such.A("hdlcc bottle app") as it:
             it.patch.stop()
 
     @it.should("get diagnose info without any project")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         reply = it.app.post_json('/get_diagnose_info')
         it.assertItemsEqual(
@@ -89,7 +89,7 @@ with such.A("hdlcc bottle app") as it:
              u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info with an existing project file")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         reply = it.app.post(
             '/get_diagnose_info',
@@ -110,7 +110,7 @@ with such.A("hdlcc bottle app") as it:
                  u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info while still not found out the builder name")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         def _getServerByProjectFile(_):
             server = mock.MagicMock()
@@ -134,7 +134,7 @@ with such.A("hdlcc bottle app") as it:
                      u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info with a non existing project file")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         reply = it.app.post(
             '/get_diagnose_info',
@@ -147,7 +147,7 @@ with such.A("hdlcc bottle app") as it:
              u'Server PID: %d' % os.getpid()])
 
     @it.should("rebuild the project with directory cleanup")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         if not it.BUILDER_NAME:
             _logger.info("Test requires a builder")
@@ -238,7 +238,7 @@ with such.A("hdlcc bottle app") as it:
         step_05_check_messages_are_the_same(step_01_msgs)
 
     @it.should("rebuild the project without directory cleanup")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
             _logger.info("Test requires a builder, except fallback")
@@ -298,7 +298,7 @@ with such.A("hdlcc bottle app") as it:
         step_03_check_messages_are_the_same(step_01_msgs)
 
     @it.should("shutdown the server when requested")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         # Ensure the server is active
         reply = it.app.post('/get_diagnose_info',
@@ -326,7 +326,7 @@ with such.A("hdlcc bottle app") as it:
             shutil.rmtree(cache)
 
     @it.should("handle buffer visits without crashing")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
             _logger.info("Test requires a builder, except fallback")

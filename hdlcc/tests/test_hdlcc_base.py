@@ -64,7 +64,7 @@ with such.A("hdlcc project") as it:
         _logger.info("Builder name: %s", it.BUILDER_NAME)
         _logger.info("Builder path: %s", it.BUILDER_PATH)
 
-        it._patch = mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        it._patch = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         it._patch.start()
 
     @it.has_teardown
