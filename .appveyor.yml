@@ -1,16 +1,10 @@
-# Notes:
-#   - Minimal appveyor.yml file is an empty file. All sections are optional.
-#   - Indent each level of configuration with 2 spaces. Do not use tabs!
-#   - All section names are case-sensitive.
-#   - Section names should be unique on each level.
-
 ---
 # ---------------------------------#
 #       general configuration      #
 # ---------------------------------#
 
 # version format
-version: 0.{build}
+version: '{build}'
 
 # branches to build
 branches:
@@ -20,6 +14,9 @@ branches:
 
 # Do not build on tags (GitHub only)
 skip_tags: true
+
+# Maximum number of concurrent jobs for the project
+max_jobs: 3
 
 # ---------------------------------#
 #    environment configuration    #
@@ -39,14 +36,23 @@ clone_depth: 5
 
 # environment variables
 environment:
+  GHDL_URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip
+  MSIM_URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
   ARCH: 32
+
   matrix:
     - BUILDER: other
+      PYTHON_VERSION: 27
     - BUILDER: ghdl
-      # URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip
-      URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip
+      PYTHON_VERSION: 27
     - BUILDER: msim
-      URL: http://download.altera.com/akdlm/software/acdsinst/15.1/185/ib_installers/ModelSimSetup-15.1.0.185-windows.exe
+      PYTHON_VERSION: 27
+    - BUILDER: other
+      PYTHON_VERSION: 35
+    - BUILDER: ghdl
+      PYTHON_VERSION: 35
+    - BUILDER: msim
+      PYTHON_VERSION: 35
 
 # # build cache to preserve files/folders between builds
 # cache:
@@ -61,6 +67,7 @@ install:
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
 
+  - python --version
   - if "%BUILDER%" == "msim" (python run_tests.py --msim -v)
   - if "%BUILDER%" == "ghdl" (python run_tests.py --ghdl -v)
   - if "%BUILDER%" == "other" (python run_tests.py --fallback --standalone -v)

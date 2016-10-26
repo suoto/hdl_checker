@@ -219,7 +219,7 @@ def _getDefaultTestByEnv(env):
     if env in ('msim', 'ghdl', 'xvhdl'):
         return ('hdlcc.tests.test_builders',
                 'hdlcc.tests.test_hdlcc_base',
-                'hdlcc.tests.test_persistency',
+                'hdlcc.tests.test_persistence',
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone')
     elif env == 'standalone':

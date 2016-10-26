@@ -114,7 +114,7 @@ with such.A("hdlcc server") as it:
         utils.terminateProcess(it._server.pid)
 
     @it.should("shutdown the server when requested")
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
         startCodeCheckerServer()
         # Ensure the server is active

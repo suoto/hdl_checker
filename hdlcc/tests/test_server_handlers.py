@@ -51,10 +51,19 @@ with such.A("hdlcc bottle app") as it:
     def setup():
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+        _logger.info("Builder name: %s", it.BUILDER_NAME)
+        _logger.info("Builder path: %s", it.BUILDER_PATH)
         if it.BUILDER_NAME:
             it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
+
+        if it.BUILDER_PATH:
+            it.patch = mock.patch.dict(
+                'os.environ',
+                {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+            it.patch.start()
+        it.app = TestApp(handlers.app)
 
     @it.has_teardown
     def teardown():
@@ -67,323 +76,286 @@ with such.A("hdlcc bottle app") as it:
         if p.exists('.xvhdl.init'):
             os.remove('.xvhdl.init')
 
-    with it.having("no PID attachment"):
-        @it.has_setup
-        def setup():
-            _logger.info("Builder name: %s", it.BUILDER_NAME)
-            _logger.info("Builder path: %s", it.BUILDER_PATH)
-            if it.BUILDER_PATH:
-                it.patch = mock.patch.dict(
-                    'os.environ',
-                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-                it.patch.start()
-            it.app = TestApp(handlers.app)
+        if it.BUILDER_PATH:
+            it.patch.stop()
 
-        @it.has_teardown
-        def teardown():
-            if it.BUILDER_PATH:
-                it.patch.stop()
+    @it.should("get diagnose info without any project")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        reply = it.app.post_json('/get_diagnose_info')
+        it.assertItemsEqual(
+            reply.json['info'],
+            [u'hdlcc version: %s' % hdlcc.__version__,
+             u'Server PID: %d' % os.getpid()])
 
-        @it.should("get diagnose info without any project")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            reply = it.app.post_json('/get_diagnose_info')
+    @it.should("get diagnose info with an existing project file")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        reply = it.app.post(
+            '/get_diagnose_info',
+            {'project_file' : it.PROJECT_FILE})
+
+        _logger.info("Reply is %s", reply.json['info'])
+
+        if it.BUILDER_NAME:
+            it.assertItemsEqual(
+                reply.json['info'],
+                [u'hdlcc version: %s' % hdlcc.__version__,
+                 u'Server PID: %d' % os.getpid(),
+                 u'Builder: %s' % it.BUILDER_NAME])
+        else:
             it.assertItemsEqual(
                 reply.json['info'],
                 [u'hdlcc version: %s' % hdlcc.__version__,
                  u'Server PID: %d' % os.getpid()])
 
-        @it.should("get diagnose info with an existing project file")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
+    @it.should("get diagnose info while still not found out the builder name")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        def _getServerByProjectFile(_):
+            server = mock.MagicMock()
+            server.builder = None
+            return server
+        with mock.patch('hdlcc.handlers._getServerByProjectFile',
+                        _getServerByProjectFile):
             reply = it.app.post(
                 '/get_diagnose_info',
                 {'project_file' : it.PROJECT_FILE})
-
-            _logger.info("Reply is %s", reply.json['info'])
-
-            if it.BUILDER_NAME:
+            if it.BUILDER_NAME in ('msim', 'ghdl', 'xvhdl'):
                 it.assertItemsEqual(
                     reply.json['info'],
                     [u'hdlcc version: %s' % hdlcc.__version__,
                      u'Server PID: %d' % os.getpid(),
-                     u'Builder: %s' % it.BUILDER_NAME])
+                     u'Builder: <unknown> (config file parsing is underway)'])
             else:
                 it.assertItemsEqual(
                     reply.json['info'],
                     [u'hdlcc version: %s' % hdlcc.__version__,
                      u'Server PID: %d' % os.getpid()])
 
-        @it.should("get diagnose info while still not found out the builder name")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            def _getServerByProjectFile(_):
-                server = mock.MagicMock()
-                server.builder = None
-                return server
-            with mock.patch('hdlcc.handlers._getServerByProjectFile',
-                            _getServerByProjectFile):
-                reply = it.app.post(
-                    '/get_diagnose_info',
-                    {'project_file' : it.PROJECT_FILE})
-                if it.BUILDER_NAME in ('msim', 'ghdl', 'xvhdl'):
-                    it.assertItemsEqual(
-                        reply.json['info'],
-                        [u'hdlcc version: %s' % hdlcc.__version__,
-                         u'Server PID: %d' % os.getpid(),
-                         u'Builder: <unknown> (config file parsing is underway)'])
-                else:
-                    it.assertItemsEqual(
-                        reply.json['info'],
-                        [u'hdlcc version: %s' % hdlcc.__version__,
-                         u'Server PID: %d' % os.getpid()])
+    @it.should("get diagnose info with a non existing project file")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        reply = it.app.post(
+            '/get_diagnose_info',
+            {'project_file' : 'some_project'})
 
-        @it.should("get diagnose info with a non existing project file")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            reply = it.app.post(
-                '/get_diagnose_info',
-                {'project_file' : 'some_project'})
+        _logger.info("Reply is %s", reply.json['info'])
+        it.assertItemsEqual(
+            reply.json['info'],
+            [u'hdlcc version: %s' % hdlcc.__version__,
+             u'Server PID: %d' % os.getpid()])
 
-            _logger.info("Reply is %s", reply.json['info'])
-            it.assertItemsEqual(
-                reply.json['info'],
-                [u'hdlcc version: %s' % hdlcc.__version__,
-                 u'Server PID: %d' % os.getpid()])
+    @it.should("rebuild the project with directory cleanup")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        if not it.BUILDER_NAME:
+            _logger.info("Test requires a builder")
+            return
+        # The main reason to rebuild is when the project data is corrupt
+        # Test is as follows:
+        # 1) Check that a file builds OK
+        # 2) Erase the target folder.
+        # 3) Check the file fails to build
+        # 4) Rebuild the project
+        # 5) Check the file builds OK again and returns the same set of
+        #    messages
 
-        @it.should("rebuild the project with directory cleanup")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            if not it.BUILDER_NAME:
-                _logger.info("Test requires a builder")
-                return
-            # The main reason to rebuild is when the project data is corrupt
-            # Test is as follows:
-            # 1) Check that a file builds OK
-            # 2) Erase the target folder.
-            # 3) Check the file fails to build
-            # 4) Rebuild the project
-            # 5) Check the file builds OK again and returns the same set of
-            #    messages
+        def step_01_check_file_builds_ok():
+            data = {
+                'project_file' : it.PROJECT_FILE,
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
 
-            def step_01_check_file_builds_ok():
-                data = {
-                    'project_file' : it.PROJECT_FILE,
-                    'path'         : p.join(
-                        VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+            ui_reply = it.app.post('/get_ui_messages', data)
+            reply = it.app.post('/get_messages_by_path', data)
 
-                ui_reply = it.app.post('/get_ui_messages', data)
-                reply = it.app.post('/get_messages_by_path', data)
+            return reply.json['messages'] + ui_reply.json['ui_messages']
 
-                return reply.json['messages'] + ui_reply.json['ui_messages']
+        def step_02_erase_target_folder():
+            target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
+            it.assertTrue(
+                p.exists(target_folder),
+                "Target folder '%s' doesn't exists" % target_folder)
+            shutil.rmtree(target_folder)
+            it.assertFalse(
+                p.exists(target_folder),
+                "Target folder '%s' still exists!" % target_folder)
 
-            def step_02_erase_target_folder():
-                target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
-                it.assertTrue(
-                    p.exists(target_folder),
-                    "Target folder '%s' doesn't exists" % target_folder)
-                shutil.rmtree(target_folder)
-                it.assertFalse(
-                    p.exists(target_folder),
-                    "Target folder '%s' still exists!" % target_folder)
-
-            def step_03_check_build_fails(ref_msgs):
-                step_03_msgs = step_01_check_file_builds_ok()
-                if step_03_msgs:
-                    _logger.info("Step 03 messages:")
-                    for msg in step_03_msgs:
-                        _logger.info(msg)
-                else:
-                    _logger.info("Step 03 generated no messages")
-
-                it.assertNotEquals(step_01_msgs, step_03_msgs)
-
-            def step_04_rebuild_project():
-                data = {'project_file' : it.PROJECT_FILE}
-                it.app.post('/rebuild_project', data)
-                data = {
-                    'project_file' : it.PROJECT_FILE,
-                    'path'         : p.join(
-                        VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
-
-            def step_05_check_messages_are_the_same(msgs):
-                step_05_msgs = step_01_check_file_builds_ok()
-                if step_05_msgs:
-                    _logger.info("Step 05 messages:")
-                    for msg in step_05_msgs:
-                        _logger.info(msg)
-                else:
-                    _logger.info("Step 05 generated no messages")
-
-                it.assertEquals(msgs, step_05_msgs)
-
-            _logger.info("Step 01")
-            step_01_msgs = step_01_check_file_builds_ok()
-            if step_01_msgs:
-                _logger.info("Step 01 messages:")
-            else:
-                _logger.info("Step 01 generated no messages")
-
-            for msg in step_01_msgs:
-                _logger.info(msg)
-                it.assertNotEquals(
-                    msg.get('error_type', None), 'E',
-                    "No errors should be found at this point")
-
-            _logger.info("Step 02")
-            step_02_erase_target_folder()
-
-            _logger.info("Step 03")
-            step_03_check_build_fails(step_01_msgs)
-
-            _logger.info("Step 04")
-            step_04_rebuild_project()
-
-            _logger.info("Step 05")
-            step_05_check_messages_are_the_same(step_01_msgs)
-
-        @it.should("rebuild the project without directory cleanup")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
-                _logger.info("Test requires a builder, except fallback")
-                return
-            # If the user doesn't knows if the project data is corrupt, he/she
-            # should be able to rebuild even if everything is OK.
-            # Test is as follows:
-            # 1) Check that a file builds OK
-            # 2) Rebuild the project
-            # 3) Check the file builds OK again and returns the same set of
-            #    messages
-
-            def step_01_check_file_builds_ok():
-                data = {
-                    'project_file' : it.PROJECT_FILE,
-                    'path'         : p.join(
-                        VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
-                _logger.info("Waiting for any previous process to finish")
-
-                ui_reply = it.app.post('/get_ui_messages', data)
-                reply = it.app.post('/get_messages_by_path', data)
-
-                return reply.json['messages'] + ui_reply.json['ui_messages']
-
-            def step_02_rebuild_project():
-                data = {'project_file' : it.PROJECT_FILE}
-                it.app.post('/rebuild_project', data)
-                data = {
-                    'project_file' : it.PROJECT_FILE,
-                    'path'         : p.join(
-                        VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
-
-            def step_03_check_messages_are_the_same(msgs):
-                step_03_msgs = step_01_check_file_builds_ok()
-                if step_03_msgs:
-                    _logger.info("Step 03 messages:")
-                    for msg in step_03_msgs:
-                        _logger.info(msg)
-                else:
-                    _logger.info("Step 03 generated no messages")
-
-                it.assertEquals(msgs, step_03_msgs)
-
-            _logger.info("Step 01")
-            step_01_msgs = step_01_check_file_builds_ok()
-            if step_01_msgs:
-                _logger.info("Step 01 messages:")
-                for msg in step_01_msgs:
+        def step_03_check_build_fails(ref_msgs):
+            step_03_msgs = step_01_check_file_builds_ok()
+            if step_03_msgs:
+                _logger.info("Step 03 messages:")
+                for msg in step_03_msgs:
                     _logger.info(msg)
             else:
-                _logger.info("Step 01 generated no messages")
+                _logger.info("Step 03 generated no messages")
 
-            _logger.info("Step 02")
-            step_02_rebuild_project()
+            it.assertNotEquals(step_01_msgs, step_03_msgs)
 
-            _logger.info("Step 03")
-            step_03_check_messages_are_the_same(step_01_msgs)
+        def step_04_rebuild_project():
+            data = {'project_file' : it.PROJECT_FILE}
+            it.app.post('/rebuild_project', data)
+            data = {
+                'project_file' : it.PROJECT_FILE,
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
 
-        @it.should("shutdown the server when requested")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            # Ensure the server is active
-            reply = it.app.post('/get_diagnose_info',
-                                {'project_file' : 'some_project'})
-            it.assertEqual(reply.status, '200 OK')
-
-            # Send a request to shutdown the server and check if it
-            # calls the terminate process method
-            pids = []
-            def terminateProcess(pid):
-                _logger.info("Terminating PID %d", pid)
-                pids.append(pid)
-
-            with mock.patch('hdlcc.utils.terminateProcess', terminateProcess):
-                reply = it.app.post('/shutdown')
-                it.assertEqual(pids, [os.getpid(),])
-
-    with it.having("GRLIB as reference library"):
-        @it.has_setup
-        def setup():
-            it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-            it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
-            if it.BUILDER_NAME:
-                it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
+        def step_05_check_messages_are_the_same(msgs):
+            step_05_msgs = step_01_check_file_builds_ok()
+            if step_05_msgs:
+                _logger.info("Step 05 messages:")
+                for msg in step_05_msgs:
+                    _logger.info(msg)
             else:
-                it.PROJECT_FILE = None
+                _logger.info("Step 05 generated no messages")
 
-            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
+            it.assertEquals(msgs, step_05_msgs)
 
-            if p.exists(cache):
-                shutil.rmtree(cache)
+        _logger.info("Step 01")
+        step_01_msgs = step_01_check_file_builds_ok()
+        if step_01_msgs:
+            _logger.info("Step 01 messages:")
+        else:
+            _logger.info("Step 01 generated no messages")
 
-            it.test_file = p.join(VIM_HDL_EXAMPLES, 'another_library',
-                                  'foo.vhd')
+        for msg in step_01_msgs:
+            _logger.info(msg)
+            it.assertNotEquals(
+                msg.get('error_type', None), 'E',
+                "No errors should be found at this point")
 
-            if it.BUILDER_PATH:
-                it.patch = mock.patch.dict(
-                    'os.environ',
-                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-                it.patch.start()
+        _logger.info("Step 02")
+        step_02_erase_target_folder()
 
-            #  startCodeCheckerServer()
+        _logger.info("Step 03")
+        step_03_check_build_fails(step_01_msgs)
 
-        @it.has_teardown
-        def teardown():
-            if it.BUILDER_PATH:
-                it.patch.stop()
+        _logger.info("Step 04")
+        step_04_rebuild_project()
 
-            cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
-            if p.exists(cache):
-                shutil.rmtree(cache)
+        _logger.info("Step 05")
+        step_05_check_messages_are_the_same(step_01_msgs)
 
-        @it.should("handle buffer visits without crashing")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test():
-            if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
-                _logger.info("Test requires a builder, except fallback")
-                return
+    @it.should("rebuild the project without directory cleanup")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
+            _logger.info("Test requires a builder, except fallback")
+            return
+        # If the user doesn't knows if the project data is corrupt, he/she
+        # should be able to rebuild even if everything is OK.
+        # Test is as follows:
+        # 1) Check that a file builds OK
+        # 2) Rebuild the project
+        # 3) Check the file builds OK again and returns the same set of
+        #    messages
 
-            def build_without_buffer_visit():
-                data = {'project_file' : it.PROJECT_FILE,
-                        'path'         : it.test_file}
+        def step_01_check_file_builds_ok():
+            data = {
+                'project_file' : it.PROJECT_FILE,
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+            _logger.info("Waiting for any previous process to finish")
 
-                _ = it.app.post('/get_messages_by_path', data)
+            ui_reply = it.app.post('/get_ui_messages', data)
+            reply = it.app.post('/get_messages_by_path', data)
 
-            def build_with_buffer_visit():
-                data = {'project_file' : it.PROJECT_FILE,
-                        'path'         : it.test_file}
+            return reply.json['messages'] + ui_reply.json['ui_messages']
 
-                _ = it.app.post('/on_buffer_visit', data)
+        def step_02_rebuild_project():
+            data = {'project_file' : it.PROJECT_FILE}
+            it.app.post('/rebuild_project', data)
+            data = {
+                'project_file' : it.PROJECT_FILE,
+                'path'         : p.join(
+                    VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
 
-            def build_with_buffer_leave():
-                data = {'project_file' : it.PROJECT_FILE,
-                        'path'         : it.test_file}
+        def step_03_check_messages_are_the_same(msgs):
+            step_03_msgs = step_01_check_file_builds_ok()
+            if step_03_msgs:
+                _logger.info("Step 03 messages:")
+                for msg in step_03_msgs:
+                    _logger.info(msg)
+            else:
+                _logger.info("Step 03 generated no messages")
 
-                _ = it.app.post('/on_buffer_leave', data)
+            it.assertEquals(msgs, step_03_msgs)
 
-            build_without_buffer_visit()
-            build_with_buffer_leave()
-            build_with_buffer_visit()
+        _logger.info("Step 01")
+        step_01_msgs = step_01_check_file_builds_ok()
+        if step_01_msgs:
+            _logger.info("Step 01 messages:")
+            for msg in step_01_msgs:
+                _logger.info(msg)
+        else:
+            _logger.info("Step 01 generated no messages")
+
+        _logger.info("Step 02")
+        step_02_rebuild_project()
+
+        _logger.info("Step 03")
+        step_03_check_messages_are_the_same(step_01_msgs)
+
+    @it.should("shutdown the server when requested")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        # Ensure the server is active
+        reply = it.app.post('/get_diagnose_info',
+                            {'project_file' : 'some_project'})
+        it.assertEqual(reply.status, '200 OK')
+
+        # Send a request to shutdown the server and check if it
+        # calls the terminate process method
+        pids = []
+        def terminateProcess(pid):
+            _logger.info("Terminating PID %d", pid)
+            pids.append(pid)
+
+        with mock.patch('hdlcc.utils.terminateProcess', terminateProcess):
+            reply = it.app.post('/shutdown')
+            it.assertEqual(pids, [os.getpid(),])
+
+    @it.has_teardown
+    def teardown():
+        if it.BUILDER_PATH:
+            it.patch.stop()
+
+        cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
+        if p.exists(cache):
+            shutil.rmtree(cache)
+
+    @it.should("handle buffer visits without crashing")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
+            _logger.info("Test requires a builder, except fallback")
+            return
+
+        test_file = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+
+
+        def build_without_buffer_visit():
+            data = {'project_file' : it.PROJECT_FILE,
+                    'path'         : test_file}
+
+            _ = it.app.post('/get_messages_by_path', data)
+
+        def build_with_buffer_visit():
+            data = {'project_file' : it.PROJECT_FILE,
+                    'path'         : test_file}
+
+            _ = it.app.post('/on_buffer_visit', data)
+
+        def build_with_buffer_leave():
+            data = {'project_file' : it.PROJECT_FILE,
+                    'path'         : test_file}
+
+            _ = it.app.post('/on_buffer_leave', data)
+
+        build_without_buffer_visit()
+        build_with_buffer_leave()
+        build_with_buffer_visit()
 
 it.createTests(globals())
 

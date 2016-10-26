@@ -33,8 +33,6 @@ import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
-CACHE_BUILD_SPEEDUP = 2
-
 BASE_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
 
@@ -57,7 +55,7 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
         self._ui_handler.error(message)
         self._msg_queue.put(('error', message))
 
-with such.A("hdlcc project with persistency") as it:
+with such.A("hdlcc project with persistence") as it:
 
     @it.has_setup
     def setup():
@@ -121,68 +119,7 @@ with such.A("hdlcc project with persistency") as it:
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
-        @it.should('measure time taken to build a project without any cache')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test_001():
-            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
-                _logger.info("Test requires a builder")
-                return
-            for _ in range(5):
-                start = time.time()
-                project = StandaloneProjectBuilder(it.PROJECT_FILE)
-                project.clean()
-                parse_time = time.time() - start
-                project.getMessagesByPath(it.target_file)
-                build_time = time.time() - start - parse_time
-
-                _logger.info("Parsing took %fs", parse_time)
-                _logger.info("Building took %fs", build_time)
-
-                it.parse_times += [parse_time]
-                it.build_times += [build_time]
-
-            _logger.info("Builds took between %f and %f",
-                         min(it.build_times), max(it.build_times))
-
-            # Remove spurious values we may have caught
-            it.build_times.remove(max(it.build_times))
-            it.build_times.remove(min(it.build_times))
-
-            # Maximum and minimum time shouldn't be too different
-            if max(it.build_times)/min(it.build_times) > 1.3:
-                _logger.warning(
-                    "Build times between %f and %f seems too different! "
-                    "Complete build times: %s",
-                    min(it.build_times), max(it.build_times), it.build_times)
-
-        @it.should('build at least %dx faster when recovering the info' %
-                   CACHE_BUILD_SPEEDUP)
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
-        def test_002():
-            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
-                _logger.info("Test requires a builder")
-                return
-            _logger.info("Creating object")
-            start = time.time()
-            project = StandaloneProjectBuilder(it.PROJECT_FILE)
-            parse_time = time.time() - start
-            _logger.info("Building de facto")
-            project.getMessagesByPath(it.target_file)
-            _logger.info("Done")
-            build_time = time.time() - start - parse_time
-
-            _logger.info("Parsing took %fs", parse_time)
-            _logger.info("Building took %fs", build_time)
-
-            average = float(sum(it.build_times))/len(it.build_times)
-
-            it.assertTrue(
-                build_time < average/CACHE_BUILD_SPEEDUP,
-                "Building with cache took %f (should be < %f). "
-                "Builder used was '%s'" % \
-                    (build_time, average/CACHE_BUILD_SPEEDUP, it.BUILDER_NAME))
-
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
@@ -198,7 +135,7 @@ with such.A("hdlcc project with persistency") as it:
                        "Project shouldn't have recovered from cache. "
                        "Messages found:\n%s" % "\n".join(messages))
 
-    @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def _buildWithCache():
         del it.project
 
@@ -253,7 +190,7 @@ with such.A("hdlcc project with persistency") as it:
             _buildWithCache()
 
         @it.should('build without cache if cache is invalid')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test_003():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")
@@ -319,7 +256,7 @@ with such.A("hdlcc project with persistency") as it:
             utils.cleanProjectCache(it.PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test_001():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")

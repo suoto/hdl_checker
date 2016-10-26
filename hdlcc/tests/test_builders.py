@@ -21,9 +21,10 @@ import logging
 import os
 import os.path as p
 import shutil
-import mock
 from nose2.tools import such
 from nose2.tools.params import params
+
+import mock
 
 import hdlcc.builders
 import hdlcc.utils as utils

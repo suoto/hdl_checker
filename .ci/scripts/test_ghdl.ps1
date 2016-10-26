@@ -20,8 +20,8 @@
 
 $env:BUILDER_NAME="ghdl"
 $env:ARCH="32"
-# $env:URL="http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip"
-$env:URL="http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
+# $env:GHDL_URL="http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.31/Windows/ghdl-0.31-mcode-win32.zip"
+$env:GHDL_URL="http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip"
 # $env:INSTALL_DIR="$env:CI_WORK_PATH\\ghdl-0.31-mcode-win32"
 # $env:BUILDER_PATH="$env:INSTALL_DIR\\bin"
 

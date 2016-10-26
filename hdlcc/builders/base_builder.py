@@ -167,17 +167,33 @@ class BaseBuilder(object):
 
         rebuilds = []
         for rebuild in parse_results:
-            if rebuild not in rebuilds:
-                if 'unit_type' in rebuild and 'unit_name' in rebuild:
-                    for dependency in source.getDependencies():
-                        if dependency['unit'] == rebuild['unit_name']:
-                            self._logger.info("Adding '%s'", rebuild)
-                            rebuilds += [rebuild]
-                            break
-                else:
-                    rebuilds += [rebuild]
-        return rebuilds
+            unit_type = rebuild.get('unit_type', None)
+            library_name = rebuild.get('library_name', None)
+            unit_name = rebuild.get('unit_name', None)
+            rebuild_path = rebuild.get('rebuild_path', None)
 
+            rebuild_info = None
+            if None not in (unit_type, unit_name):
+                for dependency in source.getDependencies():
+                    if dependency['unit'] == rebuild['unit_name']:
+                        rebuild_info = {'unit_type' : unit_type,
+                                        'unit_name' : unit_name}
+                        break
+            elif None not in (library_name, unit_name):
+                rebuild_info = {'library_name' : library_name,
+                                'unit_name' : unit_name}
+            elif rebuild_path is not None:
+                # GHDL sometimes gives the full path of the file that
+                # should be recompiled
+                rebuild_info = {'rebuild_path' : rebuild_path}
+            else:  # pragma: no cover
+                self._logger.warning("Don't know what to do with %s",
+                                     rebuild)
+
+            if rebuild_info is not None and rebuild_info not in rebuilds:
+                rebuilds.append(rebuild_info)
+
+        return rebuilds
 
     def _searchForRebuilds(self, line): # pragma: no cover
         """
@@ -229,7 +245,7 @@ class BaseBuilder(object):
         """
 
     @abc.abstractmethod
-    def _buildSource(self, source, flags=None):
+    def _buildSource(self, path, library, flags=None):
         """
         Callback called to actually build the source
         """
@@ -245,9 +261,21 @@ class BaseBuilder(object):
 
         records = []
         rebuilds = []
-        for line in self._buildSource(source, flags):
+        # We must give precedence to the buffer content over the file
+        # content, so we dump the buffer content to a temporary file
+        # and tell the compiler to compile it instead
+        if source.hasBufferContent():
+            build_path = source.dumpBufferContentToFile()
+            self._logger.debug("Source has buffered content, using %s",
+                               build_path)
+        else:
+            build_path = source.filename
+
+        for line in self._buildSource(build_path, source.library, flags):
             if self._shouldIgnoreLine(line):
                 continue
+
+            line = line.replace(build_path, source.filename)
 
             records += [x for x in self._makeRecords(line) if x not in records]
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in

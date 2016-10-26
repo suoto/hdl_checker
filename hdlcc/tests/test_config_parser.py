@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring
+# pylint: disable=function-redefined, missing-docstring, protected-access
 
 import os
 import os.path as p
@@ -58,8 +58,9 @@ with such.A('config parser object') as it:
                "parameter is found")
     def test():
         with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
-            ConfigParser(
-                p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_unknown_parm.prj'))
+            parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                         'project_unknown_parm.prj'))
+            parser.getSources()
 
     @it.should("assign a default value for target dir equal to the builder value")
     def test():
@@ -71,8 +72,11 @@ with such.A('config parser object') as it:
 
     with it.having("a standard project file"):
         @it.has_setup
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
         def setup():
+            it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
+                                     lambda: False)
+            it.no_vunit.start()
+
             project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                       'standard_project_file.prj')
             it.parser = ConfigParser(project_filename)
@@ -86,6 +90,7 @@ with such.A('config parser object') as it:
         def teardown():
             os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'))
             os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))
+            it.no_vunit.stop()
 
         @it.should("extract builder")
         def test():
@@ -101,41 +106,46 @@ with such.A('config parser object') as it:
         @it.should("extract build flags for single build")
         def test():
             it.assertItemsEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_file.vhd'),
+                                        batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_package.vhd'),
+                                        batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
             it.assertItemsEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_testbench.vhd'),
+                                        batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
 
         @it.should("extract build flags for batch builds")
         def test():
             it.assertItemsEqual(
-                it.parser._getBatchBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_file.vhd'),
+                                        batch_mode=True),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
             it.assertItemsEqual(
-                it.parser._getBatchBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_package.vhd'),
+                                        batch_mode=True),
                 set(['-b0', '-b1', '-g0', '-g1', '-f1']))
 
         @it.should("include VHDL and Verilog sources")
         def test():
             it.assertItemsEqual(
-                [x.filename for x in it.parser.getSources()],
                 [p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                  p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                  p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
                  p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
-                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))])
+                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))],
+                [x.filename for x in it.parser.getSources()])
 
         @it.should("tell correctly if a path is on the project file")
         @params((p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd'), True),
@@ -149,35 +159,41 @@ with such.A('config parser object') as it:
         @it.should("return build flags for a VHDL file")
         def test():
             it.assertEqual(
-                it.parser._getBatchBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_testbench.vhd'),
+                                        batch_mode=True),
                 ['-g0', '-g1', '-b0', '-b1', '-build-using', 'some', 'way', ])
             it.assertEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'sample_testbench.vhd'),
+                                        batch_mode=False),
                 ['-g0', '-g1', '-s0', '-s1', '-build-using', 'some', 'way', ])
 
         @it.should("return build flags for a Verilog file")
         def test():
             it.assertEqual(
-                it.parser._getBatchBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'foo.v'),
+                                        batch_mode=True),
                 ['-permissive', '-some-flag', 'some', 'value', ])
             it.assertEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'foo.v'),
+                                        batch_mode=False),
                 ['-lint', '-hazards', '-pedanticerrors', '-some-flag',
                  'some', 'value'])
 
         @it.should("return build flags for a System Verilog file")
         def test():
             it.assertEqual(
-                it.parser._getBatchBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'bar.sv'),
+                                        batch_mode=True),
                 ['-permissive', 'some', 'sv', 'flag'])
             it.assertEqual(
-                it.parser._getSingleBuildFlagsByPath(
-                    p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv')),
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'bar.sv'),
+                                        batch_mode=False),
                 ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
 
         @it.should("Match the result of ConfigParser.simpleParse")
@@ -185,12 +201,6 @@ with such.A('config parser object') as it:
             target_dir, builder_name = ConfigParser.simpleParse(it.parser.filename)
             it.assertEqual(it.parser.getTargetDir(), target_dir)
             it.assertEqual(it.parser.getBuilder(), builder_name)
-
-        @it.should("get sources' paths")
-        def test():
-            it.assertListEqual(
-                [x.filename for x in it.parser.getSources()],
-                it.parser.getSourcesPaths())
 
         @it.should("restore from cached state")
         def test():
@@ -210,9 +220,25 @@ with such.A('config parser object') as it:
                     p.exists(source.filename),
                     "Couldn't find source with path '%s'" % source.filename)
 
+        @it.should("consider non absolute paths are relative to the "
+                   "configuration file path")
+        def test():
+            file_path = p.normpath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo',
+                                          'bar.vhd'))
+
+            # Consider non absolute paths are relative to the configuration
+            # file path
+            it.assertEquals(file_path,
+                            it.parser._getSourcePath(p.join('foo', 'bar.vhd')))
+
+            # Absolute paths should refer to the current path
+            it.assertEquals(
+                p.abspath(p.join('foo', 'bar.vhd')),
+                it.parser._getSourcePath(p.abspath(p.join('foo', 'bar.vhd'))))
+
     with it.having("no project file"):
         @it.should("create the object without error")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test():
             it.parser = ConfigParser()
             it.assertIsNotNone(it.parser)
@@ -230,14 +256,14 @@ with such.A('config parser object') as it:
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser._getSingleBuildFlagsByPath(path), [])
+            it.assertEqual(it.parser.getBuildFlags(path, batch_mode=False), [])
 
         @it.should("return empty batch build flags for any path")
         @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
-            it.assertEqual(it.parser._getBatchBuildFlagsByPath(path), [])
+            it.assertEqual(it.parser.getBuildFlags(path, batch_mode=True), [])
 
         @it.should("say every path is on the project file")
         @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
@@ -248,7 +274,7 @@ with such.A('config parser object') as it:
 
     with it.having("not installed VUnit"):
         @it.should("not add VUnit files to the source list")
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def test():
             # We'll add no project file, so the only sources that should
             # be fond are VUnit's files
@@ -281,7 +307,7 @@ with such.A('config parser object') as it:
                             new_callable=mock.PropertyMock,
                             return_value=('vhdl', )):
                 parser = ConfigParser(project_filename)
-            sources = parser.getSources()
+                sources = parser.getSources()
 
             vunit_files = 0
             for source in sources:
@@ -345,7 +371,7 @@ with such.A('config parser object') as it:
             return result
 
         @it.has_setup
-        @mock.patch('hdlcc.config_parser.hasVunit', lambda: False)
+        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def setup():
             it.project_filename = 'test.prj'
             it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
@@ -457,7 +483,7 @@ with such.A('config parser object') as it:
     with it.having("no builder configured on the project file"):
         @it.has_setup
         def setup():
-            it.patcher = mock.patch('hdlcc.config_parser.hasVunit',
+            it.patcher = mock.patch('hdlcc.config_parser.foundVunit',
                                     lambda: False)
             it.patcher.start()
 

@@ -50,7 +50,7 @@ def _extractSet(entry):
 
     return [value for value in _splitAtWhitespaces(entry)]
 
-def hasVunit():
+def foundVunit():
     """
     Checks if our env has VUnit installed
     """
@@ -114,11 +114,6 @@ class ConfigParser(object):
         self._timestamp = 0
         self._lock = Lock()
 
-        if self.filename is not None:
-            with self._lock:
-                self._doParseConfigFile()
-                self._addVunitIfFound()
-
     def __eq__(self, other): # pragma: no cover
         if not isinstance(other, type(self)):
             return False
@@ -139,13 +134,13 @@ class ConfigParser(object):
         """
         Tries to import files to support VUnit right out of the box
         """
-        if not hasVunit() or self._parms['builder'] == 'fallback':
+        if not foundVunit() or self._parms['builder'] == 'fallback':
             return
 
         import vunit
 
         self._logger.info("VUnit installation found")
-        logging.getLogger('vunit').setLevel(logging.ERROR)
+        #  logging.getLogger('vunit').setLevel(logging.ERROR)
 
         builder_class = getBuilderByName(self.getBuilder())
 
@@ -290,6 +285,7 @@ class ConfigParser(object):
         if self._shouldParse():
             with self._lock:
                 self._doParseConfigFile()
+                self._addVunitIfFound()
 
     def _doParseConfigFile(self):
         """
@@ -430,7 +426,7 @@ class ConfigParser(object):
                 # Try to get the build info for this source. If we get nothing
                 # we just skip it
                 build_info = self._handleParsedSource(
-                    match['lang'], match['library'], source_path, match['flags'])
+                    match['library'], source_path, match['flags'])
                 if build_info:
                     source_build_list.append(build_info)
 
@@ -466,7 +462,7 @@ class ConfigParser(object):
 
         return source_path
 
-    def _handleParsedSource(self, language, library, path, flags):
+    def _handleParsedSource(self, library, path, flags):
         """
         Handles a parsed line that adds a source
         """
@@ -542,33 +538,14 @@ class ConfigParser(object):
         self._parseIfNeeded()
         return self._parms['target_dir']
 
-    def _getSingleBuildFlagsByPath(self, path):
-        """
-        Return a list of flags configured to build a single source
-        """
-        self._parseIfNeeded()
-        if self.filename is None:
-            return []
-        lang = self.getSourceByPath(path).filetype
-
-        return self._parms['global_build_flags'][lang] + \
-               self._parms['single_build_flags'][lang] + \
-               self._sources[p.abspath(path)].flags
-
-    def _getBatchBuildFlagsByPath(self, path):
-        """
-        Return a list of flags configured to build a single source
-        """
-        self._parseIfNeeded()
-        if self.filename is None:
-            return []
-        lang = self.getSourceByPath(path).filetype
-
-        return self._parms['global_build_flags'][lang] + \
-               self._parms['batch_build_flags'][lang] + \
-               self._sources[p.abspath(path)].flags
-
     def getBuildFlags(self, path, batch_mode):
+        """
+        Return a list of flags configured to build a source in batch or
+        single mode
+        """
+        self._parseIfNeeded()
+        if self.filename is None:
+            return []
         lang = self.getSourceByPath(path).filetype
         flags = list(self._parms['global_build_flags'][lang])
 
@@ -577,7 +554,7 @@ class ConfigParser(object):
         else:
             flags += self._parms['single_build_flags'][lang]
 
-        if path not in self._sources:
+        if not self.hasSource(path):
             return flags
 
         return flags + self._sources[p.abspath(path)].flags
@@ -588,13 +565,6 @@ class ConfigParser(object):
         """
         self._parseIfNeeded()
         return list(self._sources.values())
-
-    def getSourcesPaths(self):
-        """
-        Returns a list of absolute paths to the sources found
-        """
-        self._parseIfNeeded()
-        return list(self._sources.keys())
 
     def getSourceByPath(self, path):
         """

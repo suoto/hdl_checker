@@ -20,18 +20,26 @@ import abc
 import os.path as p
 import logging
 import re
+import time
 
 from hdlcc.utils import getFileType, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
-class BaseSourceFile(object):
+class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
     """
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
     """
 
     __metaclass__ = abc.ABCMeta
+
+    @abc.abstractproperty
+    def _comment(self):
+        """
+        Should return a regex object that matches a comment (or comments)
+        used by the language
+        """
 
     def __init__(self, filename, library='work', flags=None):
         self.filename = p.normpath(filename)
@@ -41,6 +49,9 @@ class BaseSourceFile(object):
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
+
+        self._buffer_time = None
+        self._buffer_content = None
 
         self.abspath = p.abspath(filename)
 
@@ -70,6 +81,8 @@ class BaseSourceFile(object):
         obj.flags = state['flags']
         obj._cache = state['_cache']
         obj._content = None
+        obj._buffer_time = None
+        obj._buffer_content = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
@@ -113,11 +126,54 @@ class BaseSourceFile(object):
         """
         return self.getmtime() > self._mtime
 
+    def _clearCachesIfChanged(self):
+        """
+        Clears all the caches if the file has changed to force updating
+        every parsed info
+        """
+        if self._changed():
+            self._content = None
+            self._cache = {}
+
+    def getmtime(self):
+        """
+        Gets file modification time as defined in p.getmtime
+        """
+        if self._buffer_time is not None:
+            return self._buffer_time
+        if not p.exists(self.filename):
+            return None
+        return p.getmtime(self.filename)
+
+    def setBufferContent(self, content):
+        self._buffer_content = content
+        self._buffer_time = time.time()
+
+    def hasBufferContent(self):
+        return self._buffer_content is not None
+
+    def dumpBufferContentToFile(self):
+        buffer_dump_path = p.join(p.dirname(self.filename), '.dump_' +
+                                  p.basename(self.filename))
+        open(buffer_dump_path, 'w').write(self._buffer_content)
+        return buffer_dump_path
+
+    def clearBufferContent(self):
+        self._buffer_time = None
+        self._buffer_content = None
+
     def getSourceContent(self):
         """
         Cached version of the _getSourceContent method
         """
-        if self._changed() or self._content is None:
+        if self._buffer_content is not None:
+            if self._changed():
+                self._cache = {}
+            return self._buffer_content
+
+        self._clearCachesIfChanged()
+
+        if self._content is None:
             self._content = self._getSourceContent()
             self._mtime = self.getmtime()
 
@@ -129,7 +185,8 @@ class BaseSourceFile(object):
         """
         if not p.exists(self.filename):
             return []
-        if self._changed() or 'design_units' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'design_units' not in self._cache:
             self._cache['design_units'] = self._getDesignUnits()
 
         return self._cache['design_units']
@@ -141,7 +198,8 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or 'dependencies' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'dependencies' not in self._cache:
             self._cache['dependencies'] = self._getDependencies()
 
         return self._cache['dependencies']
@@ -153,7 +211,8 @@ class BaseSourceFile(object):
         if not p.exists(self.filename):
             return []
 
-        if self._changed() or 'libraries' not in self._cache:
+        self._clearCachesIfChanged()
+        if 'libraries' not in self._cache:
             self._cache['libraries'] = removeDuplicates(self._getLibraries())
 
         return self._cache['libraries']
@@ -163,19 +222,11 @@ class BaseSourceFile(object):
         Cached version of the _getMatchingLibrary method
         """
         key = ','.join(['getMatchingLibrary', unit_name, unit_type])
-        if self._changed() or key not in self._cache:
+        self._clearCachesIfChanged()
+        if key not in self._cache:
             self._cache[key] = self._getMatchingLibrary(
                 unit_type, unit_name)
         return self._cache[key]
-
-
-    def getmtime(self):
-        """
-        Gets file modification time as defined in p.getmtime
-        """
-        if not p.exists(self.filename):
-            return None
-        return p.getmtime(self.filename)
 
     def getDesignUnitsDotted(self):
         """
