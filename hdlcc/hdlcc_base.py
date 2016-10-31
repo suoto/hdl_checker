@@ -38,7 +38,7 @@ class HdlCodeCheckerBase(object):
     HDL Code Checker project builder class
     """
 
-    _USE_THREADS = False
+    _USE_THREADS = True
     _MAX_REBUILD_ATTEMPTS = 20
 
     __metaclass__ = abc.ABCMeta
@@ -430,6 +430,8 @@ class HdlCodeCheckerBase(object):
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
+        self._setupEnvIfNeeded()
+
         source, remarks = self._getSourceByPath(path)
         return self._sortBuildMessages(
             self.getMessagesBySource(source, *args, **kwargs) + remarks)
@@ -486,6 +488,7 @@ class HdlCodeCheckerBase(object):
         """
         Returns a list of VhdlSourceFile objects parsed
         """
+        self._setupEnvIfNeeded()
         return self._config.getSources()
 
     def onBufferVisit(self, path):
@@ -494,6 +497,7 @@ class HdlCodeCheckerBase(object):
         means caching the build sequence before the file is actually
         checked, so the overall wait time is reduced
         """
+        self._setupEnvIfNeeded()
         source, _ = self._getSourceByPath(path)
         _ = self.getBuildSequence(source)
 
