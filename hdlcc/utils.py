@@ -43,15 +43,18 @@ except ImportError:  # pragma: no cover
 
     dump = serializer.dump  # pylint: disable=invalid-name
 
-import six
-
-
 _logger = logging.getLogger(__name__)
-
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, six.string_types):
+
+    # Copied from six source
+    if sys.version_info[0] == 3:
+        string_types = str,
+    else:
+        string_types = basestring,
+
+    if isinstance(stream, string_types):
         class Stream(object):
             """
             File subclass that allows RainbowLoggingHandler to write

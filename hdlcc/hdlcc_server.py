@@ -25,7 +25,6 @@ import os.path as p
 import logging
 import argparse
 from threading import Timer
-import six
 
 _logger = logging.getLogger(__name__)
 
@@ -91,12 +90,11 @@ def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
     # TODO: Fix this for Python3
-    if six.PY2:
+    if sys.version_info[0] == 2:
         _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
     # Call it again to log the paths we added
-    _setupPaths()
     import hdlcc
     from hdlcc import handlers
     import hdlcc.utils as utils # pylint: disable=redefined-outer-name
