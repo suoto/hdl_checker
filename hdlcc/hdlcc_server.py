@@ -27,6 +27,7 @@ import argparse
 from threading import Timer
 
 _logger = logging.getLogger(__name__)
+PY2 = sys.version_info[0] == 2
 
 def _setupPaths():
     "Add our dependencies to sys.path"
@@ -79,19 +80,36 @@ def parseArguments():
 
     return args
 
+# Copied from ycmd!
+def openForStdHandle(filepath):
+    """
+    Returns a file object that can be used to replace sys.stdout or
+    sys.stderr
+    """
+    # Need to open the file in binary mode on py2 because of bytes vs unicode.
+    # If we open in text mode (default), then third-party code that uses `print`
+    # (we're replacing sys.stdout!) with an `str` object on py2 will cause
+    # tracebacks because text mode insists on unicode objects. (Don't forget,
+    # `open` is actually `io.open` because of future builtins.)
+    # Since this function is used for logging purposes, we don't want the output
+    # to be delayed. This means no buffering for binary mode and line buffering
+    # for text mode. See https://docs.python.org/2/library/io.html#io.open
+    if PY2:
+        return open(filepath, mode='wb', buffering=0)
+    return open(filepath, mode='w', buffering=1)
+
+
 def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     "Redirect stdout and stderr to files"
     if stdout is not None:
-        sys.stdout = open(stdout, 'ab') #, buffering=1)
+        sys.stdout = openForStdHandle(stdout)
     if stderr is not None:
-        sys.stderr = open(stderr, 'ab') #, buffering=1)
+        sys.stderr = openForStdHandle(stderr)
 
 def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
-    # TODO: Fix this for Python3
-    if sys.version_info[0] == 2:
-        _setupPipeRedirection(args.stdout, args.stderr)
+    _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
     # Call it again to log the paths we added
