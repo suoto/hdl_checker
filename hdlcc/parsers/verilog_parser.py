@@ -72,5 +72,5 @@ class VerilogParser(BaseSourceFile):
         return design_units
 
     def _getLibraries(self):
-        return []
+        return [self.library, ]
 

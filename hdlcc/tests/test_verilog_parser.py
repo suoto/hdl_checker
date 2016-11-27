@@ -75,9 +75,9 @@ module clock_divider
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-        @it.should('return no libraries')
+        @it.should('return only its own library')
         def test():
-            it.assertEqual([], it.source.getLibraries())
+            it.assertEqual(['work', ], it.source.getLibraries())
 
     with it.having('a package code'):
         @it.has_setup
@@ -105,9 +105,9 @@ endpackage
             it.assertItemsEqual([{'type' : 'package', 'name' : 'msgPkg'}],
                                 design_units)
 
-        @it.should('return no libraries')
+        @it.should('return only its own library')
         def test():
-            it.assertEqual([], it.source.getLibraries())
+            it.assertEqual(['work', ], it.source.getLibraries())
 
 it.createTests(globals())
 
