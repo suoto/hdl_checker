@@ -231,8 +231,10 @@ class BaseBuilder(object):
                                   shell=shell, env=subp_env).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
-            self._logger.debug("Command '%s' failed with error code %d",
-                               cmd_with_args, exc.returncode)
+            self._logger.debug(
+                "Command '%s' failed with error code %d.\nStdout:\n%s",
+                cmd_with_args, exc.returncode, '\n'.join([x.decode() for x in
+                                                          stdout]))
 
         return [x.decode() for x in stdout]
 
