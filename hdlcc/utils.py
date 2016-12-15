@@ -84,7 +84,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
                     except:
                         _logger.exception("Something went wrong!")
 
-        _stream = Stream(stream, 'ab', buffering=1)
+        _stream = Stream(stream, 'ab', buffering=0)
     else:
         _stream = stream
 
