@@ -247,6 +247,7 @@ class ConfigParser(object):
         sources = state.pop('_sources')
         obj.filename = state.pop('filename', None)
         obj._timestamp = state.pop('_timestamp')
+        obj._lock = Lock()
 
         obj._parms = state['_parms']
         obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
