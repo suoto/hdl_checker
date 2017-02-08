@@ -223,6 +223,26 @@ def shutdownServer():
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
 
+@app.post('/get_dependencies')
+@_exceptionWrapper
+def getDependencies():
+    """
+    Terminates the current process to shutdown the server
+    """
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+    content = bottle.request.forms.get('content', None)
+
+    _logger.debug("Getting dependencies for '%s', '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    source = server._getSourceByPath(path)[0]
+    content = []
+    for dependency in source.getDependencies():
+        content.append("%s.%s" % (dependency['library'], dependency['unit']))
+
+    return {'dependencies' : content}
+
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name
 setupSignalHandlers()
