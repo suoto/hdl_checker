@@ -227,11 +227,10 @@ def shutdownServer():
 @_exceptionWrapper
 def getDependencies():
     """
-    Terminates the current process to shutdown the server
+    Returns the direct dependencies of a given source path
     """
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
-    content = bottle.request.forms.get('content', None)
 
     _logger.debug("Getting dependencies for '%s', '%s'", project_file, path)
 
@@ -242,6 +241,23 @@ def getDependencies():
         content.append("%s.%s" % (dependency['library'], dependency['unit']))
 
     return {'dependencies' : content}
+
+@app.post('/get_build_sequence')
+@_exceptionWrapper
+def getBuildSequence():
+    """
+    Returns the build sequence of a given source path
+    """
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+
+    _logger.debug("Getting build sequence for '%s', '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    source = server._getSourceByPath(path)[0]
+
+    return {'sequence' : [x.filename for x in
+                          server.updateBuildSequenceCache(source)]}
 
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name
