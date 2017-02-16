@@ -262,7 +262,7 @@ class HdlCodeCheckerBase(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], str(x['line_number']), str(x['error_number'])))
 
-    def getBuildSequence(self, source):
+    def updateBuildSequenceCache(self, source):
         """
         Wrapper to _getBuildSequence passing the initial build sequence
         list empty and caching the result
@@ -287,11 +287,16 @@ class HdlCodeCheckerBase(object):
             cached_sequence = self._build_sequence_cache[key]['sequence']
             cached_timestamp = self._build_sequence_cache[key]['timestamp']
             if cached_sequence:
-                current_timestamp = max([x.getmtime() for x in cached_sequence])
+                current_timestamp = max([x.getmtime() for x in cached_sequence]
+                                        + [source.getmtime()])
             else:
                 current_timestamp = 0
+
             if current_timestamp > cached_timestamp:
+                self._logger.debug("Timestamp change, rescanning build "
+                                   "sequence")
                 build_sequence = []
+                self._getBuildSequence(source, build_sequence)
                 self._build_sequence_cache[key] = {
                     'sequence': build_sequence,
                     'timestamp' : current_timestamp}
@@ -351,7 +356,7 @@ class HdlCodeCheckerBase(object):
         self._logger.info("Building '%s', batch_mode = %s",
                           str(source.filename), batch_mode)
 
-        build_sequence = self.getBuildSequence(source)
+        build_sequence = self.updateBuildSequenceCache(source)
 
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
@@ -499,7 +504,7 @@ class HdlCodeCheckerBase(object):
         """
         self._setupEnvIfNeeded()
         source, _ = self._getSourceByPath(path)
-        _ = self.getBuildSequence(source)
+        self.updateBuildSequenceCache(source)
 
     def onBufferLeave(self, _):
         """

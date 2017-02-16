@@ -307,8 +307,8 @@ class ConfigParser(object):
         # to speed up parsing (important especially for libraries with
         # many files. The multiprocessing.Pool class used to hang, so
         # watch out if this behaves well enough to be used
+        self._logger.info("Adding %d sources", len(source_build_list))
         for source in getSourceFileObjects(source_build_list):
-            self._logger.debug("Adding source %s", source)
             self._sources[source.filename] = source
 
         self._cleanUpSourcesList(source_path_list)
