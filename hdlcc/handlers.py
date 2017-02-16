@@ -235,7 +235,7 @@ def getDependencies():
     _logger.debug("Getting dependencies for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
-    source = server._getSourceByPath(path)[0]
+    source, _ = server.getSourceByPath(path)
     content = []
     for dependency in source.getDependencies():
         content.append("%s.%s" % (dependency['library'], dependency['unit']))
@@ -254,7 +254,7 @@ def getBuildSequence():
     _logger.debug("Getting build sequence for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
-    source = server._getSourceByPath(path)[0]
+    source, _ = server.getSourceByPath(path)
 
     return {'sequence' : [x.filename for x in
                           server.updateBuildSequenceCache(source)]}

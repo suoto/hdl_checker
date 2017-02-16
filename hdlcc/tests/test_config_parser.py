@@ -501,18 +501,32 @@ with such.A('config parser object') as it:
                 commands.append(cmd_with_args)
                 return []
 
-            with mock.patch('hdlcc.builders.%s.checkEnvironment' % builder,
-                            lambda self: setattr(self, '_version', '<foo>')):
-                with mock.patch('hdlcc.builders.%s._subprocessRunner' % builder,
-                                _subprocessMocker):
+            @staticmethod
+            def isAvailable():
+                return True
 
-                    parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                                 'project_wo_builder_wo_target_dir.prj'))
-                    for cmd in commands:
-                        _logger.warning('>' + str(cmd))
-                    it.assertEquals(parser.getBuilder(), builder.lower())
+            patches = [
+                mock.patch('hdlcc.builders.%s.checkEnvironment' % builder,
+                           lambda self: setattr(self, '_version', '<foo>')),
+                mock.patch('hdlcc.builders.%s._subprocessRunner' % builder,
+                           _subprocessMocker),
+                mock.patch('hdlcc.builders.%s.isAvailable' % builder,
+                           isAvailable)]
 
-        @it.should("use fallback is no builder pass")
+            for patch in patches:
+                patch.start()
+
+            try:
+                parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                             'project_wo_builder_wo_target_dir.prj'))
+                for cmd in commands:
+                    _logger.warning('>' + str(cmd))
+                it.assertEquals(parser.getBuilder(), builder.lower())
+            finally:
+                for patch in patches:
+                    patch.stop()
+
+        @it.should("use fallback if no builder pass")
         def test():
             parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                          'project_wo_builder_wo_target_dir.prj'))

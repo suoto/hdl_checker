@@ -207,7 +207,7 @@ class HdlCodeCheckerBase(object):
         from HDL Code Checker to the user
         """
 
-    def _getSourceByPath(self, path):
+    def getSourceByPath(self, path):
         """
         Get the source object, flags and any additional info to be displayed
         """
@@ -400,7 +400,7 @@ class HdlCodeCheckerBase(object):
         for rebuild in rebuilds:
             self._logger.debug("Rebuild hint: '%s'", rebuild)
             if 'rebuild_path' in rebuild:
-                rebuild_sources = [self._getSourceByPath(rebuild['rebuild_path'])[0]]
+                rebuild_sources = [self.getSourceByPath(rebuild['rebuild_path'])[0]]
             else:
                 unit_name = rebuild.get('unit_name', None)
                 library_name = rebuild.get('library_name', None)
@@ -437,7 +437,7 @@ class HdlCodeCheckerBase(object):
         """
         self._setupEnvIfNeeded()
 
-        source, remarks = self._getSourceByPath(path)
+        source, remarks = self.getSourceByPath(path)
         return self._sortBuildMessages(
             self.getMessagesBySource(source, *args, **kwargs) + remarks)
 
@@ -482,7 +482,7 @@ class HdlCodeCheckerBase(object):
 
         self._setupEnvIfNeeded()
 
-        source, remarks = self._getSourceByPath(path)
+        source, remarks = self.getSourceByPath(path)
         source.setBufferContent(content)
         messages = self.getMessagesBySource(source)
         source.clearBufferContent()
@@ -503,7 +503,7 @@ class HdlCodeCheckerBase(object):
         checked, so the overall wait time is reduced
         """
         self._setupEnvIfNeeded()
-        source, _ = self._getSourceByPath(path)
+        source, _ = self.getSourceByPath(path)
         self.updateBuildSequenceCache(source)
 
     def onBufferLeave(self, _):

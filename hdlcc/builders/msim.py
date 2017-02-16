@@ -131,6 +131,11 @@ class MSim(BaseBuilder):
                 "Version number is '%s'", \
                 stdout, self._version)
 
+    @staticmethod
+    def isAvailable():
+        return ((not os.system('vcom -version')) and
+                (not os.system('vlog -version')))
+
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
         if not self._iniFileExists():

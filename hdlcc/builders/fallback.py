@@ -40,6 +40,10 @@ class Fallback(BaseBuilder):
     def _checkEnvironment(self):
         return
 
+    @staticmethod
+    def isAvailable():
+        return True
+
     def _buildSource(self, path, library, flags=None): # pragma: no cover
         return [], []
 

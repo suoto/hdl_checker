@@ -97,6 +97,10 @@ class XVHDL(BaseBuilder):
                 "Version number is '%s'", \
                 stdout[:-1], self._version)
 
+    @staticmethod
+    def isAvailable():
+        return not os.system('xvhdl --nolog --version')
+
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
         # like this. Review this at some point

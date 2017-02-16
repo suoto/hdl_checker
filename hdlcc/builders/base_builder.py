@@ -132,6 +132,14 @@ class BaseBuilder(object):
         del state['_lock']
         return state
 
+    @staticmethod
+    def isAvailable():
+        """
+        Method that should be overriden by child classes and return True
+        if the given builder is available on the current environment
+        """
+        raise NotImplementedError
+
     def checkEnvironment(self):
         """
         Sanity environment check for child classes. Any exception raised
@@ -159,6 +167,7 @@ class BaseBuilder(object):
 
     def _getRebuilds(self, source, line):
         """
+        Gets info on what should be rebuilt to satisfy the builder
         """
         try:
             parse_results = self._searchForRebuilds(line)

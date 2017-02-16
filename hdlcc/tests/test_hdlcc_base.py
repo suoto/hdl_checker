@@ -180,7 +180,7 @@ with such.A("hdlcc project") as it:
         path = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                       'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
-        source, remarks = project._getSourceByPath(path)
+        source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
@@ -201,7 +201,7 @@ with such.A("hdlcc project") as it:
             p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.sv'))
     def test(_, path):
         project = StandaloneProjectBuilder()
-        source, remarks = project._getSourceByPath(path)
+        source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VerilogParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(

@@ -19,7 +19,6 @@
 
 import os
 import os.path as p
-import time
 import logging
 from multiprocessing import Queue
 
@@ -124,6 +123,10 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
 
     def _checkEnvironment(self):
         return
+
+    @staticmethod
+    def isAvailable():
+        return True
 
     def _buildSource(self, source, flags=None): # pragma: no cover
         return [], []
