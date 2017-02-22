@@ -454,7 +454,7 @@ class HdlCodeCheckerBase(object):
             pool = ThreadPool()
 
             static_check = pool.apply_async(
-                getStaticMessages, args=(source.getSourceContent().split('\n'), ))
+                getStaticMessages, args=(source.getRawSourceContent().split('\n'), ))
 
             if self._isBuilderCallable():
                 builder_check = pool.apply_async(self._getBuilderMessages,
@@ -466,7 +466,7 @@ class HdlCodeCheckerBase(object):
             pool.terminate()
             pool.join()
         else:
-            records = getStaticMessages(source.getSourceContent().split('\n'))
+            records = getStaticMessages(source.getRawSourceContent().split('\n'))
             if self._isBuilderCallable():
                 records += self._getBuilderMessages(source, batch_mode)
 

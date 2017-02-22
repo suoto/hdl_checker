@@ -67,6 +67,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
             '_cache' : self._cache,
             '_mtime' : self._mtime,
             'filetype' : self.filetype}
+        if 'raw_content' in state['_cache']:
+            del state['_cache']['raw_content']
         return state
 
     @classmethod
@@ -178,6 +180,21 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
             self._mtime = self.getmtime()
 
         return self._content
+
+    def getRawSourceContent(self):
+        """
+        Gets the whole source content, without removing comments or
+        other preprocessing
+        """
+        self._clearCachesIfChanged()
+
+        if self._buffer_content is not None:
+            return self._buffer_content
+        if 'raw_content' not in self._cache or self._changed():
+            self._cache['raw_content'] = \
+                open(self.filename, mode='rb').read().decode(errors='ignore')
+
+        return self._cache['raw_content']
 
     def getDesignUnits(self):
         """
