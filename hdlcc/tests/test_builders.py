@@ -60,6 +60,7 @@ with such.A("builder object") as it:
 
             cls = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
             it.builder = cls('._%s' % it.BUILDER_NAME)
+            it.cls = cls
 
         @it.has_teardown
         def teardown():
@@ -71,6 +72,10 @@ with such.A("builder object") as it:
         @it.should('pass environment check')
         def test():
             it.builder.checkEnvironment()
+
+        @it.should('should be available')
+        def test():
+            it.assertTrue(it.cls.isAvailable())
 
         @it.should('not fail when creating the same library multiple times')
         def test():

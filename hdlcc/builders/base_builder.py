@@ -133,7 +133,7 @@ class BaseBuilder(object):
         return state
 
     @staticmethod
-    def isAvailable():
+    def isAvailable():  # pragma: no-cover
         """
         Method that should be overriden by child classes and return True
         if the given builder is available on the current environment

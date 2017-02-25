@@ -59,6 +59,8 @@ def _getServerByProjectFile(project_file):
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
+    if isinstance(project_file, str) and project_file.lower() == 'none':
+        project_file = None
     try:
         return _hdlcc_objects[project_file]
     except KeyError:
@@ -165,15 +167,8 @@ def getMessagesByPath():
     _logger.debug("Getting messages for '%s', '%s', %s", project_file, path,
                   "no content" if content is None else "with content")
 
-
     server = _getServerByProjectFile(project_file)
-    response = {}
-    if content is None:
-        response['messages'] = server.getMessagesByPath(path)
-    else:
-        response['messages'] = server.getMessagesWithText(path, content)
-
-    return response
+    return {'messages': server.getMessagesByPath(path)}
 
 @app.post('/get_ui_messages')
 @_exceptionWrapper
@@ -239,6 +234,8 @@ def getDependencies():
     content = []
     for dependency in source.getDependencies():
         content.append("%s.%s" % (dependency['library'], dependency['unit']))
+
+    _logger.debug("Found %d dependencies", len(content))
 
     return {'dependencies' : content}
 

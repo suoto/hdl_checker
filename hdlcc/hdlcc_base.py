@@ -487,6 +487,13 @@ class HdlCodeCheckerBase(object):
         messages = self.getMessagesBySource(source)
         source.clearBufferContent()
 
+        # Some messages may not include the filename field when checking a
+        # file by content. In this case, we'll assume the empty filenames
+        # refer to the same filename we got in the first place
+        for message in messages:
+            if message['filename'] is None:
+                message['filename'] = path
+
         return messages + remarks
 
     def getSources(self):

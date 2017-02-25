@@ -241,7 +241,7 @@ class MSim(BaseBuilder):
                           p.abspath(_modelsim_ini))
 
         modelsim_env = os.environ.get('MODELSIM')
-        if modelsim_env is not None:
+        if modelsim_env is not None:  # pragma: no-cover
             self._logger.info("MODELSIM environment variable set to %s, using "
                               "this path as default modelsim.ini",
                               modelsim_env)
