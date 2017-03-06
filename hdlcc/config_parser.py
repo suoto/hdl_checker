@@ -137,9 +137,9 @@ class ConfigParser(object):
             return
 
         import vunit  # pylint: disable=import-error
+        logging.getLogger('vunit').setLevel(logging.WARNING)
 
         self._logger.info("VUnit installation found")
-        #  logging.getLogger('vunit').setLevel(logging.ERROR)
 
         builder_class = getBuilderByName(self.getBuilder())
 
@@ -464,7 +464,6 @@ class ConfigParser(object):
 
         # If the source should be built, return the build info for it
         if self._shouldAddSource(path, library, flags_set):
-            self._logger.debug("Adding source: lib '%s', '%s'", library, path)
             return {'filename' : path, 'library' : library, 'flags' : flags_set}
 
     def _shouldAddSource(self, source_path, library, flags):
