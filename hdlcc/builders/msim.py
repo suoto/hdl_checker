@@ -175,6 +175,9 @@ class MSim(BaseBuilder):
                                filetype, path)
 
     def _getExtraFlags(self, lang):
+        """
+        Gets extra flags configured for the specific language
+        """
         libs = []
         for library in self._added_libraries + self._external_libraries[lang]:
             libs = ['-L', library]
@@ -224,6 +227,9 @@ class MSim(BaseBuilder):
             raise
 
     def _iniFileExists(self):
+        """
+        Checks if the modelsim.ini file exists at the expected location
+        """
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         return p.exists(_modelsim_ini)
