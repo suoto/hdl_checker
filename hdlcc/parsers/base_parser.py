@@ -98,14 +98,11 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
             return False
 
         for attr in ('filename', 'library', 'flags', 'filetype', 'abspath'):
-            if not hasattr(other, attr):
-                #  _logger.warning("Other has no %s attribute", attr)
+            if not hasattr(other, attr):  # pragma: no cover
                 return False
             if getattr(self, attr) != getattr(other, attr):
-                #  _logger.warning("Attribute %s differs", attr)
                 return False
 
-        #  _logger.warning("%s matches %s", repr(self), repr(other))
         return True
 
     def __ne__(self, other):

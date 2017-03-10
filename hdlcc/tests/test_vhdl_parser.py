@@ -179,6 +179,25 @@ with such.A('VHDL source file object') as it:
                  {'unit': 'package_with_constants', 'library': 'work'}],
                 dependencies)
 
+        @it.should('report as equal after recovering from cache')
+        def test():
+            state = it.source.getState()
+            cls = type(it.source)
+            recovered = cls.recoverFromState(state)
+            it.assertEqual(it.source, recovered, "Sources are not equal")
+
+        @it.should('report different sources as not equal')
+        def test():
+            state = it.source.getState()
+            other = VhdlParser('other.vhd')
+            it.assertNotEqual(it.source, other, "Sources should not be equal")
+
+        @it.should('not fail when comparing with misc types')
+        def test():
+            it.assertNotEqual(it.source, "string")
+            it.assertNotEqual(it.source, 10)
+            it.assertNotEqual(it.source, None)
+
     with it.having('a package code'):
         @it.has_setup
         def setup():
@@ -242,6 +261,7 @@ with such.A('VHDL source file object') as it:
         @it.should('return source modification time')
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
+
 
 it.createTests(globals())
 

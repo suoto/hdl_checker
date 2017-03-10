@@ -221,14 +221,16 @@ def getFileType(filename):
         return 'vhdl'
     if extension == 'v':
         return 'verilog'
-    if extension in ('sv', 'svh'):
+    if extension in ('sv', 'svh'):  # pragma: no cover
         return 'systemverilog'
-    assert False, "Unknown file type: '%s'" % extension
-
+    assert False, "Unknown file type: '%s'" % extension  # pragma: no cover
 
 if not hasattr(p, 'samefile'):
     def samefile(file1, file2):
-        "Emulated version of os.path.samefile"
+        """
+        Emulated version of os.path.samefile. This is needed for Python
+        2.7 running on Windows (at least on Appveyor CI)
+        """
         return os.stat(file1) == os.stat(file2)
 else:
     samefile = p.samefile # pylint: disable=invalid-name
@@ -267,7 +269,7 @@ def removeDuplicates(seq):
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 # Copied from ycmd
-def toBytes(value):
+def toBytes(value):  # pragma: no cover
     """
     Consistently returns the new bytes() type from python-future.
     Assumes incoming strings are either UTF-8 or unicode (which is
