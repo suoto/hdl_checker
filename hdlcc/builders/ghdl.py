@@ -90,7 +90,7 @@ class GHDL(BaseBuilder):
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['ghdl', '--version'])
         self._version = \
-                re.findall(r"(?<=GHDL)\s+([\w\.]+)\s+", \
+                re.findall(r"(?<=GHDL)\s+([^\s]+)\s+", \
                 stdout[0])[0]
         self._logger.info("GHDL version string: '%s'. " + \
                 "Version number is '%s'", \
