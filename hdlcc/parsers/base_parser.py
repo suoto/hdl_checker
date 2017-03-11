@@ -51,7 +51,9 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
+
         self._prev = None
+
         self.abspath = p.abspath(filename)
 
     def getState(self):
@@ -122,7 +124,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         provided by p.getmtime
         """
         if self.getmtime() > self._mtime:
-            _logger.debug("File '%s' has changed", self.filename)
             return True
         return False
 
@@ -186,7 +187,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         buffer_dump_path = self.getDumpPath()
         _logger.debug("Dumping buffer content to '%s'", buffer_dump_path)
         open(buffer_dump_path, 'w').write(self._content)
-        return buffer_dump_path
 
     def _clearBufferContent(self):
         """
@@ -204,6 +204,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
         Cached version of the _getSourceContent method
         """
+
         self._clearCachesIfChanged()
 
         if self._content is None:
@@ -221,7 +222,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
 
         if self.hasBufferContent():
             return self._content
-
         if 'raw_content' not in self._cache or self._changed():
             self._cache['raw_content'] = \
                 open(self.filename, mode='rb').read().decode(errors='ignore')
