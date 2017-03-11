@@ -606,6 +606,8 @@ with such.A("hdlcc project") as it:
             _logger.debug("Records received:")
             for record in records:
                 _logger.debug("- %s", record)
+            else:
+                _logger.warning("No records found")
 
             # Check that all records point to the original filename and
             # remove them from the records so it's easier to compare

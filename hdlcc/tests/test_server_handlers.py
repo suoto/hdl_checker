@@ -355,35 +355,35 @@ with such.A("hdlcc bottle app") as it:
 
     # TODO: This test has side effects and makes other tests fail. Skip
     #       it for now
-    #  @it.should("get messages with content")
-    #  def test():
-    #      data = {
-    #          'project_file' : it.PROJECT_FILE,
-    #          'path'         : p.join(
-    #              VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'),
-    #          'content'      : '-- TODO: Nothing to see here'}
+    @it.should("get messages with content")
+    def test():
+        data = {
+            'project_file' : it.PROJECT_FILE,
+            'path'         : p.join(
+                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'),
+            'content'      : '-- TODO: Nothing to see here'}
 
-    #      ui_reply = it.app.post('/get_ui_messages', data)
-    #      reply = it.app.post('/get_messages_by_path', data)
+        ui_reply = it.app.post('/get_ui_messages', data)
+        reply = it.app.post('/get_messages_by_path', data)
 
-    #      _logger.info("UI reply: %s", ui_reply)
-    #      _logger.info("Reply: %s", reply)
+        _logger.info("UI reply: %s", ui_reply)
+        _logger.info("Reply: %s", reply)
 
-    #      messages = reply.json['messages']
+        messages = reply.json['messages']
 
-    #      for message in messages:
-    #          it.assertTrue(utils.samefile(message.pop('filename'),
-    #                                       data['path']))
+        for message in messages:
+            it.assertTrue(utils.samefile(message.pop('filename'),
+                                         data['path']))
 
-    #      it.assertIn(
-    #          {"error_type"    : "W",
-    #           "checker"       : "HDL Code Checker/static",
-    #           "line_number"   : 1,
-    #           "column"        : 4,
-    #           "error_subtype" : "",
-    #           "error_number"  : "0",
-    #           "error_message" : "TODO: Nothing to see here"},
-    #          messages)
+        it.assertIn(
+            {"error_type"    : "W",
+             "checker"       : "HDL Code Checker/static",
+             "line_number"   : 1,
+             "column"        : 4,
+             "error_subtype" : "",
+             "error_number"  : "0",
+             "error_message" : "TODO: Nothing to see here"},
+            messages)
 
     @it.should("get source dependencies")
     @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)

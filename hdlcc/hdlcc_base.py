@@ -483,9 +483,8 @@ class HdlCodeCheckerBase(object):
         self._setupEnvIfNeeded()
 
         source, remarks = self.getSourceByPath(path)
-        source.setBufferContent(content)
-        messages = self.getMessagesBySource(source)
-        source.clearBufferContent()
+        with source.havingBufferContent(content):
+            messages = self.getMessagesBySource(source)
 
         # Some messages may not include the filename field when checking a
         # file by content. In this case, we'll assume the empty filenames

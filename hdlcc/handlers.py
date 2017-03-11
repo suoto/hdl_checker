@@ -168,7 +168,13 @@ def getMessagesByPath():
                   "no content" if content is None else "with content")
 
     server = _getServerByProjectFile(project_file)
-    return {'messages': server.getMessagesByPath(path)}
+    response = {}
+    if content is None:
+        response['messages'] = server.getMessagesByPath(path)
+    else:
+        response['messages'] = server.getMessagesWithText(path, content)
+
+    return response
 
 @app.post('/get_ui_messages')
 @_exceptionWrapper

@@ -17,10 +17,12 @@
 "Base source file parser"
 
 import abc
+import os
 import os.path as p
 import logging
 import re
 import time
+from contextlib import contextmanager
 
 from hdlcc.utils import getFileType, removeDuplicates
 
@@ -49,10 +51,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
-
-        self._buffer_time = None
-        self._buffer_content = None
-
+        self._prev = None
         self.abspath = p.abspath(filename)
 
     def getState(self):
@@ -83,8 +82,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         obj.flags = state['flags']
         obj._cache = state['_cache']
         obj._content = None
-        obj._buffer_time = None
-        obj._buffer_content = None
+        obj._prev = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
@@ -123,7 +121,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         Checks if the file changed based on the modification time
         provided by p.getmtime
         """
-        return self.getmtime() > self._mtime
+        if self.getmtime() > self._mtime:
+            _logger.debug("File '%s' has changed", self.filename)
+            return True
+        return False
 
     def _clearCachesIfChanged(self):
         """
@@ -131,45 +132,77 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         every parsed info
         """
         if self._changed():
-            self._content = None
+            # Since the content was set by the caller, we can't really clear
+            # this unless we're handling with a proper file
+            if not self.hasBufferContent():  # pragma: no cover
+                self._content = None
             self._cache = {}
 
     def getmtime(self):
         """
         Gets file modification time as defined in p.getmtime
         """
-        if self._buffer_time is not None:
-            return self._buffer_time
+        if self.hasBufferContent():
+            return 0
         if not p.exists(self.filename):
             return None
         return p.getmtime(self.filename)
 
-    def setBufferContent(self, content):
-        self._buffer_content = content
-        self._buffer_time = time.time()
+    @contextmanager
+    def havingBufferContent(self, content):
+        """
+        Context manager for handling a source file with a custom content
+        that is different from the file it points to. This is intended to
+        allow as-you-type checking
+        """
+        self._setBufferContent(content)
+        yield
+        self._clearBufferContent()
+
+    def getDumpPath(self):
+        """
+        Returns the dump path in use while inside the havingBufferContent
+        context
+        """
+        return p.join(p.dirname(self.filename), '.dump_' +
+                      p.basename(self.filename))
 
     def hasBufferContent(self):
-        return self._buffer_content is not None
+        """
+        Returns true whenever the source is inside the havingBufferContent
+        context
+        """
+        return self._prev is not None
 
-    def dumpBufferContentToFile(self):
-        buffer_dump_path = p.join(p.dirname(self.filename), '.dump_' +
-                                  p.basename(self.filename))
-        open(buffer_dump_path, 'w').write(self._buffer_content)
-        return buffer_dump_path
+    def _setBufferContent(self, content):
+        """
+        Setup portion of the havingBufferContent context
+        """
+        _logger.debug("Setting source content")
+        self._prev = (self._mtime, self._content)
+        self._content = content
+        self._mtime = time.time()
 
-    def clearBufferContent(self):
-        self._buffer_time = None
-        self._buffer_content = None
+        buffer_dump_path = self.getDumpPath()
+        _logger.debug("Dumping buffer content to '%s'", buffer_dump_path)
+        open(buffer_dump_path, 'w').write(self._content)
+
+    def _clearBufferContent(self):
+        """
+        Tear down portion of the havingBufferContent context
+        """
+        _logger.debug("Clearing buffer content")
+        buffer_dump_path = self.getDumpPath()
+        if p.exists(buffer_dump_path):
+            os.remove(buffer_dump_path)
+
+        self._mtime, self._content = self._prev
+        self._prev = None
 
     def getSourceContent(self):
         """
         Cached version of the _getSourceContent method
         """
-        if self._buffer_content is not None:
-            if self._changed():
-                self._cache = {}
-            return self._buffer_content
-
         self._clearCachesIfChanged()
 
         if self._content is None:
@@ -185,8 +218,9 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
         self._clearCachesIfChanged()
 
-        if self._buffer_content is not None:
-            return self._buffer_content
+        if self.hasBufferContent():
+            return self._content
+
         if 'raw_content' not in self._cache or self._changed():
             self._cache['raw_content'] = \
                 open(self.filename, mode='rb').read().decode(errors='ignore')

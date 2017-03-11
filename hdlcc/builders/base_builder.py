@@ -276,7 +276,7 @@ class BaseBuilder(object):
         # content, so we dump the buffer content to a temporary file
         # and tell the compiler to compile it instead
         if source.hasBufferContent():
-            build_path = source.dumpBufferContentToFile()
+            build_path = source.getDumpPath()
             self._logger.debug("Source has buffered content, using %s",
                                build_path)
         else:
