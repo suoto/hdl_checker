@@ -29,7 +29,7 @@ from threading import Timer
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
 
-def _setupPaths():
+def _setupPaths():  # pragma: no cover
     "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
     for path in (
@@ -97,7 +97,6 @@ def openForStdHandle(filepath):
     if PY2:
         return open(filepath, mode='wb', buffering=0)
     return open(filepath, mode='w', buffering=1)
-
 
 def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     "Redirect stdout and stderr to files"

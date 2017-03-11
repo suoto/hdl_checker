@@ -34,6 +34,7 @@ except ImportError:  # Python 2.x
 
 import hdlcc
 import hdlcc.handlers as handlers
+import hdlcc.utils as utils
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
@@ -70,6 +71,10 @@ with such.A("hdlcc bottle app") as it:
         build_folder = p.join(VIM_HDL_EXAMPLES, '.build')
         if p.exists(build_folder):
             shutil.rmtree(build_folder)
+
+        cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
+        if p.exists(cache):
+            shutil.rmtree(cache)
 
         if p.exists('xvhdl.pb'):
             os.remove('xvhdl.pb')
@@ -316,15 +321,6 @@ with such.A("hdlcc bottle app") as it:
             reply = it.app.post('/shutdown')
             it.assertEqual(pids, [os.getpid(),])
 
-    @it.has_teardown
-    def teardown():
-        if it.BUILDER_PATH:
-            it.patch.stop()
-
-        cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
-        if p.exists(cache):
-            shutil.rmtree(cache)
-
     @it.should("handle buffer visits without crashing")
     @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
     def test():
@@ -356,6 +352,85 @@ with such.A("hdlcc bottle app") as it:
         build_without_buffer_visit()
         build_with_buffer_leave()
         build_with_buffer_visit()
+
+    # TODO: This test has side effects and makes other tests fail. Skip
+    #       it for now
+    #  @it.should("get messages with content")
+    #  def test():
+    #      data = {
+    #          'project_file' : it.PROJECT_FILE,
+    #          'path'         : p.join(
+    #              VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'),
+    #          'content'      : '-- TODO: Nothing to see here'}
+
+    #      ui_reply = it.app.post('/get_ui_messages', data)
+    #      reply = it.app.post('/get_messages_by_path', data)
+
+    #      _logger.info("UI reply: %s", ui_reply)
+    #      _logger.info("Reply: %s", reply)
+
+    #      messages = reply.json['messages']
+
+    #      for message in messages:
+    #          it.assertTrue(utils.samefile(message.pop('filename'),
+    #                                       data['path']))
+
+    #      it.assertIn(
+    #          {"error_type"    : "W",
+    #           "checker"       : "HDL Code Checker/static",
+    #           "line_number"   : 1,
+    #           "column"        : 4,
+    #           "error_subtype" : "",
+    #           "error_number"  : "0",
+    #           "error_message" : "TODO: Nothing to see here"},
+    #          messages)
+
+    @it.should("get source dependencies")
+    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    def test():
+        data = {
+            'project_file' : it.PROJECT_FILE,
+            'path'         : p.join(
+                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+
+        for _ in range(10):
+            ui_reply = it.app.post('/get_ui_messages', data)
+            reply = it.app.post('/get_dependencies', data)
+
+            _logger.info("UI reply: %s", ui_reply)
+            _logger.info("Reply: %s", reply)
+
+        dependencies = reply.json['dependencies']
+
+        _logger.info("Dependencies: %s", ', '.join(dependencies))
+
+        it.assertItemsEqual(
+            ["ieee.std_logic_1164",
+             "ieee.numeric_std",
+             "basic_library.clock_divider"],
+            dependencies)
+
+    @it.should("get source build sequence")
+    def test():
+        data = {
+            'project_file' : it.PROJECT_FILE,
+            'path'         : p.join(
+                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+
+        reply = it.app.post('/get_build_sequence', data)
+
+        sequence = reply.json['sequence']
+
+        _logger.info("Sequence: %s", sequence)
+
+        if it.BUILDER_NAME:
+            it.assertEquals(
+                [p.join(VIM_HDL_EXAMPLES, 'basic_library', 'very_common_pkg.vhd'),
+                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'package_with_constants.vhd'),
+                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')],
+                sequence)
+        else:
+            it.assertEquals([], sequence, "%s error" % it.BUILDER_NAME)
 
 it.createTests(globals())
 

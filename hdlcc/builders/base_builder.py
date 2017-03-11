@@ -132,6 +132,14 @@ class BaseBuilder(object):
         del state['_lock']
         return state
 
+    @staticmethod
+    def isAvailable():  # pragma: no cover
+        """
+        Method that should be overriden by child classes and return True
+        if the given builder is available on the current environment
+        """
+        raise NotImplementedError
+
     def checkEnvironment(self):
         """
         Sanity environment check for child classes. Any exception raised
@@ -159,6 +167,7 @@ class BaseBuilder(object):
 
     def _getRebuilds(self, source, line):
         """
+        Gets info on what should be rebuilt to satisfy the builder
         """
         try:
             parse_results = self._searchForRebuilds(line)
@@ -267,7 +276,7 @@ class BaseBuilder(object):
         # content, so we dump the buffer content to a temporary file
         # and tell the compiler to compile it instead
         if source.hasBufferContent():
-            build_path = source.dumpBufferContentToFile()
+            build_path = source.getDumpPath()
             self._logger.debug("Source has buffered content, using %s",
                                build_path)
         else:

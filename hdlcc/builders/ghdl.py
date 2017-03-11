@@ -96,6 +96,10 @@ class GHDL(BaseBuilder):
                 "Version number is '%s'", \
                 stdout[:-1], self._version)
 
+    @staticmethod
+    def isAvailable():
+        return not os.system('ghdl --version')
+
     def getBuiltinLibraries(self):
         return self._builtin_libraries
 

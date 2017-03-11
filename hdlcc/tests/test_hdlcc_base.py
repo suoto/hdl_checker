@@ -180,7 +180,7 @@ with such.A("hdlcc project") as it:
         path = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                       'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
-        source, remarks = project._getSourceByPath(path)
+        source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
@@ -201,7 +201,7 @@ with such.A("hdlcc project") as it:
             p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.sv'))
     def test(_, path):
         project = StandaloneProjectBuilder()
-        source, remarks = project._getSourceByPath(path)
+        source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VerilogParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
@@ -307,7 +307,7 @@ with such.A("hdlcc project") as it:
             project._config._sources[str(source)] = source
         it.assertEqual(
             [common_dependency, indirect_dependency, direct_dependency],
-            project.getBuildSequence(target_source))
+            project.updateBuildSequenceCache(target_source))
 
     @it.should("not include sources that are not dependencies")
     def test():
@@ -335,7 +335,7 @@ with such.A("hdlcc project") as it:
         for source in (target_source, direct_dependency, not_a_dependency):
             project._config._sources[str(source)] = source
         it.assertEqual([direct_dependency],
-                       project.getBuildSequence(target_source))
+                       project.updateBuildSequenceCache(target_source))
 
     @it.should("handle cases where the source file for a dependency is not found")
     def test():
@@ -351,7 +351,7 @@ with such.A("hdlcc project") as it:
         for source in (target_source, ):
             project._config._sources[str(source)] = source
 
-        it.assertEqual([], project.getBuildSequence(target_source))
+        it.assertEqual([], project.updateBuildSequenceCache(target_source))
 
     @it.should("return empty list when the source has no dependencies")
     def test():
@@ -366,7 +366,7 @@ with such.A("hdlcc project") as it:
         for source in (target_source, ):
             project._config._sources[str(source)] = source
 
-        it.assertEqual([], project.getBuildSequence(target_source))
+        it.assertEqual([], project.updateBuildSequenceCache(target_source))
 
     @it.should("identify ciruclar dependencies")
     def test():
@@ -390,7 +390,7 @@ with such.A("hdlcc project") as it:
             project._config._sources[str(source)] = source
 
         it.assertEqual([direct_dependency, ],
-                       project.getBuildSequence(target_source))
+                       project.updateBuildSequenceCache(target_source))
 
     @it.should("resolve conflicting dependencies by using signature")
     def test():
@@ -425,7 +425,7 @@ with such.A("hdlcc project") as it:
         for source in (target_source, implementation_a, implementation_b):
             project._config._sources[str(source)] = source
 
-        project.getBuildSequence(target_source)
+        project.updateBuildSequenceCache(target_source)
 
         it.assertNotEqual(messages, [])
 
@@ -606,6 +606,8 @@ with such.A("hdlcc project") as it:
             _logger.debug("Records received:")
             for record in records:
                 _logger.debug("- %s", record)
+            else:
+                _logger.warning("No records found")
 
             # Check that all records point to the original filename and
             # remove them from the records so it's easier to compare

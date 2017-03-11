@@ -207,7 +207,7 @@ class HdlCodeCheckerBase(object):
         from HDL Code Checker to the user
         """
 
-    def _getSourceByPath(self, path):
+    def getSourceByPath(self, path):
         """
         Get the source object, flags and any additional info to be displayed
         """
@@ -262,7 +262,7 @@ class HdlCodeCheckerBase(object):
         return sorted(records, key=lambda x: \
                 (x['error_type'], str(x['line_number']), str(x['error_number'])))
 
-    def getBuildSequence(self, source):
+    def updateBuildSequenceCache(self, source):
         """
         Wrapper to _getBuildSequence passing the initial build sequence
         list empty and caching the result
@@ -287,11 +287,16 @@ class HdlCodeCheckerBase(object):
             cached_sequence = self._build_sequence_cache[key]['sequence']
             cached_timestamp = self._build_sequence_cache[key]['timestamp']
             if cached_sequence:
-                current_timestamp = max([x.getmtime() for x in cached_sequence])
+                current_timestamp = max([x.getmtime() for x in cached_sequence]
+                                        + [source.getmtime()])
             else:
                 current_timestamp = 0
+
             if current_timestamp > cached_timestamp:
+                self._logger.debug("Timestamp change, rescanning build "
+                                   "sequence")
                 build_sequence = []
+                self._getBuildSequence(source, build_sequence)
                 self._build_sequence_cache[key] = {
                     'sequence': build_sequence,
                     'timestamp' : current_timestamp}
@@ -351,7 +356,7 @@ class HdlCodeCheckerBase(object):
         self._logger.info("Building '%s', batch_mode = %s",
                           str(source.filename), batch_mode)
 
-        build_sequence = self.getBuildSequence(source)
+        build_sequence = self.updateBuildSequenceCache(source)
 
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
@@ -395,7 +400,7 @@ class HdlCodeCheckerBase(object):
         for rebuild in rebuilds:
             self._logger.debug("Rebuild hint: '%s'", rebuild)
             if 'rebuild_path' in rebuild:
-                rebuild_sources = [self._getSourceByPath(rebuild['rebuild_path'])[0]]
+                rebuild_sources = [self.getSourceByPath(rebuild['rebuild_path'])[0]]
             else:
                 unit_name = rebuild.get('unit_name', None)
                 library_name = rebuild.get('library_name', None)
@@ -432,7 +437,7 @@ class HdlCodeCheckerBase(object):
         """
         self._setupEnvIfNeeded()
 
-        source, remarks = self._getSourceByPath(path)
+        source, remarks = self.getSourceByPath(path)
         return self._sortBuildMessages(
             self.getMessagesBySource(source, *args, **kwargs) + remarks)
 
@@ -449,7 +454,7 @@ class HdlCodeCheckerBase(object):
             pool = ThreadPool()
 
             static_check = pool.apply_async(
-                getStaticMessages, args=(source.getSourceContent().split('\n'), ))
+                getStaticMessages, args=(source.getRawSourceContent().split('\n'), ))
 
             if self._isBuilderCallable():
                 builder_check = pool.apply_async(self._getBuilderMessages,
@@ -461,7 +466,7 @@ class HdlCodeCheckerBase(object):
             pool.terminate()
             pool.join()
         else:
-            records = getStaticMessages(source.getSourceContent().split('\n'))
+            records = getStaticMessages(source.getRawSourceContent().split('\n'))
             if self._isBuilderCallable():
                 records += self._getBuilderMessages(source, batch_mode)
 
@@ -477,10 +482,16 @@ class HdlCodeCheckerBase(object):
 
         self._setupEnvIfNeeded()
 
-        source, remarks = self._getSourceByPath(path)
-        source.setBufferContent(content)
-        messages = self.getMessagesBySource(source)
-        source.clearBufferContent()
+        source, remarks = self.getSourceByPath(path)
+        with source.havingBufferContent(content):
+            messages = self.getMessagesBySource(source)
+
+        # Some messages may not include the filename field when checking a
+        # file by content. In this case, we'll assume the empty filenames
+        # refer to the same filename we got in the first place
+        for message in messages:
+            if message['filename'] is None:
+                message['filename'] = path
 
         return messages + remarks
 
@@ -498,8 +509,8 @@ class HdlCodeCheckerBase(object):
         checked, so the overall wait time is reduced
         """
         self._setupEnvIfNeeded()
-        source, _ = self._getSourceByPath(path)
-        _ = self.getBuildSequence(source)
+        source, _ = self.getSourceByPath(path)
+        self.updateBuildSequenceCache(source)
 
     def onBufferLeave(self, _):
         """

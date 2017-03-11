@@ -124,13 +124,13 @@ class StandaloneProjectBuilder(hdlcc.hdlcc_base.HdlCodeCheckerBase):
     """Implementation of standalone hdlcc.hdlcc_base.HdlCodeCheckerBase
     to run via shell"""
     _ui_logger = logging.getLogger('UI')
-    def _handleUiInfo(self, message):
+    def _handleUiInfo(self, message):  # pragma: no cover
         self._ui_logger.info(message)
 
-    def _handleUiWarning(self, message):
+    def _handleUiWarning(self, message):  # pragma: no cover
         self._ui_logger.warning(message)
 
-    def _handleUiError(self, message):
+    def _handleUiError(self, message):  # pragma: no cover
         self._ui_logger.error(message)
 
 def runStandaloneSourceFileParse(fname):

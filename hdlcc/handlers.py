@@ -59,6 +59,8 @@ def _getServerByProjectFile(project_file):
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
+    if isinstance(project_file, str) and project_file.lower() == 'none':
+        project_file = None
     try:
         return _hdlcc_objects[project_file]
     except KeyError:
@@ -165,15 +167,8 @@ def getMessagesByPath():
     _logger.debug("Getting messages for '%s', '%s', %s", project_file, path,
                   "no content" if content is None else "with content")
 
-
     server = _getServerByProjectFile(project_file)
-    response = {}
-    if content is None:
-        response['messages'] = server.getMessagesByPath(path)
-    else:
-        response['messages'] = server.getMessagesWithText(path, content)
-
-    return response
+    return {'messages': server.getMessagesByPath(path)}
 
 @app.post('/get_ui_messages')
 @_exceptionWrapper
@@ -222,6 +217,44 @@ def shutdownServer():
     """
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
+
+@app.post('/get_dependencies')
+@_exceptionWrapper
+def getDependencies():
+    """
+    Returns the direct dependencies of a given source path
+    """
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+
+    _logger.debug("Getting dependencies for '%s', '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    source, _ = server.getSourceByPath(path)
+    content = []
+    for dependency in source.getDependencies():
+        content.append("%s.%s" % (dependency['library'], dependency['unit']))
+
+    _logger.debug("Found %d dependencies", len(content))
+
+    return {'dependencies' : content}
+
+@app.post('/get_build_sequence')
+@_exceptionWrapper
+def getBuildSequence():
+    """
+    Returns the build sequence of a given source path
+    """
+    project_file = bottle.request.forms.get('project_file')
+    path = bottle.request.forms.get('path')
+
+    _logger.debug("Getting build sequence for '%s', '%s'", project_file, path)
+
+    server = _getServerByProjectFile(project_file)
+    source, _ = server.getSourceByPath(path)
+
+    return {'sequence' : [x.filename for x in
+                          server.updateBuildSequenceCache(source)]}
 
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name

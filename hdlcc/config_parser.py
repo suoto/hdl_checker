@@ -17,7 +17,6 @@
 "Configuration file parser"
 
 import os.path as p
-import shutil
 import re
 import logging
 from threading import Lock
@@ -137,15 +136,15 @@ class ConfigParser(object):
         if not foundVunit() or self._parms['builder'] == 'fallback':
             return
 
-        import vunit
+        import vunit  # pylint: disable=import-error
+        logging.getLogger('vunit').setLevel(logging.WARNING)
 
         self._logger.info("VUnit installation found")
-        #  logging.getLogger('vunit').setLevel(logging.ERROR)
 
         builder_class = getBuilderByName(self.getBuilder())
 
         if 'systemverilog' in builder_class.file_types:
-            from vunit.verilog import VUnit
+            from vunit.verilog import VUnit    # pylint: disable=import-error
             self._logger.debug("Builder supports Verilog, "
                                "using vunit.verilog.VUnit")
             builder_class.addExternalLibrary('verilog', 'vunit_lib')
@@ -154,7 +153,7 @@ class ConfigParser(object):
                                   'include'))
             self._importVunitFiles(VUnit)
 
-        from vunit import VUnit
+        from vunit import VUnit  # pylint: disable=import-error
         self._importVunitFiles(VUnit)
 
     def _importVunitFiles(self, vunit_module):
@@ -307,8 +306,8 @@ class ConfigParser(object):
         # to speed up parsing (important especially for libraries with
         # many files. The multiprocessing.Pool class used to hang, so
         # watch out if this behaves well enough to be used
+        self._logger.info("Adding %d sources", len(source_build_list))
         for source in getSourceFileObjects(source_build_list):
-            self._logger.debug("Adding source %s", source)
             self._sources[source.filename] = source
 
         self._cleanUpSourcesList(source_path_list)
@@ -339,23 +338,17 @@ class ConfigParser(object):
         If no builder was specified, try to find one that works using
         a dummy target dir
         """
-        target_dir = '.dummy'
         builder_class = None
         self._logger.debug("Searching for builder among %s",
                            AVAILABLE_BUILDERS)
         for builder_class in AVAILABLE_BUILDERS:
             if builder_class.builder_name == 'fallback':
                 continue
-            try:
-                builder_class(target_dir)
+            if builder_class.isAvailable():
                 break
-            except hdlcc.exceptions.SanityCheckError:
-                self._logger.debug("Builder '%s' failed",
-                                   builder_class.builder_name)
+            else:
+                self._logger.debug("'%s' failed", builder_class.builder_name)
                 continue
-            finally:
-                if p.exists(target_dir): # pragma: no cover
-                    shutil.rmtree(target_dir)
 
         if builder_class is not None:
             self._logger.info("Builder '%s' has worked",
@@ -471,7 +464,6 @@ class ConfigParser(object):
 
         # If the source should be built, return the build info for it
         if self._shouldAddSource(path, library, flags_set):
-            self._logger.debug("Adding source: lib '%s', '%s'", library, path)
             return {'filename' : path, 'library' : library, 'flags' : flags_set}
 
     def _shouldAddSource(self, source_path, library, flags):

@@ -19,6 +19,7 @@
 import os
 import os.path as p
 import re
+from shutil import copyfile
 from .base_builder import BaseBuilder
 from hdlcc.utils import getFileType
 
@@ -130,6 +131,11 @@ class MSim(BaseBuilder):
                 "Version number is '%s'", \
                 stdout, self._version)
 
+    @staticmethod
+    def isAvailable():
+        return ((not os.system('vcom -version')) and
+                (not os.system('vlog -version')))
+
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
         if not self._iniFileExists():
@@ -169,6 +175,9 @@ class MSim(BaseBuilder):
                                filetype, path)
 
     def _getExtraFlags(self, lang):
+        """
+        Gets extra flags configured for the specific language
+        """
         libs = []
         for library in self._added_libraries + self._external_libraries[lang]:
             libs = ['-L', library]
@@ -218,6 +227,9 @@ class MSim(BaseBuilder):
             raise
 
     def _iniFileExists(self):
+        """
+        Checks if the modelsim.ini file exists at the expected location
+        """
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         return p.exists(_modelsim_ini)
@@ -226,7 +238,6 @@ class MSim(BaseBuilder):
         """
         Adds a library to a non-existent ModelSim init file
         """
-
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         if not p.exists(self._target_folder):  # pragma: no cover
@@ -235,24 +246,32 @@ class MSim(BaseBuilder):
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
 
-        cwd = p.abspath(os.curdir)
-        self._logger.debug("Current dir is %s, changing to %s",
-                           cwd, self._target_folder)
-        os.chdir(self._target_folder)
-        if cwd == os.curdir: # pragma: no cover
-            self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
-            assert 0
+        modelsim_env = os.environ.get('MODELSIM')
+        if modelsim_env is not None:  # pragma: no cover
+            self._logger.info("MODELSIM environment variable set to %s, using "
+                              "this path as default modelsim.ini",
+                              modelsim_env)
+            # Copy the modelsim.ini as indicated by the MODELSIM environment
+            # variable
+            copyfile(modelsim_env, _modelsim_ini)
+        else:
+            cwd = p.abspath(os.curdir)
+            self._logger.debug("Current dir is %s, changing to %s",
+                               cwd, self._target_folder)
+            os.chdir(self._target_folder)
+            if cwd == os.curdir: # pragma: no cover
+                self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
+                assert 0
 
+            self._subprocessRunner(['vmap', '-c'])
 
-        self._subprocessRunner(['vmap', '-c'])
+            self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
+            for _dir in os.listdir(p.abspath(os.curdir)):
+                self._logger.debug("- '%s'", _dir)
 
-        self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
-        for _dir in os.listdir(p.abspath(os.curdir)):
-            self._logger.debug("- '%s'", _dir)
-
-        self._logger.debug("Current dir is %s, changing to %s",
-                           p.abspath(os.curdir), cwd)
-        os.chdir(cwd)
+            self._logger.debug("Current dir is %s, changing to %s",
+                               p.abspath(os.curdir), cwd)
+            os.chdir(cwd)
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
