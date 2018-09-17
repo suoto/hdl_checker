@@ -17,3 +17,4 @@ six==1.10.0
 testfixtures==4.10.0
 vunit-hdl==0.66.0
 WebTest==2.0.23
+rainbow_logging_handler==2.2.2
