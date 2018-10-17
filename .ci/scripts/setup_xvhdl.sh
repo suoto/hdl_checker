@@ -30,7 +30,7 @@ XVHDL_TGZ="${CACHE_DIR}/xvhdl.tar.bz2"
 
 if [ ! -f "${XVHDL_TGZ}.gpg" -a -n "${XVHDL_URL}" ]; then
   trap "rm -f -- '$PASS_FILE'" EXIT
-  wget --no-check-certificate --verbose "${XVHDL_URL}" -O "${XVHDL_TGZ}.gpg"
+  wget --no-check-certificate --quiet "${XVHDL_URL}" -O "${XVHDL_TGZ}.gpg"
   trap - EXIT
 fi
 

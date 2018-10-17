@@ -29,7 +29,7 @@ mkdir -p ${INSTALLATION_DIR}
 # CWD=$(pwd)
 
 if [ ! -f "${GHDL_TAR_GZ}" ]; then
-  wget ${URL} -O ${GHDL_TAR_GZ}
+  wget ${URL} -O ${GHDL_TAR_GZ} --quiet
 fi
 
 if [ ! -d "${INSTALLATION_DIR}/bin" ]; then

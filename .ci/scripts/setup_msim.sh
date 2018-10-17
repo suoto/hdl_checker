@@ -29,7 +29,7 @@ CWD=$(pwd)
 # cd ${CACHE_DIR}
 
 if [ ! -f "${MSIM_INSTALLER}" ]; then
-  wget ${URL} -O ${MSIM_INSTALLER}
+  wget ${URL} -O ${MSIM_INSTALLER} --quiet
   chmod +x ${MSIM_INSTALLER}
   ${MSIM_INSTALLER} --help
 fi
