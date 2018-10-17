@@ -28,7 +28,7 @@ setup(
     author_email     = 'andre820@gmail.com',
     url              = 'https://github.com/suoto/hdlcc',
     license          = 'GPLv3',
-    packages         = ['hdlcc', 'hdlcc.builders'],
+    packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers'],
     install_requires = ['argcomplete', 'argparse', 'prettytable',],
     cmdclass         = versioneer.get_cmdclass(),
     entry_points={
