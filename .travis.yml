@@ -36,11 +36,12 @@ env:
 # # Alternative to the above, but forces the usage of previous infrastructure,
 # # which is painfuly low in comparison to the container based architecture
 # sudo: required
+# sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch;
 
 before_install:
   - if [ "$BUILDER" == "msim" ]; then
       sudo apt-get update -qq;
-      sudo apt-get install -qq libgd-dev;
+      sudo apt-get install -qq libgd-dev libtcl8.5;
     fi
 
 before_script:
