@@ -12,7 +12,7 @@ nose2-cov==1.0a4
 nose2==0.6.5
 pbr==1.10.0
 prettytable==0.7.2
-requests==2.10.0
+requests==2.20.0
 six==1.10.0
 testfixtures==4.10.0
 vunit-hdl==0.66.0
