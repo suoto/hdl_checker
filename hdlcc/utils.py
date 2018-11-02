@@ -16,16 +16,16 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
-import sys
+import logging
 import os
 import os.path as p
-import logging
-import signal
-import time
-import subprocess as subp
 import shutil
+import signal
+import subprocess as subp
+import sys
+import time
+from contextlib import contextmanager
 from threading import Lock
-
 
 # Make the serializer transparent
 try:
@@ -310,3 +310,15 @@ def toBytes(value):  # pragma: no cover
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
 
+@contextmanager
+def pushd(new_dir):
+    """
+    Python context to move in and out of directories
+    (source: https://gist.github.com/howardhamilton/537e13179489d6896dd3)
+    """
+    previous_dir = os.getcwd()
+    os.chdir(new_dir)
+    try:
+        yield
+    finally:
+        os.chdir(previous_dir)

@@ -21,7 +21,7 @@ import os.path as p
 import re
 from shutil import copyfile
 from .base_builder import BaseBuilder
-from hdlcc.utils import getFileType
+from hdlcc.utils import getFileType, pushd
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
@@ -255,23 +255,9 @@ class MSim(BaseBuilder):
             # variable
             copyfile(modelsim_env, _modelsim_ini)
         else:
-            cwd = p.abspath(os.curdir)
-            self._logger.debug("Current dir is %s, changing to %s",
-                               cwd, self._target_folder)
-            os.chdir(self._target_folder)
-            if cwd == os.curdir: # pragma: no cover
-                self._logger.fatal("cwd: %s, curdir: %s, error!", cwd, os.curdir)
-                assert 0
-
-            self._subprocessRunner(['vmap', '-c'])
-
-            self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
-            for _dir in os.listdir(p.abspath(os.curdir)):
-                self._logger.debug("- '%s'", _dir)
-
-            self._logger.debug("Current dir is %s, changing to %s",
-                               p.abspath(os.curdir), cwd)
-            os.chdir(cwd)
+            with pushd(self._target_folder):
+                self._subprocessRunner(['vmap', '-c'])
+                self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
