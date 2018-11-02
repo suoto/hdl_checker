@@ -397,8 +397,12 @@ with such.A('config parser object') as it:
             return result
 
         @it.has_setup
-        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+        #  @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def setup():
+            it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
+                                     lambda: False)
+            it.no_vunit.start()
+
             it.project_filename = 'test.prj'
             it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
             it.sources = [
@@ -414,6 +418,7 @@ with such.A('config parser object') as it:
         @it.has_teardown
         def teardown():
             os.remove(it.project_filename)
+            it.no_vunit.stop()
 
         @it.should("Find only the sources given then the extra source")
         def test_01():
@@ -421,7 +426,7 @@ with such.A('config parser object') as it:
             sources_pre = getSourcesFrom()
 
             _logger.info("Paths found:")
-            for source in sources_pre.keys():
+            for source in sources_pre:
                 _logger.info(" - %s", source)
 
             it.assertItemsEqual(
@@ -436,7 +441,7 @@ with such.A('config parser object') as it:
                 [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
 
             _logger.info("Paths found:")
-            for source in sources_post.keys():
+            for source in sources_post:
                 _logger.info(" - %s", source)
 
             it.assertItemsEqual(
@@ -546,7 +551,7 @@ with such.A('config parser object') as it:
                 parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                              'project_wo_builder_wo_target_dir.prj'))
                 for cmd in commands:
-                    _logger.warning('>' + str(cmd))
+                    _logger.warning('> %s', str(cmd))
                 it.assertEquals(parser.getBuilder(), builder.lower())
             finally:
                 for patch in patches:

@@ -596,7 +596,7 @@ class ConfigParser(object):
                                     source.getDesignUnits())
             if not case_sensitive:
                 source_library = source_library.lower()
-                design_unit_names = map(str.lower, design_unit_names)
+                design_unit_names = map(lambda x: x.lower(), design_unit_names)
 
             if source_library == library_name and unit_name in design_unit_names:
                 sources += [source]
