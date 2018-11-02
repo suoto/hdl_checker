@@ -126,4 +126,3 @@ class VhdlParser(BaseSourceFile):
                 design_units.append(unit)
 
         return design_units
-

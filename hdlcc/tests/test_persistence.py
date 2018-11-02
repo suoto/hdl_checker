@@ -264,7 +264,6 @@ with such.A("hdlcc project with persistence") as it:
             _logger.info("Building without cache")
             _buildWithoutCache()
             _logger.info("Restoring original path")
-            #  utils.removeFromPath(it.BUILDER_PATH)
             it.patch.stop()
 
             _logger.info("Building with changed env")

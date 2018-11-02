@@ -336,7 +336,8 @@ class HdlCodeCheckerBase(object):
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
             if dependency == reference:
-                return removeDuplicates(build_sequence)
+                build_sequence = removeDuplicates(build_sequence)
+                return
 
             if dependency not in build_sequence:
                 self._getBuildSequence(dependency, reference=source,
@@ -393,6 +394,8 @@ class HdlCodeCheckerBase(object):
 
         self._handleUiError("Unable to build '%s' after %d attempts" %
                             (source, self._MAX_REBUILD_ATTEMPTS))
+
+        return {}
 
     def _handleRebuilds(self, rebuilds, source):
         """
@@ -521,4 +524,3 @@ class HdlCodeCheckerBase(object):
         Runs actions when leaving a buffer.
         """
         pass
-
