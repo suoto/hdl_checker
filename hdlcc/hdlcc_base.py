@@ -309,9 +309,13 @@ class HdlCodeCheckerBase(object):
         """
         self._logger.debug("Checking build sequence for %s", source)
         for library, unit in self._resolveRelativeNames(source):
-            # Get a list of source files that contains this design unit
+            # Get a list of source files that contains this design unit.
+            # At this point, all the info we have pretty much depends on
+            # parsed text. Since Verilog is case sensitive and VHDL is not,
+            # we need to make sure we've got it right when mapping dependencies
+            # on mixed language projects
             dependencies_list = self._config.discoverSourceDependencies(
-                unit, library)
+                unit, library, case_sensitive=source.filetype != 'vhdl')
 
             if not dependencies_list:
                 continue

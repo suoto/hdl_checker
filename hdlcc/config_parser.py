@@ -575,22 +575,41 @@ class ConfigParser(object):
             return True
         return p.abspath(path) in self._sources.keys()
 
-    def findSourcesByDesignUnit(self, unit, library='work'):
+    def findSourcesByDesignUnit(self, unit, library='work',
+                                case_sensitive=False):
+        """
+        Return the source (or sources) that define the given design
+        unit. Case sensitive mode should be used when tracking
+        dependencies on Verilog files. VHDL should use VHDL
+        """
+        # Default to lower case if we're not handling case sensitive. VHDL
+        # source files are all converted to lower case when parsed, so the
+        # units they define are in lower case already
+        library_name = library if case_sensitive else library.lower()
+        unit_name = unit if case_sensitive else unit.lower()
+
         sources = []
+
         for source in self._sources.values():
-            if source.library == library and unit in [x['name'] for x in
-                                                      source.getDesignUnits()]:
+            source_library = source.library
+            design_unit_names = map(lambda x: x['name'],
+                                    source.getDesignUnits())
+            if not case_sensitive:
+                source_library = source_library.lower()
+                design_unit_names = map(str.lower, design_unit_names)
+
+            if source_library == library_name and unit_name in design_unit_names:
                 sources += [source]
+
         if not sources:
             self._logger.warning("No source file defining '%s.%s'",
                                  library, unit)
         return sources
 
-    def discoverSourceDependencies(self, unit, library):
+    def discoverSourceDependencies(self, unit, library, case_sensitive):
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same
-        name, there is no guarantee that the right one was picked
+        name, there is no guarantee that the right one is selected
         """
-        return self.findSourcesByDesignUnit(unit, library)
-
+        return self.findSourcesByDesignUnit(unit, library, case_sensitive)
