@@ -613,3 +613,4 @@ class ConfigParser(object):
         name, there is no guarantee that the right one is selected
         """
         return self.findSourcesByDesignUnit(unit, library, case_sensitive)
+

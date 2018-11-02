@@ -208,14 +208,40 @@ with such.A('config parser object') as it:
             restored = ConfigParser.recoverFromState(state)
             it.assertEqual(it.parser, restored)
 
-        @it.should("raise hdlcc.exceptions.DesignUnitNotFoundError when "
-                   "a design unit can't be found")
+        @it.should("find the correct source defining a design unit")
         def test():
             it.assertEquals(
                 [], it.parser.findSourcesByDesignUnit('some_unit', 'some_lib'))
 
             sources = it.parser.findSourcesByDesignUnit('sample_package')
             for source in sources:
+                it.assertTrue(
+                    p.exists(source.filename),
+                    "Couldn't find source with path '%s'" % source.filename)
+
+        @it.should("find the correct source defining a design unit when case "
+                   "doesn't match")
+        def test():
+            lower_insensitive = it.parser.findSourcesByDesignUnit(
+                'sample_package', case_sensitive=False)
+            lower_sensitive = it.parser.findSourcesByDesignUnit(
+                'sample_package', case_sensitive=True)
+
+            upper_insensitive = it.parser.findSourcesByDesignUnit(
+                'SAMPLE_PACKAGE', case_sensitive=False)
+            upper_sensitive = it.parser.findSourcesByDesignUnit(
+                'SAMPLE_PACKAGE', case_sensitive=True)
+
+            it.assertNotEqual(lower_insensitive, [])
+            it.assertNotEqual(lower_sensitive, [])
+            it.assertItemsEqual(lower_insensitive, lower_sensitive)
+
+            it.assertNotEqual(upper_insensitive, [])
+            it.assertEquals(upper_sensitive, [])
+
+            it.assertItemsEqual(lower_insensitive, upper_insensitive)
+
+            for source in lower_insensitive:
                 it.assertTrue(
                     p.exists(source.filename),
                     "Couldn't find source with path '%s'" % source.filename)
