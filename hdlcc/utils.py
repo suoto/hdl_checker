@@ -214,16 +214,28 @@ def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
 def onCI():       # pragma: no cover # pylint: disable=missing-docstring
     return 'CI' in os.environ
 
+class UnknownTypeExtension(Exception):
+    """
+    Exception thrown when trying to get the file type of an unknown extension.
+    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
+    """
+    def __init__(self, path):
+        super(UnknownTypeExtension, self).__init__()
+        self._path = path
+
+    def __str__(self):
+        return "Couldn't determine file type for path %s" % self._path
+
 def getFileType(filename):
     "Gets the file type of a source file"
     extension = filename[str(filename).rfind('.') + 1:].lower()
-    if extension in ['vhd', 'vhdl']:
+    if extension in ('vhd', 'vhdl'):
         return 'vhdl'
-    if extension == 'v':
+    if extension in ('v', 'vh'):
         return 'verilog'
     if extension in ('sv', 'svh'):  # pragma: no cover
         return 'systemverilog'
-    assert False, "Unknown file type: '%s'" % extension  # pragma: no cover
+    raise UnknownTypeExtension(filename)
 
 if not hasattr(p, 'samefile'):
     def samefile(file1, file2):
@@ -322,3 +334,13 @@ def pushd(new_dir):
         yield
     finally:
         os.chdir(previous_dir)
+
+def isFileReadable(path):
+    """
+    Checks if a given file is readable
+    """
+    try:
+        open(path, 'r').close()
+        return True
+    except IOError:
+        return False

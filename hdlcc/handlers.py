@@ -26,6 +26,7 @@ import bottle
 import hdlcc
 import hdlcc.utils as utils
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.builders import AVAILABLE_BUILDERS
 
 _logger = logging.getLogger(__name__)
 
@@ -129,6 +130,28 @@ def getDiagnoseInfo():
         _logger.info(" - %s", diag)
 
     return {'info' : response}
+
+@app.post('/get_working_builders')
+@_exceptionWrapper
+def getWorkingBuilders():
+    """
+    Collects misc diagnose info for the clients
+    """
+    _logger.info("Collecting builders that worked")
+
+    builders = []
+
+    for builder_class in AVAILABLE_BUILDERS:
+        if builder_class.builder_name == 'fallback':
+            continue
+        if builder_class.isAvailable():
+            _logger.debug("'%s' worked", builder_class.builder_name)
+            builders.append(builder_class.builder_name)
+        else:
+            _logger.debug("'%s' failed", builder_class.builder_name)
+
+    return {'builders': builders}
+
 
 @app.post('/on_buffer_visit')
 @_exceptionWrapper
