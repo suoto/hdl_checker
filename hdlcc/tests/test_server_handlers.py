@@ -498,12 +498,17 @@ with such.A("hdlcc bottle app") as it:
 
                 it.assertEquals(
                     content[4:],
-                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
-                     'vhdl lib %s/path_a/source_tb.vhd' % it.dummy_test_path,
-                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
-                             % it.dummy_test_path,
-                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
-                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                            'some_source.vhd'),
+                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                            'source_tb.vhd'),
+                     'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                     'path_b',
+                                                     'a_systemverilog_source.sv'),
+                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                               'a_verilog_source.v'),
+                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                            'some_source.vhd')])
 
             elif it.BUILDER_NAME == 'msim':
                 it.assertEqual(
@@ -512,23 +517,27 @@ with such.A("hdlcc bottle app") as it:
                      '# Available builders: %s' % it.BUILDER_NAME,
                      'builder = %s' % it.BUILDER_NAME,
 
-                     'global_build_flags[systemverilog] = ' + \
-                         '+incdir+dummy_test_path/sv_includes',
+                     'global_build_flags[systemverilog] = +incdir+%s' % \
+                         p.join(it.dummy_test_path, 'sv_includes'),
 
-                     'global_build_flags[verilog] = ' + \
-                         '+incdir+dummy_test_path/path_a ' + \
-                         '+incdir+dummy_test_path/v_includes',
-
+                     'global_build_flags[verilog] = +incdir+%s +incdir+%s' % \
+                         (p.join(it.dummy_test_path, 'path_a'),
+                          p.join(it.dummy_test_path, 'v_includes')),
                      ''])
 
                 it.assertEquals(
                     content[6:],
-                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
-                     'vhdl lib %s/path_a/source_tb.vhd -2008' % it.dummy_test_path,
-                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
-                             % it.dummy_test_path,
-                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
-                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                            'some_source.vhd'),
+                     'vhdl lib %s -2008' % p.join(it.dummy_test_path, 'path_a',
+                                            'source_tb.vhd'),
+                     'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                     'path_b',
+                                                     'a_systemverilog_source.sv'),
+                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                               'a_verilog_source.v'),
+                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                            'some_source.vhd')])
             else:
                 # Fallback contents
                 it.assertEqual(content[:3],
@@ -538,11 +547,16 @@ with such.A("hdlcc bottle app") as it:
 
                 it.assertEquals(
                     content[3:],
-                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
-                     'vhdl lib %s/path_a/source_tb.vhd' % it.dummy_test_path,
-                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
-                             % it.dummy_test_path,
-                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
-                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                            'some_source.vhd'),
+                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                            'source_tb.vhd'),
+                     'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                     'path_b',
+                                                     'a_systemverilog_source.sv'),
+                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                               'a_verilog_source.v'),
+                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                            'some_source.vhd')])
 
 it.createTests(globals())
