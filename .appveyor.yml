@@ -42,12 +42,6 @@ environment:
 
   matrix:
     - BUILDER: other
-      PYTHON_VERSION: 27
-    - BUILDER: ghdl
-      PYTHON_VERSION: 27
-    - BUILDER: msim
-      PYTHON_VERSION: 27
-    - BUILDER: other
       PYTHON_VERSION: 35
     - BUILDER: ghdl
       PYTHON_VERSION: 35
