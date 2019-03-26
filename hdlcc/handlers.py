@@ -26,7 +26,7 @@ from multiprocessing import Queue
 import bottle
 import hdlcc
 import hdlcc.utils as utils
-from hdlcc.builders import AVAILABLE_BUILDERS
+from hdlcc.builders import getWorkingBuilders
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
@@ -143,22 +143,9 @@ def runConfigGenerator():
     _logger.info("Running config generator %s(%s, %s)",
                  repr(name), repr(args), repr(kwargs))
 
-    builders = kwargs.get('builders', None)
+    kwargs['builders'] = list(getWorkingBuilders())
 
-    if builders is None:
-        builders = []
-
-        for builder_class in AVAILABLE_BUILDERS:
-            if builder_class.builder_name == 'fallback':
-                continue
-            if builder_class.isAvailable():
-                _logger.debug("'%s' worked", builder_class.builder_name)
-                builders.append(builder_class.builder_name)
-            else:
-                _logger.debug("'%s' failed", builder_class.builder_name)
-
-        kwargs['builders'] = builders
-
+    _logger.debug("Running config generator: %s(%s, %s)", name, args, kwargs)
     generator = getGeneratorByName(name)(*args, **kwargs)
     content = generator.generate()
 

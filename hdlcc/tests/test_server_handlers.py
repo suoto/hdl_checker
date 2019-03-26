@@ -17,6 +17,7 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import json
 import logging
 import os
 import os.path as p
@@ -473,8 +474,6 @@ with such.A("hdlcc bottle app") as it:
 
         @it.should("shoud be able to run simple file config generator")
         def test():
-            import json
-
             data = {
                 'generator' : 'SimpleFinder',
                 'args'      : json.dumps(tuple()),
@@ -488,6 +487,9 @@ with such.A("hdlcc bottle app") as it:
             _logger.info("Content:")
             for line in content:
                 _logger.info(repr(line))
+
+            _logger.info("OK then, will use %s",
+                    os.environ.get('BUILDER_NAME', None))
 
             if it.BUILDER_NAME in ('ghdl', 'xvhdl'):
                 it.assertEqual(content[:4],
@@ -530,7 +532,7 @@ with such.A("hdlcc bottle app") as it:
                     ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
                                             'some_source.vhd'),
                      'vhdl lib %s -2008' % p.join(it.dummy_test_path, 'path_a',
-                                            'source_tb.vhd'),
+                                                  'source_tb.vhd'),
                      'systemverilog lib %s' % p.join(it.dummy_test_path,
                                                      'path_b',
                                                      'a_systemverilog_source.sv'),

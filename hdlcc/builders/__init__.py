@@ -41,6 +41,19 @@ def getBuilderByName(name):
 
     return builder
 
+def getWorkingBuilders():
+    """
+    Returns a generator with the names of builders that are actually working
+    """
+    for builder_class in AVAILABLE_BUILDERS:
+        if builder_class.builder_name == 'fallback':
+            continue
+        if builder_class.isAvailable():
+            _logger.debug("Builder %s worked", builder_class.builder_name)
+            yield builder_class.builder_name
+        else:
+            _logger.debug("Builder %s failed", builder_class.builder_name)
+
 __all__ = ['MSim', 'XVHDL', 'GHDL', 'Fallback']
 
 AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback

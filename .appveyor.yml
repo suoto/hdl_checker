@@ -48,6 +48,20 @@ environment:
     - BUILDER: msim
       PYTHON_VERSION: 35
 
+    - BUILDER: other
+      PYTHON_VERSION: 36
+    - BUILDER: ghdl
+      PYTHON_VERSION: 36
+    - BUILDER: msim
+      PYTHON_VERSION: 36
+
+    - BUILDER: other
+      PYTHON_VERSION: 37
+    - BUILDER: ghdl
+      PYTHON_VERSION: 37
+    - BUILDER: msim
+      PYTHON_VERSION: 37
+
 # # build cache to preserve files/folders between builds
 # cache:
 #   - '%CACHE_PATH%'
