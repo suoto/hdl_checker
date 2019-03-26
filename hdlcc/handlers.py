@@ -16,17 +16,19 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
+import json
+import logging
 import os
 import os.path as p
-import logging
-from multiprocessing import Queue
 import signal
-import bottle
+from multiprocessing import Queue
 
+import bottle
 import hdlcc
 import hdlcc.utils as utils
-from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.builders import AVAILABLE_BUILDERS
+from hdlcc.config_generators import getGeneratorByName
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
 _logger = logging.getLogger(__name__)
 
@@ -131,27 +133,36 @@ def getDiagnoseInfo():
 
     return {'info' : response}
 
-@app.post('/get_working_builders')
+@app.post('/run_config_generator')
 @_exceptionWrapper
-def getWorkingBuilders():
-    """
-    Collects misc diagnose info for the clients
-    """
-    _logger.info("Collecting builders that worked")
+def runConfigGenerator():
+    name = bottle.request.forms.get('generator', None)
+    args = json.loads(bottle.request.forms.get('args'))
+    kwargs = json.loads(bottle.request.forms.get('kwargs'))
 
-    builders = []
+    _logger.info("Running config generator %s(%s, %s)",
+                 repr(name), repr(args), repr(kwargs))
 
-    for builder_class in AVAILABLE_BUILDERS:
-        if builder_class.builder_name == 'fallback':
-            continue
-        if builder_class.isAvailable():
-            _logger.debug("'%s' worked", builder_class.builder_name)
-            builders.append(builder_class.builder_name)
-        else:
-            _logger.debug("'%s' failed", builder_class.builder_name)
+    builders = kwargs.get('builders', None)
 
-    return {'builders': builders}
+    if builders is None:
+        builders = []
 
+        for builder_class in AVAILABLE_BUILDERS:
+            if builder_class.builder_name == 'fallback':
+                continue
+            if builder_class.isAvailable():
+                _logger.debug("'%s' worked", builder_class.builder_name)
+                builders.append(builder_class.builder_name)
+            else:
+                _logger.debug("'%s' failed", builder_class.builder_name)
+
+        kwargs['builders'] = builders
+
+    generator = getGeneratorByName(name)(*args, **kwargs)
+    content = generator.generate()
+
+    return {'content': content}
 
 @app.post('/on_buffer_visit')
 @_exceptionWrapper
@@ -288,4 +299,3 @@ def getBuildSequence():
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name
 setupSignalHandlers()
-

@@ -22,19 +22,19 @@ import os
 import os.path as p
 import shutil
 
-from webtest import TestApp
-from nose2.tools import such
-
 import six
+from nose2.tools import such
+from webtest import TestApp
+
+import hdlcc
+import hdlcc.handlers as handlers
+import hdlcc.utils as utils
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
     import mock
 
-import hdlcc
-import hdlcc.handlers as handlers
-import hdlcc.utils as utils
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
@@ -432,5 +432,117 @@ with such.A("hdlcc bottle app") as it:
         else:
             it.assertEquals([], sequence, "%s error" % it.BUILDER_NAME)
 
-it.createTests(globals())
+    with it.having('some scatered sources'):
+        @it.has_setup
+        def setup():
+            # Needs to agree with vroom test file
+            it.dummy_test_path = 'dummy_test_path'
 
+            it.assertFalse(
+                p.exists(it.dummy_test_path),
+                "Path '%s' shouldn't exist right now" % it.dummy_test_path)
+
+            os.mkdir(it.dummy_test_path)
+
+            os.mkdir(p.join(it.dummy_test_path, 'path_a'))
+            os.mkdir(p.join(it.dummy_test_path, 'path_b'))
+            os.mkdir(p.join(it.dummy_test_path, 'v_includes'))
+            os.mkdir(p.join(it.dummy_test_path, 'sv_includes'))
+            # Create empty sources
+            for path in (p.join('path_a', 'some_source.vhd'),
+                         p.join('path_a', 'header_out_of_place.vh'),
+                         p.join('path_a', 'source_tb.vhd'),
+                         p.join('path_b', 'some_source.vhd'),
+                         p.join('path_b', 'a_verilog_source.v'),
+                         p.join('path_b', 'a_systemverilog_source.sv'),
+                         # Create headers for both extensions
+                         p.join('v_includes', 'verilog_header.vh'),
+                         p.join('sv_includes', 'systemverilog_header.svh'),
+                         # Make the tree 'dirty' with other source types
+                         p.join('path_a', 'not_hdl_source.log'),
+                         p.join('path_a', 'not_hdl_source.py')):
+                _logger.info("Writing to %s", path)
+                open(p.join(it.dummy_test_path, path), 'w').write('')
+
+        @it.has_teardown
+        def teardown():
+            # Create a dummy arrangement of sources
+            if p.exists(it.dummy_test_path):
+                _logger.info("Removing %s", repr(it.dummy_test_path))
+                shutil.rmtree(it.dummy_test_path)
+
+        @it.should("shoud be able to run simple file config generator")
+        def test():
+            import json
+
+            data = {
+                'generator' : 'SimpleFinder',
+                'args'      : json.dumps(tuple()),
+                'kwargs'    : json.dumps({'paths': [it.dummy_test_path, ]})
+            }
+
+            reply = it.app.post('/run_config_generator', data)
+
+            content = reply.json['content'].split('\n')
+
+            _logger.info("Content:")
+            for line in content:
+                _logger.info(repr(line))
+
+            if it.BUILDER_NAME in ('ghdl', 'xvhdl'):
+                it.assertEqual(content[:4],
+                               ['# Files found: 5',
+                                '# Available builders: %s' % it.BUILDER_NAME,
+                                'builder = %s' % it.BUILDER_NAME,
+                                ''])
+
+                it.assertEquals(
+                    content[4:],
+                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
+                     'vhdl lib %s/path_a/source_tb.vhd' % it.dummy_test_path,
+                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
+                             % it.dummy_test_path,
+                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
+                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+
+            elif it.BUILDER_NAME == 'msim':
+                it.assertEqual(
+                    content[:6],
+                    ['# Files found: 5',
+                     '# Available builders: %s' % it.BUILDER_NAME,
+                     'builder = %s' % it.BUILDER_NAME,
+
+                     'global_build_flags[systemverilog] = ' + \
+                         '+incdir+dummy_test_path/sv_includes',
+
+                     'global_build_flags[verilog] = ' + \
+                         '+incdir+dummy_test_path/path_a ' + \
+                         '+incdir+dummy_test_path/v_includes',
+
+                     ''])
+
+                it.assertEquals(
+                    content[6:],
+                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
+                     'vhdl lib %s/path_a/source_tb.vhd -2008' % it.dummy_test_path,
+                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
+                             % it.dummy_test_path,
+                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
+                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+            else:
+                # Fallback contents
+                it.assertEqual(content[:3],
+                               ['# Files found: 5',
+                                '# Available builders: ',
+                                ''])
+
+                it.assertEquals(
+                    content[3:],
+                    ['vhdl lib %s/path_a/some_source.vhd' % it.dummy_test_path,
+                     'vhdl lib %s/path_a/source_tb.vhd' % it.dummy_test_path,
+                     'systemverilog lib %s/path_b/a_systemverilog_source.sv' \
+                             % it.dummy_test_path,
+                     'verilog lib %s/path_b/a_verilog_source.v' % it.dummy_test_path,
+                     'vhdl lib %s/path_b/some_source.vhd' % it.dummy_test_path])
+
+it.createTests(globals())
