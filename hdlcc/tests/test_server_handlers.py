@@ -441,7 +441,8 @@ with such.A("hdlcc bottle app") as it:
 
             it.assertFalse(
                 p.exists(it.dummy_test_path),
-                "Path '%s' shouldn't exist right now" % it.dummy_test_path)
+                "Path '%s' shouldn't exist right now" % \
+                        p.abspath(it.dummy_test_path))
 
             os.mkdir(it.dummy_test_path)
 
@@ -449,8 +450,10 @@ with such.A("hdlcc bottle app") as it:
             os.mkdir(p.join(it.dummy_test_path, 'path_b'))
             os.mkdir(p.join(it.dummy_test_path, 'v_includes'))
             os.mkdir(p.join(it.dummy_test_path, 'sv_includes'))
-            # Create empty sources
-            for path in (p.join('path_a', 'some_source.vhd'),
+            # Create empty sources and some extra files as well
+            for path in ('README.txt',         # This shouldn't be included
+                         'nonreadable.txt',    # This shouldn't be included
+                         p.join('path_a', 'some_source.vhd'),
                          p.join('path_a', 'header_out_of_place.vh'),
                          p.join('path_a', 'source_tb.vhd'),
                          p.join('path_b', 'some_source.vhd'),
@@ -473,6 +476,8 @@ with such.A("hdlcc bottle app") as it:
                 shutil.rmtree(it.dummy_test_path)
 
         @it.should("shoud be able to run simple file config generator")
+        @mock.patch('hdlcc.config_generators.simple_finder.isFileReadable',
+                    lambda path: 'nonreadable' not in path)
         def test():
             data = {
                 'generator' : 'SimpleFinder',
@@ -489,76 +494,62 @@ with such.A("hdlcc bottle app") as it:
                 _logger.info(repr(line))
 
             _logger.info("OK then, will use %s",
-                    os.environ.get('BUILDER_NAME', None))
+                         os.environ.get('BUILDER_NAME', None))
 
-            if it.BUILDER_NAME in ('ghdl', 'xvhdl'):
-                it.assertEqual(content[:4],
-                               ['# Files found: 5',
-                                '# Available builders: %s' % it.BUILDER_NAME,
-                                'builder = %s' % it.BUILDER_NAME,
-                                ''])
+            if it.BUILDER_NAME in ('msim', ):
+                intro = [
+                    '# Files found: 5',
+                    '# Available builders: %s' % it.BUILDER_NAME,
+                    'builder = %s' % it.BUILDER_NAME,
 
-                it.assertEquals(
-                    content[4:],
-                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
-                                            'some_source.vhd'),
-                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
-                                            'source_tb.vhd'),
-                     'systemverilog lib %s' % p.join(it.dummy_test_path,
-                                                     'path_b',
-                                                     'a_systemverilog_source.sv'),
-                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                               'a_verilog_source.v'),
-                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                            'some_source.vhd')])
+                    'global_build_flags[systemverilog] = +incdir+%s' % \
+                        p.join(it.dummy_test_path, 'sv_includes'),
 
-            elif it.BUILDER_NAME == 'msim':
-                it.assertEqual(
-                    content[:6],
-                    ['# Files found: 5',
-                     '# Available builders: %s' % it.BUILDER_NAME,
-                     'builder = %s' % it.BUILDER_NAME,
+                    'global_build_flags[verilog] = +incdir+%s +incdir+%s' % \
+                        (p.join(it.dummy_test_path, 'path_a'),
+                         p.join(it.dummy_test_path, 'v_includes')),
+                    '']
 
-                     'global_build_flags[systemverilog] = +incdir+%s' % \
-                         p.join(it.dummy_test_path, 'sv_includes'),
+                files = [
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'some_source.vhd'),
+                    'vhdl lib %s -2008' % p.join(it.dummy_test_path, 'path_a',
+                                                 'source_tb.vhd'),
+                    'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                    'path_b',
+                                                    'a_systemverilog_source.sv'),
+                    'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                              'a_verilog_source.v'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                           'some_source.vhd')]
 
-                     'global_build_flags[verilog] = +incdir+%s +incdir+%s' % \
-                         (p.join(it.dummy_test_path, 'path_a'),
-                          p.join(it.dummy_test_path, 'v_includes')),
-                     ''])
-
-                it.assertEquals(
-                    content[6:],
-                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
-                                            'some_source.vhd'),
-                     'vhdl lib %s -2008' % p.join(it.dummy_test_path, 'path_a',
-                                                  'source_tb.vhd'),
-                     'systemverilog lib %s' % p.join(it.dummy_test_path,
-                                                     'path_b',
-                                                     'a_systemverilog_source.sv'),
-                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                               'a_verilog_source.v'),
-                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                            'some_source.vhd')])
             else:
-                # Fallback contents
-                it.assertEqual(content[:3],
-                               ['# Files found: 5',
-                                '# Available builders: ',
-                                ''])
+                if it.BUILDER_NAME in ('ghdl', 'xvhdl'):
+                    # Default start of the contents when a builder was found
+                    intro = ['# Files found: 5',
+                             '# Available builders: %s' % it.BUILDER_NAME,
+                             'builder = %s' % it.BUILDER_NAME,
+                             '']
+                else:
+                    # Fallback contents
+                    intro = ['# Files found: 5',
+                             '# Available builders: ',
+                             '']
 
-                it.assertEquals(
-                    content[3:],
-                    ['vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
-                                            'some_source.vhd'),
-                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
-                                            'source_tb.vhd'),
-                     'systemverilog lib %s' % p.join(it.dummy_test_path,
-                                                     'path_b',
-                                                     'a_systemverilog_source.sv'),
-                     'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                               'a_verilog_source.v'),
-                     'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
-                                            'some_source.vhd')])
+                files = [
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'some_source.vhd'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'source_tb.vhd'),
+                    'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                    'path_b',
+                                                    'a_systemverilog_source.sv'),
+                    'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                              'a_verilog_source.v'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                           'some_source.vhd')]
+
+            it.assertEqual(content[:len(intro)], intro)
+            it.assertEquals(content[len(intro):], files)
 
 it.createTests(globals())
