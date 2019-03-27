@@ -245,18 +245,20 @@ def runTestsForEnv(env, args):
     else:
         nose_args += _getDefaultTestByEnv(env)
 
-    if env in TEST_ENVS:
+    if env in TEST_ENVS and not _ON_WINDOWS:
         test_env = TEST_ENVS[env]
         test_env.update(
             {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
         patch = mock.patch.dict('os.environ', test_env)
-        patch.start()
+    else:
+        patch = mock.patch.dict(
+            'os.environ',
+            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
+    patch.start()
     tests = nose2.discover(exit=False, argv=nose_args)
-
-    if env in TEST_ENVS:
-        patch.stop()
+    patch.stop()
 
     return tests.result.wasSuccessful()
 
