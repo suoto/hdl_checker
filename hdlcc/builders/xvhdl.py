@@ -45,6 +45,14 @@ class XVHDL(BaseBuilder):
     def _shouldIgnoreLine(self, line):
         if 'ignored due to previous errors' in line:
             return True
+
+        # Ignore messages like
+        # ERROR: [VRFC 10-3032] 'library.package' failed to restore
+        # This message doesn't come alone, we should be getting other (more
+        # usefull) info anyway
+        if '[VRFC 10-3032]' in line:
+            return True
+
         return not (line.startswith('ERROR') or
                     line.startswith('WARNING'))
 
