@@ -287,8 +287,10 @@ def main():
     logging.getLogger('vunit').setLevel(logging.ERROR)
     logging.getLogger('requests').setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
-    log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
-    file_handler.formatter = logging.Formatter(log_format)
+    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
+    log_format = '%(levelname)-7s | %(asctime)s | ' + \
+        '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s |\t%(message)s'
+    file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
     logging.root.addHandler(file_handler)
 
     _logger.info("Environment info:")
