@@ -33,14 +33,16 @@ class XVHDL(BaseBuilder):
     _stdout_message_scanner = re.compile(
         r"^(?P<error_type>[EW])\w+:\s*"
         r"\[(?P<error_number>[^\]]+)\]\s*"
-        r"(?P<error_message>[^\[]+)\s*\["
-        r"(?P<filename>[^:]+):"
-        r"(?P<line_number>\d+)", flags=re.I)
+        r"(?P<error_message>[^\[]+)\s*"
+        r"("
+        r"\[(?P<filename>[^:]+):"
+        r"(?P<line_number>\d+)\]"
+        r")?", flags=re.I)
 
     _iter_rebuild_units = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
-        r".*(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb\s+needs.*",
-        flags=re.I).finditer
+        r"'?.*/(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb'?"
+        r"\s+needs to be re-saved.*", flags=re.I).finditer
 
     def _shouldIgnoreLine(self, line):
         if 'ignored due to previous errors' in line:
@@ -64,7 +66,7 @@ class XVHDL(BaseBuilder):
                                    'synplify', 'synopsis', 'maxii',
                                    'family_support')
 
-    def _makeRecords(self, line):
+    def _makeRecords(self, message):
         line_number = None
         column = None
         filename = None
@@ -72,7 +74,7 @@ class XVHDL(BaseBuilder):
         error_type = None
         error_message = None
 
-        scan = self._stdout_message_scanner.scanner(line)
+        scan = self._stdout_message_scanner.scanner(message)
 
         while True:
             match = scan.match()
