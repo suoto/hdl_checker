@@ -37,7 +37,7 @@ class SimpleFinder(BaseGenerator):
     """
     def __init__(self, builders, paths):
         super(SimpleFinder, self).__init__(builders)
-        self._logger.debug("Search paths: %s", paths)
+        self._logger.debug("Search paths: %s", [p.abspath(x) for x in  paths])
         self._paths = paths
         self._valid_extensions = tuple(list(_SOURCE_EXTENSIONS) +
                                        list(_HEADER_EXTENSIONS))

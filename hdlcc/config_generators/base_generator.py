@@ -55,8 +55,8 @@ class BaseGenerator:
         Add a source to project. 'flags' and 'library' are only used for
         regular sources and not for header files (files ending in .vh or .svh)
         """
-        self._logger.debug("Adding path %s (flgas=%s, library=%s)", path,
-                           flags, library)
+        self._logger.debug("Adding path %s (flags=%s, library=%s)",
+                           p.abspath(path), flags, library)
 
         if p.basename(path).split('.')[-1].lower() in ('vh', 'svh'):
             file_type = getFileType(path)

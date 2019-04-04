@@ -108,9 +108,13 @@ def setupLogging(stream, level, color=True): # pragma: no cover
             # pylint: enable=bad-whitespace
     except ImportError: # pragma: no cover
         handler = logging.StreamHandler(_stream)  # pylint: disable=redefined-variable-type
-        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        handler.formatter = logging.Formatter(log_format)
+        handler.formatter = logging.Formatter(
+            '%(levelname)-7s | %(asctime)s | ' +
+            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+            '|\t%(message)s', datefmt='%H:%M:%S')
 
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('pynvim').setLevel(logging.WARNING)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
 
