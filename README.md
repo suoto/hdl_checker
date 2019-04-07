@@ -1,10 +1,8 @@
 # HDL Code Checker
 
 [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
-[![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master)
 [![codecov](https://codecov.io/gh/suoto/hdlcc/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdlcc)
 [![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
-[![Code Health](https://landscape.io/github/suoto/hdlcc/master/landscape.svg?style=flat)](https://landscape.io/github/suoto/hdlcc/master)
 [![Join the chat at https://gitter.im/suoto/hdlcc](https://badges.gitter.im/suoto/hdlcc.svg)](https://gitter.im/suoto/hdlcc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdlcc)
 
@@ -174,14 +172,10 @@ Tools with planned support:
 | System  | CI integration | CI status                                                                                                                             |
 | :--:    | :--:           | :--:                                                                                                                                  |
 | Linux   | Yes            | [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)                             |
-| Windows | Yes            | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc) |
-| OSX     | No             | N/A                                                                                                                                   |
 
 ### Editor support
 
 * Vim: [vim-hdl](https://github.com/suoto/vim-hdl/)
-* Komodo: [Komodo HDL Lint](https://github.com/suoto/komodo-hdl-lint). **on
-  hold**
 
 ---
 
