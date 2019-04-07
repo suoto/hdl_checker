@@ -245,22 +245,18 @@ def runTestsForEnv(env, args):
     else:
         nose_args += _getDefaultTestByEnv(env)
 
-    if env in TEST_ENVS and not _ON_WINDOWS:
-        test_env = TEST_ENVS[env]
-        test_env.update(
-            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    test_env = os.environ.copy()
 
-        patch = mock.patch.dict('os.environ', test_env)
-    else:
-        patch = mock.patch.dict(
-            'os.environ',
-            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    if env in TEST_ENVS:
+        test_env.update(TEST_ENVS[env])
 
-    patch.start()
-    tests = nose2.discover(exit=False, argv=nose_args)
-    patch.stop()
+    test_env.update({'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
-    return tests.result.wasSuccessful()
+    with mock.patch.dict('os.environ', test_env):
+        successful = nose2.discover(exit=False,
+                                    argv=nose_args).result.wasSuccessful()
+
+    return successful
 
 def _setupPaths():
     "Add our dependencies to sys.path"
