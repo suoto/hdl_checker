@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -245,22 +245,18 @@ def runTestsForEnv(env, args):
     else:
         nose_args += _getDefaultTestByEnv(env)
 
-    if env in TEST_ENVS and not _ON_WINDOWS:
-        test_env = TEST_ENVS[env]
-        test_env.update(
-            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    test_env = os.environ.copy()
 
-        patch = mock.patch.dict('os.environ', test_env)
-    else:
-        patch = mock.patch.dict(
-            'os.environ',
-            {'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    if env in TEST_ENVS:
+        test_env.update(TEST_ENVS[env])
 
-    patch.start()
-    tests = nose2.discover(exit=False, argv=nose_args)
-    patch.stop()
+    test_env.update({'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
-    return tests.result.wasSuccessful()
+    with mock.patch.dict('os.environ', test_env):
+        successful = nose2.discover(exit=False,
+                                    argv=nose_args).result.wasSuccessful()
+
+    return successful
 
 def _setupPaths():
     "Add our dependencies to sys.path"
@@ -287,8 +283,10 @@ def main():
     logging.getLogger('vunit').setLevel(logging.ERROR)
     logging.getLogger('requests').setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
-    log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
-    file_handler.formatter = logging.Formatter(log_format)
+    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
+    log_format = '%(levelname)-7s | %(asctime)s | ' + \
+        '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
+    file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
     logging.root.addHandler(file_handler)
 
     _logger.info("Environment info:")

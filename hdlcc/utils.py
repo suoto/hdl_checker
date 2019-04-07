@@ -47,7 +47,7 @@ PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
 
-def setupLogging(stream, level, color=True): # pragma: no cover
+def setupLogging(stream, level, force_tty=True): # pragma: no cover
     "Setup logging according to the command line parameters"
 
     # Copied from six source
@@ -63,7 +63,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
             with colors
             """
             _lock = Lock()
-            _color = color
+            _force_tty = force_tty
 
             def __init__(self, *args, **kwargs):
                 self._fd = open(*args, **kwargs)
@@ -72,45 +72,27 @@ def setupLogging(stream, level, color=True): # pragma: no cover
                 """
                 Tells if this stream accepts control chars
                 """
-                return self._color
+                return self._force_tty
 
             def write(self, text):
                 """
                 Writes to the stream
                 """
                 with self._lock:
-                    try:
-                        self._fd.write(toBytes(text))
-                    except:
-                        _logger.exception("Something went wrong!")
+                    self._fd.write(toBytes(text))
 
         _stream = Stream(stream, 'ab', buffering=0)
     else:
         _stream = stream
 
-    try:
-        from rainbow_logging_handler import RainbowLoggingHandler
-        handler = RainbowLoggingHandler(
-            _stream,
-            #  Customizing each column's color
-            # pylint: disable=bad-whitespace
-            color_asctime          = ('dim white',  'black'),
-            color_name             = ('dim white',  'black'),
-            color_funcName         = ('green',      'black'),
-            color_lineno           = ('dim white',  'black'),
-            color_pathname         = ('black',      'red'),
-            color_module           = ('yellow',     None),
-            color_message_debug    = ('color_59',   None),
-            color_message_info     = (None,         None),
-            color_message_warning  = ('color_226',  None),
-            color_message_error    = ('red',        None),
-            color_message_critical = ('bold white', 'red'))
-            # pylint: enable=bad-whitespace
-    except ImportError: # pragma: no cover
-        handler = logging.StreamHandler(_stream)  # pylint: disable=redefined-variable-type
-        log_format = "%(levelname)-8s || %(name)-30s || %(message)s"
-        handler.formatter = logging.Formatter(log_format)
+    handler = logging.StreamHandler(_stream)
+    handler.formatter = logging.Formatter(
+        '%(levelname)-7s | %(asctime)s | ' +
+        '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+        '|\t%(message)s', datefmt='%H:%M:%S')
 
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('pynvim').setLevel(logging.WARNING)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
 
@@ -214,16 +196,28 @@ def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
 def onCI():       # pragma: no cover # pylint: disable=missing-docstring
     return 'CI' in os.environ
 
+class UnknownTypeExtension(Exception):
+    """
+    Exception thrown when trying to get the file type of an unknown extension.
+    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
+    """
+    def __init__(self, path):
+        super(UnknownTypeExtension, self).__init__()
+        self._path = path
+
+    def __str__(self):
+        return "Couldn't determine file type for path %s" % self._path
+
 def getFileType(filename):
     "Gets the file type of a source file"
     extension = filename[str(filename).rfind('.') + 1:].lower()
-    if extension in ['vhd', 'vhdl']:
+    if extension in ('vhd', 'vhdl'):
         return 'vhdl'
-    if extension == 'v':
+    if extension in ('v', 'vh'):
         return 'verilog'
     if extension in ('sv', 'svh'):  # pragma: no cover
         return 'systemverilog'
-    assert False, "Unknown file type: '%s'" % extension  # pragma: no cover
+    raise UnknownTypeExtension(filename)
 
 if not hasattr(p, 'samefile'):
     def samefile(file1, file2):
@@ -322,3 +316,13 @@ def pushd(new_dir):
         yield
     finally:
         os.chdir(previous_dir)
+
+def isFileReadable(path):
+    """
+    Checks if a given file is readable
+    """
+    try:
+        open(path, 'r').close()
+        return True
+    except IOError:
+        return False

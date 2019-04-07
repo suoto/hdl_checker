@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,15 +16,18 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
+import json
+import logging
 import os
 import os.path as p
-import logging
-from multiprocessing import Queue
 import signal
-import bottle
+from multiprocessing import Queue
 
+import bottle
 import hdlcc
 import hdlcc.utils as utils
+from hdlcc.builders import getWorkingBuilders
+from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
 _logger = logging.getLogger(__name__)
@@ -129,6 +132,24 @@ def getDiagnoseInfo():
         _logger.info(" - %s", diag)
 
     return {'info' : response}
+
+@app.post('/run_config_generator')
+@_exceptionWrapper
+def runConfigGenerator():
+    name = bottle.request.forms.get('generator', None)
+    args = json.loads(bottle.request.forms.get('args'))
+    kwargs = json.loads(bottle.request.forms.get('kwargs'))
+
+    _logger.info("Running config generator %s(%s, %s)",
+                 repr(name), repr(args), repr(kwargs))
+
+    kwargs['builders'] = list(getWorkingBuilders())
+
+    _logger.debug("Running config generator: %s(%s, %s)", name, args, kwargs)
+    generator = getGeneratorByName(name)(*args, **kwargs)
+    content = generator.generate()
+
+    return {'content': content}
 
 @app.post('/on_buffer_visit')
 @_exceptionWrapper
@@ -265,4 +286,3 @@ def getBuildSequence():
 #  We'll store a dict to store differents hdlcc objects
 _hdlcc_objects = {} # pylint: disable=invalid-name
 setupSignalHandlers()
-

@@ -19,6 +19,7 @@
 import os
 import os.path as p
 import re
+from glob import glob
 
 from .base_builder import BaseBuilder
 
@@ -111,11 +112,23 @@ class GHDL(BaseBuilder):
             library_path_match = self._scan_library_paths(line)
             if library_path_match:
                 library_path = library_path_match.groupdict()['library_path']
+                self._logger.debug("library path is %s", library_path)
 
-                for library in os.listdir(p.join(library_path, 'v93', '')):
-                    self._builtin_libraries.append(library.strip().lower())
+                # Up to v0.36 ghdl kept libraries at
+                #   <library_path>/<vhdl starndard>/<name>
+                # but his has been changed to
+                #   <library_path>/<name>/<vhdl starndard>
+                libraries_paths = glob(
+                    p.join(library_path, 'v93', '*') if self._version < '0.36'
+                    else
+                    p.join(library_path, '*'))
 
-        self._logger.debug("Builtin libraries found: %s",
+                for path in filter(p.isdir, libraries_paths):
+                    name = path.split(p.sep)[-1]
+                    self._builtin_libraries.append(name.strip().lower())
+
+        self._logger.debug("Found %d builtin libraries: %s",
+                           len(self._builtin_libraries),
                            " ".join(self._builtin_libraries))
 
     def _getGhdlArgs(self, path, library, flags=None):
@@ -134,11 +147,7 @@ class GHDL(BaseBuilder):
         """
         Runs GHDL with import source switch
         """
-        vhdl_std = []
-        for flag in flags:
-            if flag.startswith('--std='):
-                vhdl_std = [flag]
-                break
+        vhdl_std = tuple(filter(lambda flag: flag.startswith('--std='), flags))
         self._logger.debug("Importing source with std '%s'", vhdl_std)
         cmd = ['ghdl', '-i'] + self._getGhdlArgs(path, library, tuple(vhdl_std))
         return cmd
@@ -147,7 +156,6 @@ class GHDL(BaseBuilder):
         """
         Runs GHDL with analyze source switch
         """
-
         return ['ghdl', '-a'] + self._getGhdlArgs(path, library, flags)
 
     def _checkSyntax(self, path, library, flags=None):

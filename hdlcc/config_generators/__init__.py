@@ -18,43 +18,14 @@
 
 import logging
 
-from .fallback import Fallback
-from .ghdl import GHDL
-from .msim import MSim
-from .xvhdl import XVHDL
+from .simple_finder import SimpleFinder
 
 _logger = logging.getLogger(__name__)
 
-def getBuilderByName(name):
+def getGeneratorByName(name):
     "Returns the builder class given a string name"
     # Check if the builder selected is implemented and create the
     # builder attribute
-    if name == 'msim':
-        builder = MSim
-    elif name == 'xvhdl':
-        builder = XVHDL
-    elif name == 'ghdl':
-        builder = GHDL
-    else:
-        _logger.info("Using Fallback builder")
-        builder = Fallback
+    return {'SimpleFinder': SimpleFinder}.get(name, SimpleFinder)
 
-    return builder
-
-def getWorkingBuilders():
-    """
-    Returns a generator with the names of builders that are actually working
-    """
-    for builder_class in AVAILABLE_BUILDERS:
-        if builder_class.builder_name == 'fallback':
-            continue
-        if builder_class.isAvailable():
-            _logger.debug("Builder %s worked", builder_class.builder_name)
-            yield builder_class.builder_name
-        else:
-            _logger.debug("Builder %s failed", builder_class.builder_name)
-
-__all__ = ['MSim', 'XVHDL', 'GHDL', 'Fallback']
-
-AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback
-
+__all__ = ['SimpleFinder', ]

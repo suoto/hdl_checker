@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,24 +17,25 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import json
 import logging
 import os
 import os.path as p
 import shutil
 
-from webtest import TestApp
-from nose2.tools import such
-
 import six
+from nose2.tools import such
+from webtest import TestApp
+
+import hdlcc
+import hdlcc.handlers as handlers
+import hdlcc.utils as utils
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
     import mock
 
-import hdlcc
-import hdlcc.handlers as handlers
-import hdlcc.utils as utils
 
 TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
@@ -432,5 +433,123 @@ with such.A("hdlcc bottle app") as it:
         else:
             it.assertEquals([], sequence, "%s error" % it.BUILDER_NAME)
 
-it.createTests(globals())
+    with it.having('some scatered sources'):
+        @it.has_setup
+        def setup():
+            # Needs to agree with vroom test file
+            it.dummy_test_path = 'dummy_test_path'
 
+            it.assertFalse(
+                p.exists(it.dummy_test_path),
+                "Path '%s' shouldn't exist right now" % \
+                        p.abspath(it.dummy_test_path))
+
+            os.mkdir(it.dummy_test_path)
+
+            os.mkdir(p.join(it.dummy_test_path, 'path_a'))
+            os.mkdir(p.join(it.dummy_test_path, 'path_b'))
+            os.mkdir(p.join(it.dummy_test_path, 'v_includes'))
+            os.mkdir(p.join(it.dummy_test_path, 'sv_includes'))
+            # Create empty sources and some extra files as well
+            for path in ('README.txt',         # This shouldn't be included
+                         'nonreadable.txt',    # This shouldn't be included
+                         p.join('path_a', 'some_source.vhd'),
+                         p.join('path_a', 'header_out_of_place.vh'),
+                         p.join('path_a', 'source_tb.vhd'),
+                         p.join('path_b', 'some_source.vhd'),
+                         p.join('path_b', 'a_verilog_source.v'),
+                         p.join('path_b', 'a_systemverilog_source.sv'),
+                         # Create headers for both extensions
+                         p.join('v_includes', 'verilog_header.vh'),
+                         p.join('sv_includes', 'systemverilog_header.svh'),
+                         # Make the tree 'dirty' with other source types
+                         p.join('path_a', 'not_hdl_source.log'),
+                         p.join('path_a', 'not_hdl_source.py')):
+                _logger.info("Writing to %s", path)
+                open(p.join(it.dummy_test_path, path), 'w').write('')
+
+        @it.has_teardown
+        def teardown():
+            # Create a dummy arrangement of sources
+            if p.exists(it.dummy_test_path):
+                _logger.info("Removing %s", repr(it.dummy_test_path))
+                shutil.rmtree(it.dummy_test_path)
+
+        @it.should("shoud be able to run simple file config generator")
+        @mock.patch('hdlcc.config_generators.simple_finder.isFileReadable',
+                    lambda path: 'nonreadable' not in path)
+        def test():
+            data = {
+                'generator' : 'SimpleFinder',
+                'args'      : json.dumps(tuple()),
+                'kwargs'    : json.dumps({'paths': [it.dummy_test_path, ]})
+            }
+
+            reply = it.app.post('/run_config_generator', data)
+
+            content = reply.json['content'].split('\n')
+
+            _logger.info("Content:")
+            for line in content:
+                _logger.info(repr(line))
+
+            _logger.info("OK then, will use %s",
+                         os.environ.get('BUILDER_NAME', None))
+
+            if it.BUILDER_NAME in ('msim', ):
+                intro = [
+                    '# Files found: 5',
+                    '# Available builders: %s' % it.BUILDER_NAME,
+                    'builder = %s' % it.BUILDER_NAME,
+
+                    'global_build_flags[systemverilog] = +incdir+%s' % \
+                        p.join(it.dummy_test_path, 'sv_includes'),
+
+                    'global_build_flags[verilog] = +incdir+%s +incdir+%s' % \
+                        (p.join(it.dummy_test_path, 'path_a'),
+                         p.join(it.dummy_test_path, 'v_includes')),
+                    '']
+
+                files = [
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'some_source.vhd'),
+                    'vhdl lib %s -2008' % p.join(it.dummy_test_path, 'path_a',
+                                                 'source_tb.vhd'),
+                    'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                    'path_b',
+                                                    'a_systemverilog_source.sv'),
+                    'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                              'a_verilog_source.v'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                           'some_source.vhd')]
+
+            else:
+                if it.BUILDER_NAME in ('ghdl', 'xvhdl'):
+                    # Default start of the contents when a builder was found
+                    intro = ['# Files found: 5',
+                             '# Available builders: %s' % it.BUILDER_NAME,
+                             'builder = %s' % it.BUILDER_NAME,
+                             '']
+                else:
+                    # Fallback contents
+                    intro = ['# Files found: 5',
+                             '# Available builders: ',
+                             '']
+
+                files = [
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'some_source.vhd'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_a',
+                                           'source_tb.vhd'),
+                    'systemverilog lib %s' % p.join(it.dummy_test_path,
+                                                    'path_b',
+                                                    'a_systemverilog_source.sv'),
+                    'verilog lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                              'a_verilog_source.v'),
+                    'vhdl lib %s' % p.join(it.dummy_test_path, 'path_b',
+                                           'some_source.vhd')]
+
+            it.assertEqual(content[:len(intro)], intro)
+            it.assertEquals(content[len(intro):], files)
+
+it.createTests(globals())

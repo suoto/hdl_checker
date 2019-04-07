@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ def foundVunit():
     Checks if our env has VUnit installed
     """
     try:
-        import vunit  # pylint: disable=unused-variable
+        import vunit  # pylint: disable=unused-import
         result = True
     except ImportError: # pragma: no cover
         result = False
@@ -107,11 +107,11 @@ class ConfigParser(object):
             self._parms['builder'] = 'fallback'
             self._parms['target_dir'] = '.fallback'
 
-            self._logger.info("No configuration file given, using dummy")
+            self._logger.info("No configuration file given, using fallback")
 
         self._sources = {}
         self._timestamp = 0
-        self._lock = Lock()
+        self._parse_lock = Lock()
 
     def __eq__(self, other): # pragma: no cover
         if not isinstance(other, type(self)):
@@ -246,7 +246,7 @@ class ConfigParser(object):
         sources = state.pop('_sources')
         obj.filename = state.pop('filename', None)
         obj._timestamp = state.pop('_timestamp')
-        obj._lock = Lock()
+        obj._parse_lock = Lock()
 
         obj._parms = state['_parms']
         obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
@@ -283,7 +283,7 @@ class ConfigParser(object):
         Parses the configuration file
         """
         if self._shouldParse():
-            with self._lock:
+            with self._parse_lock:
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
@@ -302,17 +302,14 @@ class ConfigParser(object):
             source_build_list += line_build_list
 
         # At this point we have a list of sources parsed from the config
-        # file and the info we need to build each one. We'll use a pool
-        # to speed up parsing (important especially for libraries with
-        # many files. The multiprocessing.Pool class used to hang, so
-        # watch out if this behaves well enough to be used
+        # file and the info we need to build each one.
         self._logger.info("Adding %d sources", len(source_build_list))
         for source in getSourceFileObjects(source_build_list):
             self._sources[source.filename] = source
 
         self._cleanUpSourcesList(source_path_list)
 
-        # If no builder was configured, try to discover
+        # If no builder was configured, try to discover one that works
         if 'builder' not in self._parms.keys():
             self._discoverBuilder()
 
@@ -613,4 +610,3 @@ class ConfigParser(object):
         name, there is no guarantee that the right one is selected
         """
         return self.findSourcesByDesignUnit(unit, library, case_sensitive)
-

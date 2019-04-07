@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,18 +33,28 @@ class XVHDL(BaseBuilder):
     _stdout_message_scanner = re.compile(
         r"^(?P<error_type>[EW])\w+:\s*"
         r"\[(?P<error_number>[^\]]+)\]\s*"
-        r"(?P<error_message>[^\[]+)\s*\["
-        r"(?P<filename>[^:]+):"
-        r"(?P<line_number>\d+)", flags=re.I)
+        r"(?P<error_message>[^\[]+)\s*"
+        r"("
+        r"\[(?P<filename>[^:]+):"
+        r"(?P<line_number>\d+)\]"
+        r")?", flags=re.I)
 
     _iter_rebuild_units = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
-        r".*(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb\s+needs.*",
-        flags=re.I).finditer
+        r"'?.*/(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb'?"
+        r"\s+needs to be re-saved.*", flags=re.I).finditer
 
     def _shouldIgnoreLine(self, line):
         if 'ignored due to previous errors' in line:
             return True
+
+        # Ignore messages like
+        # ERROR: [VRFC 10-3032] 'library.package' failed to restore
+        # This message doesn't come alone, we should be getting other (more
+        # usefull) info anyway
+        if '[VRFC 10-3032]' in line:
+            return True
+
         return not (line.startswith('ERROR') or
                     line.startswith('WARNING'))
 
@@ -56,7 +66,7 @@ class XVHDL(BaseBuilder):
                                    'synplify', 'synopsis', 'maxii',
                                    'family_support')
 
-    def _makeRecords(self, line):
+    def _makeRecords(self, message):
         line_number = None
         column = None
         filename = None
@@ -64,7 +74,7 @@ class XVHDL(BaseBuilder):
         error_type = None
         error_message = None
 
-        scan = self._stdout_message_scanner.scanner(line)
+        scan = self._stdout_message_scanner.scanner(message)
 
         while True:
             match = scan.match()

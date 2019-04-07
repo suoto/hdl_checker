@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -271,18 +271,26 @@ with such.A("builder object") as it:
                     'error_type': 'E',
                     'checker': 'ghdl'}]
             elif it.BUILDER_NAME == 'xvhdl':
-                expected = [{
-                    'line_number': '4',
-                    'error_number': 'VRFC 10-91',
-                    'error_message': 'some_lib is not declared',
-                    'column': None,
-                    'error_type': 'E',
-                    'checker': 'xvhdl'}]
+                expected = [
+                    {'line_number': '4',
+                     'error_number': 'VRFC 10-91',
+                     'error_message': 'some_lib is not declared',
+                     'column': None,
+                     'error_type': 'E',
+                     'checker': 'xvhdl'},
+
+                    {'line_number': '4',
+                     'error_number': 'VRFC 10-2989',
+                     'error_message': "'some_lib' is not declared",
+                     'column': None,
+                     'error_type': 'E',
+                     'checker': 'xvhdl'}]
 
             it.assertEqual(len(records), 1)
-            it.assertTrue(utils.samefile(records[0].pop('filename'),
+            record = records.pop()
+            it.assertTrue(utils.samefile(record.pop('filename'),
                                          source.filename))
-            it.assertEquals(records, expected)
+            it.assertIn(record, expected)
 
             it.assertEqual(rebuilds, [])
 
