@@ -50,7 +50,7 @@ class MSim(BaseBuilder):
     _iter_rebuild_units = re.compile(
         r"(" \
             r"Recompile\s*(?P<lib_name_0>\w+)\.(?P<unit_name_0>\w+)\s+because" \
-            r"\s+[^\s]+\s+has changed"
+            r"\s+.*?\s+ha(?:ve|s) changed"
         r"|" \
             r"^\*\* Warning:.*\(vcom-1127\)\s*Entity\s(?P<lib_name_1>\w+)\." \
             r"(?P<unit_name_1>\w+).*"
