@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
+import functools
+import inspect
 import logging
 import os
 import os.path as p
@@ -25,7 +27,7 @@ import subprocess as subp
 import sys
 import time
 from contextlib import contextmanager
-from threading import Lock
+from threading import Lock, Timer
 
 # Make the serializer transparent
 try:
@@ -113,8 +115,7 @@ def isProcessRunning(pid):
     "Checks if a process is running given its PID"
     if onWindows():
         return _isProcessRunningOnWindows(pid)
-    else:
-        return _isProcessRunningOnPosix(pid)
+    return _isProcessRunningOnPosix(pid)
 
 def _isProcessRunningOnPosix(pid):
     "Checks if a given PID is runnning under POSIX OSs"
@@ -298,8 +299,7 @@ def toBytes(value):  # pragma: no cover
         # type from python-future.
         if PY2:
             return bytes(value.encode('utf8'), encoding='utf8')
-        else:
-            return bytes(value, encoding='utf8')
+        return bytes(value, encoding='utf8')
 
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
@@ -326,3 +326,30 @@ def isFileReadable(path):
         return True
     except IOError:
         return False
+
+def debounce(interval_s, keyed_by=None):
+    """Debounce calls to this function until interval_s seconds have passed."""
+    def wrapper(func):
+        timers = {}
+        lock = Lock()
+
+        @functools.wraps(func)
+        def debounced(*args, **kwargs):
+            call_args = inspect.getcallargs(func, *args, **kwargs)
+            key = call_args[keyed_by] if keyed_by else None
+
+            def run():
+                with lock:
+                    del timers[key]
+                return func(*args, **kwargs)
+
+            with lock:
+                old_timer = timers.get(key)
+                if old_timer:
+                    old_timer.cancel()
+
+                timer = Timer(interval_s, run)
+                timers[key] = timer
+                timer.start()
+        return debounced
+    return wrapper

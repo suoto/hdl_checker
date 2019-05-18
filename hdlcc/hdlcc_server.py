@@ -36,7 +36,8 @@ def _setupPaths():  # pragma: no cover
             hdlcc_base_path,
             p.join(hdlcc_base_path, 'dependencies', 'requests'),
             p.join(hdlcc_base_path, 'dependencies', 'waitress'),
-            p.join(hdlcc_base_path, 'dependencies', 'bottle')):
+            p.join(hdlcc_base_path, 'dependencies', 'bottle'),
+            p.join(hdlcc_base_path, 'dependencies', 'python-jsonrpc-server')):
         path = p.abspath(path)
         if path not in sys.path:
             print("Adding '%s'" % path)
@@ -58,6 +59,7 @@ def parseArguments():
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
     parser.add_argument('--nocolor', action='store_true', default=False)
+    parser.add_argument('--lsp', action='store_true', default=False)
 
     parser.add_argument('--stdout', action='store')
     parser.add_argument('--stderr', action='store')
@@ -74,7 +76,7 @@ def parseArguments():
     args.port = args.port or 50000
     args.log_level = args.log_level or logging.INFO
     args.log_stream = args.log_stream or sys.stdout
-    args.color = False if args.nocolor else True
+    args.color = not args.nocolor
 
     del args.nocolor
 
@@ -115,6 +117,7 @@ def main(): # pylint: disable=missing-docstring
     import hdlcc
     from hdlcc import handlers
     import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+    import hdlcc.lsp
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
@@ -142,12 +145,17 @@ def main(): # pylint: disable=missing-docstring
         "our parent is %s" % args.attach_to_pid,
         hdlcc.__version__)
 
-    if args.attach_to_pid is not None:
-        _attachPids(args.attach_to_pid, os.getpid())
+    if not args.lsp:
+        if args.attach_to_pid is not None:
+            _attachPids(args.attach_to_pid, os.getpid())
 
-    handlers.app.run(host=args.host, port=args.port, threads=20,
-                     server='waitress')
+        handlers.app.run(host=args.host, port=args.port, threads=10,
+                         server='waitress')
+    else:
+        hdlcc.lsp.startTcpLangServer(args.host, args.port,
+                                     hdlcc.lsp.LanguageServer)
+
+
 
 if __name__ == '__main__':
     main()
-
