@@ -23,10 +23,9 @@ import logging
 import subprocess as subp
 from threading import Lock
 
-import hdlcc.options as options
 from hdlcc.exceptions import SanityCheckError
 
-class BaseBuilder(object):
+class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """
     Class that implements the base builder flow
     """
@@ -371,8 +370,7 @@ class BaseBuilder(object):
             cached_info['rebuilds'] = rebuilds
             cached_info['compile_time'] = source.getmtime()
 
-            if not options.cache_error_messages and \
-                    'E' in [x['error_type'] for x in records]:
+            if 'E' in [x['error_type'] for x in records]:
                 cached_info['compile_time'] = 0
 
         else:
@@ -381,4 +379,3 @@ class BaseBuilder(object):
             rebuilds = cached_info['rebuilds']
 
         return records, rebuilds
-
