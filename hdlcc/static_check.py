@@ -168,7 +168,7 @@ def _getMiscChecks(objects):
     Get generic code hints (or it should do that sometime in the future...)
     """
     if 'library' not in [x['type'] for x in objects.values()]:
-        raise StopIteration
+        return
 
     for library, obj in objects.items():
         if obj['type'] != 'library':
