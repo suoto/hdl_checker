@@ -29,7 +29,10 @@ setup(
     url              = 'https://github.com/suoto/hdlcc',
     license          = 'GPLv3',
     packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers'],
-    install_requires = ['argcomplete', 'argparse', 'prettytable',],
+    install_requires = ['argcomplete', 'argparse', 'prettytable',
+                        'future>=0.14.0',
+                        'futures; python_version<"3.2"',
+                        'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass         = versioneer.get_cmdclass(),
     entry_points={
         'console_scripts' : ['hdlcc=hdlcc.standalone:main',]

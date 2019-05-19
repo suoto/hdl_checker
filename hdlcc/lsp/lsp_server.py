@@ -23,7 +23,11 @@
 
 import functools
 import logging
-import socketserver
+try:
+    import socketserver
+except ImportError:
+    # Python 2.7 support
+    import SocketServer as socketserver
 import threading
 
 from pyls_jsonrpc.dispatchers import MethodDispatcher
