@@ -21,6 +21,7 @@
 
 # pylint: disable=missing-docstring
 
+import functools
 import logging
 import socketserver
 import threading
@@ -29,7 +30,7 @@ from pyls_jsonrpc.dispatchers import MethodDispatcher
 from pyls_jsonrpc.endpoint import Endpoint
 from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
-from hdlcc.utils import isProcessRunning, debounce
+from hdlcc.utils import debounce, isProcessRunning
 
 from . import defines, uris
 
@@ -75,8 +76,8 @@ def startTcpLangServer(bind_addr, port, handler_class):
         {'DELEGATE_CLASS': handler_class}
     )
 
+    socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer((bind_addr, port), wrapper_class)
-    server.allow_reuse_address = True
 
     try:
         _logger.info('Serving %s on (%s, %s)', handler_class.__name__, bind_addr, port)
@@ -96,6 +97,36 @@ def startIoLangServer(rfile, wfile, check_parent_process, handler_class):
     server = handler_class(rfile, wfile, check_parent_process)
     server.start()
 
+def _toStr(d):
+    result = []
+    for key, value in d.items():
+        if key != 'text':
+            result += ['%s: %s' % (repr(key), repr(value))]
+        else:
+            result += ['%s: <%d lines>' % (repr(key), value.count('\n'))]
+
+    return ', '.join(result)
+
+def _logCalls(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        _str = "%s(%s, %s)" % (func.__name__, args, _toStr(kwargs))
+        if getattr(func, '_lsp_unimplemented', False):
+            _logger.warning(_str)
+        else:
+            _logger.debug(_str)
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+def _markUnimplemented(func):
+    """
+    Mark a method as unimplmemented so any calls logged via _logCalls decorator
+    will be warnings
+    """
+    func._lsp_unimplemented = True
+    return func
+
 
 class LanguageServer(MethodDispatcher):
     """ Implementation of the Microsoft VSCode Language Server Protocol
@@ -105,8 +136,6 @@ class LanguageServer(MethodDispatcher):
     # pylint: disable=too-many-public-methods,redefined-builtin
 
     def __init__(self, rx, tx, check_parent_process=False):
-        self.workspace = None
-
         self._jsonrpc_stream_reader = JsonRpcStreamReader(rx)
         self._jsonrpc_stream_writer = JsonRpcStreamWriter(tx)
         self._check_parent_process = check_parent_process
@@ -137,10 +166,12 @@ class LanguageServer(MethodDispatcher):
 
         raise KeyError()
 
+    @_logCalls
     def m_shutdown(self, **_kwargs):
         "Shutdowns the server"
         self._shutdown = True
 
+    @_logCalls
     def m_exit(self, **_kwargs):
         "Don't know yet"
         self._endpoint.shutdown()
@@ -150,34 +181,25 @@ class LanguageServer(MethodDispatcher):
     def capabilities(self):
         "Returns language server capabilities"
         server_capabilities = {
-            'codeActionProvider': True,
-            'codeLensProvider': {
-                'resolveProvider': False,  # We may need to make this configurable
-            },
-            'completionProvider': {
-                'resolveProvider': False,  # We know everything ahead of time
-                'triggerCharacters': ['.']
-            },
-            'documentFormattingProvider': True,
             'documentHighlightProvider': True,
-            'documentRangeFormattingProvider': True,
-            'documentSymbolProvider': True,
-            'definitionProvider': True,
+            #  'documentSymbolProvider': True,
+            #  'definitionProvider': True,
             #  'executeCommandProvider': {
             #      'commands': flatten(self._hook('pyls_commands'))
             #  },
-            'hoverProvider': True,
-            'referencesProvider': True,
-            'renameProvider': True,
-            'signatureHelpProvider': {
-                'triggerCharacters': ['(', ',']
-            },
+            #  'hoverProvider': True,
+            #  'referencesProvider': True,
+            #  'renameProvider': True,
+            #  'signatureHelpProvider': {
+            #      'triggerCharacters': ['(', ',']
+            #  },
             'textDocumentSync': defines.TextDocumentSyncKind.INCREMENTAL,
             #  'experimental': merge(self._hook('pyls_experimental_capabilities'))
         }
-        _logger.info('Server capabilities: %s', server_capabilities)
+        _logger.debug('Server capabilities: %s', server_capabilities)
         return server_capabilities
 
+    @_logCalls
     def m_initialize(self, processId=None, rootUri=None, # pylint: disable=invalid-name
                      rootPath=None, initializationOptions=None, **_kwargs):
 
@@ -189,8 +211,6 @@ class LanguageServer(MethodDispatcher):
 
         if rootUri is None:
             rootUri = uris.from_fs_path(rootPath) if rootPath is not None else ''
-
-        #  self.workspace = Workspace(rootUri, self._endpoint)
 
         if self._check_parent_process and processId is not None:
             def watchParentProcess(pid):
@@ -208,8 +228,10 @@ class LanguageServer(MethodDispatcher):
         # Get our capabilities
         return {'capabilities': self.capabilities()}
 
+    @_logCalls
+    @_markUnimplemented
     def m_initialized(self, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
     def execute_command(self, command, arguments):
         pass
@@ -218,101 +240,124 @@ class LanguageServer(MethodDispatcher):
     def lint(self, doc_uri, is_saved):
         _logger.info("Linting %s, saved=%s", doc_uri, is_saved)
 
-        # Since we're debounced, the document may no longer be open
-        if doc_uri in self.workspace.documents:
-            self.workspace.publish_diagnostics(
-                doc_uri,
-                {}
-            )
-
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__did_close(self,  # pylint: disable=invalid-name
                                    textDocument=None, **_kwargs):
-        pass
-        #  self.workspace.rm_document(textDocument['uri'])
+        "Unimplemented LSP handler"
 
+    @_logCalls
     def m_text_document__did_open(self,  # pylint: disable=invalid-name
                                   textDocument=None, **_kwargs):
-        self.workspace.put_document(textDocument['uri'], textDocument['text'], version=textDocument.get('version'))
+        #  self.workspace.put_document(textDocument['uri'], textDocument['text'], version=textDocument.get('version'))
         #  self._hook('pyls_document_did_open', textDocument['uri'])
         self.lint(textDocument['uri'], is_saved=False)
 
+    @_logCalls
     def m_text_document__did_change(self,  # pylint: disable=invalid-name
                                     contentChanges=None, textDocument=None,
                                     **_kwargs):
-        for change in contentChanges:
-            self.workspace.update_document(
-                textDocument['uri'],
-                change,
-                version=textDocument.get('version')
-            )
+        #  for change in contentChanges:
+        #      self.workspace.update_document(
+        #          textDocument['uri'],
+        #          change,
+        #          version=textDocument.get('version')
+        #      )
         self.lint(textDocument['uri'], is_saved=False)
 
+    @_logCalls
     def m_text_document__did_save(self,  # pylint: disable=invalid-name
                                   textDocument=None, **_kwargs):
         self.lint(textDocument['uri'], is_saved=True)
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__code_action(self,  # pylint: disable=invalid-name
                                      textDocument=None, range=None,
                                      context=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__code_lens(self,  # pylint: disable=invalid-name
                                    textDocument=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__completion(self,  # pylint: disable=invalid-name
                                     textDocument=None, position=None,
                                     **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__definition(self,  # pylint: disable=invalid-name
                                     textDocument=None, position=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__document_highlight(self,  # pylint: disable=invalid-name
                                             textDocument=None, position=None,
                                             **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__hover(self,  # pylint: disable=invalid-name
                                textDocument=None, position=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__document_symbol(self,  # pylint: disable=invalid-name
                                          textDocument=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__formatting(self,  # pylint: disable=invalid-name
                                     textDocument=None, _options=None,
                                     **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__rename(self,  # pylint: disable=invalid-name
                                 textDocument=None, position=None, newName=None,
                                 **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__range_formatting(self,  # pylint: disable=invalid-name
                                           textDocument=None, range=None,
                                           _options=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__references(self,  # pylint: disable=invalid-name
                                     textDocument=None, position=None,
                                     context=None, **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_text_document__signature_help(self,  # pylint: disable=invalid-name
                                         textDocument=None, position=None,
                                         **_kwargs):
-        pass
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_workspace__did_change_configuration(self,  # pylint: disable=invalid-name
                                               settings=None):
-        #  self.config.update((settings or {}).get('pyls', {}))
-        for doc_uri in self.workspace.documents:
-            self.lint(doc_uri, is_saved=False)
+        "Unimplemented LSP handler"
 
+    @_logCalls
+    @_markUnimplemented
     def m_workspace__did_change_watched_files(self,  # pylint: disable=invalid-name
                                               changes=None, **_kwargs):
         changed_py_files = set()
@@ -329,13 +374,15 @@ class LanguageServer(MethodDispatcher):
         #      # Only externally changed python files and lint configs may result in changed diagnostics.
         #      return
 
-        for doc_uri in self.workspace.documents:
-            # Changes in doc_uri are already handled by m_text_document__did_save
-            if doc_uri not in changed_py_files:
-                self.lint(doc_uri, is_saved=False)
+        #  for doc_uri in self.workspace.documents:
+        #      # Changes in doc_uri are already handled by m_text_document__did_save
+        #      if doc_uri not in changed_py_files:
+        #          self.lint(doc_uri, is_saved=False)
 
+    @_logCalls
     def m_workspace__execute_command(self, command=None, arguments=None):
         return self.execute_command(command, arguments)
+
 
 
 def flatten(list_of_lists):

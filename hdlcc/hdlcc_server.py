@@ -54,7 +54,7 @@ def parseArguments():
 
     # Options
     parser.add_argument('--host', action='store',)
-    parser.add_argument('--port', action='store',)
+    parser.add_argument('--port', action='store', type=int)
     parser.add_argument('--attach-to-pid', action='store', type=int)
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
