@@ -23,24 +23,21 @@
 
 import functools
 import logging
+import threading
+
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.utils import debounce, isProcessRunning
+from pyls_jsonrpc.dispatchers import MethodDispatcher
+from pyls_jsonrpc.endpoint import Endpoint
+from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
+
+from . import defines, uris
+
 try:
     import socketserver
 except ImportError:
     # Python 2.7 support
     import SocketServer as socketserver
-import threading
-
-from pyls_jsonrpc.dispatchers import MethodDispatcher
-from pyls_jsonrpc.endpoint import Endpoint
-from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
-
-from hdlcc.utils import debounce, isProcessRunning
-
-from . import defines, uris
-
-#  from . import lsp, _utils, uris
-#  from .config import config
-#  from .workspace import Workspace
 
 _logger = logging.getLogger(__name__)
 
@@ -101,9 +98,9 @@ def startIoLangServer(rfile, wfile, check_parent_process, handler_class):
     server = handler_class(rfile, wfile, check_parent_process)
     server.start()
 
-def _toStr(d):
+def _toStr(dict_):
     result = []
-    for key, value in d.items():
+    for key, value in dict_.items():
         if key != 'text':
             result += ['%s: %s' % (repr(key), repr(value))]
         else:
@@ -112,9 +109,10 @@ def _toStr(d):
     return ', '.join(result)
 
 def _logCalls(func):
+    import pprint
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
-        _str = "%s(%s, %s)" % (func.__name__, args, _toStr(kwargs))
+        _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         if getattr(func, '_lsp_unimplemented', False):
             _logger.warning(_str)
         else:
@@ -128,14 +126,73 @@ def _markUnimplemented(func):
     Mark a method as unimplmemented so any calls logged via _logCalls decorator
     will be warnings
     """
-    func._lsp_unimplemented = True
+    func._lsp_unimplemented = True  # pylint: disable=protected-access
     return func
+
+
+class HdlCodeCheckerServer(HdlCodeCheckerBase):
+    """
+    HDL Code Checker project builder class
+    """
+    _logger = logging.getLogger(__name__ + '.HdlCodeCheckerServer')
+
+    def __init__(self, *args, **kwargs):
+        super(HdlCodeCheckerServer, self).__init__(*args, **kwargs)
+
+    def _handleUiInfo(self, message):
+        self._logger.info(message)
+        #  self._msg_queue.put(("info", message))
+
+    def _handleUiWarning(self, message):
+        self._logger.warning(message)
+        #  self._msg_queue.put(("warning", message))
+
+    def _handleUiError(self, message):
+        self._logger.error(message)
+        #  self._msg_queue.put(("error", message))
+
+    def getQueuedMessages(self):
+        "Returns queued UI messages"
+        #  while not self._msg_queue.empty():  # pragma: no cover
+        #      yield self._msg_queue.get()
+
+    #  class DiagnosticSeverity(object):
+    #      Error = 1
+    #      Warning = 2
+    #      Information = 3
+    #      Hint = 4
+
+
+    def getMessagesByPath(self, *args, **kwargs):
+        messages = super(HdlCodeCheckerServer, self).getMessagesByPath(*args, **kwargs)
+        _logger.warning("Got %d messages", len(messages))
+        for message in messages:
+            _logger.info(message)
+            yield {
+                    'source': message.get('checker', '?'),
+                    'range': {
+                        'start': {
+                            'line': message.get('line_number', 1),
+                            'character': '',
+                        },
+                        'end': {
+                            'line': message.get('line_number', 1),
+                            'character': '',
+                        },
+                    },
+                'message': message.get('error_message', '?'),
+                'severity': 1,
+            }
 
 
 class LanguageServer(MethodDispatcher):
     """ Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
     """
+
+    M_PUBLISH_DIAGNOSTICS = 'textDocument/publishDiagnostics'
+    M_APPLY_EDIT = 'workspace/applyEdit'
+    M_SHOW_MESSAGE = 'window/showMessage'
 
     # pylint: disable=too-many-public-methods,redefined-builtin
 
@@ -146,6 +203,8 @@ class LanguageServer(MethodDispatcher):
         self._endpoint = Endpoint(self, self._jsonrpc_stream_writer.write, max_workers=MAX_WORKERS)
         self._dispatchers = []
         self._shutdown = False
+
+        self._checker = None
 
     def start(self):
         """Entry point for the server."""
@@ -185,7 +244,7 @@ class LanguageServer(MethodDispatcher):
     def capabilities(self):
         "Returns language server capabilities"
         server_capabilities = {
-            'documentHighlightProvider': True,
+            #  'documentHighlightProvider': True,
             #  'documentSymbolProvider': True,
             #  'definitionProvider': True,
             #  'executeCommandProvider': {
@@ -197,7 +256,7 @@ class LanguageServer(MethodDispatcher):
             #  'signatureHelpProvider': {
             #      'triggerCharacters': ['(', ',']
             #  },
-            'textDocumentSync': defines.TextDocumentSyncKind.INCREMENTAL,
+            'textDocumentSync': defines.TextDocumentSyncKind.NONE,
             #  'experimental': merge(self._hook('pyls_experimental_capabilities'))
         }
         _logger.debug('Server capabilities: %s', server_capabilities)
@@ -215,6 +274,9 @@ class LanguageServer(MethodDispatcher):
 
         if rootUri is None:
             rootUri = uris.from_fs_path(rootPath) if rootPath is not None else ''
+
+        self._checker = HdlCodeCheckerServer(
+            initializationOptions.get('config_file', None))
 
         if self._check_parent_process and processId is not None:
             def watchParentProcess(pid):
@@ -242,7 +304,28 @@ class LanguageServer(MethodDispatcher):
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
     def lint(self, doc_uri, is_saved):
-        _logger.info("Linting %s, saved=%s", doc_uri, is_saved)
+        #  server = self._servers[config_file] = HdlCodeCheckerServer(config_file)
+        if self._checker is None:
+            return
+
+        path = uris.to_fs_path(doc_uri)
+        _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
+
+        self._endpoint.notify(
+            self.M_PUBLISH_DIAGNOSTICS,
+            params={'uri': doc_uri,
+                    'diagnostics': list(self._checker.getMessagesByPath(path))})
+
+    def bufferActions(self, doc_uri, action):
+        if self._checker is None:
+            return
+
+        path = uris.to_fs_path(doc_uri)
+
+        if action == 'visit':
+            self._checker.onBufferVisit(path)
+        elif action == 'leave':
+            self._checker.onBufferLeave(path)
 
     @_logCalls
     @_markUnimplemented
