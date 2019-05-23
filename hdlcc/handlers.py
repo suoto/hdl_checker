@@ -34,13 +34,13 @@ _logger = logging.getLogger(__name__)
 
 app = bottle.Bottle() # pylint: disable=invalid-name
 
-class HdlCodeCheckerSever(HdlCodeCheckerBase):
+class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     HDL Code Checker project builder class
     """
     def __init__(self, *args, **kwargs):
         self._msg_queue = Queue()
-        super(HdlCodeCheckerSever, self).__init__(*args, **kwargs)
+        super(HdlCodeCheckerServer, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(("info", message))
@@ -58,7 +58,7 @@ class HdlCodeCheckerSever(HdlCodeCheckerBase):
 
 def _getServerByProjectFile(project_file):
     """
-    Returns the HdlCodeCheckerSever object that corresponds to the given
+    Returns the HdlCodeCheckerServer object that corresponds to the given
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
@@ -68,7 +68,7 @@ def _getServerByProjectFile(project_file):
         return _hdlcc_objects[project_file]
     except KeyError:
         _logger.debug("Created new project server for '%s'", project_file)
-        project = HdlCodeCheckerSever(project_file)
+        project = HdlCodeCheckerServer(project_file)
         _hdlcc_objects[project_file] = project
         return project
 
