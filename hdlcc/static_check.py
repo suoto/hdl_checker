@@ -16,8 +16,11 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "VHDL static checking to find unused signals, ports and constants."
 
-import re
 import logging
+import re
+
+from hdlcc.messages import (ErrorType, LibraryCanBeOmmitedMessage,
+                            StaticCheckerMessage, UnusedObjectMessage)
 
 _logger = logging.getLogger(__name__)
 
@@ -150,17 +153,12 @@ def _getCommentTags(vbuffer):
 
         for match in __COMMENT_TAG_SCANNER__.finditer(line):
             _dict = match.groupdict()
-            message = {
-                'checker'        : 'HDL Code Checker/static',
-                'line_number'    : lnum,
-                'column'         : match.start(match.lastindex - 1) + 1,
-                'filename'       : None,
-                'error_number'   : '0',
-                'error_type'     : 'W',
-                'error_subtype'  : '',
-                'error_message'  : "%s: %s" % (_dict['tag'].upper(), _dict['text'])
-                }
-            result += [message]
+            result += [
+                StaticCheckerMessage(
+                    line_number=lnum,
+                    column=match.start(match.lastindex - 1) + 1,
+                    error_type=ErrorType.STYLE_INFO,
+                    message="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
     return result
 
 def _getMiscChecks(objects):
@@ -174,16 +172,10 @@ def _getMiscChecks(objects):
         if obj['type'] != 'library':
             continue
         if library == 'work':
-            yield {
-                'checker'        : 'HDL Code Checker/static',
-                'line_number'    : obj['lnum'] + 1,
-                'column'         : obj['start'] + 1,
-                'filename'       : None,
-                'error_number'   : '0',
-                'error_type'     : 'W',
-                'error_subtype'  : 'Style',
-                'error_message'  : "Declaration of library '{library}' can "
-                                   "be omitted".format(library=library)}
+            yield LibraryCanBeOmmitedMessage(
+                line_number=obj['lnum'] + 1,
+                column=obj['start'] + 1,
+                library=library)
 
 def getStaticMessages(vbuffer=None):
     "VHDL static checking"
@@ -193,19 +185,12 @@ def getStaticMessages(vbuffer=None):
 
     for _object in _getUnusedObjects(vbuffer, objects.keys()):
         obj_dict = objects[_object]
-        message = {
-            'checker'        : 'HDL Code Checker/static',
-            'line_number'    : obj_dict['lnum'] + 1,
-            'column'         : obj_dict['start'] + 1,
-            'filename'       : None,
-            'error_number'   : '0',
-            'error_type'     : 'W',
-            'error_subtype'  : 'Style',
-            'error_message'  : "{obj_type} '{obj_name}' is never used".format(
-                obj_type=obj_dict['type'], obj_name=_object),
-            }
+        result += [UnusedObjectMessage(
+            line_number=obj_dict['lnum'] + 1,
+            column=obj_dict['start'] + 1,
+            object_type=obj_dict['type'],
+            object_name=_object)]
 
-        result.append(message)
     return result + _getCommentTags(vbuffer) + list(_getMiscChecks(objects))
 
 def standalone(): # pragma: no cover
@@ -220,5 +205,4 @@ def standalone(): # pragma: no cover
 
 if __name__ == '__main__':
     standalone()
-
 

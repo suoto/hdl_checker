@@ -25,11 +25,12 @@ import functools
 import logging
 import threading
 
-from hdlcc.hdlcc_base import HdlCodeCheckerBase
-from hdlcc.utils import debounce, isProcessRunning
 from pyls_jsonrpc.dispatchers import MethodDispatcher
 from pyls_jsonrpc.endpoint import Endpoint
 from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
+
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.utils import debounce, isProcessRunning
 
 from . import defines, uris
 
