@@ -36,15 +36,16 @@ class MSim(BaseBuilder):
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
-        r"^\*\*\s*(?P<severity>[WE])\w+\s*" \
-            r"(:\s*|\(suppressible\):\s*)"
-        r"(" \
-            r"(?P<filename>.*(?=\(\d+\)))"
-            r"\((?P<line_number>\d+)\):\s*"
-        r"|" \
-            r"\(vcom-\d+\)\s*"
-        r")"
-        r"(?P<error_message>.*)\s*").finditer
+        r"""^\*\*\s*
+                (?P<severity>[WE])\w+\s*
+                (\(suppressible\))?:\s*
+                (:?
+                    (?P<filename>.*(?=\(\d+\)))
+                    \((?P<line_number>\d+)\):
+                |
+                    \(vcom-\d+\)
+                )?
+            \s*(?P<error_message>.*)\s*""", flags=re.VERBOSE).finditer
 
     _should_ignore = re.compile('|'.join([
         r"^\s*$",
