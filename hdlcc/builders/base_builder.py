@@ -24,6 +24,7 @@ import subprocess as subp
 from threading import Lock
 
 from hdlcc.exceptions import SanityCheckError
+from hdlcc.diagnostics import DiagType
 
 class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """
@@ -158,7 +159,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
     @abc.abstractmethod
-    def _makeRecords(self, message):
+    def _makeRecords(self, line):
         """
         Static method that converts a string into a dict that has
         elements identifying its fields
@@ -269,7 +270,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             if lib not in self.getBuiltinLibraries():
                 self._createLibrary(lib)
 
-        records = []
+        diagnostics = []
         rebuilds = []
         # We must give precedence to the buffer content over the file
         # content, so we dump the buffer content to a temporary file
@@ -287,24 +288,24 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
             line = line.replace(build_path, source.filename)
 
-            records += [x for x in self._makeRecords(line) if x not in records]
+            diagnostics += [x for x in self._makeRecords(line) if x not in diagnostics]
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in
                          rebuilds]
 
-        self._logBuildResults(records, rebuilds)
+        self._logBuildResults(diagnostics, rebuilds)
 
-        return records, rebuilds
+        return diagnostics, rebuilds
 
-    def _logBuildResults(self, records, rebuilds): # pragma: no cover
+    def _logBuildResults(self, diagnostics, rebuilds): # pragma: no cover
         """
-        Logs records and rebuilds only for debugging purposes
+        Logs diagnostics and rebuilds only for debugging purposes
         """
         if not self._logger.isEnabledFor(logging.DEBUG):
             return
 
-        if records:
-            self._logger.debug("Records found")
-            for record in records:
+        if diagnostics:
+            self._logger.debug("Diagnostic messages found")
+            for record in diagnostics:
                 self._logger.debug(record)
 
         if rebuilds:
@@ -313,7 +314,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 self._logger.debug(rebuild)
 
     @abc.abstractmethod
-    def _createLibrary(self, source):
+    def _createLibrary(self, library):
         """
         Callback called to create a library
         """
@@ -339,7 +340,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         if source.abspath not in self._build_info_cache.keys():
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
-                'records' : [],
+                'diagnostics' : [],
                 'rebuilds' : []}
 
         cached_info = self._build_info_cache[source.abspath]
@@ -358,7 +359,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             # Build a list of flags and pass it as tuple
             build_flags = source.flags + flags
             with self._lock:
-                records, rebuilds = \
+                diagnostics, rebuilds = \
                         self._buildAndParse(source, flags=tuple(build_flags))
 
             for rebuild in rebuilds:
@@ -366,16 +367,16 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                     if rebuild['library_name'] == 'work':
                         rebuild['library_name'] = source.library
 
-            cached_info['records'] = records
+            cached_info['diagnostics'] = diagnostics
             cached_info['rebuilds'] = rebuilds
             cached_info['compile_time'] = source.getmtime()
 
-            if 'E' in [x['error_type'] for x in records]:
+            if DiagType.ERROR in [x.severity for x in diagnostics]:
                 cached_info['compile_time'] = 0
 
         else:
             self._logger.debug("Nothing to do for %s", source)
-            records = cached_info['records']
+            diagnostics = cached_info['diagnostics']
             rebuilds = cached_info['rebuilds']
 
-        return records, rebuilds
+        return diagnostics, rebuilds

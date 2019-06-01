@@ -21,7 +21,7 @@ import os.path as p
 import re
 from shutil import copyfile
 
-from hdlcc.diagnostics import DiagType, MsimMessage
+from hdlcc.diagnostics import DiagType, BuilderDiag
 from hdlcc.utils import getFileType, pushd
 
 from .base_builder import BaseBuilder
@@ -36,7 +36,7 @@ class MSim(BaseBuilder):
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
-        r"^\*\*\s*(?P<error_type>[WE])\w+\s*" \
+        r"^\*\*\s*(?P<severity>[WE])\w+\s*" \
             r"(:\s*|\(suppressible\):\s*)"
         r"(" \
             r"(?P<filename>.*(?=\(\d+\)))"
@@ -106,23 +106,39 @@ class MSim(BaseBuilder):
         records = []
 
         for match in self._stdout_message_scanner(line):
-            info = {
-                'checker'        : self.builder_name,
-                'line_number'    : None,
-                'column'         : None,
-                'filename'       : None,
-                'error_number'   : None,
-                'error_type'     : None,
-                'error_message'  : None}
-            for key, content in match.groupdict().items():
-                info[key] = content
+            info = match.groupdict()
+
+            self._logger.info("Parsed dict: %s", repr(info))
+
+            text = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
+                          info['error_message']).strip()
+
+            diag = BuilderDiag(builder_name=self.builder_name, text=text)
+
+            error_number = None
 
             if ('vcom-' in line) or ('vlog' in line):
-                info['error_number'] = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
+                error_number = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
 
-            info['error_message'] = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
-                                           info['error_message']).strip()
-            records += [info]
+            diag.error_number = error_number
+
+            filename = info.get('filename')
+            line_number = info.get('line_number')
+            column = info.get('column')
+
+            if filename is not None:
+                diag.filename = filename
+            if line_number is not None:
+                diag.line_number = line_number
+            if column is not None:
+                diag.line_number = column
+
+            if info.get('severity', None) in ('W', 'e'):
+                diag.severity = DiagType.WARNING
+            elif info.get('severity', None) in ('E', 'e'):
+                diag.severity = DiagType.ERROR
+
+            records += [diag]
 
         return records
 
@@ -131,9 +147,9 @@ class MSim(BaseBuilder):
         self._version = \
                 re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                 stdout[0])[0]
-        self._logger.debug("vcom version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout, self._version)
+        self._logger.debug("vcom version string: '%s'. "
+                           "Version number is '%s'",
+                           stdout, self._version)
 
     @staticmethod
     def isAvailable():
@@ -172,11 +188,12 @@ class MSim(BaseBuilder):
         filetype = getFileType(path)
         if filetype == 'vhdl':
             return self._buildVhdl(path, library, flags)
-        elif filetype in ('verilog', 'systemverilog'):
+        if filetype in ('verilog', 'systemverilog'):
             return self._buildVerilog(path, library, flags)
-        else:  # pragma: no cover
-            self._logger.error("Unknown file type %s for path '%s'",
-                               filetype, path)
+
+        self._logger.error("Unknown file type %s for path '%s'",
+                           filetype, path)
+        return None
 
     def _getExtraFlags(self, lang):
         """
@@ -267,7 +284,7 @@ class MSim(BaseBuilder):
         "Deletes a library from ModelSim init file"
         if not p.exists(p.join(self._target_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
-            return
+            return None
         return self._subprocessRunner(
             ['vdel', '-modelsimini', self._modelsim_ini, '-lib', library,
              '-all'])
@@ -281,5 +298,3 @@ class MSim(BaseBuilder):
 
         self._subprocessRunner(['vmap', '-modelsimini', self._modelsim_ini,
                                 library, p.join(self._target_folder, library)])
-
-

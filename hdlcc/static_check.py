@@ -160,7 +160,7 @@ def _getCommentTags(vbuffer):
                 StaticCheckerDiag(
                     line_number=lnum,
                     column=match.start(match.lastindex - 1) + 1,
-                    error_type=DiagType.STYLE_INFO,
+                    severity=DiagType.STYLE_INFO,
                     text="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
     return result
 

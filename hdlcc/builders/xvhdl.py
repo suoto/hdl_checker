@@ -66,7 +66,7 @@ class XVHDL(BaseBuilder):
                                    'synplify', 'synopsis', 'maxii',
                                    'family_support')
 
-    def _makeRecords(self, message):
+    def _makeRecords(self, line):
         line_number = None
         column = None
         filename = None
@@ -74,7 +74,7 @@ class XVHDL(BaseBuilder):
         error_type = None
         error_message = None
 
-        scan = self._stdout_message_scanner.scanner(message)
+        scan = self._stdout_message_scanner.scanner(line)
 
         while True:
             match = scan.match()

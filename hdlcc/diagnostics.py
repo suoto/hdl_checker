@@ -27,81 +27,103 @@ class DiagType(object):  # pylint: disable=too-few-public-methods
     """
     Enum-like class for error types
     """
-    NONE = 0
-    INFO = 1
-    WARNING = 2
-    ERROR = 3
-    STYLE_INFO = 4
-    STYLE_WARNING = 5
-    STYLE_ERROR = 6
+    NONE = 'None'
+    INFO = 'Info'
+    WARNING = 'Warning'
+    ERROR = 'Error'
+    STYLE_INFO = 'Info (style)'
+    STYLE_WARNING = 'Warning (style)'
+    STYLE_ERROR = 'Error (style)'
 
 class BaseDiagnostic(object):  # pylint: disable=too-few-public-methods
     """
     Base container for diagnostics
     """
-    def __init__(self, checker=CHECKER_NAME, filename=None, line_number=None,
-                 column=None, error_number=None, error_type=None,
-                 text=None):
+    def __init__(self, # pylint: disable=too-many-arguments
+                 checker, text, filename=None, line_number=None, column=None,
+                 error_number=None, severity=None):
 
-        self._checker = checker
-        self._filename = filename
-        self._line_number = line_number
-        self._column = column
-        self._error_number = error_number
-        self._error_type = error_type
-        self._text = text
+        # Checker can't be changed
+        self.__checker = CHECKER_NAME if checker is None else checker
 
-    def __str__(self):
+        # Modifiable attributes
+        self.filename = filename
+        self.error_number = error_number
+        self.text = text
+
+        # Modifiable with rules
+        self.__line_number = line_number
+        self.__column = column
+        self.__severity = severity
+
+        if line_number is not None:
+            self.line_number = line_number
+        if column is not None:
+            self.column = column
+        if severity is not None:
+            self.severity = severity
+
+    def __repr__(self):
         return ('{}(checker="{}", filename="{}", line_number="{}", '
-                'column="{}", error_number="{}", error_type="{}", '
+                'column="{}", error_number="{}", severity="{}", '
                 'text={})'
-                .format(self.__class__.__name__, self._checker, self._filename,
-                        self._line_number, self._column, self._error_number,
-                        self._error_type, repr(self._text)))
+                .format(self.__class__.__name__, self.__checker, self.filename,
+                        self.__line_number, self.__column, self.error_number,
+                        self.__severity, repr(self.text)))
 
     def __eq__(self, other):
         # Won't compare apples to oranges
         if not isinstance(other, BaseDiagnostic):
             return False
 
-        # Compare attributes
-        for attr in ('checker', 'filename', 'line_number', 'column',
-                     'error_number', 'error_type', 'text'):
-            try:
+        try:
+            # Compare attributes
+            for attr in ('checker', 'filename', 'line_number', 'column',
+                         'error_number', 'severity', 'text'):
                 if getattr(self, attr) != getattr(other, attr):
                     return False
-            except AttributeError:
-                return False
+        except AttributeError:
+            return False
 
         return True
 
     @property
     def checker(self):
-        return self._checker
+        "Full checker name"
+        return self.__checker
 
     @property
     def line_number(self):
-        return self._line_number
+        "Diagnostics line number"
+        if self.__line_number is not None:
+            return int(self.__line_number)
+        return self.__line_number
+
+    @line_number.setter
+    def line_number(self, value):
+        self.__line_number = int(value)
 
     @property
     def column(self):
-        return self._column
+        "Diagnostics column"
+        if self.__column is not None:
+            return int(self.__column)
+        return self.__column
+
+    @column.setter
+    def column(self, value):
+        self.__column = int(value)
 
     @property
-    def filename(self):
-        return self._filename
+    def severity(self):
+        "Diagnostics severity (use diagnostics.DiagType for consistency)"
+        return self.__severity
 
-    @property
-    def error_number(self):
-        return self._error_number
-
-    @property
-    def error_type(self):
-        return self._error_type
-
-    @property
-    def text(self):
-        return self._text
+    @severity.setter
+    def severity(self, value):
+        assert value in DiagType.__dict__.values(), \
+            "Invalid severity {}".format(repr(value))
+        self.__severity = value
 
 class PathNotInProjectFile(BaseDiagnostic):
     """
@@ -110,38 +132,41 @@ class PathNotInProjectFile(BaseDiagnostic):
     """
     def __init__(self, path):
         super(PathNotInProjectFile, self).__init__(
-            checker=CHECKER_NAME, filename=path, error_type=DiagType.WARNING,
+            checker=CHECKER_NAME, filename=path, severity=DiagType.WARNING,
             text='Path "{}" not found in project file'.format(path))
 
 class StaticCheckerDiag(BaseDiagnostic):
-    def __init__(self, filename=None, line_number=None, column=None,
-                 error_number=None, error_type=None, text=None):
+    "Base diagnostics issues from static checks"
+    def __init__(self, # pylint: disable=too-many-arguments
+                 text, severity, filename=None, line_number=None, column=None,
+                 error_number=None):
 
-        assert error_type in (DiagType.STYLE_INFO, DiagType.STYLE_WARNING,
-                              DiagType.STYLE_ERROR), \
+        assert severity in (DiagType.STYLE_INFO, DiagType.STYLE_WARNING,
+                            DiagType.STYLE_ERROR), \
             "Static checker diags should only carry style error types"
 
         super(StaticCheckerDiag, self).__init__(
-            checker=STATIC_CHECKER_NAME, filename=filename,
-            line_number=line_number, column=column, error_number=error_number,
-            error_type=error_type, text=text)
+            checker=STATIC_CHECKER_NAME, text=text, severity=severity,
+            filename=filename, line_number=line_number, column=column,
+            error_number=error_number)
 
 class LibraryShouldBeOmited(StaticCheckerDiag):
-    def __init__(self, filename=None, line_number=None, column=None,
-                 library=None):
+    "Library declaration should be ommited"
+    def __init__(self, library, filename=None, line_number=None, column=None):
         super(LibraryShouldBeOmited, self).__init__(
             line_number=line_number, column=column, filename=filename,
-            error_type=DiagType.STYLE_WARNING,
-            text="Declaration of library '{library}' can be "
-                    "omitted".format(library=library))
-
+            severity=DiagType.STYLE_WARNING,
+            text="Declaration of library '{library}' can be omitted" \
+                    .format(library=library))
 
 class ObjectIsNeverUsed(StaticCheckerDiag):
-    def __init__(self, filename=None, line_number=None, column=None,
+    "Reports an object that was created but never used"
+    def __init__(self,  # pylint: disable=too-many-arguments
+                 filename=None, line_number=None, column=None,
                  object_name=None, object_type=None):
         super(ObjectIsNeverUsed, self).__init__(
             filename=filename, line_number=line_number, column=column,
-            error_type=DiagType.STYLE_WARNING,
+            severity=DiagType.STYLE_WARNING,
             text="{} '{}' is never used".format(object_type, object_name))
 
 class BuilderDiag(BaseDiagnostic):
@@ -149,10 +174,10 @@ class BuilderDiag(BaseDiagnostic):
     text issues when checking a file whose path in not present on the
     project file
     """
-    _name = '{}/{}'.format(CHECKER_NAME, 'msim')
-
-    def __init__(self, filename=None, line_number=None, column=None,
-                 error_number=None, error_type=None, text=None):
+    def __init__(self, # pylint: disable=too-many-arguments
+                 builder_name, text, filename=None, line_number=None, column=None,
+                 error_number=None, severity=None):
         super(BuilderDiag, self).__init__(
-            checker=self._name, filename=filename, error_type=error_type,
-            text=text)
+            checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
+            filename=filename, line_number=line_number, column=column,
+            error_number=error_number, severity=severity)
