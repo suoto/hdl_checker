@@ -19,7 +19,11 @@
 import os
 import os.path as p
 import re
+
+from hdlcc.diagnostics import BuilderDiag, DiagType
+
 from .base_builder import BaseBuilder
+
 
 class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''
@@ -31,7 +35,7 @@ class XVHDL(BaseBuilder):
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
-        r"^(?P<error_type>[EW])\w+:\s*"
+        r"^(?P<severity>[EW])\w+:\s*"
         r"\[(?P<error_number>[^\]]+)\]\s*"
         r"(?P<error_message>[^\[]+)\s*"
         r"("
@@ -67,45 +71,38 @@ class XVHDL(BaseBuilder):
                                    'family_support')
 
     def _makeRecords(self, line):
-        line_number = None
-        column = None
-        filename = None
-        error_number = None
-        error_type = None
-        error_message = None
-
         scan = self._stdout_message_scanner.scanner(line)
 
-        while True:
-            match = scan.match()
-            if not match:
-                break
+        match = scan.match()
+        if not match:
+            return
 
-            _dict = match.groupdict()
+        info = match.groupdict()
 
-            line_number = _dict['line_number']
-            filename = _dict['filename']
-            error_number = _dict['error_number']
-            error_type = _dict['error_type']
-            error_message = _dict['error_message'].strip()
+        diag = BuilderDiag(
+            builder_name=self.builder_name,
+            text=info['error_message'].strip(),
+            line_number=info['line_number'],
+            filename=info['filename'],
+            error_number=info['error_number'])
 
-        return [{
-            'checker'        : self.builder_name,
-            'line_number'    : line_number,
-            'column'         : column,
-            'filename'       : filename,
-            'error_number'   : error_number,
-            'error_type'     : error_type,
-            'error_message'  : error_message,
-        }]
+        if info.get('severity', None) in ('W', 'e'):
+            diag.severity = DiagType.WARNING
+        elif info.get('severity', None) in ('E', 'e'):
+            diag.severity = DiagType.ERROR
+
+        yield diag
+
+    def _parseBuiltinLibraries(self):
+        "(Not used by XVHDL)"
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
         self._version = \
                 re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
-        self._logger.info("xvhdl version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        self._logger.info("xvhdl version string: '%s'. "
+                          "Version number is '%s'",
+                          stdout[:-1], self._version)
 
     @staticmethod
     def isAvailable():

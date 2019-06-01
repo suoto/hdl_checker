@@ -21,7 +21,10 @@ import os.path as p
 import re
 from glob import glob
 
+from hdlcc.diagnostics import BuilderDiag, DiagType
+
 from .base_builder import BaseBuilder
+
 
 class GHDL(BaseBuilder):
     """
@@ -66,27 +69,32 @@ class GHDL(BaseBuilder):
         self._parseBuiltinLibraries()
 
     def _makeRecords(self, line):
-        record = {
-            'checker'       : self.builder_name,
-            'line_number'   : None,
-            'column'        : None,
-            'filename'      : None,
-            'error_number'  : None,
-            'error_type'    : None,
-            'error_message' : None}
-
         for match in self._stdout_message_parser(line):
-            _dict = match.groupdict()
-            for key in record.keys():
-                if key in _dict.keys():
-                    record[key] = _dict[key]
+            info = match.groupdict()
+            diag = BuilderDiag(
+                builder_name=self.builder_name,
+                text=info.get('error_message', None))
 
-            if _dict['is_warning']:
-                record['error_type'] = 'W'
+            if info['is_warning']:
+                diag.severity = DiagType.WARNING
             else:
-                record['error_type'] = 'E'
+                diag.severity = DiagType.ERROR
 
-        return [record]
+            filename = info.get('filename')
+            line_number = info.get('line_number')
+            column = info.get('column')
+
+            if filename is not None:
+                diag.filename = filename
+            if line_number is not None:
+                diag.line_number = line_number
+            if column is not None:
+                diag.column = column
+
+            self._logger.info("Diag: %s", diag)
+            yield diag
+
+        #  return [diag, ]
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['ghdl', '--version'])

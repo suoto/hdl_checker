@@ -113,8 +113,9 @@ with such.A("builder object") as it:
 
             _logger.info("Running '%s'", case)
             it.assertEqual(
-                it.builder._makeRecords(
-                    "** Error: %s(21): near \"EOF\": (vcom-1576) expecting \';\'." % path),
+                list(it.builder._makeRecords(
+                    "** Error: %s(21): near \"EOF\": (vcom-1576) "
+                    "expecting \';\'." % path)),
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="near \"EOF\": expecting \';\'.",
@@ -124,10 +125,10 @@ with such.A("builder object") as it:
                     severity=DiagType.ERROR)])
 
             it.assertEqual(
-                it.builder._makeRecords(
+                list(it.builder._makeRecords(
                     "** Warning: %s(23): (vcom-1320) Type of expression "
                     "\"(OTHERS => '0')\" is ambiguous; using element type "
-                    "STD_LOGIC_VECTOR, not aggregate type register_type." % path),
+                    "STD_LOGIC_VECTOR, not aggregate type register_type." % path)),
 
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
@@ -140,10 +141,10 @@ with such.A("builder object") as it:
                     severity=DiagType.WARNING)])
 
             it.assertEquals(
-                it.builder._makeRecords(
+                list(it.builder._makeRecords(
                     "** Warning: %s(39): (vcom-1514) Range choice direction "
                     "(downto) does not determine aggregate index range "
-                    "direction (to)." % path),
+                    "direction (to)." % path)),
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="Range choice direction (downto) does not determine "
@@ -154,8 +155,8 @@ with such.A("builder object") as it:
                     severity=DiagType.WARNING)])
 
             it.assertEquals(
-                it.builder._makeRecords(
-                    "** Error: (vcom-11) Could not find work.regfile_pkg."),
+                list(it.builder._makeRecords(
+                    "** Error: (vcom-11) Could not find work.regfile_pkg.")),
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="Could not find work.regfile_pkg.",
@@ -163,9 +164,9 @@ with such.A("builder object") as it:
                     severity=DiagType.ERROR)])
 
             it.assertEquals(
-                it.builder._makeRecords(
+                list(it.builder._makeRecords(
                     "** Error (suppressible): %s(7): (vcom-1195) Cannot find "
-                    "expanded name \"work.regfile_pkg\"." % path),
+                    "expanded name \"work.regfile_pkg\"." % path)),
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="Cannot find expanded name \"work.regfile_pkg\".",
@@ -175,8 +176,8 @@ with such.A("builder object") as it:
                     severity=DiagType.ERROR)])
 
             it.assertEquals(
-                it.builder._makeRecords(
-                    "** Error: %s(7): Unknown expanded name." % path),
+                list(it.builder._makeRecords(
+                    "** Error: %s(7): Unknown expanded name." % path)),
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="Unknown expanded name.",
@@ -194,15 +195,16 @@ with such.A("builder object") as it:
                 _logger.info("GHDL only test")
                 return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeRecords(
-                "%s:11:35: extra ';' at end of interface list" % path),
-                [{'checker'        : 'ghdl',
-                  'line_number'    : '11',
-                  'column'         : '35',
-                  'filename'       : path,
-                  'error_number'   : None,
-                  'severity'     : 'E',
-                  'error_message'  : "extra ';' at end of interface list"}])
+            it.assertEquals(
+                list(it.builder._makeRecords(
+                    "%s:11:35: extra ';' at end of interface list" % path)),
+                [BuilderDiag(
+                    builder_name=it.BUILDER_NAME,
+                    filename=path,
+                    line_number=11,
+                    column=35,
+                    severity=DiagType.ERROR,
+                    text="extra ';' at end of interface list")])
 
         @it.should("parse XVHDL builder lines correctly")
         @params('/some/file/with/abs/path.vhd',
@@ -214,15 +216,16 @@ with such.A("builder object") as it:
                 _logger.info("XVHDL only test")
                 return
             _logger.info("Running %s", case)
-            it.assertEquals(it.builder._makeRecords(
-                'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path),
-                [{'checker'        : 'xvhdl',
-                  'line_number'    : '12',
-                  'column'         : None,
-                  'filename'       : path,
-                  'error_number'   : 'VRFC 10-1412',
-                  'severity'     : 'E',
-                  'error_message'  : "syntax error near )"}])
+            it.assertEquals(
+                list(it.builder._makeRecords(
+                    'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path)),
+                [BuilderDiag(
+                    builder_name=it.BUILDER_NAME,
+                    text="syntax error near )",
+                    filename=path,
+                    line_number=12,
+                    error_number='VRFC 10-1412',
+                    severity=DiagType.ERROR)])
 
         @it.should('compile a VHDL source without errors')
         def test():
@@ -276,28 +279,27 @@ with such.A("builder object") as it:
                     error_number='1136',
                     severity=DiagType.ERROR)]
             elif it.BUILDER_NAME == 'ghdl':
-                expected = [{
-                    'line_number': '4',
-                    'error_number': None,
-                    'error_message': 'no declaration for "some_lib"',
-                    'column': '5',
-                    'severity': 'E',
-                    'checker': 'ghdl'}]
+                expected = [BuilderDiag(
+                    builder_name=it.BUILDER_NAME,
+                    text='no declaration for "some_lib"',
+                    line_number=4,
+                    column=5,
+                    severity=DiagType.ERROR)]
             elif it.BUILDER_NAME == 'xvhdl':
                 expected = [
-                    {'line_number': '4',
-                     'error_number': 'VRFC 10-91',
-                     'error_message': 'some_lib is not declared',
-                     'column': None,
-                     'severity': 'E',
-                     'checker': 'xvhdl'},
+                    BuilderDiag(
+                        builder_name=it.BUILDER_NAME,
+                        text='some_lib is not declared',
+                        line_number=4,
+                        error_number='VRFC 10-91',
+                        severity=DiagType.ERROR),
 
-                    {'line_number': '4',
-                     'error_number': 'VRFC 10-2989',
-                     'error_message': "'some_lib' is not declared",
-                     'column': None,
-                     'severity': 'E',
-                     'checker': 'xvhdl'}]
+                    BuilderDiag(
+                        builder_name=it.BUILDER_NAME,
+                        text="'some_lib' is not declared",
+                        line_number='4',
+                        error_number='VRFC 10-2989',
+                        severity=DiagType.ERROR)]
 
             it.assertEqual(len(records), 1)
             record = records.pop()
@@ -341,4 +343,3 @@ with such.A("builder object") as it:
                 it.builder._searchForRebuilds(line))
 
 it.createTests(globals())
-

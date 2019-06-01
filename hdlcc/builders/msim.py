@@ -132,16 +132,14 @@ class MSim(BaseBuilder):
             if line_number is not None:
                 diag.line_number = line_number
             if column is not None:
-                diag.line_number = column
+                diag.column = column
 
             if info.get('severity', None) in ('W', 'e'):
                 diag.severity = DiagType.WARNING
             elif info.get('severity', None) in ('E', 'e'):
                 diag.severity = DiagType.ERROR
 
-            records += [diag]
-
-        return records
+            yield diag
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['vcom', '-version'])
