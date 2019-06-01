@@ -20,8 +20,12 @@ import os
 import os.path as p
 import re
 from shutil import copyfile
-from .base_builder import BaseBuilder
+
+from hdlcc.diagnostics import DiagType, MsimMessage
 from hdlcc.utils import getFileType, pushd
+
+from .base_builder import BaseBuilder
+
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''

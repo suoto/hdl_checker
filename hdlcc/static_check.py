@@ -19,8 +19,8 @@
 import logging
 import re
 
-from hdlcc.messages import (ErrorType, LibraryCanBeOmmitedMessage,
-                            StaticCheckerMessage, UnusedObjectMessage)
+from hdlcc.diagnostics import (DiagType, LibraryShouldBeOmited,
+                               ObjectIsNeverUsed, StaticCheckerDiag)
 
 _logger = logging.getLogger(__name__)
 
@@ -138,6 +138,9 @@ __COMMENT_TAG_SCANNER__ = re.compile('|'.join([
     r"\s*--\s*(?P<tag>TODO|FIXME|XXX)\s*:\s*(?P<text>.*)"]))
 
 def _getCommentTags(vbuffer):
+    """
+    Generates diags from 'TODO', 'FIXME' and 'XXX' tags
+    """
     result = []
     lnum = 0
     for line in vbuffer:
@@ -154,11 +157,11 @@ def _getCommentTags(vbuffer):
         for match in __COMMENT_TAG_SCANNER__.finditer(line):
             _dict = match.groupdict()
             result += [
-                StaticCheckerMessage(
+                StaticCheckerDiag(
                     line_number=lnum,
                     column=match.start(match.lastindex - 1) + 1,
-                    error_type=ErrorType.STYLE_INFO,
-                    message="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
+                    error_type=DiagType.STYLE_INFO,
+                    text="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
     return result
 
 def _getMiscChecks(objects):
@@ -172,7 +175,7 @@ def _getMiscChecks(objects):
         if obj['type'] != 'library':
             continue
         if library == 'work':
-            yield LibraryCanBeOmmitedMessage(
+            yield LibraryShouldBeOmited(
                 line_number=obj['lnum'] + 1,
                 column=obj['start'] + 1,
                 library=library)
@@ -185,7 +188,7 @@ def getStaticMessages(vbuffer=None):
 
     for _object in _getUnusedObjects(vbuffer, objects.keys()):
         obj_dict = objects[_object]
-        result += [UnusedObjectMessage(
+        result += [ObjectIsNeverUsed(
             line_number=obj_dict['lnum'] + 1,
             column=obj_dict['start'] + 1,
             object_type=obj_dict['type'],
@@ -194,6 +197,9 @@ def getStaticMessages(vbuffer=None):
     return result + _getCommentTags(vbuffer) + list(_getMiscChecks(objects))
 
 def standalone(): # pragma: no cover
+    """
+    Standalone entry point
+    """
     import sys
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
@@ -205,4 +211,3 @@ def standalone(): # pragma: no cover
 
 if __name__ == '__main__':
     standalone()
-

@@ -30,7 +30,7 @@ from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.config_parser import ConfigParser
 from hdlcc.static_check import getStaticMessages
-from hdlcc.messages import PathNotInProjectFileMessage
+from hdlcc.diagnostics import PathNotInProjectFile
 
 _logger = logging.getLogger('build messages')
 
@@ -226,7 +226,7 @@ class HdlCodeCheckerBase(object):
         # at least have some info on the source
         if source is None:
             if self.builder.builder_name != 'fallback':
-                remarks += [PathNotInProjectFileMessage(p.abspath(path)), ]
+                remarks += [PathNotInProjectFile(p.abspath(path)), ]
 
             self._logger.info("Path %s not found in the project file",
                               p.abspath(path))
@@ -517,4 +517,3 @@ class HdlCodeCheckerBase(object):
         """
         Runs actions when leaving a buffer.
         """
-        pass

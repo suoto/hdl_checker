@@ -19,13 +19,17 @@
 
 from __future__ import print_function
 
+import argparse
+import logging
 import os
 import os.path as p
-import logging
-import time
-import argparse
-from prettytable import PrettyTable
 import sys
+import time
+
+from prettytable import PrettyTable
+
+import hdlcc
+from hdlcc.utils import setupLogging
 
 try:
     import cProfile as profile
@@ -38,8 +42,6 @@ try:
 except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
-import hdlcc
-from hdlcc.utils import setupLogging
 
 _logger = logging.getLogger(__name__)
 
