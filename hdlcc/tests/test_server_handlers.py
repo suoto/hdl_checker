@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=function-redefined
+# pylint: disable=missing-docstring
+# pylint: disable=protected-access
+# pylint: disable=invalid-name
 
 import json
 import logging
@@ -25,20 +28,19 @@ import shutil
 
 import six
 
+from nose2.tools import such
+from webtest import TestApp
+
 import hdlcc
 import hdlcc.handlers as handlers
 import hdlcc.utils as utils
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from nose2.tools import such
-from webtest import TestApp
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
     import mock
 
-
-#  TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
 
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 
@@ -192,7 +194,7 @@ with such.A("hdlcc bottle app") as it:
                 p.exists(target_folder),
                 "Target folder '%s' still exists!" % target_folder)
 
-        def step_03_check_build_fails(ref_msgs):
+        def step_03_check_build_fails():
             step_03_msgs = step_01_check_file_builds_ok()
             if step_03_msgs:
                 _logger.info("Step 03 messages:")
@@ -208,8 +210,8 @@ with such.A("hdlcc bottle app") as it:
             it.app.post('/rebuild_project', data)
             data = {
                 'project_file' : it.PROJECT_FILE,
-                'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
+                'path'         : p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                                        'clock_divider.vhd')}
 
         def step_05_check_messages_are_the_same(msgs):
             step_05_msgs = step_01_check_file_builds_ok()
@@ -239,7 +241,7 @@ with such.A("hdlcc bottle app") as it:
         step_02_erase_target_folder()
 
         _logger.info("Step 03")
-        step_03_check_build_fails(step_01_msgs)
+        step_03_check_build_fails()
 
         _logger.info("Step 04")
         step_04_rebuild_project()

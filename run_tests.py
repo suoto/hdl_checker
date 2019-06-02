@@ -164,7 +164,8 @@ def _parseArguments():
     parser.add_argument('--verbose', '-v', action='store_true')
 
     parser.add_argument('--log-file', action='store',
-                        default=p.abspath(p.expanduser("~/tests.log")))
+                        default=p.join(os.environ['TOX_ENV_DIR'], 'tmp',
+                                       'tests.log'))
 
     parser.add_argument('--log-level', action='store', default='INFO',
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
@@ -252,6 +253,8 @@ def runTestsForEnv(env, args):
 
     test_env.update({'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
 
+    _logger.info("nose2 args: %s", nose_args)
+
     with mock.patch.dict('os.environ', test_env):
         successful = nose2.discover(exit=False,
                                     argv=nose_args).result.wasSuccessful()
@@ -273,7 +276,7 @@ def _setupPaths():
 
 def main():
     args = _parseArguments()
-    _setupLogging(args.log_stream, args.log_level)
+    _setupLogging(args.log_stream, args.log_level, color=False)
     _setupPaths()
     #  _clear()
 

@@ -15,9 +15,9 @@
 ---
 language: python
 # Need to upgrade this at some point
-dist: precise
+# dist: precise
 python:
-  - "2.7"
+  # - "2.7"
   - "3.5"
 
 env:
@@ -33,29 +33,25 @@ env:
       # sudo apt-get install -qq libgd-dev libtcl8.5 tree;
 
 before_install:
-  - if [ "$BUILDER" == "msim" ]; then
-      sudo apt-get update -qq;
-      sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch;
-    fi
+  - sudo apt-get update -qq;
+  - sudo apt-get install -qq libtcl8.5
 
 before_script:
-  - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
+  # - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
+  - pip install tox
   - "git submodule update"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
   - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
   - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 # command to install dependencies
-install:
-  - pip install -r requirements.txt
-  # A nice to have, not really needed
-  - pip install git+https://github.com/suoto/rainbow_logging_handler
-  - pip install -e .
+# install:
+#   - pip install -r requirements.txt
+#   # A nice to have, not really needed
+#   - pip install git+https://github.com/suoto/rainbow_logging_handler
+#   - pip install -e .
 # command to run tests
-# script: "./run_tests.sh ${BUILDER} -vv --log-capture"
-script: "./run_tests.py --${BUILDER} -v"
-after_failure:
-  - "cat tests.log"
+script: "tox -e ${BUILDER}"
 after_success:
   - "coverage combine"
   - "coverage report"

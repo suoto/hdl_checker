@@ -49,23 +49,23 @@ PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
 
-def setupLogging(stream, level, force_tty=True): # pragma: no cover
+def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
 
     # Copied from six source
     if sys.version_info[0] == 3:
-        string_types = str,
+        string_types = (str,)
     else:
-        string_types = basestring,
+        string_types = (basestring,) # pylint: disable=undefined-variable
 
     if isinstance(stream, string_types):
-        class Stream(object):
+        class Stream(object):  # pylint: disable=useless-object-inheritance
             """
             File subclass that allows RainbowLoggingHandler to write
             with colors
             """
             _lock = Lock()
-            _force_tty = force_tty
+            _color = color
 
             def __init__(self, *args, **kwargs):
                 self._fd = open(*args, **kwargs)
@@ -74,7 +74,7 @@ def setupLogging(stream, level, force_tty=True): # pragma: no cover
                 """
                 Tells if this stream accepts control chars
                 """
-                return self._force_tty
+                return self._color
 
             def write(self, text):
                 """
@@ -87,14 +87,36 @@ def setupLogging(stream, level, force_tty=True): # pragma: no cover
     else:
         _stream = stream
 
-    handler = logging.StreamHandler(_stream)
-    handler.formatter = logging.Formatter(
-        '%(levelname)-7s | %(asctime)s | ' +
-        '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
-        '|\t%(message)s', datefmt='%H:%M:%S')
+    try:
+        # This is mostly for debugging when doing stuff directly from a
+        # terminal
+        from rainbow_logging_handler import RainbowLoggingHandler
+        handler = RainbowLoggingHandler(
+            _stream,
+            #  Customizing each column's color
+            # pylint: disable=bad-whitespace
+            color_asctime          = ('dim white',  'black'),
+            color_name             = ('dim white',  'black'),
+            color_funcName         = ('green',      'black'),
+            color_lineno           = ('dim white',  'black'),
+            color_pathname         = ('black',      'red'),
+            color_module           = ('yellow',     None),
+            color_message_debug    = ('color_59',   None),
+            color_message_info     = (None,         None),
+            color_message_warning  = ('color_226',  None),
+            color_message_error    = ('red',        None),
+            color_message_critical = ('bold white', 'red'))
+            # pylint: enable=bad-whitespace
+    except ImportError: # pragma: no cover
+        handler = logging.StreamHandler(_stream)
+        handler.formatter = logging.Formatter(
+            '%(levelname)-7s | %(asctime)s | ' +
+            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+            '|\t%(message)s', datefmt='%H:%M:%S')
 
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('pynvim').setLevel(logging.WARNING)
+    logging.getLogger('pyls_jsonrpc.endpoint').setLevel(logging.INFO)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
 

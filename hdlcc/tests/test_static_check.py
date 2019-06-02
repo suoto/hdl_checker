@@ -17,14 +17,16 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import re
 import logging
-from nose2.tools import such
-from nose2.tools.params import params
+import re
 
 import six
 
+from nose2.tools import such
+from nose2.tools.params import params
+
 import hdlcc.static_check as static_check
+from hdlcc.diagnostics import DiagType, StaticCheckerDiag, LibraryShouldBeOmited
 
 _logger = logging.getLogger(__name__)
 
@@ -111,15 +113,11 @@ with such.A("hdlcc project") as it:
             'end architecture foo;']
 
         it.assertItemsEqual(
-            [{'error_subtype': '',
-              'line_number': 7,
-              'checker': 'HDL Code Checker/static',
-              'error_message': expected,
-              'column': 5,
-
-              'error_type': 'W',
-              'error_number': '0',
-              'filename': None}],
+            [StaticCheckerDiag(
+                line_number=7,
+                column=5,
+                severity=DiagType.STYLE_INFO,
+                text=expected)],
             static_check._getCommentTags(text))
 
     @it.should("get misc checks")
@@ -193,14 +191,10 @@ with such.A("hdlcc project") as it:
             objects = static_check._getObjectsFromText(it.text)
 
             it.assertItemsEqual(
-                [{'checker': 'HDL Code Checker/static',
-                  'column': 9,
-                  'error_message': "Declaration of library 'work' can be omitted",
-                  'error_number': '0',
-                  'error_subtype': 'Style',
-                  'error_type': 'W',
-                  'filename': None,
-                  'line_number': 4}],
+                [LibraryShouldBeOmited(
+                    line_number=4,
+                    column=9,
+                    library='work')],
                 static_check._getMiscChecks(objects))
 
         @it.should("get unused VHDL objects")
@@ -236,9 +230,4 @@ with such.A("hdlcc project") as it:
                 ['ieee', ],
                 static_check._getUnusedObjects(it.text, objects))
 
-
-
-
 it.createTests(globals())
-
-

@@ -30,7 +30,8 @@ from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.diagnostics import (CheckerDiagnostic, DiagType, ObjectIsNeverUsed,
+from hdlcc.diagnostics import (BuilderDiag, CheckerDiagnostic, DiagType,
+                               LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
@@ -43,7 +44,6 @@ TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
-
     if six.PY3:
         it.assertItemsEqual = it.assertCountEqual
 
@@ -585,7 +585,7 @@ with such.A("hdlcc project") as it:
                     checker='HDL Code Checker/static',
                     text="signal 'another_signal' is never used",
                     column=8)],
-                 diagnostics)
+                diagnostics)  # pylint: disable=bad-continuation
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -614,15 +614,12 @@ with such.A("hdlcc project") as it:
 
             if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
                 expected = [
-                    CheckerDiagnostic(
-                        checker='HDL Code Checker/static',
-                        filename=p.abspath(filename),
-                        text="Declaration of library 'work' can be omitted",
-                        column=9,
-                        severity=DiagType.STYLE_WARNING,
-                        line_number=1),
-
+                    LibraryShouldBeOmited(library='work',
+                                          filename=p.abspath(filename),
+                                          column=9,
+                                          line_number=1),
                     PathNotInProjectFile(p.abspath(filename)),]
+
                 try:
                     it.assertItemsEqual(expected, diagnostics)
                 except:
@@ -634,12 +631,10 @@ with such.A("hdlcc project") as it:
 
             else:
                 it.assertItemsEqual(
-                    [CheckerDiagnostic(
-                        severity=DiagType.STYLE_WARNING,
-                        checker='HDL Code Checker/static',
-                        text="Declaration of library 'work' can be omitted",
-                        column=9,
-                        line_number=1)],
+                    [LibraryShouldBeOmited(library='work',
+                                           filename=p.abspath(filename),
+                                           column=9,
+                                           line_number=1)],
                     diagnostics)
 
             it.assertTrue(it.project._msg_queue.empty())
@@ -662,14 +657,10 @@ with such.A("hdlcc project") as it:
 
             try:
                 it.assertNotIn(
-                    {'severity' : 'Style',
-                     'line_number'   : 29,
-                     'checker'       : 'HDL Code Checker/static',
-                     'text' : "constant 'ADDR_WIDTH' is never used",
-                     'column'        : 14,
-                     'severity'    : DiagType.STYLE_WARNING,
-                     'error_number'  : '0',
-                     'filename'      : None},
+                    ObjectIsNeverUsed(object_type='constant',
+                                      object_name='ADDR_WIDTH',
+                                      line_number=29,
+                                      column=14),
                     diagnostics)
             finally:
                 # Remove the comment we added
@@ -695,21 +686,21 @@ with such.A("hdlcc project") as it:
                 diagnostics += [diagnostic]
 
             if it.BUILDER_NAME == 'msim':
-                expected_records = [{
-                    'checker': 'msim',
-                    'column': None,
-                    'text': "Synthesis Warning: Reset signal 'reset' "
-                                     "is not in the sensitivity list of process "
-                                     "'line__58'.",
-                    'error_number': None,
-                    'severity': DiagType.ERROR,
-                    'line_number': '58'}]
+                expected_records = [
+                    BuilderDiag(
+                        filename=filename,
+                        builder_name='msim',
+                        text="Synthesis Warning: Reset signal 'reset' "
+                             "is not in the sensitivity list of process "
+                             "'line__58'.",
+                        severity=DiagType.WARNING,
+                        line_number=58)]
             elif it.BUILDER_NAME == 'ghdl':
                 expected_records = []
             elif it.BUILDER_NAME == 'xvhdl':
                 expected_records = []
 
-            it.assertEquals(diagnostics, expected_records)
+            it.assertEqual(diagnostics, expected_records)
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -809,7 +800,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['severity'] for x in source_msgs[filename]])
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -862,7 +853,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['severity'] for x in source_msgs[filename]])
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -899,4 +890,3 @@ with such.A("hdlcc project") as it:
                 writeListToFile(very_common_pkg, code)
 
 it.createTests(globals())
-

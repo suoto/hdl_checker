@@ -39,4 +39,5 @@ if [ ! -d "${INSTALLATION_DIR}" ]; then
     --installdir "${INSTALLATION_DIR}"
 fi
 
-"${INSTALLATION_DIR}/modelsim_ase/linuxaloem/vsim" -version
+ls "${INSTALLATION_DIR}/modelsim_ase/"
+"${INSTALLATION_DIR}/modelsim_ase/linux/vsim" -version
