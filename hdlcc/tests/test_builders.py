@@ -231,7 +231,7 @@ with such.A("builder object") as it:
         def test():
             source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.vhd'))
             records, rebuilds = it.builder.build(source)
-            it.assertNotIn('E', [x['severity'] for x in records],
+            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 
@@ -242,7 +242,7 @@ with such.A("builder object") as it:
                 return
             source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.v'))
             records, rebuilds = it.builder.build(source)
-            it.assertNotIn('E', [x['severity'] for x in records],
+            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 
@@ -253,7 +253,7 @@ with such.A("builder object") as it:
                 return
             source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.sv'))
             records, rebuilds = it.builder.build(source)
-            it.assertNotIn('E', [x['severity'] for x in records],
+            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
                            'This source should not generate errors.')
             it.assertEqual(rebuilds, [])
 

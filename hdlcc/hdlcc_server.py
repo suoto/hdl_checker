@@ -137,7 +137,7 @@ def main(): # pylint: disable=missing-docstring
 
         Timer(2, _watchPidWrapper).start()
 
-    utils.setupLogging(args.log_stream, args.log_level, args.color)
+    utils.setupLogging(args.log_stream, args.log_level, True) #args.color)
     _logger.info(
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),
