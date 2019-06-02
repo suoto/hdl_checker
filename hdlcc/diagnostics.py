@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2016-2019 Andre Souto
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,9 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"""
-Diagnostics holders for checkers
-"""
+"Diagnostics holders for checkers"
 
 # pylint: disable=useless-object-inheritance
 
@@ -35,7 +33,7 @@ class DiagType(object):  # pylint: disable=too-few-public-methods
     STYLE_WARNING = 'Warning (style)'
     STYLE_ERROR = 'Error (style)'
 
-class BaseDiagnostic(object):  # pylint: disable=too-few-public-methods
+class CheckerDiagnostic(object):  # pylint: disable=too-few-public-methods
     """
     Base container for diagnostics
     """
@@ -73,7 +71,7 @@ class BaseDiagnostic(object):  # pylint: disable=too-few-public-methods
 
     def __eq__(self, other):
         # Won't compare apples to oranges
-        if not isinstance(other, BaseDiagnostic):
+        if not isinstance(other, CheckerDiagnostic):
             return False
 
         try:
@@ -86,6 +84,39 @@ class BaseDiagnostic(object):  # pylint: disable=too-few-public-methods
             return False
 
         return True
+
+    def toDict(self):
+        """Returns a dict representation of the object. All keys are always
+        present but not values are necessearily set, in which case their values
+        will be 'None'. Dict has the folowwing format:
+
+            - checker: (string) Checker name
+            - filename: (string)
+            - error_number: (string)
+            - text: (string)
+            - line_number: (int or None)
+            - column: (int or None)
+            - severity: (string) Values taken from DiagType
+        """
+        return {'checker': self.checker,
+                'filename': self.filename,
+                'error_number': self.error_number,
+                'text': self.text,
+                'line_number': self.line_number,
+                'column': self.column,
+                'severity': self.severity}
+
+    @classmethod
+    def fromDict(cls, state):
+        "Creates a diagnostics objects from state dict"
+        return cls(
+            checker=state['checker'],
+            filename=state['filename'],
+            error_number=state['error_number'],
+            text=state['text'],
+            line_number=state['line_number'],
+            column=state['column'],
+            severity=state['severity'])
 
     @property
     def checker(self):
@@ -125,7 +156,7 @@ class BaseDiagnostic(object):  # pylint: disable=too-few-public-methods
             "Invalid severity {}".format(repr(value))
         self.__severity = value
 
-class PathNotInProjectFile(BaseDiagnostic):
+class PathNotInProjectFile(CheckerDiagnostic):
     """
     Reports a check request on a file whose path in not present on the project
     file
@@ -135,7 +166,7 @@ class PathNotInProjectFile(BaseDiagnostic):
             checker=CHECKER_NAME, filename=path, severity=DiagType.WARNING,
             text='Path "{}" not found in project file'.format(path))
 
-class StaticCheckerDiag(BaseDiagnostic):
+class StaticCheckerDiag(CheckerDiagnostic):
     "Base diagnostics issues from static checks"
     def __init__(self, # pylint: disable=too-many-arguments
                  text, severity, filename=None, line_number=None, column=None,
@@ -169,7 +200,7 @@ class ObjectIsNeverUsed(StaticCheckerDiag):
             severity=DiagType.STYLE_WARNING,
             text="{} '{}' is never used".format(object_type, object_name))
 
-class BuilderDiag(BaseDiagnostic):
+class BuilderDiag(CheckerDiagnostic):
     """
     text issues when checking a file whose path in not present on the
     project file

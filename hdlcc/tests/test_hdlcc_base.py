@@ -17,27 +17,25 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
 import os
 import os.path as p
 import shutil
 import time
-import logging
-
-from nose2.tools import such
-from nose2.tools.params import params
 
 import mock
 import six
 
+from nose2.tools import such
+from nose2.tools.params import params
+
 import hdlcc
-from hdlcc.utils import writeListToFile, cleanProjectCache, onCI, samefile
-
-from hdlcc.tests.mocks import (StandaloneProjectBuilder,
-                               MSimMock,
-                               FailingBuilder,
-                               SourceMock)
-
 from hdlcc.parsers import VerilogParser, VhdlParser
+from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
+                               StandaloneProjectBuilder)
+from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+
 
 _logger = logging.getLogger(__name__)
 
@@ -185,14 +183,11 @@ with such.A("hdlcc project") as it:
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
                 remarks,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+                [CheckerDiagnostic(
+                    checker='HDL Code Checker',
+                    severity=DiagType.STYLE_WARNING,
+                    text='Path "%s" not found in project file' %
+                    p.abspath(path))])
         else:
             it.assertEquals(remarks, [])
 
@@ -206,14 +201,10 @@ with such.A("hdlcc project") as it:
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
                 remarks,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+                [CheckerDiagnostic(
+                    checker='HDL Code Checker',
+                    severity=DiagType.STYLE_WARNING,
+                    text='Path "%s" not found in project file' % p.abspath(path))])
         else:
             it.assertEquals(remarks, [])
 
@@ -243,27 +234,6 @@ with such.A("hdlcc project") as it:
 
         project = StandaloneProjectBuilder()
         it.assertEqual(list(project._resolveRelativeNames(source)), [])
-
-    @it.should("sort build messages")
-    def test():
-        records = []
-        for error_type in ('E', 'W'):
-            for line_number in (10, 11):
-                for error_number in (12, 13):
-                    records += [{'error_type' : error_type,
-                                 'line_number' : line_number,
-                                 'error_number' : error_number}]
-
-        it.assertEqual(
-            StandaloneProjectBuilder._sortBuildMessages(records),
-            [{'error_type': 'E', 'line_number': 10, 'error_number': 12},
-             {'error_type': 'E', 'line_number': 10, 'error_number': 13},
-             {'error_type': 'E', 'line_number': 11, 'error_number': 12},
-             {'error_type': 'E', 'line_number': 11, 'error_number': 13},
-             {'error_type': 'W', 'line_number': 10, 'error_number': 12},
-             {'error_type': 'W', 'line_number': 10, 'error_number': 13},
-             {'error_type': 'W', 'line_number': 11, 'error_number': 12},
-             {'error_type': 'W', 'line_number': 11, 'error_number': 13}])
 
     @it.should("return the correct build sequence")
     def test():
@@ -452,14 +422,10 @@ with such.A("hdlcc project") as it:
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
                 messages,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+                [CheckerDiagnostic(
+                    checker='HDL Code Checker',
+                    severity=DiagType.STYLE_WARNING,
+                    text='Path "%s" not found in project file' % p.abspath(path))])
         else:
             it.assertEquals(messages, [])
 
@@ -573,18 +539,16 @@ with such.A("hdlcc project") as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             it.assertIn(
-                {'error_subtype' : 'Style',
-                 'line_number'   : 43,
-                 'checker'       : 'HDL Code Checker/static',
-                 'error_message' : "signal 'neat_signal' is never used",
-                 'column'        : 12,
-                 'error_type'    : 'W',
-                 'error_number'  : '0',
-                 'filename'      : None},
-                records)
+                CheckerDiagnostic(
+                    severity=DiagType.STYLE_WARNING,
+                    line_number=43,
+                    checker='HDL Code Checker/static',
+                    text="signal 'neat_signal' is never used",
+                    column=12),
+                diagnostics)
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -601,38 +565,36 @@ with such.A("hdlcc project") as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesWithText(filename, content)
+            diagnostics = it.project.getMessagesWithText(filename, content)
 
-            _logger.debug("Records received:")
-            for record in records:
-                _logger.debug("- %s", record)
+            if diagnostics:
+                _logger.debug("Records received:")
+                for diagnostic in diagnostics:
+                    _logger.debug("- %s", diagnostic)
             else:
-                _logger.warning("No records found")
+                _logger.warning("No diagnostics found")
 
-            # Check that all records point to the original filename and
-            # remove them from the records so it's easier to compare
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
             # the remaining fields
-            for record in records:
-                record_filename = record.pop('filename')
-                if record_filename:
-                    it.assertTrue(samefile(filename, record_filename))
+            for diagnostic in diagnostics:
+                if diagnostic.filename:
+                    it.assertTrue(samefile(filename, diagnostic.filename))
 
-            it.assertItemsEqual(
-                [{'error_subtype' : 'Style',
-                  'line_number'   : 43,
-                  'checker'       : 'HDL Code Checker/static',
-                  'error_message' : "signal 'neat_signal' is never used",
-                  'column'        : 12,
-                  'error_type'    : 'W',
-                  'error_number'  : '0'},
-                 {'error_subtype' : 'Style',
-                  'line_number'   : 44,
-                  'checker'       : 'HDL Code Checker/static',
-                  'error_message' : "signal 'another_signal' is never used",
-                  'column'        : 8,
-                  'error_type'    : 'W',
-                  'error_number'  : '0'}],
-                records)
+            it.assertItemsEqual([
+                CheckerDiagnostic(
+                    checker='HDL Code Checker/static',
+                    severity=DiagType.STYLE_WARNING,
+                    line_number=43,
+                    text="signal 'neat_signal' is never used",
+                    column=12),
+                CheckerDiagnostic(
+                    severity=DiagType.STYLE_WARNING,
+                    line_number=44,
+                    checker='HDL Code Checker/static',
+                    text="signal 'another_signal' is never used",
+                    column=8)],
+                 diagnostics)
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -647,47 +609,42 @@ with such.A("hdlcc project") as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesWithText(filename, content)
+            diagnostics = it.project.getMessagesWithText(filename, content)
 
             _logger.debug("Records received:")
-            for record in records:
-                _logger.debug("- %s", record)
+            for diagnostic in diagnostics:
+                _logger.debug("- %s", diagnostic)
 
-            # Check that all records point to the original filename and
-            # remove them from the records so it's easier to compare
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
             # the remaining fields
-            for record in records:
-                record_filename = record.pop('filename')
+            for diagnostic in diagnostics:
+                record_filename = diagnostic.pop('filename')
                 if record_filename:
                     it.assertTrue(samefile(filename, record_filename))
 
             if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-                it.assertItemsEqual(
-                    [{'error_type'    : 'W',
-                      'checker'       : 'HDL Code Checker/static',
-                      'error_message' : "Declaration of library 'work' can be omitted",
-                      'column'        : 9,
-                      'error_subtype' : 'Style',
-                      'error_number'  : '0',
-                      'line_number'   : 1},
-                     {'error_type'    : 'W',
-                      'checker'       : 'hdlcc',
-                      'error_message' : 'Path "%s" not found in project file' %
-                                        p.abspath(filename),
-                      'column'        : '',
-                      'error_number'  : '',
-                      'line_number'   : ''}],
-                    records)
+                it.assertItemsEqual([
+                    CheckerDiagnostic(
+                        checker='HDL Code Checker/static',
+                        text="Declaration of library 'work' can be omitted",
+                        column=9,
+                        severity=DiagType.STYLE_WARNING,
+                        line_number=1),
+                    CheckerDiagnostic(
+                        severity=DiagType.STYLE_ERROR,
+                        checker='HDL Code Checker',
+                        text='Path "%s" not found in project file' % p.abspath(filename))],
+                    diagnostics)
             else:
                 it.assertItemsEqual(
-                    [{'error_type'    : 'W',
-                      'checker'       : 'HDL Code Checker/static',
-                      'error_message' : "Declaration of library 'work' can be omitted",
-                      'column'        : 9,
-                      'error_subtype' : 'Style',
-                      'error_number'  : '0',
-                      'line_number'   : 1}],
-                    records)
+                    [CheckerDiagnostic(
+                        severity=DiagType.STYLE_WARNING,
+                        checker='HDL Code Checker/static',
+                        text="Declaration of library 'work' can be omitted",
+                        column=9,
+                        line_number=1)],
+                    diagnostics)
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -705,19 +662,19 @@ with such.A("hdlcc project") as it:
 
             writeListToFile(filename, code)
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             try:
                 it.assertNotIn(
-                    {'error_subtype' : 'Style',
+                    {'severity' : 'Style',
                      'line_number'   : 29,
                      'checker'       : 'HDL Code Checker/static',
-                     'error_message' : "constant 'ADDR_WIDTH' is never used",
+                     'text' : "constant 'ADDR_WIDTH' is never used",
                      'column'        : 14,
-                     'error_type'    : 'W',
+                     'severity'    : DiagType.STYLE_WARNING,
                      'error_number'  : '0',
                      'filename'      : None},
-                    records)
+                    diagnostics)
             finally:
                 # Remove the comment we added
                 code[28] = code[28][3:]
@@ -736,27 +693,27 @@ with such.A("hdlcc project") as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = []
-            for record in it.project.getMessagesByPath(filename):
-                it.assertTrue(samefile(filename, record.pop('filename')))
-                records += [record]
+            diagnostics = []
+            for diagnostic in it.project.getMessagesByPath(filename):
+                it.assertTrue(samefile(filename, diagnostic.pop('filename')))
+                diagnostics += [diagnostic]
 
             if it.BUILDER_NAME == 'msim':
                 expected_records = [{
                     'checker': 'msim',
                     'column': None,
-                    'error_message': "Synthesis Warning: Reset signal 'reset' "
+                    'text': "Synthesis Warning: Reset signal 'reset' "
                                      "is not in the sensitivity list of process "
                                      "'line__58'.",
                     'error_number': None,
-                    'error_type': 'W',
+                    'severity': DiagType.ERROR,
                     'line_number': '58'}]
             elif it.BUILDER_NAME == 'ghdl':
                 expected_records = []
             elif it.BUILDER_NAME == 'xvhdl':
                 expected_records = []
 
-            it.assertEquals(records, expected_records)
+            it.assertEquals(diagnostics, expected_records)
 
             it.assertTrue(it.project._msg_queue.empty())
 
@@ -770,25 +727,25 @@ with such.A("hdlcc project") as it:
 
             it.assertTrue(it.project._msg_queue.empty())
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             _logger.info("Records found:")
-            for record in records:
-                _logger.info(record)
+            for diagnostic in diagnostics:
+                _logger.info(diagnostic)
 
             it.assertIn(
-                {'checker'        : 'hdlcc',
+                {'checker'        : 'HDL Code Checker',
                  'line_number'    : '',
                  'column'         : '',
                  'filename'       : '',
                  'error_number'   : '',
-                 'error_type'     : 'W',
-                 'error_message'  : 'Path "%s" not found in '
+                 'severity'     : DiagType.STYLE_WARNING,
+                 'text'  : 'Path "%s" not found in '
                                     'project file' % p.abspath(filename)},
-                records)
+                diagnostics)
 
             # The builder should find other issues as well...
-            it.assertTrue(len(records) > 1,
+            it.assertTrue(len(diagnostics) > 1,
                           "It was expected that the builder added some "
                           "message here indicating an error")
 
@@ -863,7 +820,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['error_type'] for x in source_msgs[filename]])
+                    'E', [x['severity'] for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -916,7 +873,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['error_type'] for x in source_msgs[filename]])
+                    'E', [x['severity'] for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "

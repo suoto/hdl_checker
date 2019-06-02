@@ -64,8 +64,7 @@ class HdlCodeCheckerBase(object):
         if target_dir is None:
             if self._config is None or self._config.getBuilder() == 'fallback':
                 return None
-            else:
-                target_dir = self._config.getTargetDir()
+            target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
 
     def _saveCache(self):
@@ -249,12 +248,12 @@ class HdlCodeCheckerBase(object):
             yield dependency['library'], dependency['unit']
 
     @staticmethod
-    def _sortBuildMessages(records):
+    def _sortBuildMessages(diagnostics):
         """
         Sorts a given set of build records
         """
-        return sorted(records, key=lambda x: \
-                (x['error_type'], str(x['line_number']), str(x['error_number'])))
+        return sorted(diagnostics, key=lambda x: \
+                (x.severity, x.line_number, x.error_number))
 
     def updateBuildSequenceCache(self, source):
         """
@@ -491,8 +490,8 @@ class HdlCodeCheckerBase(object):
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
         for message in messages:
-            if message['filename'] is None:
-                message['filename'] = path
+            if message.filename is None:
+                message.filename = path
 
         return messages + remarks
 

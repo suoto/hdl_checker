@@ -165,34 +165,35 @@ def runStandaloneStaticCheck(fname):
     for record in getStaticMessages(lines):
         print(record)
 
-def buildSource(project, source):
+def printSourceDiags(project, source):
+    "Print diagnostics for the given source"
     start = time.time()
     records = project.getMessagesByPath(source)
     end = time.time()
     _logger.info("Building source '%s' took %.4fs", source, (end - start))
     for record in records:
-        if record['filename'] is not None:
-            message = [record['filename']]
+        if record.filename is not None:
+            message = [record.filename]
         else:
             message = [source]
 
         location = []
-        if record['line_number'] is not None:
-            location += ["line %s" % record['line_number']]
+        if record.line_number is not None:
+            location += ["line %s" % record.line_number]
 
-        if record['column'] is not None:
-            location += ["column %s" % record['column']]
+        if record.column is not None:
+            location += ["column %s" % record.column]
 
         if location:
             message += ["(%s)" % ', '.join(location)]
 
-        if record['error_number'] is None:
-            message += ["(%s):" % record['error_type']]
+        if record.error_number is None:
+            message += ["(%s):" % record.severity]
         else:
-            message += ["(%s-%s):" % (record['error_type'],
-                                      record['error_number'])]
+            message += ["(%s-%s):" % (record.severity,
+                                      record.error_number)]
 
-        message += [record['error_message']]
+        message += [record.text]
 
         print(' '.join(message))
 
@@ -217,7 +218,7 @@ def runner(args):
         print(sources)
 
     for source in args.sources:
-        buildSource(project, source)
+        printSourceDiags(project, source)
 
     if args.debug_parse_source_file:
         for source in args.sources:
@@ -266,4 +267,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-

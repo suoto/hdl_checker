@@ -206,4 +206,3 @@ with such.A("hdlcc standalone tool") as it:
                     previous = len(stdout)
 
 it.createTests(globals())
-

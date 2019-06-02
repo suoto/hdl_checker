@@ -191,11 +191,13 @@ def getMessagesByPath():
     server = _getServerByProjectFile(project_file)
     response = {}
     if content is None:
-        response['messages'] = server.getMessagesByPath(path)
+        messages = server.getMessagesByPath(path)
     else:
-        response['messages'] = server.getMessagesWithText(path, content)
+        messages = server.getMessagesWithText(path, content)
 
-    return response
+    # Messages at this point need to be serializable so that bottle can send
+    # them over
+    return {'messages': [x.toDict() for x in messages]}
 
 @app.post('/get_ui_messages')
 @_exceptionWrapper

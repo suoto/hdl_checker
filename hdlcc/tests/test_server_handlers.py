@@ -24,12 +24,13 @@ import os.path as p
 import shutil
 
 import six
-from nose2.tools import such
-from webtest import TestApp
 
 import hdlcc
 import hdlcc.handlers as handlers
 import hdlcc.utils as utils
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from nose2.tools import such
+from webtest import TestApp
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -228,7 +229,7 @@ with such.A("hdlcc bottle app") as it:
         for msg in step_01_msgs:
             _logger.info(msg)
             it.assertNotEquals(
-                msg.get('error_type', None), 'E',
+                msg.get('severity', None), 'E',
                 "No errors should be found at this point")
 
         _logger.info("Step 02")
@@ -370,20 +371,19 @@ with such.A("hdlcc bottle app") as it:
         _logger.info("UI reply: %s", ui_reply)
         _logger.info("Reply: %s", reply)
 
-        messages = reply.json['messages']
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
         for message in messages:
-            it.assertTrue(utils.samefile(message.pop('filename'),
+            it.assertTrue(utils.samefile(message.filename,
                                          data['path']))
 
         it.assertIn(
-            {"error_type"    : "W",
-             "checker"       : "HDL Code Checker/static",
-             "line_number"   : 1,
-             "column"        : 4,
-             "error_subtype" : "",
-             "error_number"  : "0",
-             "error_message" : "TODO: Nothing to see here"},
+            CheckerDiagnostic(
+                filename=data['path'],
+                checker="HDL Code Checker/static",
+                text='TODO: Nothing to see here',
+                line_number=1, column=4,
+                severity=DiagType.STYLE_INFO),
             messages)
 
     @it.should("get source dependencies")
