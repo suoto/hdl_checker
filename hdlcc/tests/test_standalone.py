@@ -37,7 +37,10 @@ _logger = logging.getLogger(__name__)
 
 HDLCC_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 HDLCC_STANDALONE = p.join(HDLCC_PATH, "hdlcc", "standalone.py")
-TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
+
+#  TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
+
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 def shell(cmd):

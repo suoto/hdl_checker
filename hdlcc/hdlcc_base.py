@@ -491,7 +491,9 @@ class HdlCodeCheckerBase(object):
         # refer to the same filename we got in the first place
         for message in messages:
             if message.filename is None:
-                message.filename = path
+                message.filename = p.abspath(path)
+            #  else:
+            #      message.filename = p.abspath(message.filename)
 
         return messages + remarks
 

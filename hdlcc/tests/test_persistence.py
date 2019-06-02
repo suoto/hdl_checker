@@ -33,8 +33,11 @@ import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
-BASE_PATH = p.join(
-    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
+#  BASE_PATH = p.join(
+#      p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
+
+BASE_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'grlib')
+    #  p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
 
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"

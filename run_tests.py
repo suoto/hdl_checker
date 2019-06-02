@@ -222,10 +222,10 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_persistence',
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone')
-    elif env == 'standalone':
+    if env == 'standalone':
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_static_check')
-    elif env == 'fallback':
+    if env == 'fallback':
         return ('hdlcc.tests.test_builders',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',

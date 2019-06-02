@@ -30,19 +30,20 @@ from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
+from hdlcc.diagnostics import (CheckerDiagnostic, DiagType, ObjectIsNeverUsed,
+                               PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
 from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
+
     if six.PY3:
         it.assertItemsEqual = it.assertCountEqual
 
@@ -181,13 +182,8 @@ with such.A("hdlcc project") as it:
         source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(
-                remarks,
-                [CheckerDiagnostic(
-                    checker='HDL Code Checker',
-                    severity=DiagType.STYLE_WARNING,
-                    text='Path "%s" not found in project file' %
-                    p.abspath(path))])
+            it.assertEquals(remarks,
+                            [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(remarks, [])
 
@@ -199,12 +195,8 @@ with such.A("hdlcc project") as it:
         source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VerilogParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(
-                remarks,
-                [CheckerDiagnostic(
-                    checker='HDL Code Checker',
-                    severity=DiagType.STYLE_WARNING,
-                    text='Path "%s" not found in project file' % p.abspath(path))])
+            it.assertEquals(remarks,
+                            [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(remarks, [])
 
@@ -422,10 +414,7 @@ with such.A("hdlcc project") as it:
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
                 messages,
-                [CheckerDiagnostic(
-                    checker='HDL Code Checker',
-                    severity=DiagType.STYLE_WARNING,
-                    text='Path "%s" not found in project file' % p.abspath(path))])
+                [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(messages, [])
 
@@ -583,12 +572,14 @@ with such.A("hdlcc project") as it:
 
             it.assertItemsEqual([
                 CheckerDiagnostic(
+                    filename=filename,
                     checker='HDL Code Checker/static',
                     severity=DiagType.STYLE_WARNING,
                     line_number=43,
                     text="signal 'neat_signal' is never used",
                     column=12),
                 CheckerDiagnostic(
+                    filename=filename,
                     severity=DiagType.STYLE_WARNING,
                     line_number=44,
                     checker='HDL Code Checker/static',
@@ -619,23 +610,28 @@ with such.A("hdlcc project") as it:
             # remove them from the diagnostics so it's easier to compare
             # the remaining fields
             for diagnostic in diagnostics:
-                record_filename = diagnostic.pop('filename')
-                if record_filename:
-                    it.assertTrue(samefile(filename, record_filename))
+                it.assertTrue(samefile(filename, diagnostic.filename))
 
             if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-                it.assertItemsEqual([
+                expected = [
                     CheckerDiagnostic(
                         checker='HDL Code Checker/static',
+                        filename=p.abspath(filename),
                         text="Declaration of library 'work' can be omitted",
                         column=9,
                         severity=DiagType.STYLE_WARNING,
                         line_number=1),
-                    CheckerDiagnostic(
-                        severity=DiagType.STYLE_ERROR,
-                        checker='HDL Code Checker',
-                        text='Path "%s" not found in project file' % p.abspath(filename))],
-                    diagnostics)
+
+                    PathNotInProjectFile(p.abspath(filename)),]
+                try:
+                    it.assertItemsEqual(expected, diagnostics)
+                except:
+                    _logger.warning("Expected:")
+                    for exp in expected:
+                        _logger.warning(exp)
+
+                    raise
+
             else:
                 it.assertItemsEqual(
                     [CheckerDiagnostic(
@@ -695,7 +691,7 @@ with such.A("hdlcc project") as it:
 
             diagnostics = []
             for diagnostic in it.project.getMessagesByPath(filename):
-                it.assertTrue(samefile(filename, diagnostic.pop('filename')))
+                it.assertTrue(samefile(filename, diagnostic.filename))
                 diagnostics += [diagnostic]
 
             if it.BUILDER_NAME == 'msim':
@@ -734,14 +730,7 @@ with such.A("hdlcc project") as it:
                 _logger.info(diagnostic)
 
             it.assertIn(
-                {'checker'        : 'HDL Code Checker',
-                 'line_number'    : '',
-                 'column'         : '',
-                 'filename'       : '',
-                 'error_number'   : '',
-                 'severity'     : DiagType.STYLE_WARNING,
-                 'text'  : 'Path "%s" not found in '
-                                    'project file' % p.abspath(filename)},
+                PathNotInProjectFile(p.abspath(filename)),
                 diagnostics)
 
             # The builder should find other issues as well...

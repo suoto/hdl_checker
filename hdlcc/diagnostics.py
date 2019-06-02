@@ -16,6 +16,14 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Diagnostics holders for checkers"
 
+import logging
+import os.path as p
+
+from hdlcc.utils import samefile
+
+_logger = logging.getLogger(__name__)
+
+
 # pylint: disable=useless-object-inheritance
 
 CHECKER_NAME = 'HDL Code Checker'
@@ -72,18 +80,45 @@ class CheckerDiagnostic(object):  # pylint: disable=too-few-public-methods
     def __eq__(self, other):
         # Won't compare apples to oranges
         if not isinstance(other, CheckerDiagnostic):
+            _logger.debug("%s != %s", type(self), type(other))
             return False
 
+        msg = []
+        equal = True
+
         try:
+            # If both filenames exists and are not None, check they point to
+            # the same file, otherwise compare directly
+            if (self.filename is not None and p.exists(self.filename) and
+                    other.filename is not None and p.exists(other.filename)):
+                if not samefile(self.filename, other.filename):
+                    equal = False
+            else:
+                if self.filename != other.filename:
+                    equal = False
+
+            if not equal:
+                msg += ["%s != %s" % (self.filename, other.filename)]
+
             # Compare attributes
             for attr in ('checker', 'filename', 'line_number', 'column',
                          'error_number', 'severity', 'text'):
                 if getattr(self, attr) != getattr(other, attr):
-                    return False
+                    msg += ["%s: %s != %s" % (attr, getattr(self, attr),
+                                              getattr(other, attr))]
+                    equal = False
+                    break
+                    #  return False
         except AttributeError:
-            return False
+            msg += ['attribute error!']
+            equal = False
 
-        return True
+        if msg:
+            _logger.debug("Comparing %s and %s:", self, other)
+            for line in msg:
+                _logger.debug("- %s", line)
+
+        return equal
 
     def toDict(self):
         """Returns a dict representation of the object. All keys are always

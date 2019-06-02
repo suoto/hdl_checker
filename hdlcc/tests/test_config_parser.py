@@ -35,7 +35,9 @@ from hdlcc.utils import writeListToFile, handlePathPlease
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+#  TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 
 TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
