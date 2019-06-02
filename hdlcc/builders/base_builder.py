@@ -118,6 +118,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         obj._logger = logging.getLogger(state['_logger'])
         del state['_logger']
         obj._lock = Lock()
+        obj._build_info_cache = {}
         obj.__dict__.update(state)
         # pylint: enable=protected-access
 
@@ -129,6 +130,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
+        del state['_build_info_cache']
         del state['_lock']
         return state
 
@@ -337,7 +339,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                                source.filetype)
             return [], []
 
-        if source.abspath not in self._build_info_cache.keys():
+        if source.abspath not in self._build_info_cache:
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
                 'diagnostics' : [],
