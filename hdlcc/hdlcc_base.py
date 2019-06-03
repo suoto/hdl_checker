@@ -34,7 +34,7 @@ from hdlcc.diagnostics import PathNotInProjectFile
 
 _logger = logging.getLogger('build messages')
 
-class HdlCodeCheckerBase(object):
+class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
     """
     HDL Code Checker project builder class
     """
@@ -449,8 +449,9 @@ class HdlCodeCheckerBase(object):
         """
         self._setupEnvIfNeeded()
 
+        records = []
+
         if self._USE_THREADS:
-            records = []
             pool = ThreadPool()
 
             static_check = pool.apply_async(
@@ -461,12 +462,19 @@ class HdlCodeCheckerBase(object):
                                                  args=[source, batch_mode])
                 records += builder_check.get()
 
-            records += static_check.get()
+            # Static messages don't take the path, only the text, so we need to
+            # set add that to the diagnostic
+            for record in static_check.get():
+                record.filename = source.filename
+                records += [record]
 
             pool.terminate()
             pool.join()
         else:
-            records = getStaticMessages(source.getRawSourceContent().split('\n'))
+            for record in getStaticMessages(source.getRawSourceContent().split('\n')):
+                record.filename = source.filename
+                records += [record]
+
             if self._isBuilderCallable():
                 records += self._getBuilderMessages(source, batch_mode)
 

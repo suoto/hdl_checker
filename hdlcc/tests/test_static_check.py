@@ -32,8 +32,10 @@ _logger = logging.getLogger(__name__)
 
 with such.A("hdlcc project") as it:
     # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        def _assertCountEqual(actual, expected, msg=None):
+            return it.assertEqual(sorted(actual), sorted(expected), msg)
+        it.assertCountEqual = _assertCountEqual
 
     @it.has_setup
     def setup():
@@ -112,7 +114,7 @@ with such.A("hdlcc project") as it:
             '-- clk_out_b <= not clk_in_b;',
             'end architecture foo;']
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             [StaticCheckerDiag(
                 line_number=7,
                 column=5,
@@ -136,7 +138,7 @@ with such.A("hdlcc project") as it:
 
         objects = static_check._getObjectsFromText(text)
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             [],
             static_check._getMiscChecks(objects))
 
@@ -190,7 +192,7 @@ with such.A("hdlcc project") as it:
         def test():
             objects = static_check._getObjectsFromText(it.text)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 [LibraryShouldBeOmited(
                     line_number=4,
                     column=9,
@@ -200,7 +202,7 @@ with such.A("hdlcc project") as it:
         @it.should("get unused VHDL objects")
         def test():
             objects = static_check._getObjectsFromText(it.text)
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 ['basic_library', 'DIVIDER_A', 'DIVIDER_B', 'clk_in_b',
                  'clk_out_b'],
                 static_check._getUnusedObjects(it.text, objects))
@@ -226,7 +228,7 @@ with such.A("hdlcc project") as it:
         @it.should("get unused VHDL objects")
         def test():
             objects = static_check._getObjectsFromText(it.text)
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 ['ieee', ],
                 static_check._getUnusedObjects(it.text, objects))
 

@@ -30,9 +30,8 @@ from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.diagnostics import (BuilderDiag, CheckerDiagnostic, DiagType,
-                               LibraryShouldBeOmited, ObjectIsNeverUsed,
-                               PathNotInProjectFile)
+from hdlcc.diagnostics import (BuilderDiag, DiagType, LibraryShouldBeOmited,
+                               ObjectIsNeverUsed, PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
@@ -44,8 +43,8 @@ TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        it.assertCountEqual = it.assertItemsEqual
 
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
@@ -531,12 +530,10 @@ with such.A("hdlcc project") as it:
             diagnostics = it.project.getMessagesByPath(filename)
 
             it.assertIn(
-                CheckerDiagnostic(
-                    severity=DiagType.STYLE_WARNING,
-                    line_number=43,
-                    checker='HDL Code Checker/static',
-                    text="signal 'neat_signal' is never used",
-                    column=12),
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=43, column=12,
+                    object_type='signal', object_name='neat_signal'),
                 diagnostics)
 
             it.assertTrue(it.project._msg_queue.empty())
@@ -570,21 +567,15 @@ with such.A("hdlcc project") as it:
                 if diagnostic.filename:
                     it.assertTrue(samefile(filename, diagnostic.filename))
 
-            it.assertItemsEqual([
-                CheckerDiagnostic(
-                    filename=filename,
-                    checker='HDL Code Checker/static',
-                    severity=DiagType.STYLE_WARNING,
-                    line_number=43,
-                    text="signal 'neat_signal' is never used",
-                    column=12),
-                CheckerDiagnostic(
-                    filename=filename,
-                    severity=DiagType.STYLE_WARNING,
-                    line_number=44,
-                    checker='HDL Code Checker/static',
-                    text="signal 'another_signal' is never used",
-                    column=8)],
+            it.assertCountEqual([
+                ObjectIsNeverUsed(
+                    filename=p.abspath(filename),
+                    line_number=43, column=12,
+                    object_type='signal', object_name='neat_signal'),
+                ObjectIsNeverUsed(
+                    filename=p.abspath(filename),
+                    line_number=44, column=8,
+                    object_type='signal', object_name='another_signal')],
                 diagnostics)  # pylint: disable=bad-continuation
 
             it.assertTrue(it.project._msg_queue.empty())
@@ -621,7 +612,7 @@ with such.A("hdlcc project") as it:
                     PathNotInProjectFile(p.abspath(filename)),]
 
                 try:
-                    it.assertItemsEqual(expected, diagnostics)
+                    it.assertCountEqual(expected, diagnostics)
                 except:
                     _logger.warning("Expected:")
                     for exp in expected:
@@ -630,7 +621,7 @@ with such.A("hdlcc project") as it:
                     raise
 
             else:
-                it.assertItemsEqual(
+                it.assertCountEqual(
                     [LibraryShouldBeOmited(library='work',
                                            filename=p.abspath(filename),
                                            column=9,

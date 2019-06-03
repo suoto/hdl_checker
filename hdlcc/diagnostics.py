@@ -23,7 +23,6 @@ from hdlcc.utils import samefile
 
 _logger = logging.getLogger(__name__)
 
-
 # pylint: disable=useless-object-inheritance
 
 CHECKER_NAME = 'HDL Code Checker'
@@ -41,7 +40,7 @@ class DiagType(object):  # pylint: disable=too-few-public-methods
     STYLE_WARNING = 'Warning (style)'
     STYLE_ERROR = 'Error (style)'
 
-class CheckerDiagnostic(object):  # pylint: disable=too-few-public-methods
+class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
     """
     Base container for diagnostics
     """
@@ -70,12 +69,15 @@ class CheckerDiagnostic(object):  # pylint: disable=too-few-public-methods
             self.severity = severity
 
     def __repr__(self):
-        return ('{}(checker="{}", filename="{}", line_number="{}", '
-                'column="{}", error_number="{}", severity="{}", '
+        filename = None if self.filename is None else repr(self.filename)
+        error_number = None if self.error_number is None else repr(self.error_number)
+
+        return ('{}(checker="{}", filename={}, line_number={}, '
+                'column={}, error_number={}, severity={}, '
                 'text={})'
-                .format(self.__class__.__name__, self.__checker, self.filename,
-                        self.__line_number, self.__column, self.error_number,
-                        self.__severity, repr(self.text)))
+                .format(self.__class__.__name__, self.checker, filename,
+                        self.line_number, self.column, error_number,
+                        repr(self.severity), repr(self.text)))
 
     def __eq__(self, other):
         # Won't compare apples to oranges

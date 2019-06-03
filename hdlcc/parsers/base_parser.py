@@ -44,7 +44,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
 
     def __init__(self, filename, library='work', flags=None):
-        self.filename = p.normpath(filename)
+        self.filename = p.abspath(p.normpath(filename))
         self.library = library
         self.flags = flags if flags is not None else []
         self._cache = {}
