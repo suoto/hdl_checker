@@ -500,8 +500,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         for message in messages:
             if message.filename is None:
                 message.filename = p.abspath(path)
-            #  else:
-            #      message.filename = p.abspath(message.filename)
 
         return messages + remarks
 

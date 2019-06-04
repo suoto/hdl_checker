@@ -16,8 +16,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
-import functools
-import inspect
 import logging
 import os
 import os.path as p
@@ -27,7 +25,7 @@ import subprocess as subp
 import sys
 import time
 from contextlib import contextmanager
-from threading import Lock, Timer
+from threading import Lock
 
 # Make the serializer transparent
 try:
@@ -348,30 +346,3 @@ def isFileReadable(path):
         return True
     except IOError:
         return False
-
-def debounce(interval_s, keyed_by=None):
-    """Debounce calls to this function until interval_s seconds have passed."""
-    def wrapper(func):
-        timers = {}
-        lock = Lock()
-
-        @functools.wraps(func)
-        def debounced(*args, **kwargs):
-            call_args = inspect.getcallargs(func, *args, **kwargs)
-            key = call_args[keyed_by] if keyed_by else None
-
-            def run():
-                with lock:
-                    del timers[key]
-                return func(*args, **kwargs)
-
-            with lock:
-                old_timer = timers.get(key)
-                if old_timer:
-                    old_timer.cancel()
-
-                timer = Timer(interval_s, run)
-                timers[key] = timer
-                timer.start()
-        return debounced
-    return wrapper

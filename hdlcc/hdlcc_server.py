@@ -37,7 +37,9 @@ def _setupPaths():  # pragma: no cover
             p.join(hdlcc_base_path, 'dependencies', 'requests'),
             p.join(hdlcc_base_path, 'dependencies', 'waitress'),
             p.join(hdlcc_base_path, 'dependencies', 'bottle'),
-            p.join(hdlcc_base_path, 'dependencies', 'python-jsonrpc-server')):
+            p.join(hdlcc_base_path, 'dependencies', 'python-jsonrpc-server'),
+            p.join(hdlcc_base_path, 'dependencies', 'python-language-server')):
+        assert p.exists(path), "Path '{}' doesn't exist".format(path)
         path = p.abspath(path)
         if path not in sys.path:
             print("Adding '%s'" % path)
@@ -118,6 +120,7 @@ def main(): # pylint: disable=missing-docstring
     from hdlcc import handlers
     import hdlcc.utils as utils # pylint: disable=redefined-outer-name
     import hdlcc.lsp
+    from pyls.python_ls import start_io_lang_server, start_tcp_lang_server
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
@@ -152,8 +155,7 @@ def main(): # pylint: disable=missing-docstring
         handlers.app.run(host=args.host, port=args.port, threads=10,
                          server='waitress')
     else:
-        hdlcc.lsp.startTcpLangServer(args.host, args.port,
-                                     hdlcc.lsp.LanguageServer)
+        start_tcp_lang_server(args.host, args.port, hdlcc.lsp.HdlccLanguageServer)
 
 
 

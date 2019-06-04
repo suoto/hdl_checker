@@ -13,3 +13,6 @@
 [submodule "dependencies/python-jsonrpc-server"]
 	path = dependencies/python-jsonrpc-server
 	url = https://github.com/palantir/python-jsonrpc-server
+[submodule "dependencies/python-language-server"]
+	path = dependencies/python-language-server
+	url = https://github.com/palantir/python-language-server
