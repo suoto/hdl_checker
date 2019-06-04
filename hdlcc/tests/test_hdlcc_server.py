@@ -33,6 +33,7 @@ import hdlcc.utils as utils
 
 _logger = logging.getLogger(__name__)
 
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
@@ -40,6 +41,7 @@ def doNothing(queue):
     _logger.debug("I'm ready")
     queue.get()
     _logger.debug("Ok, done")
+
 
 with such.A("hdlcc server") as it:
     def startCodeCheckerServer():
@@ -51,11 +53,11 @@ with such.A("hdlcc server") as it:
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
         cmd = ['coverage', 'run',
                hdlcc_server_fname,
-               '--host', it._host, '--port', it._port,
+               '--host', it._host, '--port', str(it._port),
                '--log-level', HDLCC_SERVER_LOG_LEVEL,
-               '--stdout', 'hdlcc-stdout.log',
-               '--stderr', 'hdlcc-stderr.log',
-               '--log-stream', 'hdlcc.log',]
+               '--stdout', p.join(TEST_SUPPORT_PATH, 'hdlcc-stdout.log'),
+               '--stderr', p.join(TEST_SUPPORT_PATH, 'hdlcc-stderr.log'),
+               '--log-stream', p.join(TEST_SUPPORT_PATH, 'hdlcc.log')]
 
         _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
@@ -159,4 +161,3 @@ with such.A("hdlcc server") as it:
             requests.post(it._url + '/get_diagnose_info')
 
 it.createTests(globals())
-

@@ -16,3 +16,6 @@
 [submodule "dependencies/python-language-server"]
 	path = dependencies/python-language-server
 	url = https://github.com/palantir/python-language-server
+[submodule "dependencies/pluggy"]
+	path = dependencies/pluggy
+	url = https://github.com/pytest-dev/pluggy

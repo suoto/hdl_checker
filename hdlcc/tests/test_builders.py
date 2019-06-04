@@ -39,6 +39,8 @@ with such.A("builder object") as it:
     def setup():
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
+        # TODO: tox.ini should put those on the environment so we can run tests
+        # in parallel
         it.SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci',
                                  'test_support', 'test_builders')
 

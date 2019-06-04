@@ -19,11 +19,12 @@
 
 # PYTHON_ARGCOMPLETE_OK
 
-import sys
+import argparse
+import logging
 import os
 import os.path as p
-import logging
-import argparse
+import sys
+from glob import glob
 from threading import Timer
 
 _logger = logging.getLogger(__name__)
@@ -32,13 +33,11 @@ PY2 = sys.version_info[0] == 2
 def _setupPaths():  # pragma: no cover
     "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
-    for path in (
-            hdlcc_base_path,
-            p.join(hdlcc_base_path, 'dependencies', 'requests'),
-            p.join(hdlcc_base_path, 'dependencies', 'waitress'),
-            p.join(hdlcc_base_path, 'dependencies', 'bottle'),
-            p.join(hdlcc_base_path, 'dependencies', 'python-jsonrpc-server'),
-            p.join(hdlcc_base_path, 'dependencies', 'python-language-server')):
+    sys.path.insert(0, hdlcc_base_path)
+    # Pluggy is not standard...
+    sys.path.insert(0, p.join(hdlcc_base_path, 'dependencies', 'pluggy', 'src'))
+    # Add other dependencies
+    for path in glob(p.join(hdlcc_base_path, 'dependencies', '*')):
         assert p.exists(path), "Path '{}' doesn't exist".format(path)
         path = p.abspath(path)
         if path not in sys.path:
@@ -48,6 +47,22 @@ def _setupPaths():  # pragma: no cover
             msg = "WARNING: '%s' was already on sys.path!" % path
             print(msg)
             _logger.warning(msg)
+
+    # We're using part of python-language-server, we don't really need all of
+    # its dependencies nor want the user to install unrelated packages. We'll
+    # try to import both and in case they fail, just mock them. Unlikely
+    # they'll every be called unless there's an issue with the LSP
+
+    import mock
+    try:
+        import importlib_metadata  # pylint: disable=unused-import
+    except ImportError:
+        sys.modules['importlib_metadata'] = mock.MagicMock()
+
+    try:
+        import jedi  # pylint: disable=unused-import
+    except ImportError:
+        sys.modules['jedi'] = mock.MagicMock()
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
