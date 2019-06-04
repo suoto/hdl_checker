@@ -161,16 +161,18 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     def _toLspFormat(self, messages):
         for message in messages:
             _logger.info(message)
-            severity = defines.DiagnosticSeverity.Information
-
             # Translate the error into LSP severity
             severity = message.severity
 
-            if severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
+            if severity in (DiagType.INFO, DiagType.STYLE_INFO):
+                severity = defines.DiagnosticSeverity.Information
+            elif severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
                 severity = defines.DiagnosticSeverity.Hint
             elif severity in (DiagType.WARNING, DiagType.STYLE_WARNING):
                 severity = defines.DiagnosticSeverity.Warning
             elif severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
+                severity = defines.DiagnosticSeverity.Error
+            else:
                 severity = defines.DiagnosticSeverity.Error
 
             yield {
@@ -178,7 +180,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
                 'range': {
                     'start': {'line': (message.line_number or 0) - 1,
                               'character': -1, },
-                    'end': {'line': (message.line_number or 0) - 1,
+                    'end': {'line': -1,
                             'character': -1, },
                 },
                 'message': message.text,
@@ -333,7 +335,10 @@ class LanguageServer(MethodDispatcher):
             _logger.exception("Something went wrong")
             raise
 
-        _logger.warning("Diags: %s", diagnostics)
+        if diagnostics:
+            _logger.info("Diags:")
+            for diag in diagnostics:
+                _logger.info(diag)
 
         self._endpoint.notify(
             self.M_PUBLISH_DIAGNOSTICS,

@@ -223,7 +223,7 @@ class LibraryShouldBeOmited(StaticCheckerDiag):
     def __init__(self, library, filename=None, line_number=None, column=None):
         super(LibraryShouldBeOmited, self).__init__(
             line_number=line_number, column=column, filename=filename,
-            severity=DiagType.STYLE_WARNING,
+            severity=DiagType.STYLE_INFO,
             text="Declaration of library '{library}' can be omitted" \
                     .format(library=library))
 
