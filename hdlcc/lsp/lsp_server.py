@@ -29,6 +29,7 @@ from pyls_jsonrpc.dispatchers import MethodDispatcher
 from pyls_jsonrpc.endpoint import Endpoint
 from pyls_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter
 
+from hdlcc.diagnostics import DiagType
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import debounce, isProcessRunning
 
@@ -157,34 +158,46 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         #  while not self._msg_queue.empty():  # pragma: no cover
         #      yield self._msg_queue.get()
 
-    #  class DiagnosticSeverity(object):
-    #      Error = 1
-    #      Warning = 2
-    #      Information = 3
-    #      Hint = 4
-
-
-    def getMessagesByPath(self, *args, **kwargs):
-        messages = super(HdlCodeCheckerServer, self).getMessagesByPath(*args, **kwargs)
-        _logger.warning("Got %d messages", len(messages))
+    def _toLspFormat(self, messages):
         for message in messages:
             _logger.info(message)
+            severity = defines.DiagnosticSeverity.Information
+
+            # Translate the error into LSP severity
+            severity = message.severity
+
+            if severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
+                severity = defines.DiagnosticSeverity.Hint
+            elif severity in (DiagType.WARNING, DiagType.STYLE_WARNING):
+                severity = defines.DiagnosticSeverity.Warning
+            elif severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
+                severity = defines.DiagnosticSeverity.Error
+
             yield {
-                    'source': message.get('checker', '?'),
-                    'range': {
-                        'start': {
-                            'line': message.get('line_number', 1),
-                            'character': '',
-                        },
-                        'end': {
-                            'line': message.get('line_number', 1),
-                            'character': '',
-                        },
-                    },
-                'message': message.get('error_message', '?'),
-                'severity': 1,
+                'source': message.checker,
+                'range': {
+                    'start': {'line': (message.line_number or 0) - 1,
+                              'character': -1, },
+                    'end': {'line': (message.line_number or 0) - 1,
+                            'character': -1, },
+                },
+                'message': message.text,
+                'severity': severity,
             }
 
+    def getMessagesByPath(self, path, *args, **kwargs):
+        """
+        Translate message format into LSP format
+        """
+        return self._toLspFormat(
+            super(HdlCodeCheckerServer, self).getMessagesByPath(path, *args, **kwargs))
+
+    def getMessagesWithText(self, path, content):
+        """
+        Translate message format into LSP format
+        """
+        return self._toLspFormat(
+            super(HdlCodeCheckerServer, self).getMessagesWithText(path, content))
 
 class LanguageServer(MethodDispatcher):
     """ Implementation of the Microsoft VSCode Language Server Protocol
@@ -304,18 +317,28 @@ class LanguageServer(MethodDispatcher):
         pass
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
-    def lint(self, doc_uri, is_saved):
-        #  server = self._servers[config_file] = HdlCodeCheckerServer(config_file)
+    def lint(self, doc_uri, is_saved, text=None):
         if self._checker is None:
             return
 
         path = uris.to_fs_path(doc_uri)
         _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
 
+        try:
+            if is_saved:
+                diagnostics = list(self._checker.getMessagesByPath(path))
+            else:
+                diagnostics = list(self._checker.getMessagesWithText(path, text))
+        except:
+            _logger.exception("Something went wrong")
+            raise
+
+        _logger.warning("Diags: %s", diagnostics)
+
         self._endpoint.notify(
             self.M_PUBLISH_DIAGNOSTICS,
             params={'uri': doc_uri,
-                    'diagnostics': list(self._checker.getMessagesByPath(path))})
+                    'diagnostics': diagnostics})
 
     def bufferActions(self, doc_uri, action):
         if self._checker is None:
@@ -337,9 +360,11 @@ class LanguageServer(MethodDispatcher):
     @_logCalls
     def m_text_document__did_open(self,  # pylint: disable=invalid-name
                                   textDocument=None, **_kwargs):
-        #  self.workspace.put_document(textDocument['uri'], textDocument['text'], version=textDocument.get('version'))
+        #  self.workspace.put_document(textDocument['uri'],
+        #                              textDocument['text'],
+        #                              version=textDocument.get('version'))
         #  self._hook('pyls_document_did_open', textDocument['uri'])
-        self.lint(textDocument['uri'], is_saved=False)
+        self.lint(textDocument['uri'], is_saved=True)
 
     @_logCalls
     def m_text_document__did_change(self,  # pylint: disable=invalid-name
@@ -351,7 +376,7 @@ class LanguageServer(MethodDispatcher):
         #          change,
         #          version=textDocument.get('version')
         #      )
-        self.lint(textDocument['uri'], is_saved=False)
+        self.lint(textDocument['uri'], is_saved=False, text=contentChanges[0]['text'])
 
     @_logCalls
     def m_text_document__did_save(self,  # pylint: disable=invalid-name

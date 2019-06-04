@@ -17,7 +17,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 set -x
-set -e
+set +e
 
 CACHE_DIR="${HOME}/cache/"
 
@@ -28,7 +28,7 @@ mkdir -p "${INSTALLATION_DIR}"
 
 XVHDL_TGZ="${CACHE_DIR}/xvhdl.tar.bz2"
 
-if [ ! -f "${XVHDL_TGZ}.gpg" ] && [ -n "${XVHDL_URL}" ]; then
+if [ ! -f "${XVHDL_TGZ}.gpg" -a -n "${XVHDL_URL}" ]; then
   trap "rm -f -- '$PASS_FILE'" EXIT
   wget --no-check-certificate --quiet "${XVHDL_URL}" -O "${XVHDL_TGZ}.gpg"
   trap - EXIT
@@ -39,7 +39,7 @@ echo "==============================="
 if [ ! -f "${XVHDL_TGZ}" ]; then
   # --------
   # Save the passphrase to a file so we don't echo it in the logs
-  PASS_FILE=$(mktemp)
+  PASS_FILE=$(tempfile)
   trap "rm -f -- '$PASS_FILE'" EXIT
   set +x
   if [ ! -z "$PASS" ]; then

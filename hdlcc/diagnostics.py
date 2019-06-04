@@ -235,7 +235,8 @@ class ObjectIsNeverUsed(StaticCheckerDiag):
         super(ObjectIsNeverUsed, self).__init__(
             filename=filename, line_number=line_number, column=column,
             severity=DiagType.STYLE_WARNING,
-            text="{} '{}' is never used".format(object_type, object_name))
+            text="{} '{}' is never used".format(str(object_type).capitalize(),
+                                                object_name))
 
 class BuilderDiag(CheckerDiagnostic):
     """

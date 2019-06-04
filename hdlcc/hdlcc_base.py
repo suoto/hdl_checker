@@ -253,7 +253,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Sorts a given set of build records
         """
         return sorted(diagnostics, key=lambda x: \
-                (x.severity, x.line_number, x.error_number))
+                (x.severity, x.line_number or 0, x.error_number or ''))
 
     def updateBuildSequenceCache(self, source):
         """
