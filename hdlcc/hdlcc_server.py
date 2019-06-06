@@ -115,10 +115,38 @@ def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     if stderr is not None:
         sys.stderr = openForStdHandle(stderr)
 
+def _binary_stdio():
+    """
+    (from https://github.com/palantir/python-language-server)
+
+    This seems to be different for Window/Unix Python2/3, so going by:
+        https://stackoverflow.com/questions/2850893/reading-binary-data-from-stdin
+    """
+    PY3K = sys.version_info >= (3, 0)
+
+    if PY3K:
+        # pylint: disable=no-member
+        stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
+    else:
+        # Python 2 on Windows opens sys.stdin in text mode, and
+        # binary data that read from it becomes corrupted on \r\n
+        if sys.platform == "win32":
+            # set sys.stdin to binary mode
+            # pylint: disable=no-member,import-error
+            import os
+            import msvcrt
+            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+        stdin, stdout = sys.stdin, sys.stdout
+
+    return stdin, stdout
+
 def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
-    _setupPipeRedirection(args.stdout, args.stderr)
+    # LSP will use stdio to communicate
+    if not args.lsp:
+        _setupPipeRedirection(args.stdout, args.stderr)
     _setupPaths()
 
     # Call it again to log the paths we added
@@ -161,9 +189,9 @@ def main(): # pylint: disable=missing-docstring
         handlers.app.run(host=args.host, port=args.port, threads=10,
                          server='waitress')
     else:
-        start_tcp_lang_server(args.host, args.port, hdlcc.lsp.HdlccLanguageServer)
-
-
+        stdin, stdout = _binary_stdio()
+        start_io_lang_server(stdin, stdout, True,
+                             hdlcc.lsp.HdlccLanguageServer)
 
 if __name__ == '__main__':
     main()

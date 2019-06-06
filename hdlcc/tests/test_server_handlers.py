@@ -442,7 +442,8 @@ with such.A("hdlcc bottle app") as it:
         @it.has_setup
         def setup():
             # Needs to agree with vroom test file
-            it.dummy_test_path = p.join(os.environ['TOX_ENV_DIR'], 'dummy_test_path')
+            it.dummy_test_path = p.join(os.environ['TOX_ENV_DIR'],
+                                        'dummy_test_path')
 
             it.assertFalse(
                 p.exists(it.dummy_test_path),

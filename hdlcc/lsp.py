@@ -146,18 +146,6 @@ class HdlccLanguageServer(PythonLanguageServer):
         super(HdlccLanguageServer, self).__init__(*args, **kwargs)
         self._checker = None
 
-    #  @_logCalls
-    #  def m_shutdown(self, **_kwargs):
-    #      "Shutdowns the server"
-    #      self._shutdown = True
-
-    #  @_logCalls
-    #  def m_exit(self, **_kwargs):
-    #      "Don't know yet"
-    #      self._endpoint.shutdown()
-    #      self._jsonrpc_stream_reader.close()
-    #      self._jsonrpc_stream_writer.close()
-
     def capabilities(self):
         "Returns language server capabilities"
         server_capabilities = {
