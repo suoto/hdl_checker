@@ -103,22 +103,7 @@ def _setupLogging(stream, level, color=True): # pragma: no cover
         stream = Stream(stream, 'ab', buffering=1)
 
     from rainbow_logging_handler import RainbowLoggingHandler
-    rainbow_stream_handler = RainbowLoggingHandler(
-        stream,
-        #  Customizing each column's color
-        # pylint: disable=bad-whitespace
-        color_asctime          = ('dim white',  'black'),
-        color_name             = ('dim white',  'black'),
-        color_funcName         = ('green',      'black'),
-        color_lineno           = ('dim white',  'black'),
-        color_pathname         = ('black',      'red'),
-        color_module           = ('yellow',     None),
-        color_message_debug    = ('color_59',   None),
-        color_message_info     = (None,         None),
-        color_message_warning  = ('color_226',  None),
-        color_message_error    = ('red',        None),
-        color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
+    rainbow_stream_handler = RainbowLoggingHandler(stream)
 
     logging.root.addHandler(rainbow_stream_handler)
     logging.root.setLevel(level)

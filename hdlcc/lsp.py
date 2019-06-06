@@ -162,7 +162,6 @@ class HdlccLanguageServer(PythonLanguageServer):
             #      'triggerCharacters': ['(', ',']
             #  },
             'textDocumentSync': defines.TextDocumentSyncKind.NONE,
-            #  'experimental': merge(self._hook('pyls_experimental_capabilities'))
         }
         _logger.debug('Server capabilities: %s', server_capabilities)
         return server_capabilities
