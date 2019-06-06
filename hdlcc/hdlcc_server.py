@@ -49,20 +49,11 @@ def _setupPaths():  # pragma: no cover
             _logger.warning(msg)
 
     # We're using part of python-language-server, we don't really need all of
-    # its dependencies nor want the user to install unrelated packages. We'll
-    # try to import both and in case they fail, just mock them. Unlikely
-    # they'll every be called unless there's an issue with the LSP
-
+    # its dependencies nor want the user to install unrelated packages, so
+    # we'll mock them.
     import mock
-    try:
-        import importlib_metadata  # pylint: disable=unused-import
-    except ImportError:
-        sys.modules['importlib_metadata'] = mock.MagicMock()
-
-    try:
-        import jedi  # pylint: disable=unused-import
-    except ImportError:
-        sys.modules['jedi'] = mock.MagicMock()
+    sys.modules['importlib_metadata'] = mock.MagicMock()
+    sys.modules['jedi'] = mock.MagicMock()
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
