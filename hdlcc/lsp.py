@@ -69,6 +69,39 @@ def _markUnimplemented(func):
     func._lsp_unimplemented = True  # pylint: disable=protected-access
     return func
 
+def diagToLsp(diag):
+    """
+    Converts a CheckerDiagnostic object into the dictionary with into the LSP
+    expects
+    """
+    _logger.debug(diag)
+
+    # Translate the error into LSP severity
+    severity = diag.severity
+
+    if severity in (DiagType.INFO, DiagType.STYLE_INFO):
+        severity = defines.DiagnosticSeverity.Information
+    elif severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
+        severity = defines.DiagnosticSeverity.Hint
+    elif severity in (DiagType.WARNING, DiagType.STYLE_WARNING):
+        severity = defines.DiagnosticSeverity.Warning
+    elif severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
+        severity = defines.DiagnosticSeverity.Error
+    else:
+        severity = defines.DiagnosticSeverity.Error
+
+    return {
+        'source': diag.checker,
+        'range': {
+            'start': {'line': (diag.line_number or 0) - 1,
+                      'character': -1, },
+            'end': {'line': -1,
+                    'character': -1, },
+        },
+        'message': diag.text,
+        'severity': severity,
+    }
+
 
 class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
@@ -92,49 +125,6 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         self._logger.error(message)
         self._workspace.show_message(message, defines.MessageType.Error)
 
-    def _toLspFormat(self, messages):
-        for message in messages:
-            _logger.info(message)
-            # Translate the error into LSP severity
-            severity = message.severity
-
-            if severity in (DiagType.INFO, DiagType.STYLE_INFO):
-                severity = defines.DiagnosticSeverity.Information
-            elif severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
-                severity = defines.DiagnosticSeverity.Hint
-            elif severity in (DiagType.WARNING, DiagType.STYLE_WARNING):
-                severity = defines.DiagnosticSeverity.Warning
-            elif severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
-                severity = defines.DiagnosticSeverity.Error
-            else:
-                severity = defines.DiagnosticSeverity.Error
-
-            yield {
-                'source': message.checker,
-                'range': {
-                    'start': {'line': (message.line_number or 0) - 1,
-                              'character': -1, },
-                    'end': {'line': -1,
-                            'character': -1, },
-                },
-                'message': message.text,
-                'severity': severity,
-            }
-
-    def getMessagesByPath(self, path, *args, **kwargs):
-        """
-        Translate message format into LSP format
-        """
-        return self._toLspFormat(
-            super(HdlCodeCheckerServer, self).getMessagesByPath(path, *args, **kwargs))
-
-    def getMessagesWithText(self, path, content):
-        """
-        Translate message format into LSP format
-        """
-        return self._toLspFormat(
-            super(HdlCodeCheckerServer, self).getMessagesWithText(path, content))
-
 class HdlccLanguageServer(PythonLanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
@@ -144,23 +134,12 @@ class HdlccLanguageServer(PythonLanguageServer):
 
     def __init__(self, *args, **kwargs):
         super(HdlccLanguageServer, self).__init__(*args, **kwargs)
-        self._checker = None
+        # Default checker
+        self._checker = HdlCodeCheckerServer(self.workspace, None)
 
     def capabilities(self):
         "Returns language server capabilities"
         server_capabilities = {
-            #  'documentHighlightProvider': True,
-            #  'documentSymbolProvider': True,
-            #  'definitionProvider': True,
-            #  'executeCommandProvider': {
-            #      'commands': flatten(self._hook('pyls_commands'))
-            #  },
-            #  'hoverProvider': True,
-            #  'referencesProvider': True,
-            #  'renameProvider': True,
-            #  'signatureHelpProvider': {
-            #      'triggerCharacters': ['(', ',']
-            #  },
             'textDocumentSync': defines.TextDocumentSyncKind.NONE,
         }
         _logger.debug('Server capabilities: %s', server_capabilities)
@@ -177,11 +156,12 @@ class HdlccLanguageServer(PythonLanguageServer):
             processId=processId, rootUri=rootUri, rootPath=rootPath,
             initializationOptions=initializationOptions, **_kwargs)
 
-        self._checker = HdlCodeCheckerServer(
-            self.workspace, initializationOptions.get('config_file', None))
+        config_file = (initializationOptions or {}).get('config_file', None)
+        if config_file:
+            self._checker = HdlCodeCheckerServer(self.workspace, config_file)
 
         # Get our capabilities
-        return {'capabilities': self.capabilities()}
+        return {'capabilities': self.capabilities(), 'result': 'error'}
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
     def lint(self, doc_uri, is_saved):
@@ -207,3 +187,31 @@ class HdlccLanguageServer(PythonLanguageServer):
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:
             self.workspace.publish_diagnostics(doc_uri, list(diagnostics))
+
+    @_logCalls
+    def m_workspace__did_change_configuration(self, settings=None):
+        config_file = (settings or {}).get('config_file', None)
+        if config_file:
+            self._checker = HdlCodeCheckerServer(self.workspace, config_file)
+
+    @_logCalls
+    def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
+        changed_monitored_files = set()
+        config_changed = False
+        for d in (changes or []):
+            if d['uri'].endswith(MONITORED_FILES):
+                changed_monitored_files.add(d['uri'])
+            elif d['uri'].endswith(CONFIG_FILES):
+                config_changed = True
+
+        if config_changed:
+            self.config.settings.cache_clear()
+        elif not changed_monitored_files:
+            # Only externally changed python files and lint configs may result
+            # in changed diagnostics.
+            return
+
+        for doc_uri in self.workspace.documents:
+            # Changes in doc_uri are already handled by m_text_document__did_save
+            if doc_uri not in changed_monitored_files:
+                self.lint(doc_uri, is_saved=False)
