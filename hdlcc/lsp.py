@@ -24,27 +24,20 @@
 import functools
 import logging
 
-import pyls.python_ls as python_ls
-
 import pyls.uris as uris
 import pyls.lsp as defines
 from pyls._utils import debounce
 from pyls.python_ls import PythonLanguageServer
 
-python_ls.PYTHON_FILE_EXTENSIONS = ('.vhd', '.vhdl', '.sv', '.svh', '.v',
-                                    '.vh')
-python_ls.CONFIG_FILEs = ('msim.prj', )
-
 from hdlcc.diagnostics import DiagType
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+
+MONITORED_FILES = ('.vhd', '.vhdl', '.sv', '.svh', '.v', '.vh')
+CONFIG_FILES = ()
 
 _logger = logging.getLogger(__name__)
 
 LINT_DEBOUNCE_S = 0.5  # 500 ms
-PARENT_PROCESS_WATCH_INTERVAL = 10  # 10 s
-MAX_WORKERS = 64
-PYTHON_FILE_EXTENSIONS = ('.py', '.pyi')
-_CONFIG_FILES = ('pycodestyle.cfg', 'setup.cfg', 'tox.ini', '.flake8')
 
 # pylint: disable=useless-object-inheritance
 
@@ -174,10 +167,14 @@ class HdlccLanguageServer(PythonLanguageServer):
         # If the file has not been saved, use the appropriate method, which
         # will involve dumping the modified contents into a temporary file
         if is_saved:
-            diagnostics = list(self._checker.getMessagesByPath(path))
+            diagnostics = self._checker.getMessagesByPath(path)
         else:
             text = self.workspace.get_document(doc_uri).source
-            diagnostics = list(self._checker.getMessagesWithText(path, text))
+            diagnostics = self._checker.getMessagesWithText(path, text)
+
+        # Both checker methods return generators, convert to a list before
+        # returning
+        diagnostics = list([diagToLsp(x) for x in diagnostics])
 
         if diagnostics:
             _logger.debug("Diags:")
