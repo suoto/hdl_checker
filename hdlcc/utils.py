@@ -300,7 +300,7 @@ def toBytes(value):  # pragma: no cover
     # But they don't behave the same in one important aspect: iterating over a
     # bytes instance yields ints, while iterating over a (raw, py2) str yields
     # chars. We want consistent behavior so we force the use of bytes().
-    if type(value) == bytes:
+    if isinstance(value, bytes):
         return value
 
     # This is meant to catch Python 2's native str type.
