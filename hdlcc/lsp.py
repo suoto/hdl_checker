@@ -93,6 +93,7 @@ def diagToLsp(diag):
         },
         'message': diag.text,
         'severity': severity,
+        'code':  diag.error_number or -1
     }
 
 
