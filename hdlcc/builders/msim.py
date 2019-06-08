@@ -119,7 +119,7 @@ class MSim(BaseBuilder):
             error_number = None
 
             if ('vcom-' in line) or ('vlog' in line):
-                error_number = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
+                error_number = re.findall(r"((?:vcom-|vlog-)\d+)", line)[0]
 
             diag.error_number = error_number
 

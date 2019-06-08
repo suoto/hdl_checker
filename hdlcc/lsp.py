@@ -196,10 +196,10 @@ class HdlccLanguageServer(PythonLanguageServer):
     def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
         changed_monitored_files = set()
         config_changed = False
-        for d in (changes or []):
-            if d['uri'].endswith(MONITORED_FILES):
-                changed_monitored_files.add(d['uri'])
-            elif d['uri'].endswith(CONFIG_FILES):
+        for change in (changes or []):
+            if change['uri'].endswith(MONITORED_FILES):
+                changed_monitored_files.add(change['uri'])
+            elif change['uri'].endswith(CONFIG_FILES):
                 config_changed = True
 
         if config_changed:

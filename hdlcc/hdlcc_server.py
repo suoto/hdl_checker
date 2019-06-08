@@ -151,7 +151,7 @@ def main(): # pylint: disable=missing-docstring
     from hdlcc import handlers
     import hdlcc.utils as utils # pylint: disable=redefined-outer-name
     import hdlcc.lsp
-    from pyls.python_ls import start_io_lang_server, start_tcp_lang_server
+    from pyls.python_ls import start_io_lang_server
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
