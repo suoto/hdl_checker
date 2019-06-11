@@ -41,8 +41,10 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 
 # pylint: disable=useless-object-inheritance
 
+
 def _logCalls(func):
     import pprint
+
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
@@ -54,6 +56,7 @@ def _logCalls(func):
 
     return wrapper
 
+
 def _markUnimplemented(func):
     """
     Mark a method as unimplmemented so any calls logged via _logCalls decorator
@@ -61,6 +64,7 @@ def _markUnimplemented(func):
     """
     func._lsp_unimplemented = True  # pylint: disable=protected-access
     return func
+
 
 def diagToLsp(diag):
     """
@@ -118,6 +122,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     def _handleUiError(self, message):
         self._logger.error(message)
         self._workspace.show_message(message, defines.MessageType.Error)
+
 
 class HdlccLanguageServer(PythonLanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
