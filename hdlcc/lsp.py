@@ -122,7 +122,6 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         self._logger.error(message)
         self._workspace.show_message(message, defines.MessageType.Error)
 
-
 class HdlccLanguageServer(PythonLanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
@@ -133,7 +132,7 @@ class HdlccLanguageServer(PythonLanguageServer):
     def __init__(self, *args, **kwargs):
         super(HdlccLanguageServer, self).__init__(*args, **kwargs)
         # Default checker
-        self._checker = HdlCodeCheckerServer(self.workspace, None)
+        self._checker = None
 
     def capabilities(self):
         "Returns language server capabilities"
@@ -155,9 +154,8 @@ class HdlccLanguageServer(PythonLanguageServer):
             initializationOptions=initializationOptions, **_kwargs)
 
         project_file = (initializationOptions or {}).get('project_file', None)
-        if project_file:
-            self._checker = HdlCodeCheckerServer(self.workspace, project_file)
-            self._checker.clean()
+        self._checker = HdlCodeCheckerServer(self.workspace, project_file)
+        self._checker.clean()
 
         # Get our capabilities
         return {'capabilities': self.capabilities(), 'result': 'error'}
