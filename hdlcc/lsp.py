@@ -19,7 +19,7 @@
 # This implementation is heavily based on
 # https://github.com/palantir/python-language-server/
 
-# pylint: disable=missing-docstring
+# pylint: disable=useless-object-inheritance
 
 import functools
 import logging
@@ -39,10 +39,9 @@ _logger = logging.getLogger(__name__)
 
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 
-# pylint: disable=useless-object-inheritance
-
 
 def _logCalls(func):
+    "Decorator to Log calls to func"
     import pprint
 
     @functools.wraps(func)
@@ -139,7 +138,7 @@ class HdlccLanguageServer(PythonLanguageServer):
     def capabilities(self):
         "Returns language server capabilities"
         server_capabilities = {
-            'textDocumentSync': defines.TextDocumentSyncKind.NONE,
+            'textDocumentSync': defines.TextDocumentSyncKind.FULL,
         }
         _logger.debug('Server capabilities: %s', server_capabilities)
         return server_capabilities
@@ -158,6 +157,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         project_file = (initializationOptions or {}).get('project_file', None)
         if project_file:
             self._checker = HdlCodeCheckerServer(self.workspace, project_file)
+            self._checker.clean()
 
         # Get our capabilities
         return {'capabilities': self.capabilities(), 'result': 'error'}
@@ -196,6 +196,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         project_file = (settings or {}).get('project_file', None)
         if project_file:
             self._checker = HdlCodeCheckerServer(self.workspace, project_file)
+            self._checker.clean()
 
     @_logCalls
     def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
@@ -209,6 +210,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         if config_changed:
             self.config.settings.cache_clear()
+            self._checker.clean()
         elif not changed_monitored_files:
             # Only externally changed python files and lint configs may result
             # in changed diagnostics.
