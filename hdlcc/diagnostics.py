@@ -46,14 +46,14 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
     """
     def __init__(self, # pylint: disable=too-many-arguments
                  checker, text, filename=None, line_number=None, column=None,
-                 error_number=None, severity=None):
+                 error_code=None, severity=None):
 
         # Checker can't be changed
         self.__checker = CHECKER_NAME if checker is None else checker
 
         # Modifiable attributes
         self.filename = filename
-        self.error_number = error_number
+        self.error_code = error_code
         self.text = text
 
         # Modifiable with rules
@@ -70,13 +70,12 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
 
     def __repr__(self):
         filename = None if self.filename is None else repr(self.filename)
-        error_number = None if self.error_number is None else repr(self.error_number)
+        error_code = None if self.error_code is None else repr(self.error_code)
 
         return ('{}(checker="{}", filename={}, line_number={}, '
-                'column={}, error_number={}, severity={}, '
-                'text={})'
+                'column={}, error_code={}, severity={}, text={})'
                 .format(self.__class__.__name__, self.checker, filename,
-                        self.line_number, self.column, error_number,
+                        self.line_number, self.column, error_code,
                         repr(self.severity), repr(self.text)))
 
     def __eq__(self, other):
@@ -104,7 +103,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
 
             # Compare attributes
             for attr in ('checker', 'filename', 'line_number', 'column',
-                         'error_number', 'severity', 'text'):
+                         'error_code', 'severity', 'text'):
                 if getattr(self, attr) != getattr(other, attr):
                     msg += ["%s: %s != %s" % (attr, getattr(self, attr),
                                               getattr(other, attr))]
@@ -129,7 +128,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
 
             - checker: (string) Checker name
             - filename: (string)
-            - error_number: (string)
+            - error_code: (string)
             - text: (string)
             - line_number: (int or None)
             - column: (int or None)
@@ -137,7 +136,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         """
         return {'checker': self.checker,
                 'filename': self.filename,
-                'error_number': self.error_number,
+                'error_code': self.error_code,
                 'text': self.text,
                 'line_number': self.line_number,
                 'column': self.column,
@@ -149,7 +148,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         return cls(
             checker=state['checker'],
             filename=state['filename'],
-            error_number=state['error_number'],
+            error_code=state['error_code'],
             text=state['text'],
             line_number=state['line_number'],
             column=state['column'],
@@ -207,7 +206,7 @@ class StaticCheckerDiag(CheckerDiagnostic):
     "Base diagnostics issues from static checks"
     def __init__(self, # pylint: disable=too-many-arguments
                  text, severity, filename=None, line_number=None, column=None,
-                 error_number=None):
+                 error_code=None):
 
         assert severity in (DiagType.STYLE_INFO, DiagType.STYLE_WARNING,
                             DiagType.STYLE_ERROR), \
@@ -216,7 +215,7 @@ class StaticCheckerDiag(CheckerDiagnostic):
         super(StaticCheckerDiag, self).__init__(
             checker=STATIC_CHECKER_NAME, text=text, severity=severity,
             filename=filename, line_number=line_number, column=column,
-            error_number=error_number)
+            error_code=error_code)
 
 class LibraryShouldBeOmited(StaticCheckerDiag):
     "Library declaration should be ommited"
@@ -245,8 +244,20 @@ class BuilderDiag(CheckerDiagnostic):
     """
     def __init__(self, # pylint: disable=too-many-arguments
                  builder_name, text, filename=None, line_number=None, column=None,
-                 error_number=None, severity=None):
+                 error_code=None, severity=None):
         super(BuilderDiag, self).__init__(
             checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
             filename=filename, line_number=line_number, column=column,
-            error_number=error_number, severity=severity)
+            error_code=error_code, severity=severity)
+
+class BuildInProgressDiag(CheckerDiagnostic):  # pylint: disable=too-many-instance-attributes
+    """
+    Base container for diagnostics
+    """
+    def __init__(self, # pylint: disable=too-many-arguments
+                 filename=None):
+        super(BuildInProgressDiag, self).__init__(
+            checker=CHECKER_NAME,
+            text='Checking in progress...',
+            filename=filename, line_number=None, column=None, error_code=None,
+            severity=DiagType.INFO)

@@ -34,6 +34,7 @@ from hdlcc.diagnostics import PathNotInProjectFile
 
 _logger = logging.getLogger('build messages')
 
+
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
     """
     HDL Code Checker project builder class
@@ -76,11 +77,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             self._logger.debug("Skipping cache save")
             return
 
-        state = {'serializer' : serializer.__name__,
-                 '_logger': {'name' : self._logger.name,
-                             'level' : self._logger.level},
-                 'builder' : self.builder.getState(),
-                 '_config' : self._config.getState()}
+        state = {'serializer': serializer.__name__,
+                 '_logger': {'name': self._logger.name,
+                             'level': self._logger.level},
+                 'builder': self.builder.getState(),
+                 '_config': self._config.getState()}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
@@ -114,9 +115,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         except ValueError:
             self._handleUiError(
                 "Unable to recover cache from '%s' using '%s'\n"
-                "Traceback:\n%s" % \
-                    (cache_fname, serializer.__package__,
-                     traceback.format_exc()))
+                "Traceback:\n%s" % (cache_fname, serializer.__package__,
+                                    traceback.format_exc()))
 
     def _setupEnvIfNeeded(self):
         """
@@ -253,7 +253,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Sorts a given set of build records
         """
         return sorted(diagnostics, key=lambda x: \
-                (x.severity, x.line_number or 0, x.error_number or ''))
+                (x.severity, x.line_number or 0, x.error_code or ''))
 
     def updateBuildSequenceCache(self, source):
         """
@@ -275,7 +275,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 timestamp = 0
             self._build_sequence_cache[key] = {
                 'sequence': build_sequence,
-                'timestamp' : timestamp}
+                'timestamp': timestamp}
         else:
             cached_sequence = self._build_sequence_cache[key]['sequence']
             cached_timestamp = self._build_sequence_cache[key]['timestamp']
@@ -292,7 +292,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 self._getBuildSequence(source, build_sequence)
                 self._build_sequence_cache[key] = {
                     'sequence': build_sequence,
-                    'timestamp' : current_timestamp}
+                    'timestamp': current_timestamp}
 
         return self._build_sequence_cache[key]['sequence']
 

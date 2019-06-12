@@ -34,10 +34,10 @@ from hdlcc.utils import setupLogging
 try:
     import cProfile as profile
 except ImportError:
-    import profile
+    import profile  # type: ignore
 
 try:
-    import argcomplete
+    import argcomplete  # type: ignore
     _HAS_ARGCOMPLETE = True
 except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
@@ -187,11 +187,11 @@ def printSourceDiags(project, source):
         if location:
             message += ["(%s)" % ', '.join(location)]
 
-        if record.error_number is None:
+        if record.error_code is None:
             message += ["(%s):" % record.severity]
         else:
             message += ["(%s-%s):" % (record.severity,
-                                      record.error_number)]
+                                      record.error_code)]
 
         message += [record.text]
 

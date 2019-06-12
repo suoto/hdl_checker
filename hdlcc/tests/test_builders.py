@@ -123,7 +123,7 @@ with such.A("builder object") as it:
                     text="near \"EOF\": expecting \';\'.",
                     filename=path,
                     line_number=21,
-                    error_number='vcom-1576',
+                    error_code='vcom-1576',
                     severity=DiagType.ERROR)])
 
             it.assertEqual(
@@ -139,7 +139,7 @@ with such.A("builder object") as it:
                          "aggregate type register_type.",
                     filename=path,
                     line_number=23,
-                    error_number='vcom-1320',
+                    error_code='vcom-1320',
                     severity=DiagType.WARNING)])
 
             it.assertEquals(
@@ -153,7 +153,7 @@ with such.A("builder object") as it:
                          "aggregate index range direction (to).",
                     filename=path,
                     line_number=39,
-                    error_number='vcom-1514',
+                    error_code='vcom-1514',
                     severity=DiagType.WARNING)])
 
             it.assertEquals(
@@ -162,7 +162,7 @@ with such.A("builder object") as it:
                 [BuilderDiag(
                     builder_name=it.BUILDER_NAME,
                     text="Could not find work.regfile_pkg.",
-                    error_number='vcom-11',
+                    error_code='vcom-11',
                     severity=DiagType.ERROR)])
 
             it.assertEquals(
@@ -174,7 +174,7 @@ with such.A("builder object") as it:
                     text="Cannot find expanded name \"work.regfile_pkg\".",
                     filename=path,
                     line_number=7,
-                    error_number='vcom-1195',
+                    error_code='vcom-1195',
                     severity=DiagType.ERROR)])
 
             it.assertEquals(
@@ -226,7 +226,7 @@ with such.A("builder object") as it:
                     text="syntax error near )",
                     filename=path,
                     line_number=12,
-                    error_number='VRFC 10-1412',
+                    error_code='VRFC 10-1412',
                     severity=DiagType.ERROR)])
 
         @it.should('compile a VHDL source without errors')
@@ -278,7 +278,7 @@ with such.A("builder object") as it:
                     builder_name=it.BUILDER_NAME,
                     text='Unknown identifier "some_lib".',
                     line_number=4,
-                    error_number='vcom-1136',
+                    error_code='vcom-1136',
                     severity=DiagType.ERROR)]
             elif it.BUILDER_NAME == 'ghdl':
                 expected = [BuilderDiag(
@@ -293,14 +293,14 @@ with such.A("builder object") as it:
                         builder_name=it.BUILDER_NAME,
                         text='some_lib is not declared',
                         line_number=4,
-                        error_number='VRFC 10-91',
+                        error_code='VRFC 10-91',
                         severity=DiagType.ERROR),
 
                     BuilderDiag(
                         builder_name=it.BUILDER_NAME,
                         text="'some_lib' is not declared",
                         line_number='4',
-                        error_number='VRFC 10-2989',
+                        error_code='VRFC 10-2989',
                         severity=DiagType.ERROR)]
 
             it.assertEqual(len(records), 1)

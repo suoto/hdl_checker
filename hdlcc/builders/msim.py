@@ -116,12 +116,12 @@ class MSim(BaseBuilder):
 
             diag = BuilderDiag(builder_name=self.builder_name, text=text)
 
-            error_number = None
+            error_code = None
 
             if ('vcom-' in line) or ('vlog' in line):
-                error_number = re.findall(r"((?:vcom-|vlog-)\d+)", line)[0]
+                error_code = re.findall(r"((?:vcom-|vlog-)\d+)", line)[0]
 
-            diag.error_number = error_number
+            diag.error_code = error_code
 
             filename = info.get('filename')
             line_number = info.get('line_number')

@@ -37,11 +37,11 @@ try:
         return serializer.dump(indent=True, *args, **kwargs)
 except ImportError:  # pragma: no cover
     try:
-        import cPickle as serializer
+        import cPickle as serializer  # type: ignore
     except ImportError:
-        import pickle as serializer
+        import pickle as serializer   # type: ignore
 
-    dump = serializer.dump  # pylint: disable=invalid-name
+    dump = serializer.dump  # type: ignore # pylint: disable=invalid-name
 
 PY2 = sys.version_info[0] == 2
 
@@ -88,7 +88,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
     try:
         # This is mostly for debugging when doing stuff directly from a
         # terminal
-        from rainbow_logging_handler import RainbowLoggingHandler
+        from rainbow_logging_handler import RainbowLoggingHandler # type: ignore
         handler = RainbowLoggingHandler(
             _stream,
             #  Customizing each column's color

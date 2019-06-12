@@ -36,7 +36,7 @@ class XVHDL(BaseBuilder):
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
         r"^(?P<severity>[EW])\w+:\s*"
-        r"\[(?P<error_number>[^\]]+)\]\s*"
+        r"\[(?P<error_code>[^\]]+)\]\s*"
         r"(?P<error_message>[^\[]+)\s*"
         r"("
         r"\[(?P<filename>[^:]+):"
@@ -84,7 +84,7 @@ class XVHDL(BaseBuilder):
             text=info['error_message'].strip(),
             line_number=info['line_number'],
             filename=info['filename'],
-            error_number=info['error_number'])
+            error_code=info['error_code'])
 
         if info.get('severity', None) in ('W', 'e'):
             diag.severity = DiagType.WARNING

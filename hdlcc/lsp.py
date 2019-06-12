@@ -96,7 +96,7 @@ def diagToLsp(diag):
         },
         'message': diag.text,
         'severity': severity,
-        'code':  diag.error_number or -1
+        'code':  diag.error_code or -1
     }
 
 
@@ -176,18 +176,12 @@ class HdlccLanguageServer(PythonLanguageServer):
             text = self.workspace.get_document(doc_uri).source
             diagnostics = self._checker.getMessagesWithText(path, text)
 
-        # Both checker methods return generators, convert to a list before
-        # returning
-        diagnostics = list([diagToLsp(x) for x in diagnostics])
-
-        if diagnostics:
-            _logger.debug("Diags:")
-            for diag in diagnostics:
-                _logger.debug(diag)
-
         # Since we're debounced, the document may no longer be open
+        # Also note that both checker methods return generators, convert to a
+        # list before returning
         if doc_uri in self.workspace.documents:
-            self.workspace.publish_diagnostics(doc_uri, list(diagnostics))
+            self.workspace.publish_diagnostics(
+                doc_uri, list([diagToLsp(x) for x in diagnostics]))
 
     @_logCalls
     def m_workspace__did_change_configuration(self, settings=None):
