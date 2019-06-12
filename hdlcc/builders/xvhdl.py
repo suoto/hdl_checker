@@ -31,7 +31,7 @@ class XVHDL(BaseBuilder):
     # Implementation of abstract class properties
     builder_name = 'xvhdl'
     # TODO: Add xvlog support
-    file_types = ('vhdl', )
+    file_types = {'vhdl'}
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
@@ -66,9 +66,9 @@ class XVHDL(BaseBuilder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
         self._xvhdlini = '.xvhdl.init'
-        self._builtin_libraries = ('ieee', 'std', 'unisim', 'xilinxcorelib',
+        self._builtin_libraries = {'ieee', 'std', 'unisim', 'xilinxcorelib',
                                    'synplify', 'synopsis', 'maxii',
-                                   'family_support')
+                                   'family_support'}
 
     def _makeRecords(self, line):
         scan = self._stdout_message_scanner.scanner(line)

@@ -37,15 +37,15 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     default_flags = {
         'batch_build_flags' : {},
         'single_build_flags' : {},
-        'global_build_flags' : {}}
+        'global_build_flags' : {}} # type: dict
 
     _external_libraries = {
         'vhdl' : [],
-        'verilog' : []}
+        'verilog' : []}  # type: dict
 
     _include_paths = {
         'vhdl' : [],
-        'verilog' : []}
+        'verilog' : []}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):

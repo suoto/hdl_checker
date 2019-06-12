@@ -33,7 +33,7 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'ghdl'
-    file_types = ['vhdl', 'vhd']
+    file_types = {'vhdl', 'vhd'}
 
     # Default build flags
     default_flags = {
@@ -65,7 +65,6 @@ class GHDL(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(GHDL, self).__init__(target_folder)
-        self._builtin_libraries = []
         self._parseBuiltinLibraries()
 
     def _makeRecords(self, line):
@@ -98,12 +97,11 @@ class GHDL(BaseBuilder):
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['ghdl', '--version'])
-        self._version = \
-                re.findall(r"(?<=GHDL)\s+([^\s]+)\s+", \
-                stdout[0])[0]
-        self._logger.info("GHDL version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        self._version = re.findall(r"(?<=GHDL)\s+([^\s]+)\s+",
+                                   stdout[0])[0]
+        self._logger.info("GHDL version string: '%s'. "
+                          "Version number is '%s'",
+                          stdout[:-1], self._version)
 
     @staticmethod
     def isAvailable():
@@ -133,7 +131,7 @@ class GHDL(BaseBuilder):
 
                 for path in filter(p.isdir, libraries_paths):
                     name = path.split(p.sep)[-1]
-                    self._builtin_libraries.append(name.strip().lower())
+                    self._builtin_libraries.add(name.strip().lower())
 
         self._logger.debug("Found %d builtin libraries: %s",
                            len(self._builtin_libraries),
@@ -205,4 +203,3 @@ class GHDL(BaseBuilder):
                                  'unit_name' : mdict['unit_name']})
 
         return rebuilds
-

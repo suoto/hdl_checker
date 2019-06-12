@@ -32,7 +32,7 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'msim'
-    file_types = ('vhdl', 'verilog', 'systemverilog')
+    file_types = {'vhdl', 'verilog', 'systemverilog'}
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
@@ -104,8 +104,6 @@ class MSim(BaseBuilder):
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
     def _makeRecords(self, line):
-        records = []
-
         for match in self._stdout_message_scanner(line):
             info = match.groupdict()
 
@@ -161,7 +159,7 @@ class MSim(BaseBuilder):
             self._createIniFile()
         for line in self._subprocessRunner(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
-                self._builtin_libraries.append(match.groupdict()['library_name'])
+                self._builtin_libraries.add(match.groupdict()['library_name'])
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -199,7 +197,7 @@ class MSim(BaseBuilder):
         Gets extra flags configured for the specific language
         """
         libs = []
-        for library in self._added_libraries + self._external_libraries[lang]:
+        for library in list(self._added_libraries) + self._external_libraries[lang]:
             libs = ['-L', library]
         for path in self._include_paths[lang]:
             libs += ['+incdir+' + str(path)]
