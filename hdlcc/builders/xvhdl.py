@@ -122,12 +122,12 @@ class XVHDL(BaseBuilder):
 
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
-            self._added_libraries = []
+            self._added_libraries = set()
 
         if library in self._added_libraries:
             return
 
-        self._added_libraries.append(library)
+        self._added_libraries.add(library)
 
         with open(self._xvhdlini, mode='w') as fd:
             content = '\n'.join(

@@ -84,8 +84,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
-        self._builtin_libraries = []
-        self._added_libraries = []
+        self._builtin_libraries = set()
+        self._added_libraries = set()
 
         # Skip creating a folder for the fallback builder
         if self.builder_name != 'fallback':
@@ -115,8 +115,10 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
-        obj._logger = logging.getLogger(state['_logger'])
-        del state['_logger']
+        obj._logger = logging.getLogger(state.pop('_logger'))
+        obj._builtin_libraries = set(state.pop('_builtin_libraries'))
+        obj._added_libraries = set(state.pop('_added_libraries'))
+
         obj._lock = Lock()
         obj._build_info_cache = {}
         obj.__dict__.update(state)
@@ -130,6 +132,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
+        state['_builtin_libraries'] = list(self._builtin_libraries)
+        state['_added_libraries'] = list(self._added_libraries)
         del state['_build_info_cache']
         del state['_lock']
         return state
