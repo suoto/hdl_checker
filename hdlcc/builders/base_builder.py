@@ -276,7 +276,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             if lib not in self.getBuiltinLibraries():
                 self._createLibrary(lib)
 
-        diagnostics = []
+        diagnostics = set()
         rebuilds = []
         # We must give precedence to the buffer content over the file
         # content, so we dump the buffer content to a temporary file
@@ -294,9 +294,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
             line = line.replace(build_path, source.filename)
 
-            diagnostics += [x for x in self._makeRecords(line) if x not in diagnostics]
+            diagnostics = diagnostics.union(set(self._makeRecords(line)))
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in
                          rebuilds]
+
+        # If no filename is set, assume it's for the current path
+        for diag in diagnostics:
+            if diag.filename is None:
+                diag.filename = source.filename
 
         self._logBuildResults(diagnostics, rebuilds)
 
