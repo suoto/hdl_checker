@@ -359,16 +359,18 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
 
+        records = set()
         for _source in build_sequence:
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
 
-            _ = self._buildAndHandleRebuilds(_source, forced=False,
-                                             flags=_flags)
+            records.update(self._buildAndHandleRebuilds(_source, forced=False,
+                                                        flags=_flags))
 
-        source_records = self._buildAndHandleRebuilds(source, forced=True,
-                                                      flags=flags)
-        return self._sortBuildMessages(source_records)
+        records.update(self._buildAndHandleRebuilds(source, forced=True,
+                                                    flags=flags))
+
+        return self._sortBuildMessages(records)
 
     def _buildAndHandleRebuilds(self, source, *args, **kwargs):
         """

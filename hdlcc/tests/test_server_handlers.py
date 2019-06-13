@@ -55,6 +55,12 @@ with such.A("hdlcc bottle app") as it:
     if six.PY3:
         it.assertItemsEqual = it.assertCountEqual
 
+    def _assertSameFile(first, second):
+        if not utils.samefile(first, second):
+            it.fail("Paths '{}' and '{}' differ".format(first, second))
+
+    it.assertSameFile = _assertSameFile
+
     @it.has_setup
     def setup():
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
@@ -379,8 +385,7 @@ with such.A("hdlcc bottle app") as it:
         messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
         for message in messages:
-            it.assertTrue(utils.samefile(message.filename,
-                                         data['path']))
+            it.assertSameFile(message.filename, data['path'])
 
         it.assertIn(
             CheckerDiagnostic(
