@@ -33,7 +33,6 @@ from webtest import TestApp
 
 import hdlcc
 import hdlcc.handlers as handlers
-import hdlcc.utils as utils
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 
 try:  # Python 3.x
@@ -54,12 +53,6 @@ with such.A("hdlcc bottle app") as it:
     # Workaround for Python 2.x and 3.x differences
     if six.PY3:
         it.assertItemsEqual = it.assertCountEqual
-
-    def _assertSameFile(first, second):
-        if not utils.samefile(first, second):
-            it.fail("Paths '{}' and '{}' differ".format(first, second))
-
-    it.assertSameFile = _assertSameFile
 
     @it.has_setup
     def setup():
@@ -384,8 +377,7 @@ with such.A("hdlcc bottle app") as it:
 
         messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
-        for message in messages:
-            it.assertSameFile(message.filename, data['path'])
+        it.assertIn(data['path'], [x.filename for x in messages])
 
         it.assertIn(
             CheckerDiagnostic(

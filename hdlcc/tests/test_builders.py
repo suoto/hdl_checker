@@ -35,6 +35,12 @@ from hdlcc.parsers import VhdlParser
 _logger = logging.getLogger(__name__)
 
 with such.A("builder object") as it:
+    def _assertSameFile(first, second):
+        if not utils.samefile(first, second):
+            it.fail("Paths '{}' and '{}' differ".format(first, second))
+
+    it.assertSameFile = _assertSameFile
+
     @it.has_setup
     def setup():
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
@@ -305,8 +311,7 @@ with such.A("builder object") as it:
 
             it.assertEqual(len(records), 1)
             record = records.pop()
-            it.assertTrue(utils.samefile(record.filename,
-                                         source.filename))
+            it.assertSameFile(record.filename, source.filename)
 
             # By this time the path to the file is the same, so we'll force the
             # expected record's filename to use the __eq__ operator

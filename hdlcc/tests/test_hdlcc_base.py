@@ -46,6 +46,12 @@ with such.A("hdlcc project") as it:
     if six.PY2:
         it.assertCountEqual = it.assertItemsEqual
 
+    def _assertSameFile(first, second):
+        if not samefile(first, second):
+            it.fail("Paths '{}' and '{}' differ".format(first, second))
+
+    it.assertSameFile = _assertSameFile
+
     it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
 
     @it.has_setup
@@ -565,7 +571,7 @@ with such.A("hdlcc project") as it:
             # the remaining fields
             for diagnostic in diagnostics:
                 if diagnostic.filename:
-                    it.assertTrue(samefile(filename, diagnostic.filename))
+                    it.assertSameFile(filename, diagnostic.filename)
 
             it.assertCountEqual([
                 ObjectIsNeverUsed(
@@ -601,7 +607,7 @@ with such.A("hdlcc project") as it:
             # remove them from the diagnostics so it's easier to compare
             # the remaining fields
             for diagnostic in diagnostics:
-                it.assertTrue(samefile(filename, diagnostic.filename))
+                it.assertSameFile(filename, diagnostic.filename)
 
             if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
                 expected = [
@@ -673,7 +679,7 @@ with such.A("hdlcc project") as it:
 
             diagnostics = []
             for diagnostic in it.project.getMessagesByPath(filename):
-                it.assertTrue(samefile(filename, diagnostic.filename))
+                it.assertSameFile(filename, diagnostic.filename)
                 diagnostics += [diagnostic]
 
             if it.BUILDER_NAME == 'msim':
