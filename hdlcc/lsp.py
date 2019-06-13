@@ -165,16 +165,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         if self._checker is None:
             return
 
-        path = uris.to_fs_path(doc_uri)
-        _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
-
-        # If the file has not been saved, use the appropriate method, which
-        # will involve dumping the modified contents into a temporary file
-        if is_saved:
-            diagnostics = self._checker.getMessagesByPath(path)
-        else:
-            text = self.workspace.get_document(doc_uri).source
-            diagnostics = self._checker.getMessagesWithText(path, text)
+        diagnostics = self._getDiags(doc_uri, is_saved)
 
         # Since we're debounced, the document may no longer be open
         # Also note that both checker methods return generators, convert to a
@@ -182,6 +173,27 @@ class HdlccLanguageServer(PythonLanguageServer):
         if doc_uri in self.workspace.documents:
             self.workspace.publish_diagnostics(
                 doc_uri, list([diagToLsp(x) for x in diagnostics]))
+
+    def _getDiags(self, doc_uri, is_saved):
+        """
+        Gets diags of the URI, wether from the saved file or from its
+        contents
+        """
+        # If the file has not been saved, use the appropriate method, which
+        # will involve dumping the modified contents into a temporary file
+        path = uris.to_fs_path(doc_uri)
+
+        # LSP diagnostics are only valid for the scope of the resource and
+        # hdlcc may return a tree of issues, so need to filter those out
+        filter_func = lambda diag: diag.filename in (None, path)
+
+        _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
+
+        if is_saved:
+            return filter(filter_func, self._checker.getMessagesByPath(path))
+
+        text = self.workspace.get_document(doc_uri).source
+        return filter(filter_func, self._checker.getMessagesWithText(path, text))
 
     @_logCalls
     def m_workspace__did_change_configuration(self, settings=None):
