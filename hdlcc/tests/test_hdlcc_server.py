@@ -42,6 +42,19 @@ def doNothing(queue):
     queue.get()
     _logger.debug("Ok, done")
 
+def _getUnusedLocalhostPort():
+    """
+    These were "Borrowed" from YCM.
+    See https://github.com/Valloric/YouCompleteMe
+    """
+    import socket
+    sock = socket.socket()
+    # This tells the OS to give us any free port in the range [1024 - 65535]
+    sock.bind(('', 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
+
 
 with such.A("hdlcc server") as it:
     def startCodeCheckerServer():
@@ -49,8 +62,9 @@ with such.A("hdlcc server") as it:
                                     'hdlcc_server.py')
 
         it._host = '127.0.0.1'
-        it._port = '50000'
+        it._port = str(_getUnusedLocalhostPort())
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
+
         cmd = ['coverage', 'run',
                hdlcc_server_fname,
                '--host', it._host, '--port', str(it._port),
@@ -71,6 +85,7 @@ with such.A("hdlcc server") as it:
         it._url = 'http://{0}:{1}'.format(it._host, it._port)
         cmd = ['coverage', 'run',
                hdlcc_server_fname,
+               '--host', it._host, '--port', str(it._port),
                '--log-level', HDLCC_SERVER_LOG_LEVEL,
                '--attach-to-pid', str(pid),
                '--stdout', 'hdlcc-stdout.log',
@@ -91,10 +106,13 @@ with such.A("hdlcc server") as it:
                     _logger.info("Server replied OK after %d attempts", i)
                     return
             except requests.ConnectionError:
-                _logger.debug("Attempt %d raised requests.ConnectionError", i)
-            time.sleep(1)
+                pass
+            time.sleep(0.1)
 
-        assert False, "Server is not replying after 30s"
+        _logger.error("Server is not replying")
+        it._server.terminate()
+        utils.terminateProcess(it._server.pid)
+        assert False, "Server is not replying"
 
     def waitUntilBuildFinishes(data):
         _logger.info("Waiting for 30s until build is finished")
