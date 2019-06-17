@@ -100,10 +100,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             self._logger.warning("Can't recover cache from None")
             return
 
-        _logger.debug("Trying to recover from '%s'", cache_fname)
+        self._logger.debug("Trying to recover from '%s'", cache_fname)
         cache = None
         if not p.exists(cache_fname):  # pragma: no cover
-            _logger.debug("File not found")
+            self._logger.debug("File not found")
             return
 
         try:
@@ -156,15 +156,17 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         Clean up generated files
         """
+        self._logger.debug("Cleaning up project")
         cache_fname = self._getCacheFilename()
         if cache_fname is not None and p.exists(cache_fname):
-            _logger.debug("Removing cached info in '%s'", cache_fname)
+            self._logger.debug("Removing cached info in '%s'", cache_fname)
             os.remove(cache_fname)
 
-        target_dir = self._config.getTargetDir()
-        if p.exists(target_dir):
-            _logger.debug("Removing target dir '%s'", target_dir)
-            shutil.rmtree(target_dir)
+        if self._config:
+            target_dir = self._config.getTargetDir()
+            if p.exists(target_dir):
+                self._logger.debug("Removing target dir '%s'", target_dir)
+                shutil.rmtree(target_dir)
 
         del self._config
         del self.builder
@@ -505,8 +507,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
         for message in messages:
-            if message.filename is None:
-                message.filename = p.abspath(path)
+            message.filename = p.abspath(path)
 
         return messages + remarks
 

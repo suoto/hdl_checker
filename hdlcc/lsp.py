@@ -168,9 +168,9 @@ class HdlccLanguageServer(PythonLanguageServer):
         diagnostics = self._getDiags(doc_uri, is_saved)
 
         # Since we're debounced, the document may no longer be open
-        # Also note that both checker methods return generators, convert to a
-        # list before returning
         if doc_uri in self.workspace.documents:
+            # Both checker methods return generators, convert to a list before
+            # returning
             self.workspace.publish_diagnostics(
                 doc_uri, list([diagToLsp(x) for x in diagnostics]))
 
