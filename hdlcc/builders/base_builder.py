@@ -228,7 +228,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Return a list with the libraries this compiler currently knows
         """
 
-    def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
+    def _subprocessRunner(self, cmd_with_args, shell=False, env=None,
+                          cwd=None):
         """
         Runs a shell command and handles stdout catching
         """
@@ -243,7 +244,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         try:
             stdout = list(
                 subp.check_output(cmd_with_args, stderr=subp.STDOUT,
-                                  shell=shell, env=subp_env).splitlines())
+                                  shell=shell, env=subp_env, cwd=cwd).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             self._logger.debug(

@@ -24,7 +24,6 @@ import signal
 import subprocess as subp
 import sys
 import time
-from contextlib import contextmanager
 from threading import Lock
 
 # Make the serializer transparent
@@ -323,19 +322,6 @@ def toBytes(value):  # pragma: no cover
 
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
-
-@contextmanager
-def pushd(new_dir):
-    """
-    Python context to move in and out of directories
-    (source: https://gist.github.com/howardhamilton/537e13179489d6896dd3)
-    """
-    previous_dir = os.getcwd()
-    os.chdir(new_dir)
-    try:
-        yield
-    finally:
-        os.chdir(previous_dir)
 
 def isFileReadable(path):
     """

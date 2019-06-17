@@ -22,7 +22,7 @@ import re
 from shutil import copyfile
 
 from hdlcc.diagnostics import DiagType, BuilderDiag
-from hdlcc.utils import getFileType, pushd
+from hdlcc.utils import getFileType
 
 from .base_builder import BaseBuilder
 
@@ -273,9 +273,7 @@ class MSim(BaseBuilder):
             # variable
             copyfile(modelsim_env, _modelsim_ini)
         else:
-            with pushd(self._target_folder):
-                self._subprocessRunner(['vmap', '-c'])
-                self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
+            self._subprocessRunner(['vmap', '-c'], cwd=self._target_folder)
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
