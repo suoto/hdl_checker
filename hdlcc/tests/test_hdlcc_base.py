@@ -573,17 +573,24 @@ with such.A("hdlcc project") as it:
                 if diagnostic.filename:
                     it.assertSameFile(filename, diagnostic.filename)
 
-            it.assertCountEqual([
-                ObjectIsNeverUsed(
-                    filename=p.abspath(filename),
-                    line_number=43, column=12,
-                    object_type='signal', object_name='neat_signal'),
-                ObjectIsNeverUsed(
-                    filename=p.abspath(filename),
-                    line_number=44, column=8,
-                    object_type='signal', object_name='another_signal')],
-                diagnostics)  # pylint: disable=bad-continuation
+            expected = [
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=43,
+                                  column=12, object_type='signal',
+                                  object_name='neat_signal'),
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
+                                  column=8, object_type='signal',
+                                  object_name='another_signal')]
 
+            if it.BUILDER_NAME == 'msim':
+                expected += [
+                    BuilderDiag(builder_name='msim',
+                                filename=p.abspath(filename), line_number=58,
+                                severity=DiagType.WARNING,
+                                text="Synthesis Warning: Reset signal 'reset' "
+                                "is not in the sensitivity list of process "
+                                "'line__58'.")]
+
+            it.assertCountEqual(expected, diagnostics)
             it.assertTrue(it.project._msg_queue.empty())
 
         @it.should("get messages with text for file outside the project file")

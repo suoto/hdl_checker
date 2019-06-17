@@ -51,7 +51,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         # Modifiable attributes
         self.filename = filename
         self.error_code = error_code
-        self.text = text
+        self.text = str(text)
 
         # Modifiable with rules
         self.__line_number = line_number
