@@ -231,15 +231,3 @@ class BuilderDiag(CheckerDiagnostic):
             checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
             filename=filename, line_number=line_number, column=column,
             error_code=error_code, severity=severity)
-
-class BuildInProgressDiag(CheckerDiagnostic):  # pylint: disable=too-many-instance-attributes
-    """
-    Base container for diagnostics
-    """
-    def __init__(self, # pylint: disable=too-many-arguments
-                 filename=None):
-        super(BuildInProgressDiag, self).__init__(
-            checker=CHECKER_NAME,
-            text='Checking in progress...',
-            filename=filename, line_number=None, column=None, error_code=None,
-            severity=DiagType.INFO)
