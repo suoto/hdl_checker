@@ -146,6 +146,20 @@ def main(): # pylint: disable=missing-docstring
     _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
     _setupPaths()
 
+    try:
+        _startServer(args)
+    except Exception as exc:
+        if args.lsp:
+            msg = ["Unable to start HDLCC LSP server: '%s'!" % repr(exc)]
+            if args.stderr:
+                msg += ["Check %s for more info" % args.stderr]
+            else:
+                msg += ["Use --stderr to redirect the output to a file for "
+                        "more info"]
+            _reportException(' '.join(msg))
+        raise
+
+def _startServer(args):
     # Call it again to log the paths we added
     import hdlcc
     from hdlcc import handlers
@@ -189,6 +203,27 @@ def main(): # pylint: disable=missing-docstring
         stdin, stdout = _binaryStdio()
         start_io_lang_server(stdin, stdout, True,
                              hdlcc.lsp.HdlccLanguageServer)
+
+# Error is type 1
+_SHOW_MESSAGE_TYPE = 1
+
+def _reportException(text):
+    import json
+    message = {"method": "window/showMessage",
+               "jsonrpc": "2.0",
+               "params": {
+                   "message": text,
+                   "type": _SHOW_MESSAGE_TYPE}}
+
+    body = json.dumps(message)
+
+    # Ensure we get the byte length, not the character length
+    content_length = len(body) if isinstance(body, bytes) else len(body.encode('utf-8'))
+    response = ("Content-Length: {}\r\n"
+                "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
+                "{}".format(content_length, body))
+
+    sys.stdout.write(response)
 
 if __name__ == '__main__':
     main()
