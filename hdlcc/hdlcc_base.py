@@ -365,8 +365,14 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
 
-            records.update(self._buildAndHandleRebuilds(_source, forced=False,
-                                                        flags=_flags))
+            dep_records = self._buildAndHandleRebuilds(_source, forced=False,
+                                                       flags=_flags)
+
+            for record in dep_records:
+                if record.filename is None:
+                    continue
+                if record.severity in (DiagType.ERROR, ):
+                    records.add(record)
 
         records.update(self._buildAndHandleRebuilds(source, forced=True,
                                                     flags=flags))

@@ -581,14 +581,14 @@ with such.A("hdlcc project") as it:
                                   column=8, object_type='signal',
                                   object_name='another_signal')]
 
-            if it.BUILDER_NAME == 'msim':
-                expected += [
-                    BuilderDiag(builder_name='msim',
-                                filename=p.abspath(filename), line_number=58,
-                                severity=DiagType.WARNING,
-                                text="Synthesis Warning: Reset signal 'reset' "
-                                "is not in the sensitivity list of process "
-                                "'line__58'.")]
+            #  if it.BUILDER_NAME == 'msim':
+            #      expected += [
+            #          BuilderDiag(builder_name='msim',
+            #                      filename=p.abspath(filename), line_number=58,
+            #                      severity=DiagType.WARNING,
+            #                      text="Synthesis Warning: Reset signal 'reset' "
+            #                      "is not in the sensitivity list of process "
+            #                      "'line__58'.")]
 
             it.assertCountEqual(expected, diagnostics)
             it.assertTrue(it.project._msg_queue.empty())
