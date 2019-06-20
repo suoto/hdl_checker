@@ -17,20 +17,20 @@
 "HDL Code Checker project builder class"
 
 import abc
+import logging
 import os
 import os.path as p
 import shutil
-import logging
 import traceback
 from multiprocessing.pool import ThreadPool
 
-import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump)
-from hdlcc.parsers import VerilogParser, VhdlParser
+import hdlcc.exceptions
 from hdlcc.config_parser import ConfigParser
+from hdlcc.diagnostics import DiagType, PathNotInProjectFile
+from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.static_check import getStaticMessages
-from hdlcc.diagnostics import PathNotInProjectFile
+from hdlcc.utils import dump, getFileType, removeDuplicates, serializer
 
 _logger = logging.getLogger('build messages')
 
@@ -97,11 +97,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         cache_fname = self._getCacheFilename(target_dir)
         #  if self.project_file is None or cache_fname is None:
         if cache_fname is None:
-            self._logger.warning("Can't recover cache from None")
+            self._logger.warning("Cache file name is none, aborting recovery")
             return
 
         self._logger.debug("Trying to recover from '%s'", cache_fname)
-        cache = None
         if not p.exists(cache_fname):  # pragma: no cover
             self._logger.debug("File not found")
             return
@@ -146,11 +145,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
                 self._logger.info("Selected builder is '%s'",
                                   self.builder.builder_name)
-            assert self.builder is not None
-
         except hdlcc.exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+
+        assert self.builder is not None
 
     def clean(self):
         """

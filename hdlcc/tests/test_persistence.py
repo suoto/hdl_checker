@@ -273,7 +273,6 @@ with such.A("hdlcc project with persistence") as it:
 
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
             time.sleep(1)
-            time.sleep(1)
 
             _logger.info("Searching UI messages")
 

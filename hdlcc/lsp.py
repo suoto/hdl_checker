@@ -24,8 +24,8 @@
 import functools
 import logging
 
-import pyls.uris as uris
 import pyls.lsp as defines
+import pyls.uris as uris
 from pyls._utils import debounce
 from pyls.python_ls import PythonLanguageServer
 
@@ -47,11 +47,12 @@ def _logCalls(func):
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
+        result = func(self, *args, **kwargs)
         if getattr(func, '_lsp_unimplemented', False):
-            _logger.warning(_str)
+            _logger.warning("%s => %s", _str, repr(result))
         else:
-            _logger.debug(_str)
-        return func(self, *args, **kwargs)
+            _logger.info("%s => %s", _str, repr(result))
+        return result
 
     return wrapper
 
@@ -134,13 +135,12 @@ class HdlccLanguageServer(PythonLanguageServer):
         # Default checker
         self._checker = None
 
+    @_logCalls
     def capabilities(self):
         "Returns language server capabilities"
-        server_capabilities = {
+        return {
             'textDocumentSync': defines.TextDocumentSyncKind.FULL,
         }
-        _logger.debug('Server capabilities: %s', server_capabilities)
-        return server_capabilities
 
     @_logCalls
     def m_initialize(self, processId=None, rootUri=None, # pylint: disable=invalid-name
@@ -165,7 +165,8 @@ class HdlccLanguageServer(PythonLanguageServer):
         if self._checker is None:
             return
 
-        diagnostics = self._getDiags(doc_uri, is_saved)
+        diagnostics = list(self._getDiags(doc_uri, is_saved))
+        _logger.info("Diagnostics: %s", diagnostics)
 
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:
