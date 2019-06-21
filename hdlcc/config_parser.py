@@ -492,7 +492,6 @@ class ConfigParser(object):
     def simpleParse(filename):
         """
         """
-        assert p.exists(filename), "Filename '%s' doesn't exists" % filename
         target_dir = None
         builder_name = None
         for _line in open(filename, mode='rb').readlines():

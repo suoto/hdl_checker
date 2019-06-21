@@ -221,7 +221,7 @@ class ObjectIsNeverUsed(StaticCheckerDiag):
 
 class BuilderDiag(CheckerDiagnostic):
     """
-    text issues when checking a file whose path in not present on the
+    Reports issues when checking a file whose path in not present on the
     project file
     """
     def __init__(self, # pylint: disable=too-many-arguments
@@ -231,3 +231,15 @@ class BuilderDiag(CheckerDiagnostic):
             checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
             filename=filename, line_number=line_number, column=column,
             error_code=error_code, severity=severity)
+
+
+class FailedToCreateProject(CheckerDiagnostic):
+    """
+    Reports problems when reading the project file
+    """
+    def __init__(self, project_file, exception=None):
+        text = 'Exception while creating project for project file {}: {}'
+
+        super(FailedToCreateProject, self).__init__(
+            checker=None, severity=DiagType.ERROR,
+            text=text.format(repr(project_file), repr(exception)))

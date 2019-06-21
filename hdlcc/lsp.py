@@ -29,7 +29,7 @@ import pyls.uris as uris
 from pyls._utils import debounce
 from pyls.python_ls import PythonLanguageServer
 
-from hdlcc.diagnostics import DiagType
+from hdlcc.diagnostics import DiagType, FailedToCreateProject
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
 MONITORED_FILES = ('.vhd', '.vhdl', '.sv', '.svh', '.v', '.vh')
@@ -134,6 +134,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         super(HdlccLanguageServer, self).__init__(*args, **kwargs)
         # Default checker
         self._checker = None
+        self._global_diags = set()
 
     @_logCalls
     def capabilities(self):
@@ -168,6 +169,9 @@ class HdlccLanguageServer(PythonLanguageServer):
         diagnostics = list(self._getDiags(doc_uri, is_saved))
         _logger.info("Diagnostics: %s", diagnostics)
 
+        if self._global_diags:
+            diagnostics += list(self._global_diags)
+
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:
             # Both checker methods return generators, convert to a list before
@@ -200,8 +204,14 @@ class HdlccLanguageServer(PythonLanguageServer):
     def m_workspace__did_change_configuration(self, settings=None):
         project_file = (settings or {}).get('project_file', None)
         if project_file:
-            self._checker = HdlCodeCheckerServer(self.workspace, project_file)
-            self._checker.clean()
+            # Clear previous global diags since we're changing projects
+            self._global_diags = set()
+            try:
+                self._checker = HdlCodeCheckerServer(self.workspace, project_file)
+                self._checker.clean()
+            except Exception as exc:
+                self._global_diags.add(FailedToCreateProject(project_file, exc))
+                raise
 
     @_logCalls
     def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
