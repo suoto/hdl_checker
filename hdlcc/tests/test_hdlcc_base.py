@@ -35,12 +35,12 @@ from hdlcc.diagnostics import (BuilderDiag, DiagType, LibraryShouldBeOmited,
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
-from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
+from hdlcc.utils import onCI, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
+TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+VIM_HDL_EXAMPLES = p.join(TEMP_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
     if six.PY2:
@@ -52,7 +52,7 @@ with such.A("hdlcc project") as it:
 
     it.assertSameFile = _assertSameFile
 
-    it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
+    it.DUMMY_PROJECT_FILE = p.join(TEMP_PATH, 'remove_me')
 
     @it.has_setup
     def setup():
@@ -63,8 +63,6 @@ with such.A("hdlcc project") as it:
         else:
             it.PROJECT_FILE = None
 
-        cleanProjectCache(it.PROJECT_FILE)
-
         _logger.info("Builder name: %s", it.BUILDER_NAME)
         _logger.info("Builder path: %s", it.BUILDER_PATH)
 
@@ -73,19 +71,6 @@ with such.A("hdlcc project") as it:
 
     @it.has_teardown
     def teardown():
-        cleanProjectCache(it.PROJECT_FILE)
-
-        _logger.debug("Cleaning up test files")
-        for path in (it.DUMMY_PROJECT_FILE, '.fallback', '.hdlcc',
-                     'myproject.prj', 'some_file.vhd', 'xvhdl.pb',
-                     '.xvhdl.init'):
-            if p.exists(path):
-                _logger.debug("Removing %s", path)
-                if p.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    os.remove(path)
-
         it._patch.stop()
 
     @it.should("get the path to the cache filename with no config file")
@@ -115,13 +100,14 @@ with such.A("hdlcc project") as it:
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
     def test():
         # First create a project file with something in it
-        project_file = 'myproject.prj'
+        project_file = p.join(TEMP_PATH, 'myproject.prj')
         writeListToFile(project_file, [])
 
         # Create a project object and force saving the cache
         project = StandaloneProjectBuilder(project_file)
         project._saveCache()
-        it.assertTrue(p.exists(p.join('.hdlcc', '.hdlcc.cache')),
+        it.assertTrue(p.exists(p.join(TEMP_PATH, '.hdlcc',
+                                      '.hdlcc.cache')),
                       "Cache filename not found")
 
         # Now recreate the project and ensure it has recovered from the cache
@@ -148,15 +134,16 @@ with such.A("hdlcc project") as it:
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
     def test():
         # First create a project file with something in it
-        project_file = 'myproject.prj'
+        project_file = p.join(TEMP_PATH, 'myproject.prj')
         writeListToFile(project_file, [])
 
         project = StandaloneProjectBuilder(project_file)
         project._saveCache()
-        it.assertTrue(p.exists(p.join('.hdlcc', '.hdlcc.cache')),
+        it.assertTrue(p.exists(p.join(TEMP_PATH, '.hdlcc',
+                                      '.hdlcc.cache')),
                       "Cache filename not found")
 
-        open(p.join('.hdlcc', '.hdlcc.cache'), 'a').write("something\n")
+        open(p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache'), 'a').write("something\n")
 
         project = StandaloneProjectBuilder(project_file)
         found = False
@@ -167,8 +154,6 @@ with such.A("hdlcc project") as it:
                 found = True
                 break
 
-        if p.exists('.hdlcc'):
-            shutil.rmtree('.hdlcc')
         it.assertTrue(found, "Failed to warn that cache recovering has failed")
         it.assertTrue(project.builder.builder_name, 'Fallback')
 
@@ -455,14 +440,14 @@ with such.A("hdlcc project") as it:
                         "systemverilog": []}},
                 "_timestamp": 1474839625.2375762,
                 "_sources": {},
-                "filename": "/home/souto/dev/vim-hdl/dependencies/hdlcc/myproject.prj"},
+                "filename": p.join(TEMP_PATH, "/myproject.prj")},
             "serializer": "json"}
 
-        cache_path = p.join('.hdlcc', '.hdlcc.cache')
+        cache_path = p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache')
         if p.exists(p.dirname(cache_path)):
             shutil.rmtree(p.dirname(cache_path))
 
-        os.mkdir('.hdlcc')
+        os.mkdir(p.join(TEMP_PATH, '.hdlcc'))
 
         with open(cache_path, 'w') as fd:
             fd.write(repr(cache_content))
@@ -490,9 +475,6 @@ with such.A("hdlcc project") as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-            cleanProjectCache(it.PROJECT_FILE)
-
             builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
 
             if onCI() and it.BUILDER_NAME is not None:
@@ -517,8 +499,6 @@ with such.A("hdlcc project") as it:
 
         @it.has_teardown
         def teardown():
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-            cleanProjectCache(it.PROJECT_FILE)
             if it.BUILDER_PATH:
                 it.patch.stop()
 

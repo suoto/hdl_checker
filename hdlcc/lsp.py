@@ -171,7 +171,6 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         if self._global_diags:
             diagnostics += list(self._global_diags)
-
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:
             # Both checker methods return generators, convert to a list before
