@@ -193,6 +193,30 @@ with such.A("builder object") as it:
                     filename=path,
                     severity=DiagType.ERROR)])
 
+            it.assertEquals(
+                list(it.builder._makeRecords(
+                    "** Warning: [14] %s(103): (vcom-1272) Length of expected "
+                    "is 4; length of actual is 8." % path)),
+                [BuilderDiag(
+                    builder_name=it.BUILDER_NAME,
+                    text="Length of expected is 4; length of actual is 8.",
+                    line_number='103',
+                    error_code='vcom-1272',
+                    filename=path,
+                    severity=DiagType.WARNING)])
+
+            it.assertEquals(
+                list(it.builder._makeRecords(
+                    "** Warning: [14] %s(31): (vcom-1246) Range -1 downto 0 "
+                    "is null." % path)),
+                [BuilderDiag(
+                    builder_name=it.BUILDER_NAME,
+                    text="Range -1 downto 0 is null.",
+                    line_number='31',
+                    error_code='vcom-1246',
+                    filename=path,
+                    severity=DiagType.WARNING)])
+
         @it.should("parse GHDL builder lines correctly")
         @params('/some/file/with/abs/path.vhd',
                 'some/file/with/relative/path.vhd',

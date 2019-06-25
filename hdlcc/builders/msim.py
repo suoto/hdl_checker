@@ -38,8 +38,9 @@ class MSim(BaseBuilder):
     _stdout_message_scanner = re.compile(
         r"""^\*\*\s*
                 (?P<severity>[WE])\w+\s*
-                (\(suppressible\))?:\s*
+                (:?\(suppressible\))?:\s*
                 (:?
+                    (:?\s*\[\d+\])?\s*
                     (?P<filename>.*(?=\(\d+\)))
                     \((?P<line_number>\d+)\):
                 |
