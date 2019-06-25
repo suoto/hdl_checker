@@ -123,6 +123,21 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         if the configuration file should be parsed and creating the
         appropriate builder objects
         """
+        # If the config exists and it has a target directory set (meaning: the
+        # environment was setup previously) but the target directory does *NOT*
+        # exist (meaning: it was deleted), clean up to force setting up the
+        # environment from scratch. This is especially important for LSP since
+        # there seem to be no mechanism for the client to flag a corrupt state
+        # to the server.
+        #
+        # Admittedly not the best approach -- way too many implied conditions
+        # -- might review this at some point
+        target_dir = None if self._config is None else self._config.getTargetDir()
+        if target_dir is not None and not p.exists(target_dir):
+            self._handleUiWarning("Target directory {} doesn't exist, "
+                                  "forcing cleanup".format(repr(target_dir)))
+            self.clean()
+
         try:
             # If the configuration is undefined, try to extract the
             # target dir from the project file so we can have a hint of
