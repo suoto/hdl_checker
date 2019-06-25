@@ -17,12 +17,10 @@ language: python
 matrix:
   include:
     - python: "2.7" 
-      env:
-        - TOX_PYTHON_VERSION=27
+      env: TOX_PYTHON_VERSION=py27
     - python: "3.7"
       dist: xenial
-      env:
-        - TOX_PYTHON_VERSION=37
+      env: TOX_PYTHON_VERSION=py37
 
 # env:
 #   matrix:
@@ -63,7 +61,13 @@ before_script:
 #   - pip install git+https://github.com/suoto/rainbow_logging_handler
 #   - pip install -e .
 # command to run tests
-script: "tox -e ${TOX_PYTHON_VERSION}-msim -e ${TOX_PYTHON_VERSION}-ghdl -e ${TOX_PYTHON_VERSION}-fallback -e ${TOX_PYTHON_VERSION}-standalone -e ${TOX_PYTHON_VERSION}-xvhdl"
+script: tox                                \
+ -e ${TOX_PYTHON_VERSION}-msim-linux       \
+ -e ${TOX_PYTHON_VERSION}-ghdl-linux       \
+ -e ${TOX_PYTHON_VERSION}-fallback-linux   \
+ -e ${TOX_PYTHON_VERSION}-standalone-linux \
+ -e ${TOX_PYTHON_VERSION}-xvhdl-linux
+
 after_success:
   - "coverage combine"
   - "coverage report"

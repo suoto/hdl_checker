@@ -35,28 +35,35 @@ if ($env:APPVEYOR -eq "True") {
     python get-pip.py
 }
 
-pip install -r requirements.txt
-pip install git+https://github.com/suoto/rainbow_logging_handler
+pip -V
+python -m pip install --upgrade pip
+pip -V
+
+pip install tox
+
+tox --version
+
+# pip install git+https://github.com/suoto/rainbow_logging_handler
 # if (!$?) {write-error "Error while installing requirements"; exit -1}
 
 # if (!(Test-Path $env:CACHE_PATH)) {
 #     new-item "$env:CACHE_PATH" -type directory -force
 # }
 
-if ("$env:BUILDER" -eq "msim") {
-    echo "Installing MSIM"
-    . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
-    if (!$?) {write-error "Error while installing ModelSim"; exit -1}
-} elseif ("$env:BUILDER" -eq "ghdl") {
-    echo "Installing GHDL"
-    . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
-    if (!$?) {write-error "Error while installing GHDL"; exit -1}
-} else {
-    echo "No builder selected"
-}
+# if ("$env:BUILDER" -eq "msim") {
+#     echo "Installing MSIM"
+#     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
+#     if (!$?) {write-error "Error while installing ModelSim"; exit -1}
+# } elseif ("$env:BUILDER" -eq "ghdl") {
+#     echo "Installing GHDL"
+#     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
+#     if (!$?) {write-error "Error while installing GHDL"; exit -1}
+# } else {
+#     echo "No builder selected"
+# }
 
-pip install -U -e $env:APPVEYOR_BUILD_FOLDER
-if (!$?) {write-error "Error while installing hdlcc"; exit -1}
+# pip install -U -e $env:APPVEYOR_BUILD_FOLDER
+# if (!$?) {write-error "Error while installing hdlcc"; exit -1}
 
 write-host "Arch is $env:ARCH, Python selected is $env:python_path"
 
