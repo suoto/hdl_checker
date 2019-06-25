@@ -26,6 +26,8 @@ import os
 import os.path as p
 import shutil
 
+from glob import glob
+
 import six
 
 from nose2.tools import such
@@ -183,15 +185,16 @@ with such.A("hdlcc bottle app") as it:
 
             return reply.json['messages'] + ui_reply.json['ui_messages']
 
-        def step_02_erase_target_folder():
+        def step_02_erase_target_folder_contents():
             target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
             it.assertTrue(
                 p.exists(target_folder),
                 "Target folder '%s' doesn't exists" % target_folder)
-            shutil.rmtree(target_folder)
-            it.assertFalse(
-                p.exists(target_folder),
-                "Target folder '%s' still exists!" % target_folder)
+            for path in glob(p.join(target_folder, '*')):
+                hdlcc.utils.deleteFileOrDir(path)
+
+            it.assertEqual([], glob(p.join(target_folder, '*')),
+                           "Target folder '%s' still exists!" % target_folder)
 
         def step_03_check_build_fails():
             step_03_msgs = step_01_check_file_builds_ok()
@@ -237,7 +240,7 @@ with such.A("hdlcc bottle app") as it:
                 "No errors should be found at this point")
 
         _logger.info("Step 02")
-        step_02_erase_target_folder()
+        step_02_erase_target_folder_contents()
 
         _logger.info("Step 03")
         step_03_check_build_fails()

@@ -268,6 +268,12 @@ def cleanProjectCache(project_file): # pragma: no cover
         if p.exists(cache_folder):
             shutil.rmtree(cache_folder)
 
+def deleteFileOrDir(path):
+    if p.isdir(path):
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
 def handlePathPlease(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
