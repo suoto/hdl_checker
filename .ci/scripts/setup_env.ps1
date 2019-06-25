@@ -37,7 +37,7 @@ if ($env:APPVEYOR -eq "True") {
 
 pip install -r requirements.txt
 pip install git+https://github.com/suoto/rainbow_logging_handler
-if (!$?) {write-error "Error while installing requirements"; exit -1}
+# if (!$?) {write-error "Error while installing requirements"; exit -1}
 
 # if (!(Test-Path $env:CACHE_PATH)) {
 #     new-item "$env:CACHE_PATH" -type directory -force

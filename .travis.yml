@@ -14,22 +14,23 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 ---
 language: python
-dist: xenial
-python:
-  # - "2.7"
-  - "3.5"
+matrix:
+  include:
+    - python: "2.7" 
+      env:
+        - TOX_PYTHON_VERSION=27
+    - python: "3.7"
+      dist: xenial
+      env:
+        - TOX_PYTHON_VERSION=37
 
-env:
-  matrix:
-    - BUILDER=msim
-    - BUILDER=ghdl
-    - BUILDER=fallback
-    - BUILDER=standalone
-    - BUILDER=xvhdl
-
-# sudo: required
-# sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch;
-      # sudo apt-get install -qq libgd-dev libtcl8.5 tree;
+# env:
+#   matrix:
+#     - BUILDER=msim
+#     - BUILDER=ghdl
+#     - BUILDER=fallback
+#     - BUILDER=standalone
+#     - BUILDER=xvhdl
 
 before_install:
   - sudo apt-get update -qq;
@@ -49,9 +50,12 @@ before_script:
   - pip install tox
   - "git submodule update"
   - "mkdir -p ~/cache"
-  - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
-  - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
-  - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
+  # - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
+  # - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
+  # - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
+  - "./.ci/scripts/setup_msim.sh"
+  - "./.ci/scripts/setup_ghdl.sh"
+  - "./.ci/scripts/setup_xvhdl.sh"
 # command to install dependencies
 # install:
 #   - pip install -r requirements.txt
@@ -59,7 +63,7 @@ before_script:
 #   - pip install git+https://github.com/suoto/rainbow_logging_handler
 #   - pip install -e .
 # command to run tests
-script: "tox -e ${BUILDER}"
+script: "tox -e ${TOX_PYTHON_VERSION}-msim -e ${TOX_PYTHON_VERSION}-ghdl -e ${TOX_PYTHON_VERSION}-fallback -e ${TOX_PYTHON_VERSION}-standalone -e ${TOX_PYTHON_VERSION}-xvhdl"
 after_success:
   - "coverage combine"
   - "coverage report"
@@ -70,3 +74,4 @@ cache:
   pip: true
   directories:
     - ~/cache/
+
