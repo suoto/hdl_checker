@@ -47,12 +47,16 @@ def _logCalls(func):
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
-        result = func(self, *args, **kwargs)
-        if getattr(func, '_lsp_unimplemented', False):
-            _logger.warning("%s => %s", _str, repr(result))
-        else:
-            _logger.info("%s => %s", _str, repr(result))
-        return result
+        try:
+            result = func(self, *args, **kwargs)
+            if getattr(func, '_lsp_unimplemented', False):
+                _logger.warning("%s => %s", _str, repr(result))
+            else:
+                _logger.info("%s => %s", _str, repr(result))
+            return result
+        except:
+            _logger.exception("Failed to run %s", _str)
+            raise
 
     return wrapper
 
@@ -171,6 +175,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         if self._global_diags:
             diagnostics += list(self._global_diags)
+
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:
             # Both checker methods return generators, convert to a list before

@@ -38,8 +38,6 @@ _logger = logging.getLogger(__name__)
 HDLCC_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 HDLCC_STANDALONE = p.join(HDLCC_PATH, "hdlcc", "standalone.py")
 
-#  TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
-
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
@@ -110,11 +108,6 @@ with such.A("hdlcc standalone tool") as it:
             shutil.rmtree(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build'))
 
         it.patch.stop()
-
-        if p.exists('xvhdl.pb'):
-            os.remove('xvhdl.pb')
-        if p.exists('.xvhdl.init'):
-            os.remove('.xvhdl.init')
 
     with it.having("a valid project file"):
 

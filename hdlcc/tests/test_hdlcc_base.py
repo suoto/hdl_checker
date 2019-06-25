@@ -35,7 +35,7 @@ from hdlcc.diagnostics import (BuilderDiag, DiagType, LibraryShouldBeOmited,
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
-from hdlcc.utils import onCI, samefile, writeListToFile
+from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -52,6 +52,17 @@ with such.A("hdlcc project") as it:
 
     it.assertSameFile = _assertSameFile
 
+    def _assertMsgQueueIsEmpty(project):
+        msg = []
+        while not project._msg_queue.empty():
+            msg += [str(project._msg_queue.get()), ]
+
+        if msg:
+            msg.insert(0, 'Message queue should be empty but has %d messages' % len(msg))
+            it.fail('\n'.join(msg))
+
+    it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
+
     it.DUMMY_PROJECT_FILE = p.join(TEMP_PATH, 'remove_me')
 
     @it.has_setup
@@ -63,6 +74,8 @@ with such.A("hdlcc project") as it:
         else:
             it.PROJECT_FILE = None
 
+        cleanProjectCache(it.PROJECT_FILE)
+
         _logger.info("Builder name: %s", it.BUILDER_NAME)
         _logger.info("Builder path: %s", it.BUILDER_PATH)
 
@@ -71,6 +84,19 @@ with such.A("hdlcc project") as it:
 
     @it.has_teardown
     def teardown():
+        cleanProjectCache(it.PROJECT_FILE)
+
+        _logger.debug("Cleaning up test files")
+        for path in (it.DUMMY_PROJECT_FILE, '.fallback', '.hdlcc',
+                     'myproject.prj', 'some_file.vhd', 'xvhdl.pb',
+                     '.xvhdl.init'):
+            if p.exists(path):
+                _logger.debug("Removing %s", path)
+                if p.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+
         it._patch.stop()
 
     @it.should("get the path to the cache filename with no config file")
@@ -154,6 +180,8 @@ with such.A("hdlcc project") as it:
                 found = True
                 break
 
+        if p.exists('.hdlcc'):
+            shutil.rmtree('.hdlcc')
         it.assertTrue(found, "Failed to warn that cache recovering has failed")
         it.assertTrue(project.builder.builder_name, 'Fallback')
 
@@ -475,6 +503,8 @@ with such.A("hdlcc project") as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
+            cleanProjectCache(it.PROJECT_FILE)
+
             builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
 
             if onCI() and it.BUILDER_NAME is not None:
@@ -499,6 +529,7 @@ with such.A("hdlcc project") as it:
 
         @it.has_teardown
         def teardown():
+            cleanProjectCache(it.PROJECT_FILE)
             if it.BUILDER_PATH:
                 it.patch.stop()
 
@@ -511,7 +542,7 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
                               'foo.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
@@ -522,7 +553,7 @@ with such.A("hdlcc project") as it:
                     object_type='signal', object_name='neat_signal'),
                 diagnostics)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")
         def test005b():
@@ -535,7 +566,7 @@ with such.A("hdlcc project") as it:
                                 ['signal another_signal : std_logic;'] +
                                 original_content[43:])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesWithText(filename, content)
 
@@ -571,7 +602,7 @@ with such.A("hdlcc project") as it:
             #                      "'line__58'.")]
 
             it.assertCountEqual(expected, diagnostics)
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text for file outside the project file")
         def test005c():
@@ -582,7 +613,7 @@ with such.A("hdlcc project") as it:
                                  "use work.all;",
                                  "entity some_entity is end;"])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesWithText(filename, content)
 
@@ -621,7 +652,7 @@ with such.A("hdlcc project") as it:
                                            line_number=1)],
                     diagnostics)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
 
         @it.should("get updated messages")
@@ -629,7 +660,7 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
                               'foo.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             code = open(filename, 'r').read().split('\n')
 
@@ -651,7 +682,7 @@ with such.A("hdlcc project") as it:
                 code[28] = code[28][3:]
                 writeListToFile(filename, code)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages by path of a different source")
         def test007():
@@ -662,7 +693,7 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                               'clock_divider.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = []
             for diagnostic in it.project.getMessagesByPath(filename):
@@ -686,7 +717,7 @@ with such.A("hdlcc project") as it:
 
             it.assertEqual(diagnostics, expected_records)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages from a source outside the project file")
         def test009():
@@ -696,7 +727,7 @@ with such.A("hdlcc project") as it:
             filename = 'some_file.vhd'
             writeListToFile(filename, ['library some_lib;'])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
@@ -713,7 +744,7 @@ with such.A("hdlcc project") as it:
                           "It was expected that the builder added some "
                           "message here indicating an error")
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("rebuild sources when needed within the same library")
         def test010():

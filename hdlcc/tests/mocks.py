@@ -17,10 +17,12 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
 import os
 import os.path as p
-import logging
 from multiprocessing import Queue
+
+import mock
 
 import hdlcc
 
@@ -30,8 +32,6 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
-    def __init__(self, project_file=None):
-        super(StandaloneProjectBuilder, self).__init__(project_file)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(('info', message))
@@ -98,12 +98,6 @@ class SourceMock(object):
     def getDependencies(self):
         return self._dependencies
 
-    #  def getLibraries(self):
-    #      return []
-
-    #  def getSourceContent(self):
-    #      return ''
-
 class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger('MSimMock')
     builder_name = 'msim_mock'
@@ -145,3 +139,5 @@ class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
         raise hdlcc.exceptions.SanityCheckError(
             self.builder_name, "Fake error")
 
+def disableVunit(func):
+    return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
