@@ -35,7 +35,7 @@ class VerilogParser(BaseSourceFile):
     source file
     """
 
-    _comment = re.compile(r'/\*.*\*/|//[^(\r\n?|\n)]*', flags=re.S)
+    _comment = re.compile(r'\/\*.*?\*\/|//[^(\r\n?|\n)]*', flags=re.DOTALL)
 
     def _getSourceContent(self):
         # Remove multiline comments
