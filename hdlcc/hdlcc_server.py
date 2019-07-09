@@ -30,6 +30,9 @@ from threading import Timer
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
 
+_LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
+                           "jsonrpc": "2.0"}
+
 def _setupPaths():  # pragma: no cover
     "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
@@ -160,6 +163,9 @@ def main(): # pylint: disable=missing-docstring
         raise
 
 def _startServer(args):
+    """
+    Import modules and tries to start a hdlcc server
+    """
     # Call it again to log the paths we added
     import hdlcc
     from hdlcc import handlers
@@ -204,16 +210,22 @@ def _startServer(args):
         start_io_lang_server(stdin, stdout, True,
                              hdlcc.lsp.HdlccLanguageServer)
 
-# Error is type 1
-_SHOW_MESSAGE_TYPE = 1
+# This is a redefinition to be used as last resort if failed to setup
+# the server
+class MessageType:  # pylint: disable=too-few-public-methods
+    "LSP message types"
+    Error = 1
+    Warning = 2
+    Info = 3
+    Log = 4
+
 
 def _reportException(text):
+    "Hand crafted message to report issues when starting up the HDLCC server"
     import json
-    message = {"method": "window/showMessage",
-               "jsonrpc": "2.0",
-               "params": {
-                   "message": text,
-                   "type": _SHOW_MESSAGE_TYPE}}
+    message = _LSP_ERROR_MSG_TEMPLATE.copy()
+    message['params'] = {'message': text,
+                         'type': MessageType.Error}
 
     body = json.dumps(message)
 
