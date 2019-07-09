@@ -48,9 +48,6 @@ before_script:
   - pip install tox
   - "git submodule update"
   - "mkdir -p ~/cache"
-  # - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
-  # - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
-  # - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
   - "./.ci/scripts/setup_msim.sh"
   - "./.ci/scripts/setup_ghdl.sh"
   - "./.ci/scripts/setup_xvhdl.sh"
@@ -64,7 +61,6 @@ before_script:
 script:
   - echo "tox -e ${TOX_PYTHON_VERSION}-msim-linux -e ${TOX_PYTHON_VERSION}-ghdl-linux -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux -e ${TOX_PYTHON_VERSION}-xvhdl-linux"
   - tox -e ${TOX_PYTHON_VERSION}-msim-linux -e ${TOX_PYTHON_VERSION}-ghdl-linux -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux -e ${TOX_PYTHON_VERSION}-xvhdl-linux
-
 after_success:
   - "coverage combine"
   - "coverage report"

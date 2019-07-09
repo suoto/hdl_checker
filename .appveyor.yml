@@ -55,26 +55,19 @@ environment:
 
 # scripts that run after cloning repository
 install:
-  # - git clone https://github.com/suoto/grlib
-  #   "%APPVEYOR_BUILD_FOLDER%\\.ci\\test_support\\grlib" --depth 1
-  # - git submodule update --init --recursive
   # We need wheel installed to build wheels
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
   - "%PYTHON%\\python.exe -m pip install wheel tox"
 
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
-  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
-  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
+  # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
+  # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
 
   - python --version
 
 test_script:
   - tox -e py%PYTHON_VERSION%-%BUILDER%-windows -e py%PYTHON_VERSION%-fallback-windows -e py%PYTHON_VERSION%-standalone-windows
-  # - if "%BUILDER%" == "msim" (python run_tests.py --msim -v)
-  # - if "%BUILDER%" == "ghdl" (python run_tests.py --ghdl -v)
-  # - if "%BUILDER%" == "other" (python run_tests.py --fallback --standalone -v)
-  #
 after_test:
   - coverage combine
   - coverage report

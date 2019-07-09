@@ -36,13 +36,6 @@ if ($env:APPVEYOR -eq "True") {
 }
 
 
-# pip install git+https://github.com/suoto/rainbow_logging_handler
-# if (!$?) {write-error "Error while installing requirements"; exit -1}
-
-# if (!(Test-Path $env:CACHE_PATH)) {
-#     new-item "$env:CACHE_PATH" -type directory -force
-# }
-
 if ("$env:BUILDER" -eq "msim") {
     echo "Installing MSIM"
     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
@@ -54,9 +47,6 @@ if ("$env:BUILDER" -eq "msim") {
 } else {
     echo "No builder selected"
 }
-
-# pip install -U -e $env:APPVEYOR_BUILD_FOLDER
-# if (!$?) {write-error "Error while installing hdlcc"; exit -1}
 
 write-host "Arch is $env:ARCH, Python selected is $env:python_path"
 
