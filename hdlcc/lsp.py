@@ -16,9 +16,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Language server protocol implementation"
 
-# This implementation is heavily based on
-# https://github.com/palantir/python-language-server/
-
 # pylint: disable=useless-object-inheritance
 
 import functools
@@ -49,25 +46,13 @@ def _logCalls(func):
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
             result = func(self, *args, **kwargs)
-            if getattr(func, '_lsp_unimplemented', False):
-                _logger.warning("%s => %s", _str, repr(result))
-            else:
-                _logger.info("%s => %s", _str, repr(result))
+            _logger.info("%s => %s", _str, repr(result))
             return result
         except:
             _logger.exception("Failed to run %s", _str)
             raise
 
     return wrapper
-
-
-def _markUnimplemented(func):
-    """
-    Mark a method as unimplmemented so any calls logged via _logCalls decorator
-    will be warnings
-    """
-    func._lsp_unimplemented = True  # pylint: disable=protected-access
-    return func
 
 
 def diagToLsp(diag):
