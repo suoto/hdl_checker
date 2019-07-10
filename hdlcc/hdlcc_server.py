@@ -145,11 +145,11 @@ def _binaryStdio():
 def main(): # pylint: disable=missing-docstring
     args = parseArguments()
 
-    # LSP will use stdio to communicate
-    _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
-    _setupPaths()
-
     try:
+        # LSP will use stdio to communicate
+        _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
+        _setupPaths()
+
         _startServer(args)
     except Exception as exc:
         if args.lsp:
