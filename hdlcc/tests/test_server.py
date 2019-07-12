@@ -38,7 +38,7 @@ from hdlcc.tests.mocks import disableVunit
 _logger = logging.getLogger(__name__)
 
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'WARNING')
+SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 JSONRPC_VERSION = '2.0'
@@ -98,8 +98,8 @@ class _ClientServer(object):
 with such.A("hdlcc server") as it:
 
     _SERVER_BASE_CMD = [
-        'coverage', 'run', p.join(HDLCC_BASE_PATH, 'hdlcc', 'hdlcc_server.py'),
-        '--log-level', HDLCC_SERVER_LOG_LEVEL,
+        'coverage', 'run', p.join(HDLCC_BASE_PATH, 'hdlcc', 'server.py'),
+        '--log-level', SERVER_LOG_LEVEL,
         '--stdout', p.join(TEST_SUPPORT_PATH, 'hdlcc-stdout.log'),
         '--stderr', p.join(TEST_SUPPORT_PATH, 'hdlcc-stderr.log'),
         '--log-stream', p.join(TEST_SUPPORT_PATH, 'tests.log')]
@@ -221,7 +221,7 @@ with such.A("hdlcc server") as it:
         @it.has_setup
         def setup():
             import hdlcc
-            from hdlcc.hdlcc_server import _setupPaths
+            from hdlcc.server import _setupPaths
             _setupPaths()
 
         @it.should("initialize with no project file")
@@ -246,7 +246,7 @@ with such.A("hdlcc server") as it:
 
             args = type('args', (object, ),
                         {'lsp': True,
-                         'log_level': HDLCC_SERVER_LOG_LEVEL,
+                         'log_level': SERVER_LOG_LEVEL,
                          'stderr': p.join(TEST_SUPPORT_PATH, 'hdlcc-stderr.log'),
                          'log_stream': p.join(TEST_SUPPORT_PATH, 'tests.log')})
 
@@ -255,10 +255,10 @@ with such.A("hdlcc server") as it:
             stdout = mock.MagicMock(spec=sys.stdout)
             stdout.write = mock.MagicMock(spec=sys.stdout.write)
 
-            with mock.patch('hdlcc.hdlcc_server.startServer', startServer):
-                with mock.patch('hdlcc.hdlcc_server.sys.stdout', stdout):
+            with mock.patch('hdlcc.server.startServer', startServer):
+                with mock.patch('hdlcc.server.sys.stdout', stdout):
                     with it.assertRaises(AssertionError):
-                        hdlcc.hdlcc_server.main(args)
+                        hdlcc.server.main(args)
 
             # Build up the expected response
             body = json.dumps({

@@ -47,7 +47,7 @@ except ImportError:  # Python 2.x
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
+SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))

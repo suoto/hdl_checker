@@ -204,7 +204,7 @@ def _getDefaultTestByEnv(env):
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_static_check')
     if env == 'fallback':
-        return ('hdlcc.tests.test_hdlcc_server',
+        return ('hdlcc.tests.test_server',
                 'hdlcc.tests.test_builders',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',
@@ -228,7 +228,7 @@ def runTestsForEnv(env, args):
     if env in TEST_ENVS:
         test_env.update(TEST_ENVS[env])
 
-    test_env.update({'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
 
     _logger.info("nose2 args: %s", nose_args)
 
