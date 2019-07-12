@@ -37,7 +37,7 @@ _logger = logging.getLogger(__name__)
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 
 
-def _logCalls(func):
+def _logCalls(func):  # pragma: no cover
     "Decorator to Log calls to func"
     import pprint
 

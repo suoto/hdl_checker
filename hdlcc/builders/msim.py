@@ -186,12 +186,12 @@ class MSim(BaseBuilder):
         filetype = getFileType(path)
         if filetype == 'vhdl':
             return self._buildVhdl(path, library, flags)
-        if filetype in ('verilog', 'systemverilog'):
+        if filetype in ('verilog', 'systemverilog'):  # pragma: no cover
             return self._buildVerilog(path, library, flags)
 
-        self._logger.error("Unknown file type %s for path '%s'",
-                           filetype, path)
-        return None
+        self._logger.error(  # pragma: no cover
+            "Unknown file type %s for path '%s'", filetype, path)
+        return None  # pragma: no cover
 
     def _getExtraFlags(self, lang):
         """
