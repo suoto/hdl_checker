@@ -29,7 +29,7 @@ import coverage
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
-    import mock
+    import mock  # type: ignore
 
 try:
     import argcomplete
@@ -63,20 +63,6 @@ TEST_ENVS['xvhdl'] = {
     'BUILDER_PATH' : p.expanduser('~/builders/xvhdl/bin/')}
 
 
-def _noseRunner(args):
-    "Runs nose2 with coverage"
-    _logger.info("nose2 args: %s", repr(args))
-    cov = coverage.Coverage(config_file='.coveragerc')
-    cov.start()
-
-    try:
-        result = nose2.discover(exit=False, argv=args)
-    finally:
-        cov.stop()
-        cov.save()
-
-    return result
-
 def _shell(cmd):
     _logger.info("$ %s", cmd)
     for line in os.popen(cmd).read().split('\n'):
@@ -91,18 +77,21 @@ def _clear():
 
 def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
+    if stream is None:
+        return
+
     if isinstance(stream, str):
-        class Stream(file):
+        class Stream(file):  # pylint: disable=undefined-variable,too-few-public-methods
             """
             File subclass that allows RainbowLoggingHandler to write
             with colors
             """
-            def isatty(self):
+            def isatty(self):  # pylint: disable=no-self-use,missing-docstring
                 return color
 
         stream = Stream(stream, 'ab', buffering=1)
 
-    from rainbow_logging_handler import RainbowLoggingHandler
+    from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
     rainbow_stream_handler = RainbowLoggingHandler(stream)
 
     logging.root.addHandler(rainbow_stream_handler)
@@ -156,7 +145,7 @@ def _parseArguments():
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
 
-    parser.add_argument('--log-stream', action='store', default=sys.stdout,
+    parser.add_argument('--log-stream', action='store', default=None, #sys.stdout,
                         help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
@@ -198,6 +187,9 @@ def _getNoseCommandLineArgs(args):
         argv += ['--debugger']
     if args.fail_fast:
         argv += ['--fail-fast']
+
+    if args.log_level:
+        argv += ['--log-level', args.log_level]
 
     return argv
 
