@@ -25,12 +25,15 @@ import time
 
 from multiprocessing import Queue, Process
 from threading import Thread
+import json
+
 from nose2.tools import such
+
+import mock
 
 import requests
 import hdlcc.utils as utils
 from hdlcc.tests.mocks import disableVunit
-
 
 _logger = logging.getLogger(__name__)
 
@@ -38,7 +41,7 @@ TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'WARNING')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
-#  JSONRPC_VERSION = '2.0'
+JSONRPC_VERSION = '2.0'
 CALL_TIMEOUT = 2
 
 def doNothing(queue):
@@ -65,7 +68,7 @@ def start_client(client):
 
 class _ClientServer(object):
     """ A class to setup a client/server pair """
-    def __init__(self, check_parent_process=False):
+    def __init__(self):
         from pyls.python_ls import start_io_lang_server
         import hdlcc
         import hdlcc.lsp
@@ -77,7 +80,7 @@ class _ClientServer(object):
         self.server_thread = Thread(target=start_io_lang_server,
                                     args=(os.fdopen(csr, 'rb'),
                                           os.fdopen(scw, 'wb'),
-                                          check_parent_process,
+                                          False,
                                           hdlcc.lsp.HdlccLanguageServer))
 
         self.server_thread.daemon = True
@@ -92,72 +95,10 @@ class _ClientServer(object):
         self.client_thread.start()
 
 
-#  class _LspServer(object):
-#      def __init__(self):
-#          import hdlcc
-#          import hdlcc.lsp
-#                                     hdlcc.lsp.HdlccLanguageServer))
-#          from pyls_jsonrpc.endpoint import Endpoint
-
-#          server_stdin_r, server_stdin_w = os.pipe()
-#          server_stdout_r, server_stdout_w = os.pipe()
-
-#          self.server_stdin = os.fdopen(server_stdin_w, 'wb')
-#          self.server_stdout = os.fdopen(server_stdout_r, 'rb')
-
-#          self.thread = Thread(target=start_io_lang_server,
-#                               args=(os.fdopen(server_stdin_r, 'rb'),
-#                                     os.fdopen(server_stdout_w, 'wb'),
-#                                     False,
-#                                     hdlcc.lsp.HdlccLanguageServer))
-
-#          self.thread.daemon = True
-#          self.thread.start()
-
-#          self.endpoint = Endpoint(
-
-#      def notify(self, method, params=None):
-#          """Send a JSON RPC notification to the client.
-
-#           Args:
-#               method (str): The method name of the notification to send
-#               params (any): The payload of the notification
-#           """
-#          _logger.debug('Sending notification: %s %s', method, params)
-
-#          message = {
-#              'jsonrpc': JSONRPC_VERSION,
-#              'method': method,
-#          }
-#          if params is not None:
-#              message['params'] = params
-
-#          return self._send(message)
-
-#      def _send(self, message):
-#          body = json.dumps(message)
-
-#          # Ensure we get the byte length, not the character length
-#          content_length = len(body) if isinstance(body, bytes) else len(body.encode('utf-8'))
-
-#          response = (
-#              "Content-Length: {}\r\n"
-#              "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-#              "{}".format(content_length, body)
-#          )
-
-#          _logger.debug("Sending message:\n\n%s\n", response)
-#          self.server_stdin.write(utils.toBytes(response))
-#          self.server_stdin.flush()
-
-#          d = self.server_stdout.readline()
-#          assert False, 'got %s' % repr(d)
-#          #  return self.server.communicate(utils.toBytes(response), timeout=5)
-
 with such.A("hdlcc server") as it:
 
-    _server_base_cmd = ['coverage', 'run',
-        p.join(HDLCC_BASE_PATH, 'hdlcc', 'hdlcc_server.py'),
+    _SERVER_BASE_CMD = [
+        'coverage', 'run', p.join(HDLCC_BASE_PATH, 'hdlcc', 'hdlcc_server.py'),
         '--log-level', HDLCC_SERVER_LOG_LEVEL,
         '--stdout', p.join(TEST_SUPPORT_PATH, 'hdlcc-stdout.log'),
         '--stderr', p.join(TEST_SUPPORT_PATH, 'hdlcc-stderr.log'),
@@ -169,7 +110,7 @@ with such.A("hdlcc server") as it:
             it._port = str(_getUnusedLocalhostPort())
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
 
-            cmd = list(_server_base_cmd) + \
+            cmd = list(_SERVER_BASE_CMD) + \
                     ['--host', it._host,
                      '--port', str(it._port)]
 
@@ -181,7 +122,7 @@ with such.A("hdlcc server") as it:
         def startCodeCheckerServerAttachedToPid(pid):
             it._url = 'http://{0}:{1}'.format(it._host, it._port)
 
-            cmd = list(_server_base_cmd) + \
+            cmd = list(_SERVER_BASE_CMD) + \
                     ['--host', it._host,
                      '--port', str(it._port),
                      '--attach-to-pid', str(pid)]
@@ -282,12 +223,12 @@ with such.A("hdlcc server") as it:
             import hdlcc
             from hdlcc.hdlcc_server import _setupPaths
             _setupPaths()
-            it.client_server = _ClientServer()
 
         @it.should("initialize with no project file")
         @disableVunit
         def test():
-            response = it.client_server.client._endpoint.request(
+            client_server = _ClientServer()
+            response = client_server.client._endpoint.request(
                 'initialize',
                 {'rootPath': os.path.dirname(__file__),
                  'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
@@ -295,15 +236,45 @@ with such.A("hdlcc server") as it:
             _logger.debug("Response: %s", response)
             it.assertEqual(response, {'capabilities': {'textDocumentSync': 1}})
 
-        @it.should("initialize with project file")
+        @it.should("show message with reason for failing to start")
         @disableVunit
         def test():
-            response = it.client_server.client._endpoint.request(
-                'initialize',
-                {'rootPath': os.path.dirname(__file__),
-                 'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
+            import hdlcc
 
-            _logger.debug("Response: %s", response)
-            it.assertEqual(response, {'capabilities': {'textDocumentSync': 1}})
+            def startServer(*args):
+                assert False
+
+            args = type('args', (object, ),
+                        {'lsp': True,
+                         'log_level': HDLCC_SERVER_LOG_LEVEL,
+                         'stderr': p.join(TEST_SUPPORT_PATH, 'hdlcc-stderr.log'),
+                         'log_stream': p.join(TEST_SUPPORT_PATH, 'tests.log')})
+
+            # Python 2 won't allow to mock sys.stdout.write directly
+            import sys
+            stdout = mock.MagicMock(spec=sys.stdout)
+            stdout.write = mock.MagicMock(spec=sys.stdout.write)
+
+            with mock.patch('hdlcc.hdlcc_server.startServer', startServer):
+                with mock.patch('hdlcc.hdlcc_server.sys.stdout', stdout):
+                    with it.assertRaises(AssertionError):
+                        hdlcc.hdlcc_server.main(args)
+
+            # Build up the expected response
+            body = json.dumps({
+                "method": "window/showMessage",
+                "jsonrpc": JSONRPC_VERSION,
+                "params": {
+                    "message":
+                        "Unable to start HDLCC LSP server: "
+                        "\'AssertionError()\'! Check " + p.abspath(args.stderr) +
+                        " for more info",
+                    "type": 1}})
+
+            response = ("Content-Length: {}\r\n"
+                        "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
+                        "{}".format(len(body), body))
+
+            stdout.write.assert_called_once_with(response)
 
 it.createTests(globals())

@@ -33,7 +33,7 @@ PY2 = sys.version_info[0] == 2
 _LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
                            "jsonrpc": "2.0"}
 
-def _setupPaths():  # pragma: no cover
+def _setupPaths():
     "Add our dependencies to sys.path"
     hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
     sys.path.insert(0, hdlcc_base_path)
@@ -46,7 +46,7 @@ def _setupPaths():  # pragma: no cover
         if path not in sys.path:
             sys.path.insert(0, path)
         else:
-            _logger.warning("WARNING: '%s' was already on sys.path!", path)
+            _logger.debug("Path '%s' was already on sys.path!", path)
 
     # We're using part of python-language-server, we don't really need all of
     # its dependencies nor want the user to install unrelated packages, so
@@ -139,9 +139,7 @@ def _binaryStdio():
 
     return stdin, stdout
 
-def main(): # pylint: disable=missing-docstring
-    args = parseArguments()
-
+def main(args): # pylint: disable=missing-docstring
     try:
         # LSP will use stdio to communicate
         _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
@@ -149,7 +147,7 @@ def main(): # pylint: disable=missing-docstring
 
         startServer(args)
     except Exception as exc:
-        if args.lsp:
+        if args.lsp:  # pragma: no cover
             msg = ["Unable to start HDLCC LSP server: '%s'!" % repr(exc)]
             if args.stderr:
                 msg += ["Check %s for more info" % args.stderr]
@@ -157,6 +155,7 @@ def main(): # pylint: disable=missing-docstring
                 msg += ["Use --stderr to redirect the output to a file for "
                         "more info"]
             _reportException(' '.join(msg))
+        _logger.exception("Failed to start server")
         raise
 
 def startServer(args):
@@ -199,16 +198,16 @@ def startServer(args):
         "our parent is %s" % args.attach_to_pid,
         hdlcc.__version__)
 
-    if not args.lsp:
+    if args.lsp:
+        stdin, stdout = _binaryStdio()
+        start_io_lang_server(stdin, stdout, True,
+                             hdlcc.lsp.HdlccLanguageServer)
+    else:
         if args.attach_to_pid is not None:
             _attachPids(args.attach_to_pid, os.getpid())
 
         handlers.app.run(host=args.host, port=args.port, threads=10,
                          server='waitress')
-    else:
-        stdin, stdout = _binaryStdio()
-        start_io_lang_server(stdin, stdout, True,
-                             hdlcc.lsp.HdlccLanguageServer)
 
 # This is a redefinition to be used as last resort if failed to setup
 # the server
@@ -238,4 +237,4 @@ def _reportException(text):
     sys.stdout.write(response)
 
 if __name__ == '__main__':
-    main()
+    main(parseArguments())

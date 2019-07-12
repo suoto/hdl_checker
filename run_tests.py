@@ -204,12 +204,12 @@ def _getDefaultTestByEnv(env):
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_static_check')
     if env == 'fallback':
-        return ('hdlcc.tests.test_builders',
+        return ('hdlcc.tests.test_hdlcc_server',
+                'hdlcc.tests.test_builders',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',
                 'hdlcc.tests.test_hdlcc_base',
                 'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_hdlcc_server',
                 'hdlcc.tests.test_standalone',
                 'hdlcc.tests.test_misc')
     assert False
