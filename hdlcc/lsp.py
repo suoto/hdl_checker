@@ -148,7 +148,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         self._checker.clean()
 
         # Get our capabilities
-        return {'capabilities': self.capabilities(), 'result': 'error'}
+        return {'capabilities': self.capabilities()}
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
     def lint(self, doc_uri, is_saved):
