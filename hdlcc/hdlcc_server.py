@@ -44,12 +44,9 @@ def _setupPaths():  # pragma: no cover
         assert p.exists(path), "Path '{}' doesn't exist".format(path)
         path = p.abspath(path)
         if path not in sys.path:
-            print("Adding '%s'" % path)
             sys.path.insert(0, path)
         else:
-            msg = "WARNING: '%s' was already on sys.path!" % path
-            print(msg)
-            _logger.warning(msg)
+            _logger.warning("WARNING: '%s' was already on sys.path!", path)
 
     # We're using part of python-language-server, we don't really need all of
     # its dependencies nor want the user to install unrelated packages, so
@@ -150,7 +147,7 @@ def main(): # pylint: disable=missing-docstring
         _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
         _setupPaths()
 
-        _startServer(args)
+        startServer(args)
     except Exception as exc:
         if args.lsp:
             msg = ["Unable to start HDLCC LSP server: '%s'!" % repr(exc)]
@@ -162,7 +159,7 @@ def main(): # pylint: disable=missing-docstring
             _reportException(' '.join(msg))
         raise
 
-def _startServer(args):
+def startServer(args):
     """
     Import modules and tries to start a hdlcc server
     """
@@ -172,6 +169,10 @@ def _startServer(args):
     import hdlcc.utils as utils # pylint: disable=redefined-outer-name
     import hdlcc.lsp
     from pyls.python_ls import start_io_lang_server
+
+    utils.setupLogging(args.log_stream, args.log_level, True) #args.color)
+
+    _logger = logging.getLogger(__name__)
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
@@ -191,7 +192,6 @@ def _startServer(args):
 
         Timer(2, _watchPidWrapper).start()
 
-    utils.setupLogging(args.log_stream, args.log_level, True) #args.color)
     _logger.info(
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),
