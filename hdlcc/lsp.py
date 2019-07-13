@@ -69,9 +69,9 @@ def diagToLsp(diag):
         severity = defines.DiagnosticSeverity.Hint
     elif severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
         severity = defines.DiagnosticSeverity.Information
-    elif severity in (DiagType.WARNING, DiagType.STYLE_WARNING):
+    elif severity in (DiagType.WARNING, ):
         severity = defines.DiagnosticSeverity.Warning
-    elif severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
+    elif severity in (DiagType.ERROR, ):
         severity = defines.DiagnosticSeverity.Error
     else:
         severity = defines.DiagnosticSeverity.Error

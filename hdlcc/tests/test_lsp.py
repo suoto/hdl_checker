@@ -18,72 +18,71 @@
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
 import logging
-logging.getLogger(__name__).fatal("Hey there")
-import os
-import os.path as p
+import unittest
 
-from nose2.tools import such
 import mock
 
 from hdlcc.utils import patchPyls
 
-try:
-    patchPyls()
-except:
-    print("##############################################")
-    print("##############################################")
-    import traceback
-    traceback.print_exc()
-    print("##############################################")
-    print("##############################################")
-    raise
+patchPyls()
 
-try:
-    import hdlcc.lsp as lsp
-    import pyls.lsp as defines
-    from hdlcc.diagnostics import DiagType, CheckerDiagnostic
-except ImportError as exc:
-    import sys
-    print("#################### path ####################")
-    print('\n'.join(sys.path))
-    print("##############################################")
-    print(str(exc))
-    import traceback
-    traceback.print_exc()
-    print("##############################################")
-    raise
+import hdlcc.lsp as lsp
+import pyls.lsp as defines
+from hdlcc.diagnostics import DiagType, CheckerDiagnostic
 
 _logger = logging.getLogger(__name__)
 
-#  import unittest
+# pylint: disable=bad-whitespace
 
-#  class TestDiagToLsp(unittest.TestCase):
+class TestDiagToLsp(unittest.TestCase):
 
-#      def test_basic(self):
-#          diag = CheckerDiagnostic(
-#              checker='hdlcc test', text='some diag', filename='filename',
-#              line_number=1, column=1, error_code='error code',
-#              severity=DiagType.INFO)
+    def test_converting_to_lsp(self):
+        for diag_type, severity in (
+                (DiagType.INFO,           defines.DiagnosticSeverity.Hint),
+                (DiagType.STYLE_INFO,     defines.DiagnosticSeverity.Hint),
+                (DiagType.STYLE_WARNING,  defines.DiagnosticSeverity.Information),
+                (DiagType.STYLE_ERROR,    defines.DiagnosticSeverity.Information),
+                (DiagType.WARNING,        defines.DiagnosticSeverity.Warning),
+                (DiagType.ERROR,          defines.DiagnosticSeverity.Error),
+                (DiagType.NONE,           defines.DiagnosticSeverity.Error)):
 
-#          self.assertEqual(
-#              lsp.diagToLsp(diag),
-#              {'source': 'hdlcc test',
-#               'range': {
-#                   'start': {
-#                       'line': 1,
-#                       'character': -1, },
-#                   'end': {
-#                       'line': -1,
-#                       'character': -1, }},
-#               'message': 'some diag',
-#               'severity': defines.DiagnosticSeverity.Information,
-#               'code': 'error code'})
+            _logger.info("Running %s and %s", diag_type, severity)
 
-with such.A("LSP") as it:
-    @it.should
-    def test():
-        print("oi")
-        #  it.fail("Hello!")
+            diag = CheckerDiagnostic(
+                checker='hdlcc test', text='some diag', filename='filename',
+                line_number=1, column=1, error_code='error code',
+                severity=diag_type)
 
+            self.assertEqual(
+                lsp.diagToLsp(diag),
+                {'source': 'hdlcc test',
+                 'range': {
+                     'start': {
+                         'line': 0,
+                         'character': -1, },
+                     'end': {
+                         'line': -1,
+                         'character': -1, }},
+                 'message': 'some diag',
+                 'severity': severity,
+                 'code': 'error code'})
 
-it.createTests(globals())
+    def test_workspace_notify(self):
+        workspace = mock.MagicMock()
+        workspace.show_message = mock.MagicMock()
+
+        server = lsp.HdlCodeCheckerServer(workspace)
+
+        server._handleUiInfo('some info')
+        workspace.show_message.assert_called_once_with(
+            'some info', defines.MessageType.Info)
+        workspace.show_message.reset_mock()
+
+        server._handleUiWarning('some warning')
+        workspace.show_message.assert_called_once_with(
+            'some warning', defines.MessageType.Warning)
+        workspace.show_message.reset_mock()
+
+        server._handleUiError('some error')
+        workspace.show_message.assert_called_once_with(
+            'some error', defines.MessageType.Error)

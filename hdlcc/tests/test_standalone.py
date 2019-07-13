@@ -81,7 +81,8 @@ with such.A("hdlcc standalone tool") as it:
         else:
             it.PROJECT_FILE = None
 
-        it.assertTrue(p.exists(HDLCC_STANDALONE))
+        it.assertTrue(p.exists(HDLCC_STANDALONE),
+                      "Couldn't find standalone executable")
 
         env_patch = {'PYTHONPATH': HDLCC_PATH}
 
@@ -181,7 +182,8 @@ with such.A("hdlcc standalone tool") as it:
 
                 shell(cmd)
 
-                it.assertTrue(p.exists('output.stats'))
+                it.assertTrue(p.exists('output.stats'),
+                              "Couldn't find profiling data")
                 os.remove('output.stats')
 
             @it.should("control debugging level")
@@ -198,7 +200,9 @@ with such.A("hdlcc standalone tool") as it:
                 previous = 0
                 for level in range(1, 5):
                     stdout = shell(cmd + ["-" + "v"*level])
-                    it.assertTrue(len(stdout) >= previous)
+                    it.assertTrue(len(stdout) >= previous,
+                                  "Increasing logging level didn't make "
+                                  "output more verbose")
                     previous = len(stdout)
 
 it.createTests(globals())
