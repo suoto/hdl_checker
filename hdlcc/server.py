@@ -22,9 +22,7 @@
 import argparse
 import logging
 import os
-import os.path as p
 import sys
-from glob import glob
 from threading import Timer
 
 _logger = logging.getLogger(__name__)
@@ -33,27 +31,9 @@ PY2 = sys.version_info[0] == 2
 _LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
                            "jsonrpc": "2.0"}
 
-def _setupPaths():
-    "Add our dependencies to sys.path"
-    hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
-    sys.path.insert(0, hdlcc_base_path)
-    # Pluggy is not standard...
-    sys.path.insert(0, p.join(hdlcc_base_path, 'dependencies', 'pluggy', 'src'))
-    # Add other dependencies
-    for path in glob(p.join(hdlcc_base_path, 'dependencies', '*')):
-        assert p.exists(path), "Path '{}' doesn't exist".format(path)
-        path = p.abspath(path)
-        if path not in sys.path:
-            sys.path.insert(0, path)
-        else:
-            _logger.debug("Path '%s' was already on sys.path!", path)
-
-    # We're using part of python-language-server, we don't really need all of
-    # its dependencies nor want the user to install unrelated packages, so
-    # we'll mock them.
-    import mock
-    sys.modules['importlib_metadata'] = mock.MagicMock()
-    sys.modules['jedi'] = mock.MagicMock()
+if __name__ == '__main__':
+    import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+    utils.setupPaths()
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
@@ -143,7 +123,8 @@ def main(args): # pylint: disable=missing-docstring
     try:
         # LSP will use stdio to communicate
         _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
-        _setupPaths()
+        import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+        utils.patchPyls()
 
         startServer(args)
     except Exception as exc:
@@ -165,7 +146,6 @@ def startServer(args):
     # Call it again to log the paths we added
     import hdlcc
     from hdlcc import handlers
-    import hdlcc.utils as utils # pylint: disable=redefined-outer-name
     import hdlcc.lsp
     from pyls.python_ls import start_io_lang_server
 

@@ -23,4 +23,3 @@ import sys
 
 from hdlcc.standalone import main
 sys.exit(main())
-

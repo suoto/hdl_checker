@@ -47,8 +47,9 @@ with such.A("hdlcc project") as it:
         it.assertCountEqual = it.assertItemsEqual
 
     def _assertSameFile(first, second):
-        if not samefile(first, second):
-            it.fail("Paths '{}' and '{}' differ".format(first, second))
+        if not samefile(p.abspath(first), p.abspath(second)):
+            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
+                                                        p.abspath(second)))
 
     it.assertSameFile = _assertSameFile
 

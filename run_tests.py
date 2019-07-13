@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # This file is part of HDL Code Checker.
 #
 # Copyright (c) 2015-2019 Andre Souto
@@ -18,13 +18,15 @@
 # PYTHON_ARGCOMPLETE_OK
 from __future__ import print_function
 
-import sys
-import os
-import os.path as p
 import argparse
 import logging
-import nose2
+import os
+import os.path as p
+import sys
+from glob import glob
+
 import coverage
+import nose2
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -41,7 +43,7 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _ON_WINDOWS = sys.platform == 'win32'
-HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
+BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
@@ -77,9 +79,6 @@ def _clear():
 
 def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if stream is None:
-        return
-
     if isinstance(stream, str):
         class Stream(file):  # pylint: disable=undefined-variable,too-few-public-methods
             """
@@ -138,14 +137,14 @@ def _parseArguments():
     parser.add_argument('--verbose', '-v', action='store_true')
 
     parser.add_argument('--log-file', action='store',
-                        default=p.join(os.environ['TOX_ENV_DIR'], 'tmp',
+                        default=p.join(os.environ['TOX_ENV_DIR'], 'log',
                                        'tests.log'))
 
     parser.add_argument('--log-level', action='store', default='INFO',
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
 
-    parser.add_argument('--log-stream', action='store', default=None, #sys.stdout,
+    parser.add_argument('--log-stream', action='store', default=sys.stdout,
                         help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
@@ -204,7 +203,8 @@ def _getDefaultTestByEnv(env):
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_static_check')
     if env == 'fallback':
-        return ('hdlcc.tests.test_server',
+        return ('hdlcc.tests.test_lsp',
+                'hdlcc.tests.test_server',
                 'hdlcc.tests.test_builders',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',
@@ -240,16 +240,17 @@ def runTestsForEnv(env, args):
 
 def _setupPaths():
     "Add our dependencies to sys.path"
-    for path in (
-            p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
-            p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
-        ):
+    # Pluggy is not standard...
+    sys.path.insert(0, p.join(BASE_PATH, 'dependencies', 'pluggy', 'src'))
+
+    for path in glob(p.join(BASE_PATH, 'dependencies', '*')):
+        assert p.exists(path), "Path '{}' doesn't exist".format(path)
         path = p.abspath(path)
         if path not in sys.path:
-            _logger.info("Adding '%s'", path)
+            print("Inserting %s" % path)
             sys.path.insert(0, path)
         else:
-            _logger.warning("WARNING: '%s' was already on sys.path!", path)
+            _logger.debug("Path '%s' was already on sys.path!", path)
 
 def main():
     args = _parseArguments()

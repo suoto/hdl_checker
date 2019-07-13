@@ -28,7 +28,8 @@ setup(
     author_email     = 'andre820@gmail.com',
     url              = 'https://github.com/suoto/hdlcc',
     license          = 'GPLv3',
-    packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers'],
+    packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers',
+                        'hdlcc.config_generators'],
     install_requires = ['argcomplete', 'argparse', 'prettytable',
                         'future>=0.14.0',
                         'futures; python_version<"3.2"',
@@ -39,4 +40,3 @@ setup(
     }
 )
 # pylint: enable=bad-whitespace
-
