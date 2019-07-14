@@ -22,7 +22,7 @@ import functools
 import logging
 
 import pyls.lsp as defines
-import pyls.uris as uris
+from pyls.uris import to_fs_path
 from pyls._utils import debounce
 from pyls.python_ls import PythonLanguageServer
 
@@ -98,7 +98,8 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
     def __init__(self, workspace, project_file=None):
         self._workspace = workspace
-        super(HdlCodeCheckerServer, self).__init__(project_file=project_file)
+        fs_path = None if project_file is None else to_fs_path(project_file)
+        super(HdlCodeCheckerServer, self).__init__(project_file=fs_path)
 
     def _handleUiInfo(self, message):
         self._logger.info(message)
@@ -175,7 +176,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         """
         # If the file has not been saved, use the appropriate method, which
         # will involve dumping the modified contents into a temporary file
-        path = uris.to_fs_path(doc_uri)
+        path = to_fs_path(doc_uri)
 
         # LSP diagnostics are only valid for the scope of the resource and
         # hdlcc may return a tree of issues, so need to filter those out
