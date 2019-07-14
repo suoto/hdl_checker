@@ -134,8 +134,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # -- might review this at some point
         target_dir = None if self._config is None else self._config.getTargetDir()
         if target_dir is not None and not p.exists(target_dir):
-            self._handleUiWarning("Target directory {} doesn't exist, "
-                                  "forcing cleanup".format(repr(target_dir)))
+            self._handleUiWarning("Target directory '{}' doesn't exist, "
+                                  "forcing cleanup".format(target_dir))
             self.clean()
 
         try:
