@@ -339,7 +339,7 @@ def setupPaths():
 
     dependencies = list(glob(p.join(base_path, 'dependencies', '*')))
 
-    if not dependencies:
+    if not dependencies:  # pragma: no cover
         _logger.error("Found nothing inside %s",
                       p.join(base_path, 'dependencies', '*'))
 
@@ -350,7 +350,7 @@ def setupPaths():
         if path not in sys.path:
             _logger.debug("Inserting %s", path)
             sys.path.insert(0, path)
-        else:
+        else:  # pragma: no cover
             _logger.debug("Path '%s' was already on sys.path!", path)
 
 def patchPyls():

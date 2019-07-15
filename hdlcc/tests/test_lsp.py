@@ -173,19 +173,6 @@ with such.A("LSP server") as it:
             _logger.debug("reply: %s", reply)
             it.assertEqual(reply['result'], None)
 
-
-            # Handle notification message
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-            it.assertEqual(
-                reply,
-                {'jsonrpc': JSONRPC_VERSION,
-                 'method': 'window/showMessage',
-                 'params': {
-                     'type': defines.MessageType.Warning,
-                     'message': "Target directory '.fallback' doesn't "
-                                "exist, forcing cleanup"}})
-
             reply = json.loads(it.tx._read_message())
             _logger.debug("reply: %s", reply)
             it.assertEqual(
@@ -201,6 +188,18 @@ with such.A("LSP server") as it:
                           'message': "Signal 'neat_signal' is never used",
                           'severity': 3,
                           'code': -1}]}})
+
+        @it.should('not lint file outside workspace')
+        @mock.patch.object(Workspace, 'publish_diagnostics',
+                           mock.MagicMock(spec=Workspace.publish_diagnostics))
+        def test():
+            source = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                            'clock_divider.vhd')
+
+            it.server.lint(doc_uri=uris.from_fs_path(source),
+                           is_saved=True)
+
+            it.server.workspace.publish_diagnostics.assert_not_called()
 
     with it.having('a project file'):
 
@@ -236,17 +235,17 @@ with such.A("LSP server") as it:
             _logger.debug("reply: %s", reply)
             it.assertEqual(reply['result'], None)
 
-            # Handle notification message
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-            it.assertEqual(
-                reply,
-                {'jsonrpc': JSONRPC_VERSION,
-                 'method': 'window/showMessage',
-                 'params': {
-                     'type': defines.MessageType.Warning,
-                     'message': "Target directory '%s' doesn't exist, "
-                                "forcing cleanup" % p.join(VIM_HDL_EXAMPLES, '.hdlcc')}})
+            #  # Handle notification message
+            #  reply = json.loads(it.tx._read_message())
+            #  _logger.debug("reply: %s", reply)
+            #  it.assertEqual(
+            #      reply,
+            #      {'jsonrpc': JSONRPC_VERSION,
+            #       'method': 'window/showMessage',
+            #       'params': {
+            #           'type': defines.MessageType.Warning,
+            #           'message': "Target directory '%s' doesn't exist, "
+            #                      "forcing cleanup" % p.join(VIM_HDL_EXAMPLES, '.hdlcc')}})
 
             reply = json.loads(it.tx._read_message())
             _logger.debug("reply: %s", reply)
@@ -282,39 +281,31 @@ with such.A("LSP server") as it:
             _logger.debug("reply: %s", reply)
 
             it.assertTrue('error' in reply, "This message should fail")
+            it.assertEqual(reply['error']['message'],
+                           "FileNotFoundError: [Errno 2] No such file or "
+                           "directory: '{}'".format(project_file))
 
-        @it.should("flag the project file doesn't exist")
-        def test():
-            source = p.join(VIM_HDL_EXAMPLES, '__some_source.vhd')
-            it.assertFalse(p.exists(source))
+        #  @it.should("flag the project file doesn't exist")
+        #  def test():
+        #      source = p.join(VIM_HDL_EXAMPLES, 'some_source.vhd')
+        #      it.assertFalse(p.exists(source))
+        #      open(source, 'w').write('')
 
-            msg = LSP_MSG_TEMPLATE.copy()
-            msg.update({'method': 'text_document__did_open',
-                        'params' : {
-                            'textDocument': {
-                                'uri': uris.from_fs_path(source),
-                                'text': 'library work;'}}})
-            _logger.debug("Sending message: %s", msg)
-            it.server._endpoint.consume(msg)
+        #      msg = LSP_MSG_TEMPLATE.copy()
+        #      msg.update({'method': 'text_document__did_open',
+        #                  'params' : {
+        #                      'textDocument': {
+        #                          'uri': uris.from_fs_path(source),
+        #                          'text': None}}})
+        #      _logger.debug("Sending message: %s", msg)
+        #      it.server._endpoint.consume(msg)
 
-            # Not sure why this one comes out
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-            it.assertEqual(reply['result'], None)
+        #      # Not sure why this one comes out
+        #      reply = json.loads(it.tx._read_message())
+        #      _logger.debug("reply: %s", reply)
+        #      it.assertEqual(reply['result'], None)
 
-            #  # Handle notification message
-            #  reply = json.loads(it.tx._read_message())
-            #  _logger.debug("reply: %s", reply)
-            #  it.assertEqual(
-            #      reply,
-            #      {'jsonrpc': JSONRPC_VERSION,
-            #       'method': 'window/showMessage',
-            #       'params': {
-            #           'type': defines.MessageType.Warning,
-            #           'message': "Target directory '%s' doesn't exist, "
-            #                      "forcing cleanup" % p.join(VIM_HDL_EXAMPLES, '.hdlcc')}})
-
-            _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
-            _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
+        #      _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
+        #      _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
 
 it.createTests(globals())

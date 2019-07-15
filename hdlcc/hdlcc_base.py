@@ -130,10 +130,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # there seem to be no mechanism for the client to flag a corrupt state
         # to the server.
         #
-        # Admittedly not the best approach -- way too many implied conditions
-        # -- might review this at some point
+        # Admittedly not the best approach -- way too many implied conditions.
+        # Worth reviewing at some point
         target_dir = None if self._config is None else self._config.getTargetDir()
-        if target_dir is not None and not p.exists(target_dir):
+        if (target_dir is not None and
+                not p.exists(target_dir) and
+                self._config.getBuilder() != 'fallback'):
+
             self._handleUiWarning("Target directory '{}' doesn't exist, "
                                   "forcing cleanup".format(target_dir))
             self.clean()
