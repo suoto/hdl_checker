@@ -21,13 +21,15 @@
 # pylint: disable=protected-access
 # pylint: disable=function-redefined
 
+
+import json
 import logging
 import os
 import os.path as p
-import json
-import unittest2
 
 import mock
+import six
+import unittest2
 from nose2.tools import such
 
 from hdlcc.utils import patchPyls, onWindows
@@ -281,9 +283,14 @@ with such.A("LSP server") as it:
             _logger.debug("reply: %s", reply)
 
             it.assertTrue('error' in reply, "This message should fail")
-            it.assertEqual(reply['error']['message'],
-                           "FileNotFoundError: [Errno 2] No such file or "
-                           "directory: '{}'".format(project_file))
+            if six.PY3:
+                it.assertEqual(reply['error']['message'],
+                               "FileNotFoundError: [Errno 2] No such file or "
+                               "directory: '{}'".format(project_file))
+            else:
+                it.assertEqual(reply['error']['message'],
+                               u"IOError: [Errno 2] No such file or "
+                               u"directory: u'{}'".format(project_file))
 
         #  @it.should("flag the project file doesn't exist")
         #  def test():
