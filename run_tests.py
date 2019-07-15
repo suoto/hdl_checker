@@ -144,7 +144,8 @@ def _parseArguments():
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
 
-    parser.add_argument('--log-stream', action='store', default=sys.stdout,
+    parser.add_argument('--log-stream', action='store',
+                        default=sys.stdout if _CI else None,
                         help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
@@ -254,7 +255,9 @@ def _setupPaths():
 
 def main():
     args = _parseArguments()
-    _setupLogging(args.log_stream, args.log_level, color=False)
+    if args.log_stream:
+        _setupLogging(args.log_stream, args.log_level, color=False)
+
     _setupPaths()
     #  _clear()
 
@@ -269,6 +272,7 @@ def main():
         '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
     file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
     logging.root.addHandler(file_handler)
+    logging.root.setLevel(args.log_level)
 
     _logger.info("Environment info:")
     _logger.info(" - CI:       %s", _CI)
