@@ -74,8 +74,17 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
                 .format(self.__class__.__name__, self.checker, filename,
                         self.line_number, self.column, error_code,
                         repr(self.severity), repr(self.text)))
+
     def __hash__(self):
-        return hash(repr(self))
+        filename = None if self.filename is None else repr(self.filename)
+        error_code = None if self.error_code is None else repr(self.error_code)
+
+        key = ('{}(checker="{}", filename={}, line_number={}, '
+               'column={}, error_code={}, severity={}, text={})'
+               .format(CheckerDiagnostic.__class__.__name__, self.checker,
+                       filename, self.line_number, self.column, error_code,
+                       repr(self.severity), repr(self.text)))
+        return hash(key)
 
     def __eq__(self, other):
         # Won't compare apples to oranges
