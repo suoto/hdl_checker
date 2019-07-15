@@ -75,9 +75,13 @@ install:
 
 test_script:
   - tox -e py%PYTHON_VERSION%-%BUILDER%-windows
-# after_test:
-#   - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
-#   - appveyor PushArtifact hdlcc_success.zip
+after_test:
+  # - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
+  # - appveyor PushArtifact hdlcc_success.zip
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
 
 # We won't build or run tests from here
 build: off
