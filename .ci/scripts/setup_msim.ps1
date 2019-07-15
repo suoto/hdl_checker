@@ -34,6 +34,7 @@ if (!(Test-Path "$env:BUILDER_PATH")) {
     cmd /c "$env:CACHE_PATH\\modelsim.exe --mode unattended --modelsim_edition modelsim_ase --installdir $env:CI_WORK_PATH"
     write-host "Testing installation"
     cmd /c "$env:BUILDER_PATH\\vcom -version"
+    $env:PATH="$env:BUILDER_PATH;$env:PATH"
     write-host "Done here"
 }
 

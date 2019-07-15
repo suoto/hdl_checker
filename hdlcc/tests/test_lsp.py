@@ -30,7 +30,7 @@ import unittest2
 import mock
 from nose2.tools import such
 
-from hdlcc.utils import patchPyls
+from hdlcc.utils import patchPyls, onWindows
 patchPyls()
 
 # pylint: disable=ungrouped-imports
@@ -52,6 +52,9 @@ JSONRPC_VERSION = '2.0'
 LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION, 'id': 1}
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
+
+if onWindows():
+    VIM_HDL_EXAMPLES = VIM_HDL_EXAMPLES.lower()
 
 class TestDiagToLsp(unittest2.TestCase):
 

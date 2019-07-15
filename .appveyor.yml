@@ -45,44 +45,43 @@ environment:
     #   PYTHON: "C:\\Python27"
     #   BUILDER: ghdl
 
-    - PYTHON_VERSION: 37
-      PYTHON: "C:\\Python37"
-      BUILDER: ghdl
+    # - PYTHON_VERSION: 37
+    #   PYTHON: "C:\\Python37"
+    #   BUILDER: ghdl
+
+    # - PYTHON_VERSION: 37
+    #   PYTHON: "C:\\Python37"
+    #   BUILDER: msim
 
     - PYTHON_VERSION: 37
       PYTHON: "C:\\Python37"
-      BUILDER: msim
+      BUILDER: fallback
+
+    - PYTHON_VERSION: 37
+      PYTHON: "C:\\Python37"
+      BUILDER: standalone
 
 # scripts that run after cloning repository
 install:
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
   # We need wheel installed to build wheels
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
   - "%PYTHON%\\python.exe -m pip install wheel tox"
-
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
-  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
   # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
   # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
 
   - python --version
 
 test_script:
-  - tox -e py%PYTHON_VERSION%-%BUILDER%-windows -e py%PYTHON_VERSION%-fallback-windows -e py%PYTHON_VERSION%-standalone-windows
-after_test:
-  - coverage combine
-  - coverage report
-  - codecov
-  - dir /B "%HOMEPATH%\\*.log"
-  - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log" "*.log"
-  - appveyor PushArtifact hdlcc_success.zip
+  - tox -e py%PYTHON_VERSION%-%BUILDER%-windows
+# after_test:
+#   - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
+#   - appveyor PushArtifact hdlcc_success.zip
 
 # We won't build or run tests from here
 build: off
 
-on_failure:
-  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log" "*.log"
-  - appveyor PushArtifact hdlcc_failure.zip
-
-# artifacts:
-#   - path: "%HOMEPATH%\\*.log"
-#     name: Logs
+# on_failure:
+#   - 7z a hdlcc_failure.zip ".tox\\*\\log\\*"
+#   - appveyor PushArtifact hdlcc_failure.zip

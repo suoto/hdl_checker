@@ -16,11 +16,35 @@
 language: python
 matrix:
   include:
-    - python: "2.7"
-      env: TOX_PYTHON_VERSION=py27
-    - python: "3.7"
+    - name: "Python 2.7 - msim"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=msim
+    - name: "Python 2.7 - ghdl"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
+    - name: "Python 2.7 - xvhdl"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
+    - name: "Python 2.7 - standalone and fallback"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=other
+
+    - name: "Python 3.7 - msim"
+      python: "3.7"
       dist: xenial
-      env: TOX_PYTHON_VERSION=py37
+      env: TOX_PYTHON_VERSION=py37 BUILDER=msim
+    - name: "Python 3.7 - ghdl"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
+    - name: "Python 3.7 - xvhdl"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
+    - name: "Python 3.7 - standalone and fallback"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=other
 
 # env:
 #   matrix:
@@ -48,9 +72,9 @@ before_script:
   - pip install tox
   - "git submodule update"
   - "mkdir -p ~/cache"
-  - "./.ci/scripts/setup_msim.sh"
-  - "./.ci/scripts/setup_ghdl.sh"
-  - "./.ci/scripts/setup_xvhdl.sh"
+  - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
+  - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
+  - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 # command to install dependencies
 # install:
 #   - pip install -r requirements.txt
@@ -59,8 +83,10 @@ before_script:
 #   - pip install -e .
 # command to run tests
 script:
-  - echo "tox -e ${TOX_PYTHON_VERSION}-msim-linux -e ${TOX_PYTHON_VERSION}-ghdl-linux -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux -e ${TOX_PYTHON_VERSION}-xvhdl-linux"
-  - tox -e ${TOX_PYTHON_VERSION}-msim-linux -e ${TOX_PYTHON_VERSION}-ghdl-linux -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux -e ${TOX_PYTHON_VERSION}-xvhdl-linux
+  - if [ "${BUILDER}" == "msim" ] ; then  tox -e ${TOX_PYTHON_VERSION}-msim-linux ; fi
+  - if [ "${BUILDER}" == "ghdl" ] ; then  tox -e ${TOX_PYTHON_VERSION}-ghdl-linux ; fi
+  - if [ "${BUILDER}" == "xvhdl" ] ; then tox -e ${TOX_PYTHON_VERSION}-xvhdl-linux ; fi
+  - if [ "${BUILDER}" == "other" ] ; then tox -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux ; fi
 after_success:
   - "coverage combine"
   - "coverage report"

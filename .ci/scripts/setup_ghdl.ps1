@@ -64,6 +64,7 @@ if (!(Test-Path "$env:BUILDER_PATH")) {
         set-location "$env:INSTALL_DIR\\bin"
         write-host "Current dir: $(get-location)"
         cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
+        $env:PATH="$env:BUILDER_PATH;$env:PATH"
         set-location "$env:APPVEYOR_BUILD_FOLDER"
     }
 }
