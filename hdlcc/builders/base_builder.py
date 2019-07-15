@@ -279,21 +279,16 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         diagnostics = set()
         rebuilds = []
-        # We must give precedence to the buffer content over the file
-        # content, so we dump the buffer content to a temporary file
-        # and tell the compiler to compile it instead
-        if source.hasBufferContent():
-            build_path = source.getDumpPath()
-            self._logger.debug("Source has buffered content, using %s",
-                               build_path)
-        else:
-            build_path = source.filename
 
-        for line in self._buildSource(build_path, source.library, flags):
+        for line in self._buildSource(source.filename, source.library, flags):
             if self._shouldIgnoreLine(line):
                 continue
 
-            line = line.replace(build_path, source.filename)
+            # In case we're compiling a temporary dump, replace in the lines
+            # all references to the temp name with the original (shadow)
+            # filename
+            if source.shadow_filename:
+                line = line.replace(source.filename, source.shadow_filename)
 
             diagnostics = diagnostics.union(set(self._makeRecords(line)))
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in

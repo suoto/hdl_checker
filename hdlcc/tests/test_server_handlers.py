@@ -25,17 +25,15 @@ import logging
 import os
 import os.path as p
 import shutil
-
 from glob import glob
 
 import six
-
 from nose2.tools import such
 from webtest import TestApp
 
 import hdlcc
 import hdlcc.handlers as handlers
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
 from hdlcc.tests.mocks import disableVunit
 
 try:  # Python 3.x
@@ -381,14 +379,13 @@ with such.A("hdlcc bottle app") as it:
 
         it.assertIn(data['path'], [x.filename for x in messages])
 
-        it.assertIn(
-            CheckerDiagnostic(
-                filename=data['path'],
-                checker="HDL Code Checker/static",
-                text='TODO: Nothing to see here',
-                line_number=1, column=4,
-                severity=DiagType.STYLE_INFO),
-            messages)
+        expected = StaticCheckerDiag(
+            filename=data['path'],
+            line_number=1, column=4,
+            text='TODO: Nothing to see here',
+            severity=DiagType.STYLE_INFO)
+
+        it.assertIn(expected, messages)
 
     @it.should("get source dependencies")
     @disableVunit

@@ -88,9 +88,7 @@ with such.A("hdlcc project") as it:
         cleanProjectCache(it.PROJECT_FILE)
 
         _logger.debug("Cleaning up test files")
-        for path in (it.DUMMY_PROJECT_FILE, '.fallback', '.hdlcc',
-                     'myproject.prj', 'some_file.vhd', 'xvhdl.pb',
-                     '.xvhdl.init'):
+        for path in ('.fallback', '.hdlcc', 'xvhdl.pb', '.xvhdl.init'):
             if p.exists(path):
                 _logger.debug("Removing %s", path)
                 if p.isdir(path):
@@ -602,12 +600,12 @@ with such.A("hdlcc project") as it:
             #                      "is not in the sensitivity list of process "
             #                      "'line__58'.")]
 
-            it.assertCountEqual(expected, diagnostics)
+            it.assertCountEqual([hash(x) for x in expected], [hash(x) for x in diagnostics])
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text for file outside the project file")
         def test005c():
-            filename = 'some_file.vhd'
+            filename = p.join(TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ["entity some_entity is end;", ])
 
             content = "\n".join(["library work;",
@@ -725,7 +723,7 @@ with such.A("hdlcc project") as it:
             if not it.PROJECT_FILE:
                 _logger.info("Requires a valid project file")
                 return
-            filename = 'some_file.vhd'
+            filename = p.join(TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ['library some_lib;'])
 
             it.assertMsgQueueIsEmpty(it.project)

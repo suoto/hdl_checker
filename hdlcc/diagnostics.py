@@ -18,7 +18,7 @@
 
 import os.path as p
 
-from hdlcc.utils import samefile
+from hdlcc.utils import samefile, toBytes
 
 # pylint: disable=useless-object-inheritance
 
@@ -54,8 +54,8 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         self.text = str(text)
 
         # Modifiable with rules
-        self.__line_number = line_number
-        self.__column = column
+        self.__line_number = None if line_number is None else int(line_number)
+        self.__column = None if column is None else int(column)
         self.__severity = severity
 
         if line_number is not None:
@@ -66,49 +66,32 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
             self.severity = severity
 
     def __repr__(self):
-        filename = None if self.filename is None else repr(self.filename)
-        error_code = None if self.error_code is None else repr(self.error_code)
+        filename = None if self.filename is None else self.filename
+        error_code = None if self.error_code is None else self.error_code
 
-        return ('{}(checker="{}", filename={}, line_number={}, '
-                'column={}, error_code={}, severity={}, text={})'
+        return ('{}(checker="{}", filename="{}", line_number="{}", '
+                'column={}, error_code={}, severity="{}", text="{}")'
                 .format(self.__class__.__name__, self.checker, filename,
                         self.line_number, self.column, error_code,
-                        repr(self.severity), repr(self.text)))
+                        self.severity, self.text))
+
+    def _hash_data(self):
+        return b'|'.join([toBytes(x) for x in
+                          (self.checker, self.column, self.error_code,
+                           self.filename, self.line_number, self.severity,
+                           self.text)])
 
     def __hash__(self):
-        filename = None if self.filename is None else repr(self.filename)
-        error_code = None if self.error_code is None else repr(self.error_code)
-
-        key = ('{}(checker="{}", filename={}, line_number={}, '
-               'column={}, error_code={}, severity={}, text={})'
-               .format(CheckerDiagnostic.__class__.__name__, self.checker,
-                       filename, self.line_number, self.column, error_code,
-                       repr(self.severity), repr(self.text)))
-        return hash(key)
+        return hash(self._hash_data())
 
     def __eq__(self, other):
-        # Won't compare apples to oranges
-        if not isinstance(other, CheckerDiagnostic):
+        if hash(self) != hash(other):
             return False
 
-        try:
-            # If both filenames exists and are not None, check they point to
-            # the same file, otherwise compare directly
-            if (self.filename is not None and p.exists(self.filename) and
-                    other.filename is not None and p.exists(other.filename)):
-                if not samefile(self.filename, other.filename):
-                    return False
-            else:
-                if self.filename != other.filename:
-                    return False
-
-            # Compare attributes
-            for attr in ('checker', 'filename', 'line_number', 'column',
-                         'error_code', 'severity', 'text'):
-                if getattr(self, attr) != getattr(other, attr):
-                    return False
-        except AttributeError:
-            return False
+        if (self.filename is not None and p.exists(self.filename) and
+                other.filename is not None and p.exists(other.filename)):
+            if not samefile(self.filename, other.filename):
+                return False
 
         return True
 

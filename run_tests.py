@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
 # Copyright (c) 2015-2019 Andre Souto
@@ -300,9 +300,9 @@ def main():
 
     cov.stop()
     cov.save()
-    for cmd in ('coverage combine',
-                'coverage html'):
-        _shell(cmd)
+    #  for cmd in ('coverage combine',
+    #              'coverage html'):
+    #      _shell(cmd)
 
     if not passed:
         _logger.warning("Some tests failed!")
