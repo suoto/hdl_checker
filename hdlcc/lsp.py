@@ -18,6 +18,7 @@
 
 # pylint: disable=useless-object-inheritance
 
+import sys
 import functools
 import logging
 import os.path as p
@@ -37,6 +38,10 @@ _logger = logging.getLogger(__name__)
 
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 DEFAULT_PROJECT_FILENAME = 'vimhdl.prj'
+PY2 = sys.version_info[0] == 2
+
+if PY2:
+    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
 
 
 def _logCalls(func):  # pragma: no cover
@@ -96,8 +101,6 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     HDL Code Checker project builder class
     """
-    _logger = logging.getLogger(__name__ + '.HdlCodeCheckerServer')
-
     def __init__(self, workspace, project_file=DEFAULT_PROJECT_FILENAME):
         self._workspace = workspace
         super(HdlCodeCheckerServer, self).__init__(project_file)
@@ -124,7 +127,7 @@ class HdlccLanguageServer(PythonLanguageServer):
     def __init__(self, *args, **kwargs):
         super(HdlccLanguageServer, self).__init__(*args, **kwargs)
         # Default checker
-        self._checker = None
+        self._onProjectFileUpdate({'project_file': None})
         self._global_diags = set()
 
     @_logCalls
@@ -163,14 +166,18 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         try:
             self._checker = HdlCodeCheckerServer(self.workspace, path)
-        except Exception as exc:
-            _logger.exception("Failed to create checker")
+        except FileNotFoundError as exc:
+            _logger.info("Failed to create checker, reverting to fallback")
             self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)
 
         self._checker.clean()
 
     def _getProjectFilePath(self, options=None):
+        """
+        Tries to get 'project_file' from the options dict and combine it with
+        the root URI as provided by the workspace
+        """
         path = (options or {}).get('project_file', DEFAULT_PROJECT_FILENAME)
         if 'project_file' in options and path is None:
             # Path has been explicitly set to none
@@ -184,10 +191,6 @@ class HdlccLanguageServer(PythonLanguageServer):
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
     def lint(self, doc_uri, is_saved):
-        if self._checker is None:
-            _logger.warning("Can't lint, no checker")
-            return
-
         diagnostics = list(self._getDiags(doc_uri, is_saved))
         _logger.info("Diagnostics: %s", diagnostics)
 

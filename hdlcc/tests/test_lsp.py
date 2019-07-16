@@ -22,7 +22,6 @@
 # pylint: disable=function-redefined
 
 
-import json
 import logging
 import os
 import os.path as p
@@ -288,7 +287,6 @@ with such.A("LSP server") as it:
                     'initializationOptions': {
                         'project_file': it.project_file}})
 
-
         @it.should('lint file when opening it')
         def test():
             source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
@@ -328,11 +326,85 @@ with such.A("LSP server") as it:
                                  "'[Errno 2] No such file or directory: {}'"
                                  .format(
                                      path_fmt(p.join(VIM_HDL_EXAMPLES,
-                                              it.project_file))),
+                                                     it.project_file))),
                       'severity': defines.DiagnosticSeverity.Error}])
 
-        #  @it.should("stop")
-        #  def test():
-        #      it.fail("Ok, stop")
+    with it.having('no root URI or project file set'):
+
+        @it.should('respond capabilities upon initialization')
+        def test():
+            _initializeServer(
+                it.server,
+                params={
+                    'initializationOptions': {
+                        'project_file': None}})
+
+        @it.should('lint file when opening it')
+        def test():
+            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+
+            meth = mock.MagicMock()
+            with mock.patch.object(it.server.workspace,
+                                   'publish_diagnostics',
+                                   meth):
+
+                it.server.m_text_document__did_open(
+                    textDocument={'uri': uris.from_fs_path(source),
+                                  'text': None})
+
+                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                doc_uri, diagnostics = call[1]
+                _logger.info("doc_uri: %s", doc_uri)
+                _logger.info("diagnostics: %s", diagnostics)
+
+                it.assertEqual(doc_uri, uris.from_fs_path(source))
+                it.assertItemsEqual(
+                    diagnostics,
+                    [{'source': 'HDL Code Checker/static',
+                      'range': {'start': {'line': 42, 'character': -1},
+                                'end': {'line': -1, 'character': -1}},
+                      'code': -1,
+                      'message': "Signal 'neat_signal' is never used",
+                      'severity': defines.DiagnosticSeverity.Information}])
+
+    with it.having('no root URI but project file set'):
+
+        @it.should('respond capabilities upon initialization')
+        def test():
+            # In this case, project file is an absolute path, since there's no
+            # root URI
+            _initializeServer(
+                it.server,
+                params={
+                    'initializationOptions': {
+                        'project_file': p.join(VIM_HDL_EXAMPLES, 'vimhdl.prj')}})
+
+        @it.should('lint file when opening it')
+        def test():
+            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+
+            meth = mock.MagicMock()
+            with mock.patch.object(it.server.workspace,
+                                   'publish_diagnostics',
+                                   meth):
+
+                it.server.m_text_document__did_open(
+                    textDocument={'uri': uris.from_fs_path(source),
+                                  'text': None})
+
+                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                doc_uri, diagnostics = call[1]
+                _logger.info("doc_uri: %s", doc_uri)
+                _logger.info("diagnostics: %s", diagnostics)
+
+                it.assertEqual(doc_uri, uris.from_fs_path(source))
+                it.assertItemsEqual(
+                    diagnostics,
+                    [{'source': 'HDL Code Checker/static',
+                      'range': {'start': {'line': 42, 'character': -1},
+                                'end': {'line': -1, 'character': -1}},
+                      'code': -1,
+                      'message': "Signal 'neat_signal' is never used",
+                      'severity': defines.DiagnosticSeverity.Information}])
 
 it.createTests(globals())
