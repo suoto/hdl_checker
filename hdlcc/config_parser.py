@@ -406,12 +406,12 @@ class ConfigParser(object):
         source_build_list = []
 
         for match in [x.groupdict() for x in _configFileScan(line)]:
+            self._logger.debug("match: '%s'", match)
             if match['parameter'] is not None:
-                self._logger.info("match: '%s'", match)
                 self._handleParsedParameter(match['parameter'],
                                             match['parm_lang'], match['value'])
-            else:
-                for source_path in glob(self._getSourcePath(match['path'])):
+            elif match['path']:
+                for source_path in self._getSourcePaths(match['path']):
                     source_path_list += [source_path]
                     # Try to get the build info for this source. If we get nothing
                     # we just skip it
@@ -439,7 +439,7 @@ class ConfigParser(object):
         else:
             raise hdlcc.exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePath(self, path):
+    def _getSourcePaths(self, path):
         """
         Normalizes and handles absolute/relative paths
         """
@@ -450,7 +450,7 @@ class ConfigParser(object):
             fname_base_dir = p.dirname(p.abspath(self.filename))
             source_path = p.join(fname_base_dir, source_path)
 
-        return source_path
+        return glob(source_path) or [source_path]
 
     def _handleParsedSource(self, library, path, flags):
         """

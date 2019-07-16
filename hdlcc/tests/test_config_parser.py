@@ -254,13 +254,13 @@ with such.A('config parser object') as it:
 
             # Consider non absolute paths are relative to the configuration
             # file path
-            it.assertEquals(file_path,
-                            it.parser._getSourcePath(p.join('foo', 'bar.vhd')))
+            it.assertEquals([file_path, ],
+                            it.parser._getSourcePaths(p.join('foo', 'bar.vhd')))
 
             # Absolute paths should refer to the current path
             it.assertEquals(
-                p.abspath(p.join('foo', 'bar.vhd')),
-                it.parser._getSourcePath(p.abspath(p.join('foo', 'bar.vhd'))))
+                [p.abspath(p.join('foo', 'bar.vhd')), ],
+                it.parser._getSourcePaths(p.abspath(p.join('foo', 'bar.vhd'))))
 
     with it.having("no project file"):
         @it.should("create the object without error")
