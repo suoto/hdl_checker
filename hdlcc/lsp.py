@@ -166,7 +166,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         try:
             self._checker = HdlCodeCheckerServer(self.workspace, path)
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, OSError) as exc:
             _logger.info("Failed to create checker, reverting to fallback")
             self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)
