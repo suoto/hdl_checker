@@ -77,7 +77,7 @@ def _clear():
                 'git submodule foreach --recursive git clean -fdx'):
         _shell(cmd)
 
-def _setupLogging(stream, level, color=True): # pragma: no cover
+def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
     from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
     rainbow_stream_handler = RainbowLoggingHandler(stream)
@@ -241,7 +241,7 @@ def _setupPaths():
 def main():
     args = _parseArguments()
     if _CI:
-        _setupLogging(sys.stdout, args.log_level, color=False)
+        _setupLogging(sys.stdout, args.log_level)
 
     _setupPaths()
     #  _clear()
@@ -259,11 +259,11 @@ def main():
     logging.root.addHandler(file_handler)
     logging.root.setLevel(args.log_level)
 
-    _logger.info("Environment info:")
-    _logger.info(" - CI:       %s", _CI)
-    _logger.info(" - APPVEYOR: %s", _APPVEYOR)
-    _logger.info(" - TRAVIS:   %s", _TRAVIS)
-    _logger.info(" - LOG:      %s", args.log_file)
+    print("Environment info:")
+    print(" - CI:       %s" % _CI)
+    print(" - APPVEYOR: %s" % _APPVEYOR)
+    print(" - TRAVIS:   %s" % _TRAVIS)
+    print(" - LOG:      %s" % args.log_file)
 
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
