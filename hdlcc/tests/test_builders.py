@@ -53,8 +53,14 @@ with such.A("builder object") as it:
     @it.has_teardown
     def teardown():
         if it.BUILDER_NAME == 'xvhdl':
-            os.remove('.xvhdl.init')
-            os.remove('xvhdl.pb')
+            try:
+                os.remove('.xvhdl.init')
+            except OSError:
+                pass
+            try:
+                os.remove('xvhdl.pb')
+            except OSError:
+                pass
 
     with it.having('its binary executable'):
         @it.has_setup

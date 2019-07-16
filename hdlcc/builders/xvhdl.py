@@ -65,7 +65,7 @@ class XVHDL(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
-        self._xvhdlini = '.xvhdl.init'
+        self._xvhdlini = p.join(self._target_folder, '.xvhdl.init')
         self._builtin_libraries = {'ieee', 'std', 'unisim', 'xilinxcorelib',
                                    'synplify', 'synopsis', 'maxii',
                                    'family_support'}
