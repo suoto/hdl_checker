@@ -79,17 +79,6 @@ def _clear():
 
 def _setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, str):
-        class Stream(file):  # pylint: disable=undefined-variable,too-few-public-methods
-            """
-            File subclass that allows RainbowLoggingHandler to write
-            with colors
-            """
-            def isatty(self):  # pylint: disable=no-self-use,missing-docstring
-                return color
-
-        stream = Stream(stream, 'ab', buffering=1)
-
     from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
     rainbow_stream_handler = RainbowLoggingHandler(stream)
 
@@ -143,10 +132,6 @@ def _parseArguments():
     parser.add_argument('--log-level', action='store', default='INFO',
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
-
-    parser.add_argument('--log-stream', action='store',
-                        default=sys.stdout if _CI else None,
-                        help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
@@ -255,8 +240,8 @@ def _setupPaths():
 
 def main():
     args = _parseArguments()
-    if args.log_stream:
-        _setupLogging(args.log_stream, args.log_level, color=False)
+    if _CI:
+        _setupLogging(sys.stdout, args.log_level, color=False)
 
     _setupPaths()
     #  _clear()
