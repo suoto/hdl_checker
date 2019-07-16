@@ -227,10 +227,12 @@ with such.A("hdlcc server") as it:
         @it.should("initialize with no project file")
         @disableVunit
         def test():
+            from pyls import uris
+
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
                 'initialize',
-                {'rootPath': os.path.dirname(__file__),
+                {'rootPath': uris.from_fs_path(os.path.dirname(__file__)),
                  'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)

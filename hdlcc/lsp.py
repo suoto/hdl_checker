@@ -100,26 +100,18 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
     def __init__(self, workspace, project_file=DEFAULT_PROJECT_FILENAME):
         self._workspace = workspace
-
-        # Project file will be related to the root path
-        full_path = None
-        root_path = self._workspace.root_path
-
-        if project_file and root_path:
-            full_path = p.join(root_path, project_file)
-
-        super(HdlCodeCheckerServer, self).__init__(project_file=full_path)
+        super(HdlCodeCheckerServer, self).__init__(project_file)
 
     def _handleUiInfo(self, message):
-        self._logger.info(message)
+        self._logger.debug("UI info: %s", message)
         self._workspace.show_message(message, defines.MessageType.Info)
 
     def _handleUiWarning(self, message):
-        self._logger.warning(message)
+        self._logger.debug("UI warning: %s", message)
         self._workspace.show_message(message, defines.MessageType.Warning)
 
     def _handleUiError(self, message):
-        self._logger.error(message)
+        self._logger.debug("UI error: %s", message)
         self._workspace.show_message(message, defines.MessageType.Error)
 
 class HdlccLanguageServer(PythonLanguageServer):
@@ -149,21 +141,54 @@ class HdlccLanguageServer(PythonLanguageServer):
         """
         Initializes the language server
         """
-        super(HdlccLanguageServer, self).m_initialize(
+        result = super(HdlccLanguageServer, self).m_initialize(
             processId=processId, rootUri=rootUri, rootPath=rootPath,
             initializationOptions=initializationOptions, **_kwargs)
 
-        project_file = (initializationOptions or {}).get(
-                'project_file', DEFAULT_PROJECT_FILENAME)
-        self._checker = HdlCodeCheckerServer(self.workspace, project_file)
+        self._onProjectFileUpdate(initializationOptions or {})
+
+        return result
+
+    def _onProjectFileUpdate(self, options):
+        """
+        Updates the checker server from options if the 'project_file' key is
+        present
+        """
+        _logger.debug("Updating from %s", options)
+
+        # Clear previous diagnostics
+        self._global_diags = set()
+
+        path = self._getProjectFilePath(options)
+
+        try:
+            self._checker = HdlCodeCheckerServer(self.workspace, path)
+        except Exception as exc:
+            _logger.exception("Failed to create checker")
+            self._global_diags.add(FailedToCreateProject(path, exc))
+            self._checker = HdlCodeCheckerServer(self.workspace, None)
+            #  raise
+
         self._checker.clean()
 
-        # Get our capabilities
-        return {'capabilities': self.capabilities()}
+    def _getProjectFilePath(self, options=None):
+        path = (options or {}).get('project_file', None)
+        if 'project_file' in options and path is None:
+            # Path has been explicitly set to none
+            return None
+
+        path = DEFAULT_PROJECT_FILENAME
+
+        # Project file will be related to the root path
+        root_path = self.workspace.root_path
+        if root_path:
+            path = p.join(root_path, path)
+        return path
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
     def lint(self, doc_uri, is_saved):
         if self._checker is None:
+            _logger.warning("Can't lint, no checker")
             return
 
         diagnostics = list(self._getDiags(doc_uri, is_saved))
@@ -202,16 +227,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
     @_logCalls
     def m_workspace__did_change_configuration(self, settings=None):
-        project_file = (settings or {}).get('project_file', None)
-        if project_file:
-            # Clear previous global diags since we're changing projects
-            self._global_diags = set()
-            try:
-                self._checker = HdlCodeCheckerServer(self.workspace, project_file)
-                self._checker.clean()
-            except Exception as exc:
-                self._global_diags.add(FailedToCreateProject(project_file, exc))
-                raise
+        self._onProjectFileUpdate(settings or {})
 
     @_logCalls
     def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):

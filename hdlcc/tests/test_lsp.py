@@ -55,6 +55,8 @@ LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION,
                     'id': 1,
                     'processId': None}
 
+LSP_MSG_EMPTY_RESPONSE = {'jsonrpc': JSONRPC_VERSION, 'id': 1, 'result': None}
+
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
@@ -115,6 +117,27 @@ class TestDiagToLsp(unittest2.TestCase):
 
 with such.A("LSP server") as it:
 
+    def _initializeServer(server, params=None):
+        msg = LSP_MSG_TEMPLATE.copy()
+        msg.update({'method': 'initialize'})
+        msg.update(params or {})
+        _logger.debug("Sending message: %s", msg)
+        server._endpoint.consume(msg)
+
+        capabilities = json.loads(it.tx._read_message())
+        _logger.debug("capabilities: %s", capabilities)
+
+        it.assertIn('result', capabilities)
+        it.assertEqual(capabilities['result'], {"capabilities": {"textDocumentSync": 1}})
+
+        msg = LSP_MSG_TEMPLATE.copy()
+        msg.update({'method': 'initialized'})
+        _logger.debug("Sending message: %s", msg)
+        server._endpoint.consume(msg)
+
+        initialized_reply = json.loads(it.tx._read_message())
+        it.assertEqual(initialized_reply, LSP_MSG_EMPTY_RESPONSE)
+
     @it.has_setup
     def setup():
         _logger.debug("Sever")
@@ -152,16 +175,7 @@ with such.A("LSP server") as it:
 
         @it.should('respond capabilities upon initialization')
         def test():
-            msg = LSP_MSG_TEMPLATE.copy()
-            msg.update({'method': 'initialize'})
-
-            _logger.debug("Sending message: %s", msg)
-            it.server._endpoint.consume(msg)
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-
-            it.assertIn('result', reply)
-            it.assertEqual(reply['result'], {"capabilities": {"textDocumentSync": 1}})
+            _initializeServer(it.server)
 
         @it.should('lint file when opening it')
         def test():
@@ -175,15 +189,15 @@ with such.A("LSP server") as it:
             _logger.debug("Sending message: %s", msg)
             it.server._endpoint.consume(msg)
 
-            # Not sure why this one comes out
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-            it.assertEqual(reply['result'], None)
+            # Read response from did_open
+            did_open_reply = json.loads(it.tx._read_message())
+            _logger.debug("did_open_reply: %s", did_open_reply)
+            it.assertEqual(did_open_reply, LSP_MSG_EMPTY_RESPONSE)
 
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
+            publish_reply = json.loads(it.tx._read_message())
+            _logger.debug("publish_reply: %s", publish_reply)
             it.assertEqual(
-                reply,
+                publish_reply,
                 {'jsonrpc': JSONRPC_VERSION,
                  'method': 'textDocument/publishDiagnostics',
                  'params': {
@@ -193,7 +207,14 @@ with such.A("LSP server") as it:
                           'range': {'start': {'line': 42, 'character': -1},
                                     'end': {'line': -1, 'character': -1}},
                           'message': "Signal 'neat_signal' is never used",
-                          'severity': 3,
+                          'severity': defines.DiagnosticSeverity.Information,
+                          'code': -1},
+                         {'source': 'HDL Code Checker',
+                          'range': {'start': {'line': -1, 'character': -1},
+                                    'end': {'line': -1, 'character': -1}},
+                          'severity': defines.DiagnosticSeverity.Error,
+                          'message': "Exception while creating project for "
+                                     "project file 'vimhdl.prj': IOError(2, 'No such file or directory')",
                           'code': -1}]}})
 
         @it.should('not lint file outside workspace')
@@ -212,21 +233,12 @@ with such.A("LSP server") as it:
 
         @it.should('respond capabilities upon initialization')
         def test():
-            project_file = 'vimhdl.prj'
-            msg = LSP_MSG_TEMPLATE.copy()
-            msg.update({'method': 'initialize',
-                        'params' : {
-                            'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
-                            'initializationOptions': {
-                                'project_file': project_file},
-                            }})
-            _logger.debug("Sending message: %s", msg)
-            it.server._endpoint.consume(msg)
-
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-
-            it.assertEqual(reply['result'], {"capabilities": {"textDocumentSync": 1}})
+            _initializeServer(
+                it.server,
+                {'params' : {
+                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                    'initializationOptions': {
+                        'project_file': 'vimhdl.prj'}}})
 
         @it.should('lint file when opening it')
         def test():
@@ -241,9 +253,9 @@ with such.A("LSP server") as it:
             it.server._endpoint.consume(msg)
 
             # Not sure why this one comes out
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
-            it.assertEqual(reply['result'], None)
+            did_open_reply = json.loads(it.tx._read_message())
+            _logger.debug("did_open_reply: %s", did_open_reply)
+            it.assertEqual(did_open_reply['result'], None)
 
             #  # Handle notification message
             #  reply = json.loads(it.tx._read_message())
@@ -257,10 +269,10 @@ with such.A("LSP server") as it:
             #           'message': "Target directory '%s' doesn't exist, "
             #                      "forcing cleanup" % p.join(VIM_HDL_EXAMPLES, '.hdlcc')}})
 
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
+            publish_reply = json.loads(it.tx._read_message())
+            _logger.debug("publish_reply: %s", publish_reply)
             it.assertEqual(
-                reply,
+                publish_reply,
                 {'jsonrpc': JSONRPC_VERSION,
                  'method': 'textDocument/publishDiagnostics',
                  'params': {
@@ -279,49 +291,95 @@ with such.A("LSP server") as it:
         def test():
             project_file = '__some_project_file.prj'
             it.assertFalse(p.exists(project_file))
+            _initializeServer(
+                it.server,
+                {'params' : {
+                    'initializationOptions': {
+                        'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                        'project_file': project_file}}})
 
+        @it.should('lint file when opening it')
+        def test():
+            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
             msg = LSP_MSG_TEMPLATE.copy()
-            msg.update({'method': 'initialize',
-                        'params' : { 'initializationOptions': {
-                            'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
-                            'project_file': project_file}}})
+            msg.update({'method': 'text_document__did_open',
+                        'params' : {
+                            'textDocument': {
+                                'uri': uris.from_fs_path(source),
+                                'text': None}}})
             _logger.debug("Sending message: %s", msg)
             it.server._endpoint.consume(msg)
 
-            reply = json.loads(it.tx._read_message())
-            _logger.debug("reply: %s", reply)
+            # Read response from did_open
+            did_open_reply = json.loads(it.tx._read_message())
+            _logger.debug("did_open_reply: %s", did_open_reply)
+            it.assertEqual(did_open_reply, LSP_MSG_EMPTY_RESPONSE)
 
-            it.assertIn('error', reply, "This message should fail")
-            if six.PY3:
-                it.assertEqual(reply['error']['message'],
-                               "FileNotFoundError: [Errno 2] No such file or "
-                               "directory: '{}'".format(project_file))
-            else:
-                it.assertEqual(reply['error']['message'],
-                               u"IOError: [Errno 2] No such file or "
-                               u"directory: u'{}'".format(project_file))
+            publish_reply = json.loads(it.tx._read_message())
+            _logger.debug("publish_reply: %s", publish_reply)
+            it.assertEqual(
+                publish_reply,
+                {'jsonrpc': JSONRPC_VERSION,
+                 'method': 'textDocument/publishDiagnostics',
+                 'params': {
+                     'uri': uris.from_fs_path(source),
+                     'diagnostics': [
+                         {'source': 'HDL Code Checker/static',
+                          'range': {'start': {'line': 42, 'character': -1},
+                                    'end': {'line': -1, 'character': -1}},
+                          'message': "Signal 'neat_signal' is never used",
+                          'severity': defines.DiagnosticSeverity.Information,
+                          'code': -1},
+                         {'source': 'HDL Code Checker',
+                          'range': {'start': {'line': -1, 'character': -1},
+                                    'end': {'line': -1, 'character': -1}},
+                          'severity': defines.DiagnosticSeverity.Error,
+                          'message': "Exception while creating project for "
+                                     "project file 'vimhdl.prj': IOError(2, 'No such file or directory')",
+                          'code': -1}]}})
 
-        #  @it.should("flag the project file doesn't exist")
-        #  def test():
-        #      source = p.join(VIM_HDL_EXAMPLES, 'some_source.vhd')
-        #      it.assertFalse(p.exists(source))
-        #      open(source, 'w').write('')
+        @it.should("flag the project file doesn't exist")
+        def test():
+            source = p.join(VIM_HDL_EXAMPLES, 'some_source.vhd')
+            it.assertFalse(p.exists(source))
+            open(source, 'w').write('')
 
-        #      msg = LSP_MSG_TEMPLATE.copy()
-        #      msg.update({'method': 'text_document__did_open',
-        #                  'params' : {
-        #                      'textDocument': {
-        #                          'uri': uris.from_fs_path(source),
-        #                          'text': None}}})
-        #      _logger.debug("Sending message: %s", msg)
-        #      it.server._endpoint.consume(msg)
+            msg = LSP_MSG_TEMPLATE.copy()
+            msg.update({'method': 'text_document__did_open',
+                        'params' : {
+                            'textDocument': {
+                                'uri': uris.from_fs_path(source),
+                                'text': None}}})
+            _logger.debug("Sending message: %s", msg)
+            it.server._endpoint.consume(msg)
 
-        #      # Not sure why this one comes out
-        #      reply = json.loads(it.tx._read_message())
-        #      _logger.debug("reply: %s", reply)
-        #      it.assertEqual(reply['result'], None)
+            # Read response from did_open
+            did_open_reply = json.loads(it.tx._read_message())
+            _logger.debug("did_open_reply: %s", did_open_reply)
+            it.assertEqual(did_open_reply, LSP_MSG_EMPTY_RESPONSE)
 
-        #      _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
-        #      _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
+            _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
+
+            for _ in range(3):
+                msg = LSP_MSG_TEMPLATE.copy()
+                msg.update({'method': 'text_document__did_save',
+                            'params' : {
+                                'textDocument': {
+                                    'uri': uris.from_fs_path(source),
+                                    'text': None}}})
+
+                _logger.debug("Sending message: %s", msg)
+                it.server._endpoint.consume(msg)
+
+                # Not sure why this one comes out
+                did_save_reply = json.loads(it.tx._read_message())
+                _logger.debug("did_save_reply: %s", did_save_reply)
+                it.assertEqual(did_save_reply['result'], None)
+
+                import time
+                time.sleep(1)
+                _logger.fatal("reply: %s", json.loads(it.tx._read_message()))
+
+            #  it.fail("Stop!")
 
 it.createTests(globals())
