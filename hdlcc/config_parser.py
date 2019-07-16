@@ -16,16 +16,15 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Configuration file parser"
 
+import logging
 import os.path as p
 import re
-import logging
+from glob import glob
 from threading import Lock
 
 import hdlcc.exceptions
-from hdlcc.parsers import (getSourceFileObjects,
-                           VhdlParser,
-                           VerilogParser)
-from hdlcc.builders import getBuilderByName, AVAILABLE_BUILDERS
+from hdlcc.builders import AVAILABLE_BUILDERS, getBuilderByName
+from hdlcc.parsers import VerilogParser, VhdlParser, getSourceFileObjects
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -412,14 +411,14 @@ class ConfigParser(object):
                 self._handleParsedParameter(match['parameter'],
                                             match['parm_lang'], match['value'])
             else:
-                source_path = self._getSourcePath(match['path'])
-                source_path_list += [source_path]
-                # Try to get the build info for this source. If we get nothing
-                # we just skip it
-                build_info = self._handleParsedSource(
-                    match['library'], source_path, match['flags'])
-                if build_info:
-                    source_build_list.append(build_info)
+                for source_path in glob(self._getSourcePath(match['path'])):
+                    source_path_list += [source_path]
+                    # Try to get the build info for this source. If we get nothing
+                    # we just skip it
+                    build_info = self._handleParsedSource(
+                        match['library'], source_path, match['flags'])
+                    if build_info:
+                        source_build_list.append(build_info)
 
         return source_path_list, source_build_list
 
