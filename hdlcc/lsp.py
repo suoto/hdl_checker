@@ -20,11 +20,12 @@
 
 import functools
 import logging
+import os.path as p
 
 import pyls.lsp as defines
-from pyls.uris import to_fs_path
 from pyls._utils import debounce
 from pyls.python_ls import PythonLanguageServer
+from pyls.uris import to_fs_path
 
 from hdlcc.diagnostics import DiagType, FailedToCreateProject
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
@@ -35,6 +36,7 @@ CONFIG_FILES = ()
 _logger = logging.getLogger(__name__)
 
 LINT_DEBOUNCE_S = 0.5  # 500 ms
+DEFAULT_PROJECT_FILENAME = 'vimhdl.prj'
 
 
 def _logCalls(func):  # pragma: no cover
@@ -96,10 +98,17 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     _logger = logging.getLogger(__name__ + '.HdlCodeCheckerServer')
 
-    def __init__(self, workspace, project_file=None):
+    def __init__(self, workspace, project_file=DEFAULT_PROJECT_FILENAME):
         self._workspace = workspace
-        fs_path = None if project_file is None else to_fs_path(project_file)
-        super(HdlCodeCheckerServer, self).__init__(project_file=fs_path)
+
+        # Project file will be related to the root path
+        full_path = None
+        root_path = self._workspace.root_path
+
+        if project_file and root_path:
+            full_path = p.join(root_path, project_file)
+
+        super(HdlCodeCheckerServer, self).__init__(project_file=full_path)
 
     def _handleUiInfo(self, message):
         self._logger.info(message)
@@ -144,7 +153,8 @@ class HdlccLanguageServer(PythonLanguageServer):
             processId=processId, rootUri=rootUri, rootPath=rootPath,
             initializationOptions=initializationOptions, **_kwargs)
 
-        project_file = (initializationOptions or {}).get('project_file', None)
+        project_file = (initializationOptions or {}).get(
+                'project_file', DEFAULT_PROJECT_FILENAME)
         self._checker = HdlCodeCheckerServer(self.workspace, project_file)
         self._checker.clean()
 

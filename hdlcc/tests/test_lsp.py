@@ -51,7 +51,10 @@ _logger = logging.getLogger(__name__)
 # pylint: disable=bad-whitespace
 
 JSONRPC_VERSION = '2.0'
-LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION, 'id': 1}
+LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION,
+                    'id': 1,
+                    'processId': None}
+
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
@@ -94,7 +97,7 @@ class TestDiagToLsp(unittest2.TestCase):
     def test_workspace_notify(self):
         workspace = mock.MagicMock(spec=Workspace)
 
-        server = lsp.HdlCodeCheckerServer(workspace)
+        server = lsp.HdlCodeCheckerServer(workspace, project_file=None)
 
         server._handleUiInfo('some info')  # pylint: disable=protected-access
         workspace.show_message.assert_called_once_with(
@@ -151,11 +154,13 @@ with such.A("LSP server") as it:
         def test():
             msg = LSP_MSG_TEMPLATE.copy()
             msg.update({'method': 'initialize'})
+
             _logger.debug("Sending message: %s", msg)
             it.server._endpoint.consume(msg)
             reply = json.loads(it.tx._read_message())
             _logger.debug("reply: %s", reply)
 
+            it.assertIn('result', reply)
             it.assertEqual(reply['result'], {"capabilities": {"textDocumentSync": 1}})
 
         @it.should('lint file when opening it')
@@ -203,15 +208,18 @@ with such.A("LSP server") as it:
 
             it.server.workspace.publish_diagnostics.assert_not_called()
 
-    with it.having('a project file'):
+    with it.having('an existing and valid project file'):
 
         @it.should('respond capabilities upon initialization')
         def test():
-            project_file = p.join(VIM_HDL_EXAMPLES, 'vimhdl.prj')
+            project_file = 'vimhdl.prj'
             msg = LSP_MSG_TEMPLATE.copy()
             msg.update({'method': 'initialize',
-                        'params' : { 'initializationOptions': {
-                            'project_file': uris.from_fs_path(project_file)}}})
+                        'params' : {
+                            'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                            'initializationOptions': {
+                                'project_file': project_file},
+                            }})
             _logger.debug("Sending message: %s", msg)
             it.server._endpoint.consume(msg)
 
@@ -269,20 +277,21 @@ with such.A("LSP server") as it:
 
         @it.should('respond capabilities upon initialization')
         def test():
-            project_file = p.join(VIM_HDL_EXAMPLES, '__some_project_file.prj')
+            project_file = '__some_project_file.prj'
             it.assertFalse(p.exists(project_file))
 
             msg = LSP_MSG_TEMPLATE.copy()
             msg.update({'method': 'initialize',
                         'params' : { 'initializationOptions': {
-                            'project_file': uris.from_fs_path(project_file)}}})
+                            'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                            'project_file': project_file}}})
             _logger.debug("Sending message: %s", msg)
             it.server._endpoint.consume(msg)
 
             reply = json.loads(it.tx._read_message())
             _logger.debug("reply: %s", reply)
 
-            it.assertTrue('error' in reply, "This message should fail")
+            it.assertIn('error', reply, "This message should fail")
             if six.PY3:
                 it.assertEqual(reply['error']['message'],
                                "FileNotFoundError: [Errno 2] No such file or "
