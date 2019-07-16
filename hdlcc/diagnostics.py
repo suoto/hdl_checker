@@ -229,9 +229,9 @@ class FailedToCreateProject(CheckerDiagnostic):
     """
     Reports problems when reading the project file
     """
-    def __init__(self, project_file, exception=None):
-        text = 'Exception while creating project for project file {}: {}'
+    def __init__(self, exception):
+        text = "Exception while creating server: '{}'"
 
         super(FailedToCreateProject, self).__init__(
             checker=None, severity=DiagType.ERROR,
-            text=text.format(repr(project_file), repr(exception)))
+            text=text.format(str(exception)))

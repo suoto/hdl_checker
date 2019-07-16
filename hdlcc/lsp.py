@@ -165,9 +165,8 @@ class HdlccLanguageServer(PythonLanguageServer):
             self._checker = HdlCodeCheckerServer(self.workspace, path)
         except Exception as exc:
             _logger.exception("Failed to create checker")
-            self._global_diags.add(FailedToCreateProject(path, exc))
+            self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)
-            #  raise
 
         self._checker.clean()
 
@@ -177,7 +176,7 @@ class HdlccLanguageServer(PythonLanguageServer):
             # Path has been explicitly set to none
             return None
 
-        path = DEFAULT_PROJECT_FILENAME
+        #  path = DEFAULT_PROJECT_FILENAME
 
         # Project file will be related to the root path
         root_path = self.workspace.root_path
