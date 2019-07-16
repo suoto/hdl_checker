@@ -171,12 +171,10 @@ class HdlccLanguageServer(PythonLanguageServer):
         self._checker.clean()
 
     def _getProjectFilePath(self, options=None):
-        path = (options or {}).get('project_file', None)
+        path = (options or {}).get('project_file', DEFAULT_PROJECT_FILENAME)
         if 'project_file' in options and path is None:
             # Path has been explicitly set to none
             return None
-
-        #  path = DEFAULT_PROJECT_FILENAME
 
         # Project file will be related to the root path
         root_path = self.workspace.root_path

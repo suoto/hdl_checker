@@ -63,10 +63,10 @@ def _getUnusedLocalhostPort():
     return port
 
 
-def start_client(client):
+def _startClient(client):
     client.start()
 
-class _ClientServer(object):
+class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-few-public-methods
     """ A class to setup a client/server pair """
     def __init__(self):
         from pyls.python_ls import start_io_lang_server
@@ -90,7 +90,7 @@ class _ClientServer(object):
                                                     os.fdopen(csw, 'wb'),
                                                     start_io_lang_server)
 
-        self.client_thread = Thread(target=start_client, args=[self.client])
+        self.client_thread = Thread(target=_startClient, args=[self.client])
         self.client_thread.daemon = True
         self.client_thread.start()
 
