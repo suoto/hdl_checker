@@ -522,11 +522,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         with source.havingBufferContent(content):
             messages = self.getMessagesBySource(source)
 
-        # After getting messages, compile the source again with the saved
-        # contents so that other files see this source as unchanged
-        if self._isBuilderCallable():
-            _ = self._getBuilderMessages(source)
-
         # Some messages may not include the filename field when checking a
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
