@@ -83,18 +83,22 @@ def diagToLsp(diag):
     else:
         severity = defines.DiagnosticSeverity.Error
 
-    return {
+    result = {
         'source': diag.checker,
         'range': {
-            'start': {'line': (diag.line_number or 0) - 1,
-                      'character': -1, },
-            'end': {'line': -1,
-                    'character': -1, },
+            'start': {'line': max((diag.line_number or 0) - 1, 0),
+                      'character': 0, },
+            'end': {'line': max((diag.line_number or 0) - 1, 0),
+                    'character': 0, },
         },
         'message': diag.text,
         'severity': severity,
-        'code':  diag.error_code or -1
     }
+
+    if diag.error_code:
+        result['code'] = diag.error_code
+
+    return result
 
 
 class HdlCodeCheckerServer(HdlCodeCheckerBase):

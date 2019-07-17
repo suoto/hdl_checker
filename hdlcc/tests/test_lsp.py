@@ -92,10 +92,10 @@ class TestDiagToLsp(unittest2.TestCase):
                  'range': {
                      'start': {
                          'line': 0,
-                         'character': -1, },
+                         'character': 0, },
                      'end': {
-                         'line': -1,
-                         'character': -1, }},
+                         'line': 0,
+                         'character': 0, }},
                  'message': 'some diag',
                  'severity': severity,
                  'code': 'error code'})
@@ -215,9 +215,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 42, 'character': 0},
+                                'end': {'line': 42, 'character': 0}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -267,9 +266,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 42, 'character': 0},
+                                'end': {'line': 42, 'character': 0}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -313,15 +311,13 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 42, 'character': 0},
+                                'end': {'line': 42, 'character': 0}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information},
                      {'source': 'HDL Code Checker',
-                      'range': {'start': {'line': -1, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 0, 'character': 0},
+                                'end': {'line': 0, 'character': 0}},
                       'message': "Exception while creating server: "
                                  "'[Errno 2] No such file or directory: {}'"
                                  .format(
@@ -361,9 +357,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 42, 'character': 0},
+                                'end': {'line': 42, 'character': 0}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -401,9 +396,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': -1},
-                                'end': {'line': -1, 'character': -1}},
-                      'code': -1,
+                      'range': {'start': {'line': 42, 'character': 0},
+                                'end': {'line': 42, 'character': 0}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
