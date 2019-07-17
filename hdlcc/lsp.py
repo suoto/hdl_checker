@@ -107,7 +107,45 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     def __init__(self, workspace, project_file=DEFAULT_PROJECT_FILENAME):
         self._workspace = workspace
+        self._project_mtime = 0
+        if project_file is not None:
+            self._project_mtime = p.getmtime(project_file)
+
         super(HdlCodeCheckerServer, self).__init__(project_file)
+
+    def _shouldParseProjectFile(self):
+        if self.project_file is None:
+            return False
+
+        if p.getmtime(self.project_file) <= self._project_mtime:
+            return False
+
+        self._project_mtime = p.getmtime(self.project_file)
+        return True
+
+    def _shouldRecreateTargetDir(self):
+        if self._config is None:
+            return False
+
+        if p.exists(self._config.getTargetDir()):
+            return False
+
+        return self._config.getBuilder() != 'fallback'
+
+    def _setupEnvIfNeeded(self):
+        # On LSP, user can't force a fresh rebuild, we'll force a full clean if
+        # - Project file is valid and has been modified
+        # - Target directory doesn't exist (and NOT using fallback builder)
+        should_parse = self._shouldParseProjectFile()
+
+        if should_parse or self._shouldRecreateTargetDir():
+            if should_parse:
+                self._handleUiInfo("Project file has changed, rebuilding project")
+            else:
+                self._handleUiInfo("Output dir not found, rebuilding project")
+            self.clean()
+
+        super(HdlCodeCheckerServer, self)._setupEnvIfNeeded()
 
     def _handleUiInfo(self, message):
         self._logger.debug("UI info: %s", message)
