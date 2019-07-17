@@ -20,9 +20,9 @@ import abc
 import logging
 import os.path as p
 import re
-from tempfile import NamedTemporaryFile
 import time
 from contextlib import contextmanager
+from tempfile import NamedTemporaryFile
 
 from hdlcc.utils import getFileType, removeDuplicates, toBytes
 
@@ -180,14 +180,15 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             tmp_file.file.write(toBytes(self._content))
             tmp_file.file.flush()
 
-            yield
+            try:
+                yield
+            finally:
+                _logger.debug("Clearing buffer content")
 
-            _logger.debug("Clearing buffer content")
-
-            # Restore previous values
-            self._mtime, self._content = mtime, prev_content
-            self.filename = self.shadow_filename
-            self.shadow_filename = None
+                # Restore previous values
+                self._mtime, self._content = mtime, prev_content
+                self.filename = self.shadow_filename
+                self.shadow_filename = None
 
     def getSourceContent(self):
         """

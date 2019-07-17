@@ -299,8 +299,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             cached_sequence = self._build_sequence_cache[key]['sequence']
             cached_timestamp = self._build_sequence_cache[key]['timestamp']
             if cached_sequence:
-                current_timestamp = max([x.getmtime() for x in cached_sequence]
-                                        + [source.getmtime()])
+                current_timestamp = max(
+                    max({x.getmtime() for x in cached_sequence if x}),
+                    source.getmtime() or 0)
             else:
                 current_timestamp = 0
 
