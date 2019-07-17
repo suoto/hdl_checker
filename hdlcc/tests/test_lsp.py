@@ -67,7 +67,7 @@ VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 if onWindows():
     VIM_HDL_EXAMPLES = VIM_HDL_EXAMPLES.lower()
 
-class TestDiagToLsp(unittest2.TestCase):
+class TestCheckerDiagToLspDict(unittest2.TestCase):
 
     def test_converting_to_lsp(self):
         for diag_type, severity in (
@@ -87,7 +87,7 @@ class TestDiagToLsp(unittest2.TestCase):
                 severity=diag_type)
 
             self.assertEqual(
-                lsp.diagToLsp(diag),
+                lsp.checkerDiagToLspDict(diag),
                 {'source': 'hdlcc test',
                  'range': {
                      'start': {

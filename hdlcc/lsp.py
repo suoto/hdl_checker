@@ -62,7 +62,7 @@ def _logCalls(func):  # pragma: no cover
     return wrapper
 
 
-def diagToLsp(diag):
+def checkerDiagToLspDict(diag):
     """
     Converts a CheckerDiagnostic object into the dictionary with into the LSP
     expects
@@ -206,7 +206,7 @@ class HdlccLanguageServer(PythonLanguageServer):
             # Both checker methods return generators, convert to a list before
             # returning
             self.workspace.publish_diagnostics(
-                doc_uri, list([diagToLsp(x) for x in diagnostics]))
+                doc_uri, list([checkerDiagToLspDict(x) for x in diagnostics]))
 
     def _getDiags(self, doc_uri, is_saved):
         """

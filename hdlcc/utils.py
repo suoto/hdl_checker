@@ -227,7 +227,7 @@ class UnknownTypeExtension(Exception):
         self._path = path
 
     def __str__(self):
-        return "Couldn't determine file type for path %s" % self._path
+        return "Couldn't determine file type for path '%s'" % self._path
 
 def getFileType(filename):
     "Gets the file type of a source file"
