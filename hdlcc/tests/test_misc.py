@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ _logger = logging.getLogger(__name__)
 _HEADER = re.compile(
     r"(?:--|#) This file is part of HDL Code Checker\.\n"
     r"(?:--|#)\n"
-    r"(?:--|#) Copyright \(c\) (?P<copyright_years>[^\s]+) Andre Souto\n"
+    r"(?:--|#) Copyright \(c\) 2015 - 2019 suoto \(Andre Souto\)\n"
     r"(?:--|#)\n"
     r"(?:--|#) HDL Code Checker is free software: you can redistribute it and/or modify\n"
     r"(?:--|#) it under the terms of the GNU General Public License as published by\n"
