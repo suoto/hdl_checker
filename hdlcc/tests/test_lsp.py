@@ -30,7 +30,6 @@ import threading
 import time
 
 import mock
-import six
 import unittest2
 from nose2.tools import such
 
@@ -152,10 +151,7 @@ with such.A("LSP server") as it:
     @it.has_setup
     def setup():
         _logger.debug("Sever")
-        #  rx_r, rx_w = os.pipe()
         tx_r, tx_w = os.pipe()
-
-        #  rx = JsonRpcStreamWriter(os.fdopen(rx_w, 'wb'))
         it.tx = JsonRpcStreamReader(os.fdopen(tx_r, 'rb'))
 
         it.rx = mock.MagicMock()
@@ -303,10 +299,6 @@ with such.A("LSP server") as it:
                 _logger.info("doc_uri: %s", doc_uri)
                 _logger.info("diagnostics: %s", diagnostics)
 
-                # Exception will have a leading u for unicode in Python 2.
-                # Ideally this would be stripped somewhere
-                path_fmt = (lambda x: "u'%s'" % x) if six.PY2 else repr
-
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
                 it.assertItemsEqual(
                     diagnostics,
@@ -320,8 +312,7 @@ with such.A("LSP server") as it:
                                 'end': {'line': 0, 'character': 0}},
                       'message': "Exception while creating server: "
                                  "'[Errno 2] No such file or directory: {}'"
-                                 .format(
-                                     path_fmt(p.join(VIM_HDL_EXAMPLES,
+                                 .format(repr(p.join(VIM_HDL_EXAMPLES,
                                                      it.project_file))),
                       'severity': defines.DiagnosticSeverity.Error}])
 
