@@ -22,6 +22,7 @@
 # pylint: disable=function-redefined
 
 
+import sys
 import logging
 import os
 import os.path as p
@@ -62,6 +63,8 @@ MOCK_WAIT_TIMEOUT = 5
 
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
+
+_ON_WINDOWS = sys.platform == "win32"
 
 if onWindows():
     VIM_HDL_EXAMPLES = VIM_HDL_EXAMPLES.lower()
@@ -299,6 +302,11 @@ with such.A("LSP server") as it:
                 _logger.info("doc_uri: %s", doc_uri)
                 _logger.info("diagnostics: %s", diagnostics)
 
+                if _ON_WINDOWS:
+                    error = '[WinError 2] The system cannot find the file specified'
+                else:
+                    error = '[Errno 2] No such file or directory'
+
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
                 it.assertItemsEqual(
                     diagnostics,
@@ -310,9 +318,9 @@ with such.A("LSP server") as it:
                      {'source': 'HDL Code Checker',
                       'range': {'start': {'line': 0, 'character': 0},
                                 'end': {'line': 0, 'character': 0}},
-                      'message': "Exception while creating server: "
-                                 "'[Errno 2] No such file or directory: {}'"
-                                 .format(repr(p.join(VIM_HDL_EXAMPLES,
+                      'message': "Exception while creating server: '{}: {}'"
+                                 .format(error,
+                                         repr(p.join(VIM_HDL_EXAMPLES,
                                                      it.project_file))),
                       'severity': defines.DiagnosticSeverity.Error}])
 
