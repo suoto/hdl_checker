@@ -27,7 +27,8 @@ from multiprocessing.pool import ThreadPool
 import hdlcc.builders
 import hdlcc.exceptions
 from hdlcc.config_parser import ConfigParser
-from hdlcc.diagnostics import DiagType, PathNotInProjectFile
+from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
+                               PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.static_check import getStaticMessages
 from hdlcc.utils import dump, getFileType, removeDuplicates, serializer
@@ -49,6 +50,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._build_sequence_cache = {}
+        self._outstanding_diags = set()
 
         self.project_file = project_file
 
@@ -320,13 +322,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # have the same entity or package name and we failed to
             # identify the real file
             if len(dependencies_list) != 1:
-                self._handleUiWarning(
-                    "Returning dependency '%s' for %s.%s in file '%s', but "
-                    "there were %d other matches: %s. The selected option may "
-                    "be sub-optimal" % (
-                        dependency.filename, library, unit, source.filename,
-                        len(dependencies_list),
-                        ', '.join([x.filename for x in dependencies_list])))
+                self._outstanding_diags.add(
+                    DependencyNotUnique(filename=source.filename,
+                                        design_unit='{}.{}'.format(library, unit),
+                                        actual=dependency.filename,
+                                        choices=list(dependencies_list)))
 
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
@@ -458,6 +458,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Extra arguments are
         """
         self._setupEnvIfNeeded()
+        self._outstanding_diags = set()
 
         records = []
 
@@ -489,7 +490,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 records += self._getBuilderMessages(source, batch_mode)
 
         self._saveCache()
-        return records
+        return records + list(self._outstanding_diags)
 
     def getMessagesWithText(self, path, content):
         """

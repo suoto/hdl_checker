@@ -25,13 +25,13 @@ import time
 
 import mock
 import six
-
 from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.diagnostics import (BuilderDiag, DiagType, LibraryShouldBeOmited,
-                               ObjectIsNeverUsed, PathNotInProjectFile)
+from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
+                               LibraryShouldBeOmited, ObjectIsNeverUsed,
+                               PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
@@ -404,9 +404,27 @@ with such.A("hdlcc project") as it:
         for source in (target_source, implementation_a, implementation_b):
             project._config._sources[str(source)] = source
 
-        project.updateBuildSequenceCache(target_source)
+        # Make sure there was no outstanding diagnostics prior to running
+        it.assertFalse(project._outstanding_diags,
+                       "Project should not have any outstanding diagnostics")
 
-        it.assertNotEqual(messages, [])
+        project.updateBuildSequenceCache(target_source)
+        _logger.info("processing diags: %s", project._outstanding_diags)
+
+        # hdlcc should flag which one it picked, although the exact one might
+        # vary
+        it.assertEqual(len(project._outstanding_diags), 1,
+                       "Should have exactly one outstanding diagnostics by now")
+        it.assertIn(
+            project._outstanding_diags.pop(),
+            [DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_a.vhd',
+                                 choices=[implementation_a, implementation_b]),
+             DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_b.vhd',
+                                 choices=[implementation_a, implementation_b])])
 
     @it.should("get builder messages by path")
     def test():

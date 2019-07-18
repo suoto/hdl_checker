@@ -235,3 +235,18 @@ class FailedToCreateProject(CheckerDiagnostic):
         super(FailedToCreateProject, self).__init__(
             checker=None, severity=DiagType.ERROR,
             text=text.format(str(exception)))
+
+
+class DependencyNotUnique(CheckerDiagnostic):
+    """
+    Searching for a dependency should yield a single source file
+    """
+    def __init__(self, filename, design_unit, actual, choices):
+        text = ("Returning dependency '{}' for {}, but there were {} other "
+                "matches:\n{}. The selected option may not be the correct "
+                "one".format(actual, design_unit, len(choices),
+                             ', '.join({"'%s'" % x.filename for x in choices})))
+
+        super(DependencyNotUnique, self).__init__(
+            checker=None, filename=filename, severity=DiagType.STYLE_WARNING,
+            text=text)
