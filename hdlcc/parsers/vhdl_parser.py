@@ -16,9 +16,11 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "VHDL source file parser"
 
-import re
 import logging
+import re
+
 from hdlcc.parsers.base_parser import BaseSourceFile
+from hdlcc.parsers import DependencySpec, SourceLocation
 
 _logger = logging.getLogger(__name__)
 
@@ -59,32 +61,45 @@ class VhdlParser(BaseSourceFile):
         Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines
         """
-        for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
-            yield match.groupdict()
+        content = self.getSourceContent()
+        for match in _DESIGN_UNIT_SCANNER.finditer(content):
+            start = match.start()
+            yield match.groupdict(), content[:start].count('\n')
 
     def _getDependencies(self):
         libs = self.getLibraries() + ['work']
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
-        dependencies = []
-        for match in lib_deps_regex.finditer(self.getSourceContent()):
-            dependency = {}
-            dependency['library'], dependency['unit'] = match.group().split('.')[:2]
+        dependencies = set()
+        text = self.getSourceContent()
+        for match in lib_deps_regex.finditer(text):
+            library, unit = match.group().split('.')[:2]
+
             # Library 'work' means 'this' library, so we replace it
             # by the library name itself
-            if dependency['library'] == 'work':
-                dependency['library'] = self.library
-            if dependency not in dependencies:
-                dependencies.append(dependency)
+            dependency = DependencySpec(
+                library=str(self.library if library == 'work' else library),
+                name=str(unit))
+                #  location=SourceLocation(
+                #      filename=self.filename,
+                #      line_number=text[:match.start()].count('\n'),
+                #      column_number=None))
+
+            dependencies.add(dependency)
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             _dict = match.groupdict()
             package_body_name = _dict['package_body_name']
             if package_body_name is not None:
-                dependencies.append(
-                    {'library' : self.library,
-                     'unit': package_body_name})
+                location = SourceLocation(filename=self.filename,
+                                          line_number=text[:match.start()].count('\n'),
+                                          column_number=None)
+
+                dependencies.add(
+                    DependencySpec(library=str(self.library),
+                                   name=str(package_body_name),
+                                   location=None)) #location))
 
         return dependencies
 
@@ -110,7 +125,7 @@ class VhdlParser(BaseSourceFile):
         """
         design_units = []
 
-        for match in self._iterDesignUnitMatches():
+        for match, line_number in self._iterDesignUnitMatches():
             unit = None
             if match['package_name'] is not None:
                 unit = {'name' : match['package_name'],
@@ -123,6 +138,18 @@ class VhdlParser(BaseSourceFile):
                         'type' : 'context'}
 
             if unit:
+                unit['line_number'] = line_number
                 design_units.append(unit)
 
         return design_units
+
+def main():
+    import sys
+    for arg in sys.argv[1:]:
+        print(arg)
+        #  print(VhdlParser(arg).getDesignUnits())
+        for d in VhdlParser(arg).getDependencies():
+            print(d)
+
+if __name__ == '__main__':
+    main()

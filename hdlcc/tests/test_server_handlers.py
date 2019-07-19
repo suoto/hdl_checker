@@ -410,7 +410,7 @@ with such.A("hdlcc bottle app") as it:
             ["ieee.std_logic_1164",
              "ieee.numeric_std",
              "basic_library.clock_divider"],
-            dependencies)
+            [x for x in dependencies])
 
     @it.should("get source build sequence")
     def test():

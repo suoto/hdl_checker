@@ -17,6 +17,7 @@
 "HDL Code Checker project builder class"
 
 import abc
+import json
 import logging
 import os
 import os.path as p
@@ -31,7 +32,8 @@ from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import dump, getFileType, removeDuplicates, serializer
+from hdlcc.utils import (Encoder, getFileType, json_object_hook,
+                         removeDuplicates)
 
 _logger = logging.getLogger('build messages')
 
@@ -50,7 +52,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._build_sequence_cache = {}
-        self._processing_diags = set()
+        self._outstanding_diags = set()
 
         self.project_file = project_file
 
@@ -79,8 +81,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             self._logger.debug("Skipping cache save")
             return
 
-        state = {'serializer': serializer.__name__,
-                 '_logger': {'name': self._logger.name,
+        state = {'_logger': {'name': self._logger.name,
                              'level': self._logger.level},
                  'builder': self.builder.getState(),
                  '_config': self._config.getState()}
@@ -88,7 +89,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
             os.mkdir(p.dirname(cache_fname))
-        dump(state, open(cache_fname, 'w'))
+        json.dump(state, open(cache_fname, 'w'), indent=True, cls=Encoder)
 
     def _recoverCache(self, target_dir):
         """
@@ -108,16 +109,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return
 
         try:
-            cache = serializer.load(open(cache_fname, 'r'))
-            self._handleUiInfo("Recovered cache from '%s' (used '%s')" %
-                               (cache_fname, serializer.__package__))
+            cache = json.load(open(cache_fname, 'r'))
+            self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
             self._setState(cache)
             self.builder.checkEnvironment()
         except ValueError:
             self._handleUiError(
-                "Unable to recover cache from '%s' using '%s'\n"
-                "Traceback:\n%s" % (cache_fname, serializer.__package__,
-                                    traceback.format_exc()))
+                "Unable to recover cache from '{}'\n"
+                "Traceback:\n{}".format(cache_fname,
+                                        traceback.format_exc()))
 
     def _setupEnvIfNeeded(self):
         """
@@ -243,12 +243,18 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         project name space
         """
         for dependency in source.getDependencies():
-            if dependency['library'] in self.builder.getBuiltinLibraries() or \
-               dependency['unit'] == 'all' or \
-               (dependency['library'] == source.library and \
-                dependency['unit'] in [x['name'] for x in source.getDesignUnits()]):
-                continue
-            yield dependency['library'], dependency['unit']
+            try:
+                if dependency.library in self.builder.getBuiltinLibraries():
+                    continue
+                if dependency.name == 'all':
+                    continue
+                if (dependency.library == source.library and \
+                        dependency.name in [x['name'] for x in source.getDesignUnits()]):
+                    continue
+                yield dependency
+            except:
+                self._logger.warning("Dependency: %s", dependency)
+                raise
 
     @staticmethod
     def _sortBuildMessages(diagnostics):
@@ -305,41 +311,44 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Recursively finds out the dependencies of the given source file
         """
         self._logger.debug("Checking build sequence for %s", source)
-        for library, unit in self._resolveRelativeNames(source):
+        for dependency in self._resolveRelativeNames(source):
+
             # Get a list of source files that contains this design unit.
             # At this point, all the info we have pretty much depends on
             # parsed text. Since Verilog is case sensitive and VHDL is not,
             # we need to make sure we've got it right when mapping dependencies
             # on mixed language projects
             dependencies_list = self._config.discoverSourceDependencies(
-                unit, library, case_sensitive=source.filetype != 'vhdl')
+                dependency.name, dependency.library, case_sensitive=source.filetype != 'vhdl')
 
             if not dependencies_list:
                 continue
-            dependency = dependencies_list[0]
+            selected_dependency = dependencies_list[0]
+
+            self._logger.warning("Dependencies: %s", dependencies_list)
 
             # If we found more than a single file, then multiple files
             # have the same entity or package name and we failed to
             # identify the real file
             if len(dependencies_list) != 1:
-                self._processing_diags.add(
+                self._outstanding_diags.add(
                     DependencyNotUnique(filename=source.filename,
-                                        design_unit='{}.{}'.format(library, unit),
-                                        actual=dependency.filename,
+                                        design_unit='{}.{}'.format(dependency.library, dependency.name),
+                                        actual=selected_dependency.filename,
                                         choices=list(dependencies_list)))
 
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
-            if dependency == reference:
+            if selected_dependency == reference:
                 build_sequence = removeDuplicates(build_sequence)
                 return
 
-            if dependency not in build_sequence:
-                self._getBuildSequence(dependency, reference=source,
+            if selected_dependency not in build_sequence:
+                self._getBuildSequence(selected_dependency, reference=source,
                                        build_sequence=build_sequence)
 
-            if dependency not in build_sequence:
-                build_sequence.append(dependency)
+            if selected_dependency not in build_sequence:
+                build_sequence.append(selected_dependency)
 
         build_sequence = removeDuplicates(build_sequence)
 
@@ -458,7 +467,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Extra arguments are
         """
         self._setupEnvIfNeeded()
-        self._processing_diags = set()
+        self._outstanding_diags = set()
 
         records = []
 
@@ -490,7 +499,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 records += self._getBuilderMessages(source, batch_mode)
 
         self._saveCache()
-        return records + list(self._processing_diags)
+        return records + list(self._outstanding_diags)
 
     def getMessagesWithText(self, path, content):
         """

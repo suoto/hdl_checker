@@ -245,7 +245,7 @@ class DependencyNotUnique(CheckerDiagnostic):
         text = ("Returning dependency '{}' for {}, but there were {} other "
                 "matches:\n{}. The selected option may not be the correct "
                 "one".format(actual, design_unit, len(choices),
-                             ', '.join(["'%s'" % x.filename for x in choices])))
+                             ', '.join({"'%s'" % x.filename for x in choices})))
 
         super(DependencyNotUnique, self).__init__(
             checker=None, filename=filename, severity=DiagType.STYLE_WARNING,

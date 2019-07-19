@@ -68,14 +68,14 @@ class SourceMock(object):
     def _createMockFile(self):
         with open(self.filename, 'w') as fd:
             libs = hdlcc.utils.removeDuplicates(
-                [x['library'] for x in self._dependencies])
+                [x.library for x in self._dependencies])
 
             for lib in libs:
                 fd.write("library {0};\n".format(lib))
 
             for dependency in self._dependencies:
-                fd.write("use {0}.{1};\n".format(dependency['library'],
-                                                 dependency['unit']))
+                fd.write("use {0}.{1};\n".format(dependency.library,
+                                                 dependency.name))
 
             for design_unit in self._design_units:
                 fd.write("{0} is {1} end {0} {1};\n".

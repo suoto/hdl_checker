@@ -25,14 +25,14 @@ import time
 
 import mock
 import six
-
 from nose2.tools import such
 from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.diagnostics import (BuilderDiag, DiagType, LibraryShouldBeOmited,
-                               ObjectIsNeverUsed, PathNotInProjectFile)
-from hdlcc.parsers import VerilogParser, VhdlParser
+from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
+                               LibraryShouldBeOmited, ObjectIsNeverUsed,
+                               PathNotInProjectFile)
+from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
 from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
 from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
@@ -222,20 +222,21 @@ with such.A("hdlcc project") as it:
         source = mock.MagicMock()
         source.library = 'some_lib'
         source.getDependencies = mock.MagicMock(
-            return_value=[{'library' : 'some_lib',
-                           'unit' : 'some_dependency'}])
+            return_value=[DependencySpec(library='some_lib',
+                                         name='some_dependency')])
 
         project = StandaloneProjectBuilder()
         it.assertEqual(list(project._resolveRelativeNames(source)),
-                       [('some_lib', 'some_dependency')])
+                       [DependencySpec(library='some_lib',
+                                       name='some_dependency')])
 
     @it.should("eliminate the dependency of a source on itself")
     def test():
         source = mock.MagicMock()
         source.library = 'some_lib'
         source.getDependencies = mock.MagicMock(
-            return_value=[{'library' : 'some_lib',
-                           'unit' : 'some_package'}])
+            return_value=[DependencySpec(library='some_lib',
+                                         name='some_package')])
 
         source.getDesignUnits = mock.MagicMock(
             return_value=[{'type' : 'package',
@@ -250,28 +251,27 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='direct_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
 
         direct_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'direct_dependency',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'indirect_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='indirect_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
+
 
         indirect_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'indirect_dependency',
                            'type' : 'package'}],
-            dependencies=[{'unit' : 'indirect_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='indirect_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
+
 
         common_dependency = SourceMock(
             library='some_lib',
@@ -294,8 +294,9 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
+
 
         direct_dependency = SourceMock(
             library='some_lib',
@@ -322,8 +323,8 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         project = StandaloneProjectBuilder()
         project._config._sources = {}
@@ -353,15 +354,15 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         direct_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'direct_dependency',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'target',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='target')])
 
         project = StandaloneProjectBuilder()
         project._config._sources = {}
@@ -377,8 +378,8 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         implementation_a = SourceMock(
             library='some_lib',
@@ -404,9 +405,27 @@ with such.A("hdlcc project") as it:
         for source in (target_source, implementation_a, implementation_b):
             project._config._sources[str(source)] = source
 
-        project.updateBuildSequenceCache(target_source)
+        # Make sure there was no outstanding diagnostics prior to running
+        it.assertFalse(project._outstanding_diags,
+                       "Project should not have any outstanding diagnostics")
 
-        it.assertNotEqual(messages, [])
+        project.updateBuildSequenceCache(target_source)
+        _logger.info("processing diags: %s", project._outstanding_diags)
+
+        # hdlcc should flag which one it picked, although the exact one might
+        # vary
+        it.assertEqual(len(project._outstanding_diags), 1,
+                      "Should have exactly one outstanding diagnostics by now")
+        it.assertIn(
+            project._outstanding_diags.pop(),
+            [DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_a.vhd',
+                                 choices=[implementation_a, implementation_b]),
+             DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_b.vhd',
+                                 choices=[implementation_a, implementation_b])])
 
     @it.should("get builder messages by path")
     def test():
@@ -467,8 +486,7 @@ with such.A("hdlcc project") as it:
                         "systemverilog": []}},
                 "_timestamp": 1474839625.2375762,
                 "_sources": {},
-                "filename": p.join(TEMP_PATH, "/myproject.prj")},
-            "serializer": "json"}
+                "filename": p.join(TEMP_PATH, "/myproject.prj")}}
 
         cache_path = p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache')
         if p.exists(p.dirname(cache_path)):

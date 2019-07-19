@@ -240,8 +240,8 @@ def _setupPaths():
 
 def main():
     args = _parseArguments()
-    if _CI:
-        _setupLogging(sys.stdout, args.log_level)
+    #  if _CI:
+    _setupLogging(sys.stdout, args.log_level)
 
     _setupPaths()
     #  _clear()

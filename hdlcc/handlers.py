@@ -283,7 +283,8 @@ def getDependencies():
     source, _ = server.getSourceByPath(path)
     content = []
     for dependency in source.getDependencies():
-        content.append("%s.%s" % (dependency['library'], dependency['unit']))
+        content.append("%s.%s" % (str(dependency.library),
+                                  str(dependency.name)))
 
     _logger.debug("Found %d dependencies", len(content))
 

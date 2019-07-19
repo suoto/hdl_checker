@@ -20,8 +20,9 @@ import logging
 #  from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool as Pool
 
-from hdlcc.parsers.vhdl_parser import VhdlParser
+from hdlcc.parsers.dependency_spec import DependencySpec, SourceLocation
 from hdlcc.parsers.verilog_parser import VerilogParser
+from hdlcc.parsers.vhdl_parser import VhdlParser
 
 _logger = logging.getLogger(__name__)
 
@@ -64,4 +65,3 @@ def getSourceFileObjects(kwargs_list, workers=None):
     results = [x.get() for x in async_results]
 
     return results
-
