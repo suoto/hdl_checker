@@ -18,7 +18,7 @@
 if (!(Test-Path "$env:CACHE_PATH\\modelsim.exe")) {
     write-host "Downloading $env:BUILDER_NAME from $env:MSIM_URL"
     if ($env:APPVEYOR -eq "True") {
-        "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+        "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\modelsim.exe`""
         cmd /c "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\modelsim.exe`""
     } else {
         cmd /c "copy `"e:\\ModelSimSetup-15.1.0.185-windows.exe`" `"$env:CACHE_PATH\\modelsim.exe`""

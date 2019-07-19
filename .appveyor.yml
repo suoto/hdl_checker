@@ -41,10 +41,6 @@ environment:
   ARCH: 32
 
   matrix:
-    # - PYTHON_VERSION: 27
-    #   PYTHON: "C:\\Python27"
-    #   BUILDER: ghdl
-
     # - PYTHON_VERSION: 37
     #   PYTHON: "C:\\Python37"
     #   BUILDER: ghdl
@@ -55,11 +51,7 @@ environment:
 
     - PYTHON_VERSION: 37
       PYTHON: "C:\\Python37"
-      BUILDER: fallback
-
-    - PYTHON_VERSION: 37
-      PYTHON: "C:\\Python37"
-      BUILDER: standalone
+      TOXENV: py37-fallback-windows,py37-standalone-windows
 
 # scripts that run after cloning repository
 install:
@@ -68,13 +60,12 @@ install:
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
   - "%PYTHON%\\python.exe -m pip install wheel tox"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
-  # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
-  # - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
-
+  # - ps: if ($env:BUILDER "msim") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1" }
+  # - ps: if ($env:BUILDER "ghdl") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1" }
   - python --version
 
 test_script:
-  - tox -e py%PYTHON_VERSION%-%BUILDER%-windows
+  - tox
 after_test:
   # - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
   # - appveyor PushArtifact hdlcc_success.zip
