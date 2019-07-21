@@ -226,27 +226,10 @@ def runTestsForEnv(env, args):
 
     return successful
 
-def _setupPaths():
-    "Add our dependencies to sys.path"
-    # Pluggy is not standard...
-    sys.path.insert(0, p.join(BASE_PATH, 'dependencies', 'pluggy', 'src'))
-
-    for path in glob(p.join(BASE_PATH, 'dependencies', '*')):
-        assert p.exists(path), "Path '{}' doesn't exist".format(path)
-        path = p.abspath(path)
-        if path not in sys.path:
-            print("Inserting %s" % path)
-            sys.path.insert(0, path)
-        else:
-            _logger.debug("Path '%s' was already on sys.path!", path)
-
 def main():
     args = _parseArguments()
     if args.log_to_stdout:
         _setupLogging(sys.stdout, args.log_level)
-
-    _setupPaths()
-    #  _clear()
 
     _logger.info("Arguments: %s", args)
 
