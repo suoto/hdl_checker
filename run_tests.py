@@ -133,6 +133,8 @@ def _parseArguments():
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
 
+    parser.add_argument('--log-to-stdout', action='store_true')
+
     if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
 
@@ -240,7 +242,7 @@ def _setupPaths():
 
 def main():
     args = _parseArguments()
-    if _CI:
+    if args.log_to_stdout:
         _setupLogging(sys.stdout, args.log_level)
 
     _setupPaths()
