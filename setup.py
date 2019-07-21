@@ -36,7 +36,6 @@ Programming Language :: Python :: 3.5
 Programming Language :: Python :: 3.6
 Programming Language :: Python :: 3.7
 Topic :: Software Development
-Topic :: Software Development :: Text Editors
 Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)
 Topic :: Text Editors :: Integrated Development Environments (IDE)
 """

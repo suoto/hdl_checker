@@ -14,47 +14,76 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 ---
 language: python
-matrix:
+
+stages:
+- test
+- deploy 
+
+jobs:
   include:
-  - name: Python 2.7 - msim
-    python: '2.7'
-    env: TOX_PYTHON_VERSION=py27 BUILDER=msim
-  - name: Python 2.7 - ghdl
-    python: '2.7'
-    env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
-  - name: Python 2.7 - xvhdl
-    python: '2.7'
-    env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
-  - name: Python 2.7 - standalone and fallback
-    python: '2.7'
-    env: TOX_PYTHON_VERSION=py27 BUILDER=other
-  - name: Python 3.7 - msim
-    python: '3.7'
-    dist: xenial
-    env: TOX_PYTHON_VERSION=py37 BUILDER=msim
-  - name: Python 3.7 - ghdl
-    python: '3.7'
-    dist: xenial
-    env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
-  - name: Python 3.7 - xvhdl
-    python: '3.7'
-    dist: xenial
-    env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
-  - name: Python 3.7 - standalone and fallback
-    python: '3.7'
-    dist: xenial
-    env: TOX_PYTHON_VERSION=py37 BUILDER=other
-deploy:
-  provider: pypi
-  user: suoto
-  on:
-    tags: true
-    condition: $BUILDER = msim
-  skip_existing: true
-  password:
-    secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
+    # Python 2.7 land
+    - name: Python 2.7 - msim
+      python: '2.7'
+      env: BUILDER=msim
+      script: tox -e py27-msim-linux
+
+    - name: Python 2.7 - xvhdl
+      python: '2.7'
+      env: BUILDER=xvhdl
+      script: tox -e py27-xvhdl-linux
+
+    - name: Python 2.7 - standalone and fallback
+      python: '2.7'
+      env: BUILDER=other
+      script: tox -e py27-fallback-linux -e py27-standalone-linux
+
+    - name: Python 2.7 - ghdl
+      python: '2.7'
+      env: BUILDER=ghdl
+      script: tox -e py27-ghdl-linux
+
+    # Python 3.7 land
+    - name: Python 3.7 - msim
+      python: '3.7'
+      dist: xenial
+      env: BUILDER=msim
+      script: tox -e py37-msim-linux
+
+    - name: Python 3.7 - standalone and fallback
+      python: '3.7'
+      dist: xenial
+      env: BUILDER=other
+      script: tox -e py37-fallback-linux -e py37-standalone-linux
+
+    - name: Python 3.7 - ghdl
+      python: '3.7'
+      dist: xenial
+      env: BUILDER=ghdl
+      script: tox -e py37-ghdl-linux
+
+    - name: Python 3.7 - xvhdl
+      python: '3.7'
+      dist: xenial
+      env: BUILDER=xvhdl
+      script: tox -e py37-xvhdl-linux
+
+
+    - stage: deploy
+      python: 3.7
+      before_install: skip
+      before_script: skip
+      install: skip  # no tests, no depedencies needed
+      script: skip  # we're not running tests
+      deploy:
+        provider: pypi
+        user: suoto
+        on:
+          tags: true
+        password:
+          secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
 
 before_install:
+- echo "BUILDER is $BUILDER"
 - sudo apt-get update -qq;
 - sudo apt-get install -qq libtcl8.5
 - sudo dpkg --add-architecture i386
@@ -67,25 +96,13 @@ before_install:
 - export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
 
 before_script:
-  # - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
-  - pip install tox
-  - "git submodule update"
-  - "mkdir -p ~/cache"
-  - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
-  - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
-  - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
-# command to install dependencies
-# install:
-#   - pip install -r requirements.txt
-#   # A nice to have, not really needed
-#   - pip install git+https://github.com/suoto/rainbow_logging_handler
-#   - pip install -e .
-# command to run tests
-script:
-  - if [ "${BUILDER}" == "msim" ] ; then  tox -e ${TOX_PYTHON_VERSION}-msim-linux ; fi
-  - if [ "${BUILDER}" == "ghdl" ] ; then  tox -e ${TOX_PYTHON_VERSION}-ghdl-linux ; fi
-  - if [ "${BUILDER}" == "xvhdl" ] ; then tox -e ${TOX_PYTHON_VERSION}-xvhdl-linux ; fi
-  - if [ "${BUILDER}" == "other" ] ; then tox -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux ; fi
+# - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
+- pip install tox
+- "git submodule update"
+- "mkdir -p ~/cache"
+- if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
+- if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
+- if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 after_success:
 - coverage combine
 - coverage report
