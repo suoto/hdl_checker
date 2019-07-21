@@ -66,7 +66,8 @@ setuptools.setup(
                                      'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {
-        'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
+        'console_scripts' : ['hdlcc_standalone=hdlcc.standalone:main',
+                             'hdlcc=hdlcc.server:main', ]
     },
     classifiers=CLASSIFIERS.splitlines(),
 )
