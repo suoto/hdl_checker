@@ -16,26 +16,31 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "hdlcc installation script"
 
-from distutils.core import setup
+import setuptools
 import versioneer
 
+LONG_DESCRIPTION = open("README.md", "r").read()
+
 # pylint: disable=bad-whitespace
-setup(
-    name             = 'hdlcc',
-    version          = versioneer.get_version(),
-    description      = 'HDL code checker',
-    author           = 'Andre Souto',
-    author_email     = 'andre820@gmail.com',
-    url              = 'https://github.com/suoto/hdlcc',
-    license          = 'GPLv3',
-    packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers',
-                        'hdlcc.config_generators'],
-    install_requires = ['argcomplete', 'argparse', 'prettytable',
-                        'future>=0.14.0',
-                        'futures; python_version<"3.2"',
-                        'backports.functools_lru_cache; python_version<"3.2"',],
-    cmdclass         = versioneer.get_cmdclass(),
-    entry_points={
+setuptools.setup(
+    name                          = 'hdlcc',
+    version                       = versioneer.get_version(),
+    description                   = 'HDL code checker',
+    long_description              = LONG_DESCRIPTION,
+    long_description_content_type = "text/markdown",
+    author                        = 'Andre Souto',
+    author_email                  = 'andre820@gmail.com',
+    url                           = 'https://github.com/suoto/hdlcc',
+    license                       = 'GPLv3',
+    packages                      = setuptools.find_packages(),
+    install_requires              = ['argcomplete',
+                                     'argparse',
+                                     'prettytable',
+                                     'future>=0.14.0',
+                                     'futures; python_version<"3.2"',
+                                     'backports.functools_lru_cache; python_version<"3.2"',],
+    cmdclass                      = versioneer.get_cmdclass(),
+    entry_points                  = {
         'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
     }
 )
