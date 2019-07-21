@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 if (!(Test-Path "$env:CACHE_PATH\\modelsim.exe")) {
     write-host "Downloading $env:BUILDER_NAME from $env:MSIM_URL"
     if ($env:APPVEYOR -eq "True") {
-        "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\ghdl.zip`""
+        "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\modelsim.exe`""
         cmd /c "appveyor DownloadFile `"$env:MSIM_URL`" -filename `"$env:CACHE_PATH\\modelsim.exe`""
     } else {
         cmd /c "copy `"e:\\ModelSimSetup-15.1.0.185-windows.exe`" `"$env:CACHE_PATH\\modelsim.exe`""
@@ -34,6 +34,7 @@ if (!(Test-Path "$env:BUILDER_PATH")) {
     cmd /c "$env:CACHE_PATH\\modelsim.exe --mode unattended --modelsim_edition modelsim_ase --installdir $env:CI_WORK_PATH"
     write-host "Testing installation"
     cmd /c "$env:BUILDER_PATH\\vcom -version"
+    $env:PATH="$env:BUILDER_PATH;$env:PATH"
     write-host "Done here"
 }
 

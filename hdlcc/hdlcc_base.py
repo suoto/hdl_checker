@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,23 +17,26 @@
 "HDL Code Checker project builder class"
 
 import abc
+import logging
 import os
 import os.path as p
 import shutil
-import logging
 import traceback
 from multiprocessing.pool import ThreadPool
 
-import hdlcc.exceptions
 import hdlcc.builders
-from hdlcc.utils import (getFileType, removeDuplicates, serializer, dump)
-from hdlcc.parsers import VerilogParser, VhdlParser
+import hdlcc.exceptions
 from hdlcc.config_parser import ConfigParser
+from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
+                               PathNotInProjectFile)
+from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.static_check import getStaticMessages
+from hdlcc.utils import dump, getFileType, removeDuplicates, serializer
 
 _logger = logging.getLogger('build messages')
 
-class HdlCodeCheckerBase(object):
+
+class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
     """
     HDL Code Checker project builder class
     """
@@ -47,6 +50,7 @@ class HdlCodeCheckerBase(object):
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
         self._build_sequence_cache = {}
+        self._outstanding_diags = set()
 
         self.project_file = project_file
 
@@ -63,8 +67,7 @@ class HdlCodeCheckerBase(object):
         if target_dir is None:
             if self._config is None or self._config.getBuilder() == 'fallback':
                 return None
-            else:
-                target_dir = self._config.getTargetDir()
+            target_dir = self._config.getTargetDir()
         return p.join(target_dir, '.hdlcc.cache')
 
     def _saveCache(self):
@@ -76,11 +79,11 @@ class HdlCodeCheckerBase(object):
             self._logger.debug("Skipping cache save")
             return
 
-        state = {'serializer' : serializer.__name__,
-                 '_logger': {'name' : self._logger.name,
-                             'level' : self._logger.level},
-                 'builder' : self.builder.getState(),
-                 '_config' : self._config.getState()}
+        state = {'serializer': serializer.__name__,
+                 '_logger': {'name': self._logger.name,
+                             'level': self._logger.level},
+                 'builder': self.builder.getState(),
+                 '_config': self._config.getState()}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
@@ -96,13 +99,12 @@ class HdlCodeCheckerBase(object):
         cache_fname = self._getCacheFilename(target_dir)
         #  if self.project_file is None or cache_fname is None:
         if cache_fname is None:
-            self._logger.warning("Can't recover cache from None")
+            self._logger.warning("Cache file name is none, aborting recovery")
             return
 
-        _logger.debug("Trying to recover from '%s'", cache_fname)
-        cache = None
+        self._logger.debug("Trying to recover from '%s'", cache_fname)
         if not p.exists(cache_fname):  # pragma: no cover
-            _logger.debug("File not found")
+            self._logger.debug("File not found")
             return
 
         try:
@@ -114,9 +116,8 @@ class HdlCodeCheckerBase(object):
         except ValueError:
             self._handleUiError(
                 "Unable to recover cache from '%s' using '%s'\n"
-                "Traceback:\n%s" % \
-                    (cache_fname, serializer.__package__,
-                     traceback.format_exc()))
+                "Traceback:\n%s" % (cache_fname, serializer.__package__,
+                                    traceback.format_exc()))
 
     def _setupEnvIfNeeded(self):
         """
@@ -146,25 +147,27 @@ class HdlCodeCheckerBase(object):
 
                 self._logger.info("Selected builder is '%s'",
                                   self.builder.builder_name)
-            assert self.builder is not None
-
         except hdlcc.exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+
+        assert self.builder is not None
 
     def clean(self):
         """
         Clean up generated files
         """
+        self._logger.debug("Cleaning up project")
         cache_fname = self._getCacheFilename()
         if cache_fname is not None and p.exists(cache_fname):
-            _logger.debug("Removing cached info in '%s'", cache_fname)
+            self._logger.debug("Removing cached info in '%s'", cache_fname)
             os.remove(cache_fname)
 
-        target_dir = self._config.getTargetDir()
-        if p.exists(target_dir):
-            _logger.debug("Removing target dir '%s'", target_dir)
-            shutil.rmtree(target_dir)
+        if self._config:
+            target_dir = self._config.getTargetDir()
+            if p.exists(target_dir):
+                self._logger.debug("Removing target dir '%s'", target_dir)
+                shutil.rmtree(target_dir)
 
         del self._config
         del self.builder
@@ -225,15 +228,8 @@ class HdlCodeCheckerBase(object):
         # at least have some info on the source
         if source is None:
             if self.builder.builder_name != 'fallback':
-                remarks += [{
-                    'checker'        : 'hdlcc',
-                    'line_number'    : '',
-                    'column'         : '',
-                    'filename'       : '',
-                    'error_number'   : '',
-                    'error_type'     : 'W',
-                    'error_message'  : 'Path "%s" not found in project file' %
-                                       p.abspath(path)}]
+                remarks += [PathNotInProjectFile(p.abspath(path)), ]
+
             self._logger.info("Path %s not found in the project file",
                               p.abspath(path))
             cls = VhdlParser if getFileType(path) == 'vhdl' else VerilogParser
@@ -255,12 +251,12 @@ class HdlCodeCheckerBase(object):
             yield dependency['library'], dependency['unit']
 
     @staticmethod
-    def _sortBuildMessages(records):
+    def _sortBuildMessages(diagnostics):
         """
         Sorts a given set of build records
         """
-        return sorted(records, key=lambda x: \
-                (x['error_type'], str(x['line_number']), str(x['error_number'])))
+        return sorted(diagnostics, key=lambda x: \
+                (x.severity, x.line_number or 0, x.error_code or ''))
 
     def updateBuildSequenceCache(self, source):
         """
@@ -282,13 +278,14 @@ class HdlCodeCheckerBase(object):
                 timestamp = 0
             self._build_sequence_cache[key] = {
                 'sequence': build_sequence,
-                'timestamp' : timestamp}
+                'timestamp': timestamp}
         else:
             cached_sequence = self._build_sequence_cache[key]['sequence']
             cached_timestamp = self._build_sequence_cache[key]['timestamp']
             if cached_sequence:
-                current_timestamp = max([x.getmtime() for x in cached_sequence]
-                                        + [source.getmtime()])
+                current_timestamp = max(
+                    max({x.getmtime() for x in cached_sequence if x}),
+                    source.getmtime() or 0)
             else:
                 current_timestamp = 0
 
@@ -299,7 +296,7 @@ class HdlCodeCheckerBase(object):
                 self._getBuildSequence(source, build_sequence)
                 self._build_sequence_cache[key] = {
                     'sequence': build_sequence,
-                    'timestamp' : current_timestamp}
+                    'timestamp': current_timestamp}
 
         return self._build_sequence_cache[key]['sequence']
 
@@ -325,13 +322,11 @@ class HdlCodeCheckerBase(object):
             # have the same entity or package name and we failed to
             # identify the real file
             if len(dependencies_list) != 1:
-                self._handleUiWarning(
-                    "Returning dependency '%s' for %s.%s in file '%s', but "
-                    "there were %d other matches: %s. The selected option may "
-                    "be sub-optimal" % (
-                        dependency.filename, library, unit, source.filename,
-                        len(dependencies_list),
-                        ', '.join([x.filename for x in dependencies_list])))
+                self._outstanding_diags.add(
+                    DependencyNotUnique(filename=source.filename,
+                                        design_unit='{}.{}'.format(library, unit),
+                                        actual=dependency.filename,
+                                        choices=list(dependencies_list)))
 
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
@@ -366,16 +361,24 @@ class HdlCodeCheckerBase(object):
         self._logger.debug("Compilation build_sequence is:\n%s",
                            "\n".join([x.filename for x in build_sequence]))
 
+        records = set()
         for _source in build_sequence:
             _flags = self._config.getBuildFlags(_source.filename,
                                                 batch_mode=False)
 
-            _ = self._buildAndHandleRebuilds(_source, forced=False,
-                                             flags=_flags)
+            dep_records = self._buildAndHandleRebuilds(_source, forced=False,
+                                                       flags=_flags)
 
-        source_records = self._buildAndHandleRebuilds(source, forced=True,
-                                                      flags=flags)
-        return self._sortBuildMessages(source_records)
+            for record in dep_records:
+                if record.filename is None:
+                    continue
+                if record.severity in (DiagType.ERROR, ):
+                    records.add(record)
+
+        records.update(self._buildAndHandleRebuilds(source, forced=True,
+                                                    flags=flags))
+
+        return self._sortBuildMessages(records)
 
     def _buildAndHandleRebuilds(self, source, *args, **kwargs):
         """
@@ -455,9 +458,11 @@ class HdlCodeCheckerBase(object):
         Extra arguments are
         """
         self._setupEnvIfNeeded()
+        self._outstanding_diags = set()
+
+        records = []
 
         if self._USE_THREADS:
-            records = []
             pool = ThreadPool()
 
             static_check = pool.apply_async(
@@ -468,17 +473,24 @@ class HdlCodeCheckerBase(object):
                                                  args=[source, batch_mode])
                 records += builder_check.get()
 
-            records += static_check.get()
+            # Static messages don't take the path, only the text, so we need to
+            # set add that to the diagnostic
+            for record in static_check.get():
+                record.filename = source.filename
+                records += [record]
 
             pool.terminate()
             pool.join()
         else:
-            records = getStaticMessages(source.getRawSourceContent().split('\n'))
+            for record in getStaticMessages(source.getRawSourceContent().split('\n')):
+                record.filename = source.filename
+                records += [record]
+
             if self._isBuilderCallable():
                 records += self._getBuilderMessages(source, batch_mode)
 
         self._saveCache()
-        return records
+        return records + list(self._outstanding_diags)
 
     def getMessagesWithText(self, path, content):
         """
@@ -497,8 +509,7 @@ class HdlCodeCheckerBase(object):
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
         for message in messages:
-            if message['filename'] is None:
-                message['filename'] = path
+            message.filename = p.abspath(path)
 
         return messages + remarks
 
@@ -523,4 +534,3 @@ class HdlCodeCheckerBase(object):
         """
         Runs actions when leaving a buffer.
         """
-        pass

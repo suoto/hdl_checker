@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,21 +17,25 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import re
 import logging
-from nose2.tools import such
-from nose2.tools.params import params
+import re
 
 import six
 
+from nose2.tools import such
+from nose2.tools.params import params
+
 import hdlcc.static_check as static_check
+from hdlcc.diagnostics import DiagType, StaticCheckerDiag, LibraryShouldBeOmited
 
 _logger = logging.getLogger(__name__)
 
 with such.A("hdlcc project") as it:
     # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        def _assertCountEqual(actual, expected, msg=None):
+            return it.assertEqual(sorted(actual), sorted(expected), msg)
+        it.assertCountEqual = _assertCountEqual
 
     @it.has_setup
     def setup():
@@ -110,16 +114,12 @@ with such.A("hdlcc project") as it:
             '-- clk_out_b <= not clk_in_b;',
             'end architecture foo;']
 
-        it.assertItemsEqual(
-            [{'error_subtype': '',
-              'line_number': 7,
-              'checker': 'HDL Code Checker/static',
-              'error_message': expected,
-              'column': 5,
-
-              'error_type': 'W',
-              'error_number': '0',
-              'filename': None}],
+        it.assertCountEqual(
+            [StaticCheckerDiag(
+                line_number=7,
+                column=5,
+                severity=DiagType.STYLE_INFO,
+                text=expected)],
             static_check._getCommentTags(text))
 
     @it.should("get misc checks")
@@ -138,7 +138,7 @@ with such.A("hdlcc project") as it:
 
         objects = static_check._getObjectsFromText(text)
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             [],
             static_check._getMiscChecks(objects))
 
@@ -192,21 +192,17 @@ with such.A("hdlcc project") as it:
         def test():
             objects = static_check._getObjectsFromText(it.text)
 
-            it.assertItemsEqual(
-                [{'checker': 'HDL Code Checker/static',
-                  'column': 9,
-                  'error_message': "Declaration of library 'work' can be omitted",
-                  'error_number': '0',
-                  'error_subtype': 'Style',
-                  'error_type': 'W',
-                  'filename': None,
-                  'line_number': 4}],
+            it.assertCountEqual(
+                [LibraryShouldBeOmited(
+                    line_number=4,
+                    column=9,
+                    library='work')],
                 static_check._getMiscChecks(objects))
 
         @it.should("get unused VHDL objects")
         def test():
             objects = static_check._getObjectsFromText(it.text)
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 ['basic_library', 'DIVIDER_A', 'DIVIDER_B', 'clk_in_b',
                  'clk_out_b'],
                 static_check._getUnusedObjects(it.text, objects))
@@ -232,13 +228,8 @@ with such.A("hdlcc project") as it:
         @it.should("get unused VHDL objects")
         def test():
             objects = static_check._getObjectsFromText(it.text)
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 ['ieee', ],
                 static_check._getUnusedObjects(it.text, objects))
 
-
-
-
 it.createTests(globals())
-
-

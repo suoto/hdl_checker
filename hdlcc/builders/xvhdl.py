@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2015-2019 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,11 @@
 import os
 import os.path as p
 import re
+
+from hdlcc.diagnostics import BuilderDiag, DiagType
+
 from .base_builder import BaseBuilder
+
 
 class XVHDL(BaseBuilder):
     '''Builder implementation of the xvhdl compiler'''
@@ -27,12 +31,12 @@ class XVHDL(BaseBuilder):
     # Implementation of abstract class properties
     builder_name = 'xvhdl'
     # TODO: Add xvlog support
-    file_types = ('vhdl', )
+    file_types = {'vhdl'}
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
-        r"^(?P<error_type>[EW])\w+:\s*"
-        r"\[(?P<error_number>[^\]]+)\]\s*"
+        r"^(?P<severity>[EW])\w+:\s*"
+        r"\[(?P<error_code>[^\]]+)\]\s*"
         r"(?P<error_message>[^\[]+)\s*"
         r"("
         r"\[(?P<filename>[^:]+):"
@@ -61,51 +65,44 @@ class XVHDL(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(XVHDL, self).__init__(target_folder)
-        self._xvhdlini = '.xvhdl.init'
-        self._builtin_libraries = ('ieee', 'std', 'unisim', 'xilinxcorelib',
+        self._xvhdlini = p.join(self._target_folder, '.xvhdl.init')
+        self._builtin_libraries = {'ieee', 'std', 'unisim', 'xilinxcorelib',
                                    'synplify', 'synopsis', 'maxii',
-                                   'family_support')
+                                   'family_support'}
 
-    def _makeRecords(self, message):
-        line_number = None
-        column = None
-        filename = None
-        error_number = None
-        error_type = None
-        error_message = None
+    def _makeRecords(self, line):
+        scan = self._stdout_message_scanner.scanner(line)
 
-        scan = self._stdout_message_scanner.scanner(message)
+        match = scan.match()
+        if not match:
+            return
 
-        while True:
-            match = scan.match()
-            if not match:
-                break
+        info = match.groupdict()
 
-            _dict = match.groupdict()
+        diag = BuilderDiag(
+            builder_name=self.builder_name,
+            text=info['error_message'].strip(),
+            line_number=info['line_number'],
+            filename=info['filename'],
+            error_code=info['error_code'])
 
-            line_number = _dict['line_number']
-            filename = _dict['filename']
-            error_number = _dict['error_number']
-            error_type = _dict['error_type']
-            error_message = _dict['error_message'].strip()
+        if info.get('severity', None) in ('W', 'e'):
+            diag.severity = DiagType.WARNING
+        elif info.get('severity', None) in ('E', 'e'):
+            diag.severity = DiagType.ERROR
 
-        return [{
-            'checker'        : self.builder_name,
-            'line_number'    : line_number,
-            'column'         : column,
-            'filename'       : filename,
-            'error_number'   : error_number,
-            'error_type'     : error_type,
-            'error_message'  : error_message,
-        }]
+        yield diag
+
+    def _parseBuiltinLibraries(self):
+        "(Not used by XVHDL)"
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
         self._version = \
                 re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
-        self._logger.info("xvhdl version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        self._logger.info("xvhdl version string: '%s'. "
+                          "Version number is '%s'",
+                          stdout[:-1], self._version)
 
     @staticmethod
     def isAvailable():
@@ -125,12 +122,12 @@ class XVHDL(BaseBuilder):
 
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
-            self._added_libraries = []
+            self._added_libraries = set()
 
         if library in self._added_libraries:
             return
 
-        self._added_libraries.append(library)
+        self._added_libraries.add(library)
 
         with open(self._xvhdlini, mode='w') as fd:
             content = '\n'.join(

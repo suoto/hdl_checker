@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,27 +20,33 @@ import os
 import os.path as p
 import re
 from shutil import copyfile
+
+from hdlcc.diagnostics import DiagType, BuilderDiag
+from hdlcc.utils import getFileType
+
 from .base_builder import BaseBuilder
-from hdlcc.utils import getFileType, pushd
+
 
 class MSim(BaseBuilder):
     '''Builder implementation of the ModelSim compiler'''
 
     # Implementation of abstract class properties
     builder_name = 'msim'
-    file_types = ('vhdl', 'verilog', 'systemverilog')
+    file_types = {'vhdl', 'verilog', 'systemverilog'}
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
-        r"^\*\*\s*(?P<error_type>[WE])\w+\s*" \
-            r"(:\s*|\(suppressible\):\s*)"
-        r"(" \
-            r"(?P<filename>.*(?=\(\d+\)))"
-            r"\((?P<line_number>\d+)\):\s*"
-        r"|" \
-            r"\(vcom-\d+\)\s*"
-        r")"
-        r"(?P<error_message>.*)\s*").finditer
+        r"""^\*\*\s*
+                (?P<severity>[WE])\w+\s*
+                (:?\(suppressible\))?:\s*
+                (:?
+                    (:?\s*\[\d+\])?\s*
+                    (?P<filename>.*(?=\(\d+\)))
+                    \((?P<line_number>\d+)\):
+                |
+                    \(vcom-\d+\)
+                )?
+            \s*(?P<error_message>.*)\s*""", flags=re.VERBOSE).finditer
 
     _should_ignore = re.compile('|'.join([
         r"^\s*$",
@@ -99,37 +105,49 @@ class MSim(BaseBuilder):
         self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
 
     def _makeRecords(self, line):
-        records = []
-
         for match in self._stdout_message_scanner(line):
-            info = {
-                'checker'        : self.builder_name,
-                'line_number'    : None,
-                'column'         : None,
-                'filename'       : None,
-                'error_number'   : None,
-                'error_type'     : None,
-                'error_message'  : None}
-            for key, content in match.groupdict().items():
-                info[key] = content
+            info = match.groupdict()
+
+            self._logger.info("Parsed dict: %s", repr(info))
+
+            text = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
+                          info['error_message']).strip()
+
+            diag = BuilderDiag(builder_name=self.builder_name, text=text)
+
+            error_code = None
 
             if ('vcom-' in line) or ('vlog' in line):
-                info['error_number'] = re.findall(r"(?<=vcom-|vlog-)\d+", line)[0]
+                error_code = re.findall(r"((?:vcom-|vlog-)\d+)", line)[0]
 
-            info['error_message'] = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
-                                           info['error_message']).strip()
-            records += [info]
+            diag.error_code = error_code
 
-        return records
+            filename = info.get('filename')
+            line_number = info.get('line_number')
+            column = info.get('column')
+
+            if filename is not None:
+                diag.filename = filename
+            if line_number is not None:
+                diag.line_number = line_number
+            if column is not None:
+                diag.column = column
+
+            if info.get('severity', None) in ('W', 'e'):
+                diag.severity = DiagType.WARNING
+            elif info.get('severity', None) in ('E', 'e'):
+                diag.severity = DiagType.ERROR
+
+            yield diag
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['vcom', '-version'])
         self._version = \
                 re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                 stdout[0])[0]
-        self._logger.debug("vcom version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout, self._version)
+        self._logger.debug("vcom version string: '%s'. "
+                           "Version number is '%s'",
+                           stdout, self._version)
 
     @staticmethod
     def isAvailable():
@@ -142,7 +160,7 @@ class MSim(BaseBuilder):
             self._createIniFile()
         for line in self._subprocessRunner(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
-                self._builtin_libraries.append(match.groupdict()['library_name'])
+                self._builtin_libraries.add(match.groupdict()['library_name'])
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -168,18 +186,19 @@ class MSim(BaseBuilder):
         filetype = getFileType(path)
         if filetype == 'vhdl':
             return self._buildVhdl(path, library, flags)
-        elif filetype in ('verilog', 'systemverilog'):
+        if filetype in ('verilog', 'systemverilog'):  # pragma: no cover
             return self._buildVerilog(path, library, flags)
-        else:  # pragma: no cover
-            self._logger.error("Unknown file type %s for path '%s'",
-                               filetype, path)
+
+        self._logger.error(  # pragma: no cover
+            "Unknown file type %s for path '%s'", filetype, path)
+        return None  # pragma: no cover
 
     def _getExtraFlags(self, lang):
         """
         Gets extra flags configured for the specific language
         """
         libs = []
-        for library in self._added_libraries + self._external_libraries[lang]:
+        for library in list(self._added_libraries) + self._external_libraries[lang]:
             libs = ['-L', library]
         for path in self._include_paths[lang]:
             libs += ['+incdir+' + str(path)]
@@ -216,7 +235,7 @@ class MSim(BaseBuilder):
 
         if not self._iniFileExists() and library in self._added_libraries:
             return
-        self._added_libraries.append(library)
+        self._added_libraries.add(library)
         try:
             if p.exists(p.join(self._target_folder, library)):
                 return
@@ -255,15 +274,13 @@ class MSim(BaseBuilder):
             # variable
             copyfile(modelsim_env, _modelsim_ini)
         else:
-            with pushd(self._target_folder):
-                self._subprocessRunner(['vmap', '-c'])
-                self._logger.debug("After vmap at '%s'", p.abspath(os.curdir))
+            self._subprocessRunner(['vmap', '-c'], cwd=self._target_folder)
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
         if not p.exists(p.join(self._target_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
-            return
+            return None
         return self._subprocessRunner(
             ['vdel', '-modelsimini', self._modelsim_ini, '-lib', library,
              '-all'])
@@ -277,5 +294,3 @@ class MSim(BaseBuilder):
 
         self._subprocessRunner(['vmap', '-modelsimini', self._modelsim_ini,
                                 library, p.join(self._target_folder, library)])
-
-

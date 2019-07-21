@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ import signal
 import subprocess as subp
 import sys
 import time
-from contextlib import contextmanager
 from threading import Lock
+from glob import glob
 
 # Make the serializer transparent
 try:
@@ -37,33 +37,33 @@ try:
         return serializer.dump(indent=True, *args, **kwargs)
 except ImportError:  # pragma: no cover
     try:
-        import cPickle as serializer
+        import cPickle as serializer  # type: ignore
     except ImportError:
-        import pickle as serializer
+        import pickle as serializer   # type: ignore
 
-    dump = serializer.dump  # pylint: disable=invalid-name
+    dump = serializer.dump  # type: ignore # pylint: disable=invalid-name
 
 PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
 
-def setupLogging(stream, level, force_tty=True): # pragma: no cover
+def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
 
     # Copied from six source
     if sys.version_info[0] == 3:
-        string_types = str,
+        string_types = (str,)
     else:
-        string_types = basestring,
+        string_types = (basestring,) # pylint: disable=undefined-variable
 
     if isinstance(stream, string_types):
-        class Stream(object):
+        class Stream(object):  # pylint: disable=useless-object-inheritance
             """
             File subclass that allows RainbowLoggingHandler to write
             with colors
             """
             _lock = Lock()
-            _force_tty = force_tty
+            _color = color
 
             def __init__(self, *args, **kwargs):
                 self._fd = open(*args, **kwargs)
@@ -72,7 +72,7 @@ def setupLogging(stream, level, force_tty=True): # pragma: no cover
                 """
                 Tells if this stream accepts control chars
                 """
-                return self._force_tty
+                return self._color
 
             def write(self, text):
                 """
@@ -85,14 +85,36 @@ def setupLogging(stream, level, force_tty=True): # pragma: no cover
     else:
         _stream = stream
 
-    handler = logging.StreamHandler(_stream)
-    handler.formatter = logging.Formatter(
-        '%(levelname)-7s | %(asctime)s | ' +
-        '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
-        '|\t%(message)s', datefmt='%H:%M:%S')
+    try:
+        # This is mostly for debugging when doing stuff directly from a
+        # terminal
+        from rainbow_logging_handler import RainbowLoggingHandler # type: ignore
+        handler = RainbowLoggingHandler(
+            _stream,
+            #  Customizing each column's color
+            # pylint: disable=bad-whitespace
+            color_asctime          = ('dim white',  'black'),
+            color_name             = ('dim white',  'black'),
+            color_funcName         = ('green',      'black'),
+            color_lineno           = ('dim white',  'black'),
+            color_pathname         = ('black',      'red'),
+            color_module           = ('yellow',     None),
+            color_message_debug    = ('color_59',   None),
+            color_message_info     = (None,         None),
+            color_message_warning  = ('color_226',  None),
+            color_message_error    = ('red',        None),
+            color_message_critical = ('bold white', 'red'))
+            # pylint: enable=bad-whitespace
+    except ImportError: # pragma: no cover
+        handler = logging.StreamHandler(_stream)
+        handler.formatter = logging.Formatter(
+            '%(levelname)-7s | %(asctime)s | ' +
+            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+            '|\t%(message)s', datefmt='%H:%M:%S')
 
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('pynvim').setLevel(logging.WARNING)
+    logging.getLogger('pyls_jsonrpc.endpoint').setLevel(logging.INFO)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
 
@@ -113,8 +135,7 @@ def isProcessRunning(pid):
     "Checks if a process is running given its PID"
     if onWindows():
         return _isProcessRunningOnWindows(pid)
-    else:
-        return _isProcessRunningOnPosix(pid)
+    return _isProcessRunningOnPosix(pid)
 
 def _isProcessRunningOnPosix(pid):
     "Checks if a given PID is runnning under POSIX OSs"
@@ -206,7 +227,7 @@ class UnknownTypeExtension(Exception):
         self._path = path
 
     def __str__(self):
-        return "Couldn't determine file type for path %s" % self._path
+        return "Couldn't determine file type for path '%s'" % self._path
 
 def getFileType(filename):
     "Gets the file type of a source file"
@@ -248,6 +269,12 @@ def cleanProjectCache(project_file): # pragma: no cover
         if p.exists(cache_folder):
             shutil.rmtree(cache_folder)
 
+def deleteFileOrDir(path):
+    if p.isdir(path):
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
 def handlePathPlease(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
@@ -279,7 +306,7 @@ def toBytes(value):  # pragma: no cover
     # But they don't behave the same in one important aspect: iterating over a
     # bytes instance yields ints, while iterating over a (raw, py2) str yields
     # chars. We want consistent behavior so we force the use of bytes().
-    if type(value) == bytes:
+    if isinstance(value, bytes):
         return value
 
     # This is meant to catch Python 2's native str type.
@@ -298,24 +325,43 @@ def toBytes(value):  # pragma: no cover
         # type from python-future.
         if PY2:
             return bytes(value.encode('utf8'), encoding='utf8')
-        else:
-            return bytes(value, encoding='utf8')
+        return bytes(value, encoding='utf8')
 
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
 
-@contextmanager
-def pushd(new_dir):
+def setupPaths():
+    "Add our dependencies to sys.path"
+    # Pluggy is not standard...
+    base_path = p.abspath(p.join(p.dirname(__file__), '..'))
+    _logger.info("Base path: %s", base_path)
+    sys.path.insert(0, p.join(base_path, 'dependencies', 'pluggy', 'src'))
+
+    dependencies = list(glob(p.join(base_path, 'dependencies', '*')))
+
+    if not dependencies:  # pragma: no cover
+        _logger.error("Found nothing inside %s",
+                      p.join(base_path, 'dependencies', '*'))
+
+    for path in dependencies:
+        if not p.exists(path):
+            _logger.error("Path '%s' doesn't exist", path)
+        path = p.abspath(path)
+        if path not in sys.path:
+            _logger.debug("Inserting %s", path)
+            sys.path.insert(0, path)
+        else:  # pragma: no cover
+            _logger.debug("Path '%s' was already on sys.path!", path)
+
+def patchPyls():
     """
-    Python context to move in and out of directories
-    (source: https://gist.github.com/howardhamilton/537e13179489d6896dd3)
+    We're using part of python-language-server, we don't really need all of its
+    dependencies nor want the user to install unrelated packages, so we'll mock
+    them.
     """
-    previous_dir = os.getcwd()
-    os.chdir(new_dir)
-    try:
-        yield
-    finally:
-        os.chdir(previous_dir)
+    import mock
+    sys.modules['importlib_metadata'] = mock.MagicMock()
+    sys.modules['jedi'] = mock.MagicMock()
 
 def isFileReadable(path):
     """

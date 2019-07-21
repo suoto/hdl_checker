@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,32 +31,22 @@ get-content git.log
 
 if ($env:APPVEYOR -eq "True") {
     appveyor DownloadFile https://bootstrap.pypa.io/get-pip.py
-    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
-    python get-pip.py
+    if (!$?) {write-error "Error while downloading get-pip.py, exiting"; exit -1}
+    "$env:PYTHON\\python.exe get-pip.py"
 }
 
-pip install -r requirements.txt
-pip install git+https://github.com/suoto/rainbow_logging_handler
-if (!$?) {write-error "Something went wrong, exiting"; exit -1}
-
-# if (!(Test-Path $env:CACHE_PATH)) {
-#     new-item "$env:CACHE_PATH" -type directory -force
-# }
 
 if ("$env:BUILDER" -eq "msim") {
     echo "Installing MSIM"
     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1"
-    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
+    if (!$?) {write-error "Error while installing ModelSim"; exit -1}
 } elseif ("$env:BUILDER" -eq "ghdl") {
     echo "Installing GHDL"
     . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1"
-    if (!$?) {write-error "Something went wrong, exiting"; exit -1}
+    if (!$?) {write-error "Error while installing GHDL"; exit -1}
 } else {
     echo "No builder selected"
 }
-
-pip install -U -e $env:APPVEYOR_BUILD_FOLDER
-if (!$?) {write-error "Something went wrong, exiting"; exit -1}
 
 write-host "Arch is $env:ARCH, Python selected is $env:python_path"
 

@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,22 +27,22 @@ from nose2.tools import such
 _logger = logging.getLogger(__name__)
 
 _HEADER = re.compile(
-    r"(--|#) This file is part of HDL Code Checker\.\n"
-    r"(--|#)\n"
-    r"(--|#) Copyright \(c\) (?P<copyright_years>[^\s]+) Andre Souto\n"
-    r"(--|#)\n"
-    r"(--|#) HDL Code Checker is free software: you can redistribute it and/or modify\n"
-    r"(--|#) it under the terms of the GNU General Public License as published by\n"
-    r"(--|#) the Free Software Foundation, either version 3 of the License, or\n"
-    r"(--|#) \(at your option\) any later version\.\n"
-    r"(--|#)\n"
-    r"(--|#) HDL Code Checker is distributed in the hope that it will be useful,\n"
-    r"(--|#) but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
-    r"(--|#) MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\.  See the\n"
-    r"(--|#) GNU General Public License for more details\.\n"
-    r"(--|#)\n"
-    r"(--|#) You should have received a copy of the GNU General Public License\n"
-    r"(--|#) along with HDL Code Checker\.  If not, see <http://www\.gnu\.org/licenses/>\.\n")
+    r"(?:--|#) This file is part of HDL Code Checker\.\n"
+    r"(?:--|#)\n"
+    r"(?:--|#) Copyright \(c\) 2015 - 2019 suoto \(Andre Souto\)\n"
+    r"(?:--|#)\n"
+    r"(?:--|#) HDL Code Checker is free software: you can redistribute it and/or modify\n"
+    r"(?:--|#) it under the terms of the GNU General Public License as published by\n"
+    r"(?:--|#) the Free Software Foundation, either version 3 of the License, or\n"
+    r"(?:--|#) \(at your option\) any later version\.\n"
+    r"(?:--|#)\n"
+    r"(?:--|#) HDL Code Checker is distributed in the hope that it will be useful,\n"
+    r"(?:--|#) but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+    r"(?:--|#) MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\.  See the\n"
+    r"(?:--|#) GNU General Public License for more details\.\n"
+    r"(?:--|#)\n"
+    r"(?:--|#) You should have received a copy of the GNU General Public License\n"
+    r"(?:--|#) along with HDL Code Checker\.  If not, see <http://www\.gnu\.org/licenses/>\.\n")
 
 with such.A("hdlcc sources") as it:
     @it.should("contain the correct file header")
@@ -58,6 +58,10 @@ with such.A("hdlcc sources") as it:
                 return False
             # Exclude versioneer files
             if p.basename(path) in ('_version.py', 'versioneer.py'):
+                return False
+            # Exclude files copied almost as is from
+            # https://github.com/palantir/python-language-server/
+            if p.basename(path) in ('defines.py', 'uris.py'):
                 return False
             return path.split('.')[-1] in ('py', 'sh', 'ps1')
 
@@ -89,5 +93,3 @@ with such.A("hdlcc sources") as it:
         return match is not None
 
 it.createTests(globals())
-
-

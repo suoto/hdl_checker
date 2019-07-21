@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2015-2019 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,13 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=function-redefined
+# pylint: disable=missing-docstring
+# pylint: disable=protected-access
+# pylint: disable=invalid-name
 
 import json
 import logging
 import os
 import os.path as p
 import shutil
+from glob import glob
 
 import six
 from nose2.tools import such
@@ -29,7 +33,8 @@ from webtest import TestApp
 
 import hdlcc
 import hdlcc.handlers as handlers
-import hdlcc.utils as utils
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
+from hdlcc.tests.mocks import disableVunit
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -37,9 +42,10 @@ except ImportError:  # Python 2.x
     import mock
 
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-HDLCC_SERVER_LOG_LEVEL = os.environ.get('HDLCC_SERVER_LOG_LEVEL', 'INFO')
+SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
@@ -86,7 +92,7 @@ with such.A("hdlcc bottle app") as it:
             it.patch.stop()
 
     @it.should("get diagnose info without any project")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         reply = it.app.post_json('/get_diagnose_info')
         it.assertItemsEqual(
@@ -95,7 +101,7 @@ with such.A("hdlcc bottle app") as it:
              u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info with an existing project file")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         reply = it.app.post(
             '/get_diagnose_info',
@@ -116,7 +122,7 @@ with such.A("hdlcc bottle app") as it:
                  u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info while still not found out the builder name")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         def _getServerByProjectFile(_):
             server = mock.MagicMock()
@@ -140,7 +146,7 @@ with such.A("hdlcc bottle app") as it:
                      u'Server PID: %d' % os.getpid()])
 
     @it.should("get diagnose info with a non existing project file")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         reply = it.app.post(
             '/get_diagnose_info',
@@ -153,7 +159,7 @@ with such.A("hdlcc bottle app") as it:
              u'Server PID: %d' % os.getpid()])
 
     @it.should("rebuild the project with directory cleanup")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         if not it.BUILDER_NAME:
             _logger.info("Test requires a builder")
@@ -178,17 +184,18 @@ with such.A("hdlcc bottle app") as it:
 
             return reply.json['messages'] + ui_reply.json['ui_messages']
 
-        def step_02_erase_target_folder():
+        def step_02_erase_target_folder_contents():
             target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
             it.assertTrue(
                 p.exists(target_folder),
                 "Target folder '%s' doesn't exists" % target_folder)
-            shutil.rmtree(target_folder)
-            it.assertFalse(
-                p.exists(target_folder),
-                "Target folder '%s' still exists!" % target_folder)
+            for path in glob(p.join(target_folder, '*')):
+                hdlcc.utils.deleteFileOrDir(path)
 
-        def step_03_check_build_fails(ref_msgs):
+            it.assertEqual([], glob(p.join(target_folder, '*')),
+                           "Target folder '%s' still exists!" % target_folder)
+
+        def step_03_check_build_fails():
             step_03_msgs = step_01_check_file_builds_ok()
             if step_03_msgs:
                 _logger.info("Step 03 messages:")
@@ -204,8 +211,8 @@ with such.A("hdlcc bottle app") as it:
             it.app.post('/rebuild_project', data)
             data = {
                 'project_file' : it.PROJECT_FILE,
-                'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
+                'path'         : p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                                        'clock_divider.vhd')}
 
         def step_05_check_messages_are_the_same(msgs):
             step_05_msgs = step_01_check_file_builds_ok()
@@ -228,14 +235,14 @@ with such.A("hdlcc bottle app") as it:
         for msg in step_01_msgs:
             _logger.info(msg)
             it.assertNotEquals(
-                msg.get('error_type', None), 'E',
+                msg.get('severity', None), 'E',
                 "No errors should be found at this point")
 
         _logger.info("Step 02")
-        step_02_erase_target_folder()
+        step_02_erase_target_folder_contents()
 
         _logger.info("Step 03")
-        step_03_check_build_fails(step_01_msgs)
+        step_03_check_build_fails()
 
         _logger.info("Step 04")
         step_04_rebuild_project()
@@ -244,7 +251,7 @@ with such.A("hdlcc bottle app") as it:
         step_05_check_messages_are_the_same(step_01_msgs)
 
     @it.should("rebuild the project without directory cleanup")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
             _logger.info("Test requires a builder, except fallback")
@@ -304,7 +311,7 @@ with such.A("hdlcc bottle app") as it:
         step_03_check_messages_are_the_same(step_01_msgs)
 
     @it.should("shutdown the server when requested")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         # Ensure the server is active
         reply = it.app.post('/get_diagnose_info',
@@ -323,7 +330,7 @@ with such.A("hdlcc bottle app") as it:
             it.assertEqual(pids, [os.getpid(),])
 
     @it.should("handle buffer visits without crashing")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         if it.BUILDER_NAME not in ('ghdl', 'msim', 'xvhdl'):
             _logger.info("Test requires a builder, except fallback")
@@ -354,8 +361,6 @@ with such.A("hdlcc bottle app") as it:
         build_with_buffer_leave()
         build_with_buffer_visit()
 
-    # TODO: This test has side effects and makes other tests fail. Skip
-    #       it for now
     @it.should("get messages with content")
     def test():
         data = {
@@ -370,24 +375,20 @@ with such.A("hdlcc bottle app") as it:
         _logger.info("UI reply: %s", ui_reply)
         _logger.info("Reply: %s", reply)
 
-        messages = reply.json['messages']
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
-        for message in messages:
-            it.assertTrue(utils.samefile(message.pop('filename'),
-                                         data['path']))
+        it.assertIn(data['path'], [x.filename for x in messages])
 
-        it.assertIn(
-            {"error_type"    : "W",
-             "checker"       : "HDL Code Checker/static",
-             "line_number"   : 1,
-             "column"        : 4,
-             "error_subtype" : "",
-             "error_number"  : "0",
-             "error_message" : "TODO: Nothing to see here"},
-            messages)
+        expected = StaticCheckerDiag(
+            filename=data['path'],
+            line_number=1, column=4,
+            text='TODO: Nothing to see here',
+            severity=DiagType.STYLE_INFO)
+
+        it.assertIn(expected, messages)
 
     @it.should("get source dependencies")
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def test():
         data = {
             'project_file' : it.PROJECT_FILE,
@@ -437,7 +438,8 @@ with such.A("hdlcc bottle app") as it:
         @it.has_setup
         def setup():
             # Needs to agree with vroom test file
-            it.dummy_test_path = 'dummy_test_path'
+            it.dummy_test_path = p.join(os.environ['TOX_ENV_DIR'],
+                                        'dummy_test_path')
 
             it.assertFalse(
                 p.exists(it.dummy_test_path),

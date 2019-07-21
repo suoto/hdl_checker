@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,38 +17,54 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
 import os
 import os.path as p
 import shutil
 import time
-import logging
-
-from nose2.tools import such
-from nose2.tools.params import params
 
 import mock
 import six
+from nose2.tools import such
+from nose2.tools.params import params
 
 import hdlcc
-from hdlcc.utils import writeListToFile, cleanProjectCache, onCI, samefile
-
-from hdlcc.tests.mocks import (StandaloneProjectBuilder,
-                               MSimMock,
-                               FailingBuilder,
-                               SourceMock)
-
+from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
+                               LibraryShouldBeOmited, ObjectIsNeverUsed,
+                               PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
+from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
+                               StandaloneProjectBuilder)
+from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
-VIM_HDL_EXAMPLES = p.join(TEST_SUPPORT_PATH, "vim-hdl-examples")
+TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+VIM_HDL_EXAMPLES = p.join(TEMP_PATH, "vim-hdl-examples")
 
 with such.A("hdlcc project") as it:
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        it.assertCountEqual = it.assertItemsEqual
 
-    it.DUMMY_PROJECT_FILE = p.join(os.curdir, 'remove_me')
+    def _assertSameFile(first, second):
+        if not samefile(p.abspath(first), p.abspath(second)):
+            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
+                                                        p.abspath(second)))
+
+    it.assertSameFile = _assertSameFile
+
+    def _assertMsgQueueIsEmpty(project):
+        msg = []
+        while not project._msg_queue.empty():
+            msg += [str(project._msg_queue.get()), ]
+
+        if msg:
+            msg.insert(0, 'Message queue should be empty but has %d messages' % len(msg))
+            it.fail('\n'.join(msg))
+
+    it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
+
+    it.DUMMY_PROJECT_FILE = p.join(TEMP_PATH, 'remove_me')
 
     @it.has_setup
     def setup():
@@ -72,9 +88,7 @@ with such.A("hdlcc project") as it:
         cleanProjectCache(it.PROJECT_FILE)
 
         _logger.debug("Cleaning up test files")
-        for path in (it.DUMMY_PROJECT_FILE, '.fallback', '.hdlcc',
-                     'myproject.prj', 'some_file.vhd', 'xvhdl.pb',
-                     '.xvhdl.init'):
+        for path in ('.fallback', '.hdlcc', 'xvhdl.pb', '.xvhdl.init'):
             if p.exists(path):
                 _logger.debug("Removing %s", path)
                 if p.isdir(path):
@@ -111,13 +125,14 @@ with such.A("hdlcc project") as it:
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
     def test():
         # First create a project file with something in it
-        project_file = 'myproject.prj'
+        project_file = p.join(TEMP_PATH, 'myproject.prj')
         writeListToFile(project_file, [])
 
         # Create a project object and force saving the cache
         project = StandaloneProjectBuilder(project_file)
         project._saveCache()
-        it.assertTrue(p.exists(p.join('.hdlcc', '.hdlcc.cache')),
+        it.assertTrue(p.exists(p.join(TEMP_PATH, '.hdlcc',
+                                      '.hdlcc.cache')),
                       "Cache filename not found")
 
         # Now recreate the project and ensure it has recovered from the cache
@@ -144,15 +159,16 @@ with such.A("hdlcc project") as it:
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
     def test():
         # First create a project file with something in it
-        project_file = 'myproject.prj'
+        project_file = p.join(TEMP_PATH, 'myproject.prj')
         writeListToFile(project_file, [])
 
         project = StandaloneProjectBuilder(project_file)
         project._saveCache()
-        it.assertTrue(p.exists(p.join('.hdlcc', '.hdlcc.cache')),
+        it.assertTrue(p.exists(p.join(TEMP_PATH, '.hdlcc',
+                                      '.hdlcc.cache')),
                       "Cache filename not found")
 
-        open(p.join('.hdlcc', '.hdlcc.cache'), 'a').write("something\n")
+        open(p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache'), 'a').write("something\n")
 
         project = StandaloneProjectBuilder(project_file)
         found = False
@@ -183,16 +199,8 @@ with such.A("hdlcc project") as it:
         source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VhdlParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(
-                remarks,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+            it.assertEquals(remarks,
+                            [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(remarks, [])
 
@@ -204,16 +212,8 @@ with such.A("hdlcc project") as it:
         source, remarks = project.getSourceByPath(path)
         it.assertEquals(source, VerilogParser(path, library='undefined'))
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(
-                remarks,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+            it.assertEquals(remarks,
+                            [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(remarks, [])
 
@@ -243,27 +243,6 @@ with such.A("hdlcc project") as it:
 
         project = StandaloneProjectBuilder()
         it.assertEqual(list(project._resolveRelativeNames(source)), [])
-
-    @it.should("sort build messages")
-    def test():
-        records = []
-        for error_type in ('E', 'W'):
-            for line_number in (10, 11):
-                for error_number in (12, 13):
-                    records += [{'error_type' : error_type,
-                                 'line_number' : line_number,
-                                 'error_number' : error_number}]
-
-        it.assertEqual(
-            StandaloneProjectBuilder._sortBuildMessages(records),
-            [{'error_type': 'E', 'line_number': 10, 'error_number': 12},
-             {'error_type': 'E', 'line_number': 10, 'error_number': 13},
-             {'error_type': 'E', 'line_number': 11, 'error_number': 12},
-             {'error_type': 'E', 'line_number': 11, 'error_number': 13},
-             {'error_type': 'W', 'line_number': 10, 'error_number': 12},
-             {'error_type': 'W', 'line_number': 10, 'error_number': 13},
-             {'error_type': 'W', 'line_number': 11, 'error_number': 12},
-             {'error_type': 'W', 'line_number': 11, 'error_number': 13}])
 
     @it.should("return the correct build sequence")
     def test():
@@ -425,9 +404,27 @@ with such.A("hdlcc project") as it:
         for source in (target_source, implementation_a, implementation_b):
             project._config._sources[str(source)] = source
 
-        project.updateBuildSequenceCache(target_source)
+        # Make sure there was no outstanding diagnostics prior to running
+        it.assertFalse(project._outstanding_diags,
+                       "Project should not have any outstanding diagnostics")
 
-        it.assertNotEqual(messages, [])
+        project.updateBuildSequenceCache(target_source)
+        _logger.info("processing diags: %s", project._outstanding_diags)
+
+        # hdlcc should flag which one it picked, although the exact one might
+        # vary
+        it.assertEqual(len(project._outstanding_diags), 1,
+                       "Should have exactly one outstanding diagnostics by now")
+        it.assertIn(
+            project._outstanding_diags.pop(),
+            [DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_a.vhd',
+                                 choices=[implementation_a, implementation_b]),
+             DependencyNotUnique(filename="some_lib_target.vhd",
+                                 design_unit="some_lib.direct_dependency",
+                                 actual='implementation_b.vhd',
+                                 choices=[implementation_a, implementation_b])])
 
     @it.should("get builder messages by path")
     def test():
@@ -452,14 +449,7 @@ with such.A("hdlcc project") as it:
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(
                 messages,
-                [{'checker'        : 'hdlcc',
-                  'line_number'    : '',
-                  'column'         : '',
-                  'filename'       : '',
-                  'error_number'   : '',
-                  'error_type'     : 'W',
-                  'error_message'  : 'Path "%s" not found in project file' %
-                                     p.abspath(path)}])
+                [PathNotInProjectFile(p.abspath(path)), ])
         else:
             it.assertEquals(messages, [])
 
@@ -495,14 +485,14 @@ with such.A("hdlcc project") as it:
                         "systemverilog": []}},
                 "_timestamp": 1474839625.2375762,
                 "_sources": {},
-                "filename": "/home/souto/dev/vim-hdl/dependencies/hdlcc/myproject.prj"},
+                "filename": p.join(TEMP_PATH, "/myproject.prj")},
             "serializer": "json"}
 
-        cache_path = p.join('.hdlcc', '.hdlcc.cache')
+        cache_path = p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache')
         if p.exists(p.dirname(cache_path)):
             shutil.rmtree(p.dirname(cache_path))
 
-        os.mkdir('.hdlcc')
+        os.mkdir(p.join(TEMP_PATH, '.hdlcc'))
 
         with open(cache_path, 'w') as fd:
             fd.write(repr(cache_content))
@@ -530,7 +520,6 @@ with such.A("hdlcc project") as it:
                                 p.abspath('modelsim.ini'))
                 os.remove('modelsim.ini')
 
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
             cleanProjectCache(it.PROJECT_FILE)
 
             builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
@@ -557,7 +546,6 @@ with such.A("hdlcc project") as it:
 
         @it.has_teardown
         def teardown():
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
             cleanProjectCache(it.PROJECT_FILE)
             if it.BUILDER_PATH:
                 it.patch.stop()
@@ -571,22 +559,18 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
                               'foo.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             it.assertIn(
-                {'error_subtype' : 'Style',
-                 'line_number'   : 43,
-                 'checker'       : 'HDL Code Checker/static',
-                 'error_message' : "signal 'neat_signal' is never used",
-                 'column'        : 12,
-                 'error_type'    : 'W',
-                 'error_number'  : '0',
-                 'filename'      : None},
-                records)
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=43, column=12,
+                    object_type='signal', object_name='neat_signal'),
+                diagnostics)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")
         def test005b():
@@ -599,97 +583,93 @@ with such.A("hdlcc project") as it:
                                 ['signal another_signal : std_logic;'] +
                                 original_content[43:])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
-            records = it.project.getMessagesWithText(filename, content)
+            diagnostics = it.project.getMessagesWithText(filename, content)
 
-            _logger.debug("Records received:")
-            for record in records:
-                _logger.debug("- %s", record)
+            if diagnostics:
+                _logger.debug("Records received:")
+                for diagnostic in diagnostics:
+                    _logger.debug("- %s", diagnostic)
             else:
-                _logger.warning("No records found")
+                _logger.warning("No diagnostics found")
 
-            # Check that all records point to the original filename and
-            # remove them from the records so it's easier to compare
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
             # the remaining fields
-            for record in records:
-                record_filename = record.pop('filename')
-                if record_filename:
-                    it.assertTrue(samefile(filename, record_filename))
+            for diagnostic in diagnostics:
+                if diagnostic.filename:
+                    it.assertSameFile(filename, diagnostic.filename)
 
-            it.assertItemsEqual(
-                [{'error_subtype' : 'Style',
-                  'line_number'   : 43,
-                  'checker'       : 'HDL Code Checker/static',
-                  'error_message' : "signal 'neat_signal' is never used",
-                  'column'        : 12,
-                  'error_type'    : 'W',
-                  'error_number'  : '0'},
-                 {'error_subtype' : 'Style',
-                  'line_number'   : 44,
-                  'checker'       : 'HDL Code Checker/static',
-                  'error_message' : "signal 'another_signal' is never used",
-                  'column'        : 8,
-                  'error_type'    : 'W',
-                  'error_number'  : '0'}],
-                records)
+            expected = [
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=43,
+                                  column=12, object_type='signal',
+                                  object_name='neat_signal'),
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
+                                  column=8, object_type='signal',
+                                  object_name='another_signal')]
 
-            it.assertTrue(it.project._msg_queue.empty())
+            #  if it.BUILDER_NAME == 'msim':
+            #      expected += [
+            #          BuilderDiag(builder_name='msim',
+            #                      filename=p.abspath(filename), line_number=58,
+            #                      severity=DiagType.WARNING,
+            #                      text="Synthesis Warning: Reset signal 'reset' "
+            #                      "is not in the sensitivity list of process "
+            #                      "'line__58'.")]
+
+            it.assertCountEqual([hash(x) for x in expected], [hash(x) for x in diagnostics])
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text for file outside the project file")
         def test005c():
-            filename = 'some_file.vhd'
+            filename = p.join(TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ["entity some_entity is end;", ])
 
             content = "\n".join(["library work;",
                                  "use work.all;",
                                  "entity some_entity is end;"])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
-            records = it.project.getMessagesWithText(filename, content)
+            diagnostics = it.project.getMessagesWithText(filename, content)
 
             _logger.debug("Records received:")
-            for record in records:
-                _logger.debug("- %s", record)
+            for diagnostic in diagnostics:
+                _logger.debug("- %s", diagnostic)
 
-            # Check that all records point to the original filename and
-            # remove them from the records so it's easier to compare
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
             # the remaining fields
-            for record in records:
-                record_filename = record.pop('filename')
-                if record_filename:
-                    it.assertTrue(samefile(filename, record_filename))
+            for diagnostic in diagnostics:
+                it.assertSameFile(filename, diagnostic.filename)
 
             if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-                it.assertItemsEqual(
-                    [{'error_type'    : 'W',
-                      'checker'       : 'HDL Code Checker/static',
-                      'error_message' : "Declaration of library 'work' can be omitted",
-                      'column'        : 9,
-                      'error_subtype' : 'Style',
-                      'error_number'  : '0',
-                      'line_number'   : 1},
-                     {'error_type'    : 'W',
-                      'checker'       : 'hdlcc',
-                      'error_message' : 'Path "%s" not found in project file' %
-                                        p.abspath(filename),
-                      'column'        : '',
-                      'error_number'  : '',
-                      'line_number'   : ''}],
-                    records)
-            else:
-                it.assertItemsEqual(
-                    [{'error_type'    : 'W',
-                      'checker'       : 'HDL Code Checker/static',
-                      'error_message' : "Declaration of library 'work' can be omitted",
-                      'column'        : 9,
-                      'error_subtype' : 'Style',
-                      'error_number'  : '0',
-                      'line_number'   : 1}],
-                    records)
+                expected = [
+                    LibraryShouldBeOmited(library='work',
+                                          filename=p.abspath(filename),
+                                          column=9,
+                                          line_number=1),
+                    PathNotInProjectFile(p.abspath(filename)),]
 
-            it.assertTrue(it.project._msg_queue.empty())
+                try:
+                    it.assertCountEqual(expected, diagnostics)
+                except:
+                    _logger.warning("Expected:")
+                    for exp in expected:
+                        _logger.warning(exp)
+
+                    raise
+
+            else:
+                it.assertCountEqual(
+                    [LibraryShouldBeOmited(library='work',
+                                           filename=p.abspath(filename),
+                                           column=9,
+                                           line_number=1)],
+                    diagnostics)
+
+            it.assertMsgQueueIsEmpty(it.project)
 
 
         @it.should("get updated messages")
@@ -697,7 +677,7 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
                               'foo.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
             code = open(filename, 'r').read().split('\n')
 
@@ -705,25 +685,21 @@ with such.A("hdlcc project") as it:
 
             writeListToFile(filename, code)
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             try:
                 it.assertNotIn(
-                    {'error_subtype' : 'Style',
-                     'line_number'   : 29,
-                     'checker'       : 'HDL Code Checker/static',
-                     'error_message' : "constant 'ADDR_WIDTH' is never used",
-                     'column'        : 14,
-                     'error_type'    : 'W',
-                     'error_number'  : '0',
-                     'filename'      : None},
-                    records)
+                    ObjectIsNeverUsed(object_type='constant',
+                                      object_name='ADDR_WIDTH',
+                                      line_number=29,
+                                      column=14),
+                    diagnostics)
             finally:
                 # Remove the comment we added
                 code[28] = code[28][3:]
                 writeListToFile(filename, code)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages by path of a different source")
         def test007():
@@ -734,65 +710,58 @@ with such.A("hdlcc project") as it:
             filename = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                               'clock_divider.vhd')
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
-            records = []
-            for record in it.project.getMessagesByPath(filename):
-                it.assertTrue(samefile(filename, record.pop('filename')))
-                records += [record]
+            diagnostics = []
+            for diagnostic in it.project.getMessagesByPath(filename):
+                it.assertSameFile(filename, diagnostic.filename)
+                diagnostics += [diagnostic]
 
             if it.BUILDER_NAME == 'msim':
-                expected_records = [{
-                    'checker': 'msim',
-                    'column': None,
-                    'error_message': "Synthesis Warning: Reset signal 'reset' "
-                                     "is not in the sensitivity list of process "
-                                     "'line__58'.",
-                    'error_number': None,
-                    'error_type': 'W',
-                    'line_number': '58'}]
+                expected_records = [
+                    BuilderDiag(
+                        filename=filename,
+                        builder_name='msim',
+                        text="Synthesis Warning: Reset signal 'reset' "
+                             "is not in the sensitivity list of process "
+                             "'line__58'.",
+                        severity=DiagType.WARNING,
+                        line_number=58)]
             elif it.BUILDER_NAME == 'ghdl':
                 expected_records = []
             elif it.BUILDER_NAME == 'xvhdl':
                 expected_records = []
 
-            it.assertEquals(records, expected_records)
+            it.assertEqual(diagnostics, expected_records)
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages from a source outside the project file")
         def test009():
             if not it.PROJECT_FILE:
                 _logger.info("Requires a valid project file")
                 return
-            filename = 'some_file.vhd'
+            filename = p.join(TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ['library some_lib;'])
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
-            records = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(filename)
 
             _logger.info("Records found:")
-            for record in records:
-                _logger.info(record)
+            for diagnostic in diagnostics:
+                _logger.info(diagnostic)
 
             it.assertIn(
-                {'checker'        : 'hdlcc',
-                 'line_number'    : '',
-                 'column'         : '',
-                 'filename'       : '',
-                 'error_number'   : '',
-                 'error_type'     : 'W',
-                 'error_message'  : 'Path "%s" not found in '
-                                    'project file' % p.abspath(filename)},
-                records)
+                PathNotInProjectFile(p.abspath(filename)),
+                diagnostics)
 
             # The builder should find other issues as well...
-            it.assertTrue(len(records) > 1,
+            it.assertTrue(len(diagnostics) > 1,
                           "It was expected that the builder added some "
                           "message here indicating an error")
 
-            it.assertTrue(it.project._msg_queue.empty())
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("rebuild sources when needed within the same library")
         def test010():
@@ -863,7 +832,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['error_type'] for x in source_msgs[filename]])
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -916,7 +885,7 @@ with such.A("hdlcc project") as it:
                 source_msgs[filename] = \
                     it.project.getMessagesByPath(filename)
                 it.assertNotIn(
-                    'E', [x['error_type'] for x in source_msgs[filename]])
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
 
             _logger.info("Changing very_common_pkg to force rebuilding "
                          "synchronizer and another one I don't recall "
@@ -953,4 +922,3 @@ with such.A("hdlcc project") as it:
                 writeListToFile(very_common_pkg, code)
 
 it.createTests(globals())
-

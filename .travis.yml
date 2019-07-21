@@ -14,47 +14,79 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 ---
 language: python
-# Need to upgrade this at some point
-dist: precise
-python:
-  - "2.7"
-  - "3.5"
+matrix:
+  include:
+    - name: "Python 2.7 - msim"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=msim
+    - name: "Python 2.7 - ghdl"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
+    - name: "Python 2.7 - xvhdl"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
+    - name: "Python 2.7 - standalone and fallback"
+      python: "2.7"
+      env: TOX_PYTHON_VERSION=py27 BUILDER=other
 
-env:
-  matrix:
-    - BUILDER=msim
-    - BUILDER=ghdl
-    - BUILDER=fallback
-    - BUILDER=standalone
-    - BUILDER=xvhdl
+    - name: "Python 3.7 - msim"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=msim
+    - name: "Python 3.7 - ghdl"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
+    - name: "Python 3.7 - xvhdl"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
+    - name: "Python 3.7 - standalone and fallback"
+      python: "3.7"
+      dist: xenial
+      env: TOX_PYTHON_VERSION=py37 BUILDER=other
 
-# sudo: required
-# sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch;
-      # sudo apt-get install -qq libgd-dev libtcl8.5 tree;
+# env:
+#   matrix:
+#     - BUILDER=msim
+#     - BUILDER=ghdl
+#     - BUILDER=fallback
+#     - BUILDER=standalone
+#     - BUILDER=xvhdl
 
 before_install:
-  - if [ "$BUILDER" == "msim" ]; then
-      sudo apt-get update -qq;
-      sudo apt-get install -qq libgd2-xpm ia32-libs ia32-libs-multiarch;
-    fi
+  - sudo apt-get update -qq;
+  - sudo apt-get install -qq libtcl8.5
+  - sudo dpkg --add-architecture i386
+  - sudo apt-get install -qq build-essential
+  - sudo apt-get install -qq gcc-multilib
+    g++-multilib lib32z1 lib32stdc++6 lib32gcc1 expat:i386 fontconfig:i386
+    libfreetype6:i386 libexpat1:i386 libc6:i386 libgtk-3-0:i386
+    libcanberra0:i386  libice6:i386 libsm6:i386 libncurses5:i386 zlib1g:i386
+    libx11-6:i386 libxau6:i386 libxdmcp6:i386 libxext6:i386 libxft2:i386
+    libxrender1:i386 libxt6:i386 libxtst6:i386 libharfbuzz-dev:i386
+  - export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
 
 before_script:
-  - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
+  # - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
+  - pip install tox
   - "git submodule update"
   - "mkdir -p ~/cache"
   - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
   - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
   - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 # command to install dependencies
-install:
-  - pip install -r requirements.txt
-  - pip install git+https://github.com/suoto/rainbow_logging_handler
-  - pip install -e .
+# install:
+#   - pip install -r requirements.txt
+#   # A nice to have, not really needed
+#   - pip install git+https://github.com/suoto/rainbow_logging_handler
+#   - pip install -e .
 # command to run tests
-# script: "./run_tests.sh ${BUILDER} -vv --log-capture"
-script: "./run_tests.py --${BUILDER} -v"
-after_failure:
-  - "cat tests.log"
+script:
+  - if [ "${BUILDER}" == "msim" ] ; then  tox -e ${TOX_PYTHON_VERSION}-msim-linux ; fi
+  - if [ "${BUILDER}" == "ghdl" ] ; then  tox -e ${TOX_PYTHON_VERSION}-ghdl-linux ; fi
+  - if [ "${BUILDER}" == "xvhdl" ] ; then tox -e ${TOX_PYTHON_VERSION}-xvhdl-linux ; fi
+  - if [ "${BUILDER}" == "other" ] ; then tox -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux ; fi
 after_success:
   - "coverage combine"
   - "coverage report"

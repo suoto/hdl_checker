@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +16,11 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "VHDL static checking to find unused signals, ports and constants."
 
-import re
 import logging
+import re
+
+from hdlcc.diagnostics import (DiagType, LibraryShouldBeOmited,
+                               ObjectIsNeverUsed, StaticCheckerDiag)
 
 _logger = logging.getLogger(__name__)
 
@@ -135,6 +138,9 @@ __COMMENT_TAG_SCANNER__ = re.compile('|'.join([
     r"\s*--\s*(?P<tag>TODO|FIXME|XXX)\s*:\s*(?P<text>.*)"]))
 
 def _getCommentTags(vbuffer):
+    """
+    Generates diags from 'TODO', 'FIXME' and 'XXX' tags
+    """
     result = []
     lnum = 0
     for line in vbuffer:
@@ -150,17 +156,12 @@ def _getCommentTags(vbuffer):
 
         for match in __COMMENT_TAG_SCANNER__.finditer(line):
             _dict = match.groupdict()
-            message = {
-                'checker'        : 'HDL Code Checker/static',
-                'line_number'    : lnum,
-                'column'         : match.start(match.lastindex - 1) + 1,
-                'filename'       : None,
-                'error_number'   : '0',
-                'error_type'     : 'W',
-                'error_subtype'  : '',
-                'error_message'  : "%s: %s" % (_dict['tag'].upper(), _dict['text'])
-                }
-            result += [message]
+            result += [
+                StaticCheckerDiag(
+                    line_number=lnum,
+                    column=match.start(match.lastindex - 1) + 1,
+                    severity=DiagType.STYLE_INFO,
+                    text="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
     return result
 
 def _getMiscChecks(objects):
@@ -168,22 +169,16 @@ def _getMiscChecks(objects):
     Get generic code hints (or it should do that sometime in the future...)
     """
     if 'library' not in [x['type'] for x in objects.values()]:
-        raise StopIteration
+        return
 
     for library, obj in objects.items():
         if obj['type'] != 'library':
             continue
         if library == 'work':
-            yield {
-                'checker'        : 'HDL Code Checker/static',
-                'line_number'    : obj['lnum'] + 1,
-                'column'         : obj['start'] + 1,
-                'filename'       : None,
-                'error_number'   : '0',
-                'error_type'     : 'W',
-                'error_subtype'  : 'Style',
-                'error_message'  : "Declaration of library '{library}' can "
-                                   "be omitted".format(library=library)}
+            yield LibraryShouldBeOmited(
+                line_number=obj['lnum'] + 1,
+                column=obj['start'] + 1,
+                library=library)
 
 def getStaticMessages(vbuffer=None):
     "VHDL static checking"
@@ -193,22 +188,18 @@ def getStaticMessages(vbuffer=None):
 
     for _object in _getUnusedObjects(vbuffer, objects.keys()):
         obj_dict = objects[_object]
-        message = {
-            'checker'        : 'HDL Code Checker/static',
-            'line_number'    : obj_dict['lnum'] + 1,
-            'column'         : obj_dict['start'] + 1,
-            'filename'       : None,
-            'error_number'   : '0',
-            'error_type'     : 'W',
-            'error_subtype'  : 'Style',
-            'error_message'  : "{obj_type} '{obj_name}' is never used".format(
-                obj_type=obj_dict['type'], obj_name=_object),
-            }
+        result += [ObjectIsNeverUsed(
+            line_number=obj_dict['lnum'] + 1,
+            column=obj_dict['start'] + 1,
+            object_type=obj_dict['type'],
+            object_name=_object)]
 
-        result.append(message)
     return result + _getCommentTags(vbuffer) + list(_getMiscChecks(objects))
 
 def standalone(): # pragma: no cover
+    """
+    Standalone entry point
+    """
     import sys
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     for arg in sys.argv[1:]:
@@ -220,5 +211,3 @@ def standalone(): # pragma: no cover
 
 if __name__ == '__main__':
     standalone()
-
-

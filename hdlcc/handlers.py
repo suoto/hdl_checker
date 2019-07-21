@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2015-2019 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,15 +32,16 @@ from hdlcc.hdlcc_base import HdlCodeCheckerBase
 
 _logger = logging.getLogger(__name__)
 
-app = bottle.Bottle() # pylint: disable=invalid-name
+app = bottle.Bottle()  # pylint: disable=invalid-name
 
-class HdlCodeCheckerSever(HdlCodeCheckerBase):
+
+class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     HDL Code Checker project builder class
     """
     def __init__(self, *args, **kwargs):
         self._msg_queue = Queue()
-        super(HdlCodeCheckerSever, self).__init__(*args, **kwargs)
+        super(HdlCodeCheckerServer, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(("info", message))
@@ -56,9 +57,10 @@ class HdlCodeCheckerSever(HdlCodeCheckerBase):
         while not self._msg_queue.empty():  # pragma: no cover
             yield self._msg_queue.get()
 
+
 def _getServerByProjectFile(project_file):
     """
-    Returns the HdlCodeCheckerSever object that corresponds to the given
+    Returns the HdlCodeCheckerServer object that corresponds to the given
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
@@ -68,22 +70,24 @@ def _getServerByProjectFile(project_file):
         return _hdlcc_objects[project_file]
     except KeyError:
         _logger.debug("Created new project server for '%s'", project_file)
-        project = HdlCodeCheckerSever(project_file)
+        project = HdlCodeCheckerServer(project_file)
         _hdlcc_objects[project_file] = project
         return project
 
-def _exceptionWrapper(f):
+
+def _exceptionWrapper(func):
     """
-    Wraps f to log exception to the standard logger
+    Wraps func to log exception to the standard logger
     """
     def _wrapper(*args, **kwargs):
         try:
-            return f(*args, **kwargs)
+            return func(*args, **kwargs)
         except:  # pragma: no cover
-            _logger.exception("Error running '%s'", f.__name__)
+            _logger.exception("Error running '%s'", func.__name__)
             raise
 
     return _wrapper
+
 
 def setupSignalHandlers():
     """
@@ -100,6 +104,7 @@ def setupSignalHandlers():
                 signal.SIGINT]:
         signal.signal(sig, signalHandler)
 
+
 def _getProjectDiags(project_file):
     """
     Get project specific diagnose
@@ -112,6 +117,7 @@ def _getProjectDiags(project_file):
         diags += ["Builder: <unknown> (config file parsing is underway)"]
 
     return diags
+
 
 @app.post('/get_diagnose_info')
 @_exceptionWrapper
@@ -131,11 +137,18 @@ def getDiagnoseInfo():
     for diag in response:
         _logger.info(" - %s", diag)
 
-    return {'info' : response}
+    return {'info': response}
+
 
 @app.post('/run_config_generator')
 @_exceptionWrapper
 def runConfigGenerator():
+    """
+    Runs the config generator
+    request should have
+        - 'generator': generator's class name
+        - 'args', 'kwargs': arguments to be passed to the generator constructor
+    """
     name = bottle.request.forms.get('generator', None)
     args = json.loads(bottle.request.forms.get('args'))
     kwargs = json.loads(bottle.request.forms.get('kwargs'))
@@ -151,9 +164,11 @@ def runConfigGenerator():
 
     return {'content': content}
 
+
 @app.post('/on_buffer_visit')
 @_exceptionWrapper
 def onBufferVisit():
+    "Hook for doing actions related to visiting a buffer"
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     _logger.debug("Buffer visited is ('%s') '%s'", project_file, path)
@@ -163,9 +178,11 @@ def onBufferVisit():
 
     return {}
 
+
 @app.post('/on_buffer_leave')
 @_exceptionWrapper
 def onBufferLeave():
+    "Hook for doing actions related to leaving a buffer"
     project_file = bottle.request.forms.get('project_file')
     path = bottle.request.forms.get('path')
     _logger.debug("Left buffer ('%s') '%s'", project_file, path)
@@ -174,6 +191,7 @@ def onBufferLeave():
     server.onBufferLeave(path)
 
     return {}
+
 
 @app.post('/get_messages_by_path')
 @_exceptionWrapper
@@ -189,13 +207,15 @@ def getMessagesByPath():
                   "no content" if content is None else "with content")
 
     server = _getServerByProjectFile(project_file)
-    response = {}
     if content is None:
-        response['messages'] = server.getMessagesByPath(path)
+        messages = server.getMessagesByPath(path)
     else:
-        response['messages'] = server.getMessagesWithText(path, content)
+        messages = server.getMessagesWithText(path, content)
 
-    return response
+    # Messages at this point need to be serializable so that bottle can send
+    # them over
+    return {'messages': [x.toDict() for x in messages]}
+
 
 @app.post('/get_ui_messages')
 @_exceptionWrapper
@@ -217,9 +237,10 @@ def getUiMessages():
     for msg in ui_messages:  # pragma: no cover
         _logger.info(msg)
 
-    response = {'ui_messages' : ui_messages}
+    response = {'ui_messages': ui_messages}
 
     return response
+
 
 @app.post('/rebuild_project')
 @_exceptionWrapper
@@ -236,6 +257,7 @@ def rebuildProject():
     del _hdlcc_objects[project_file]
     _getServerByProjectFile(project_file)
 
+
 @app.post('/shutdown')
 @_exceptionWrapper
 def shutdownServer():
@@ -244,6 +266,7 @@ def shutdownServer():
     """
     _logger.info("Shutting down server")
     utils.terminateProcess(os.getpid())
+
 
 @app.post('/get_dependencies')
 @_exceptionWrapper
@@ -264,7 +287,8 @@ def getDependencies():
 
     _logger.debug("Found %d dependencies", len(content))
 
-    return {'dependencies' : content}
+    return {'dependencies': content}
+
 
 @app.post('/get_build_sequence')
 @_exceptionWrapper
@@ -280,9 +304,10 @@ def getBuildSequence():
     server = _getServerByProjectFile(project_file)
     source, _ = server.getSourceByPath(path)
 
-    return {'sequence' : [x.filename for x in
-                          server.updateBuildSequenceCache(source)]}
+    return {'sequence': [x.filename for x in
+                         server.updateBuildSequenceCache(source)]}
+
 
 #  We'll store a dict to store differents hdlcc objects
-_hdlcc_objects = {} # pylint: disable=invalid-name
+_hdlcc_objects = {}  # pylint: disable=invalid-name
 setupSignalHandlers()

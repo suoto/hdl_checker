@@ -41,59 +41,42 @@ environment:
   ARCH: 32
 
   matrix:
-    - BUILDER: other
-      PYTHON_VERSION: 35
-    - BUILDER: ghdl
-      PYTHON_VERSION: 35
-    - BUILDER: msim
-      PYTHON_VERSION: 35
+    # - PYTHON_VERSION: 37
+    #   PYTHON: "C:\\Python37"
+    #   BUILDER: ghdl
 
-    - BUILDER: other
-      PYTHON_VERSION: 36
-    - BUILDER: ghdl
-      PYTHON_VERSION: 36
-    - BUILDER: msim
-      PYTHON_VERSION: 36
+    # - PYTHON_VERSION: 37
+    #   PYTHON: "C:\\Python37"
+    #   BUILDER: msim
 
-    - BUILDER: other
-      PYTHON_VERSION: 37
-    - BUILDER: ghdl
-      PYTHON_VERSION: 37
-    - BUILDER: msim
-      PYTHON_VERSION: 37
-
-# # build cache to preserve files/folders between builds
-# cache:
-#   - '%CACHE_PATH%'
+    - PYTHON_VERSION: 37
+      PYTHON: "C:\\Python37"
+      TOXENV: py37-fallback-windows,py37-standalone-windows
 
 # scripts that run after cloning repository
 install:
-  - git clone https://github.com/suoto/grlib
-    "%APPVEYOR_BUILD_FOLDER%\\.ci\\test_support\\grlib" --depth 1
-  - git submodule update --init --recursive
-
-  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_env.ps1"
-
+  # We need wheel installed to build wheels
+  - "%PYTHON%\\python.exe -m pip install --upgrade pip"
+  - "%PYTHON%\\python.exe -m pip install wheel tox"
+  - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
+  # - ps: if ($env:BUILDER "msim") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1" }
+  # - ps: if ($env:BUILDER "ghdl") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1" }
   - python --version
-  - if "%BUILDER%" == "msim" (python run_tests.py --msim -v)
-  - if "%BUILDER%" == "ghdl" (python run_tests.py --ghdl -v)
-  - if "%BUILDER%" == "other" (python run_tests.py --fallback --standalone -v)
-  - coverage combine
-  - coverage report
-  - codecov
-  - dir /B "%HOMEPATH%\\*.log"
-  - 7z a hdlcc_success.zip "%HOMEPATH%\\*.log" "*.log"
-  - appveyor PushArtifact hdlcc_success.zip
+
+test_script:
+  - tox
+after_test:
+  # - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
+  # - appveyor PushArtifact hdlcc_success.zip
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
 
 # We won't build or run tests from here
 build: off
-test: off
 
-on_failure:
-  - 7z a hdlcc_failure.zip "%HOMEPATH%\\*.log" "*.log"
-  - appveyor PushArtifact hdlcc_failure.zip
-
-# artifacts:
-#   - path: "%HOMEPATH%\\*.log"
-#     name: Logs
+# on_failure:
+#   - 7z a hdlcc_failure.zip ".tox\\*\\log\\*"
+#   - appveyor PushArtifact hdlcc_failure.zip

@@ -68,3 +68,4 @@ tags
 # htmlcov/
 source.vhd
 .ci/test_support/grlib/
+.mypy_cache

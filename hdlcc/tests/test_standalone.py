@@ -1,7 +1,7 @@
 # encoding: utf-8
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,7 +37,8 @@ _logger = logging.getLogger(__name__)
 
 HDLCC_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 HDLCC_STANDALONE = p.join(HDLCC_PATH, "hdlcc", "standalone.py")
-TEST_SUPPORT_PATH = p.join(HDLCC_PATH, '.ci', 'test_support')
+
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 
 def shell(cmd):
@@ -80,7 +81,8 @@ with such.A("hdlcc standalone tool") as it:
         else:
             it.PROJECT_FILE = None
 
-        it.assertTrue(p.exists(HDLCC_STANDALONE))
+        it.assertTrue(p.exists(HDLCC_STANDALONE),
+                      "Couldn't find standalone executable")
 
         env_patch = {'PYTHONPATH': HDLCC_PATH}
 
@@ -107,11 +109,6 @@ with such.A("hdlcc standalone tool") as it:
             shutil.rmtree(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build'))
 
         it.patch.stop()
-
-        if p.exists('xvhdl.pb'):
-            os.remove('xvhdl.pb')
-        if p.exists('.xvhdl.init'):
-            os.remove('.xvhdl.init')
 
     with it.having("a valid project file"):
 
@@ -185,7 +182,8 @@ with such.A("hdlcc standalone tool") as it:
 
                 shell(cmd)
 
-                it.assertTrue(p.exists('output.stats'))
+                it.assertTrue(p.exists('output.stats'),
+                              "Couldn't find profiling data")
                 os.remove('output.stats')
 
             @it.should("control debugging level")
@@ -202,8 +200,9 @@ with such.A("hdlcc standalone tool") as it:
                 previous = 0
                 for level in range(1, 5):
                     stdout = shell(cmd + ["-" + "v"*level])
-                    it.assertTrue(len(stdout) >= previous)
+                    it.assertTrue(len(stdout) >= previous,
+                                  "Increasing logging level didn't make "
+                                  "output more verbose")
                     previous = len(stdout)
 
 it.createTests(globals())
-

@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,24 +17,23 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
 import os
 import os.path as p
-import time
-import logging
 import shutil
+import time
 from multiprocessing import Queue
 
-from nose2.tools import such
-
 import mock
+from nose2.tools import such
 
 import hdlcc
 import hdlcc.utils as utils
+from hdlcc.tests.mocks import disableVunit
 
 _logger = logging.getLogger(__name__)
 
-BASE_PATH = p.join(
-    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'grlib')
+BASE_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'grlib')
 
 class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
@@ -119,7 +118,7 @@ with such.A("hdlcc project with persistence") as it:
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def _buildWithoutCache():
         it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
@@ -135,7 +134,7 @@ with such.A("hdlcc project with persistence") as it:
                        "Project shouldn't have recovered from cache. "
                        "Messages found:\n%s" % "\n".join(messages))
 
-    @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+    @disableVunit
     def _buildWithCache():
         del it.project
 
@@ -190,7 +189,7 @@ with such.A("hdlcc project with persistence") as it:
             _buildWithCache()
 
         @it.should('build without cache if cache is invalid')
-        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+        @disableVunit
         def test_003():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")
@@ -256,7 +255,7 @@ with such.A("hdlcc project with persistence") as it:
             utils.cleanProjectCache(it.PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
-        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+        @disableVunit
         def test_001():
             if not it.BUILDER_NAME:
                 _logger.info("Skipping test, it requires a builder")
@@ -269,7 +268,6 @@ with such.A("hdlcc project with persistence") as it:
             _logger.info("Building with changed env")
 
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
-            time.sleep(1)
             time.sleep(1)
 
             _logger.info("Searching UI messages")

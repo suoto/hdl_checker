@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2015-2019 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,16 +16,15 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Configuration file parser"
 
+import logging
 import os.path as p
 import re
-import logging
+from glob import glob
 from threading import Lock
 
 import hdlcc.exceptions
-from hdlcc.parsers import (getSourceFileObjects,
-                           VhdlParser,
-                           VerilogParser)
-from hdlcc.builders import getBuilderByName, AVAILABLE_BUILDERS
+from hdlcc.builders import AVAILABLE_BUILDERS, getBuilderByName
+from hdlcc.parsers import VerilogParser, VhdlParser, getSourceFileObjects
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -407,19 +406,19 @@ class ConfigParser(object):
         source_build_list = []
 
         for match in [x.groupdict() for x in _configFileScan(line)]:
+            self._logger.debug("match: '%s'", match)
             if match['parameter'] is not None:
-                self._logger.info("match: '%s'", match)
                 self._handleParsedParameter(match['parameter'],
                                             match['parm_lang'], match['value'])
-            else:
-                source_path = self._getSourcePath(match['path'])
-                source_path_list += [source_path]
-                # Try to get the build info for this source. If we get nothing
-                # we just skip it
-                build_info = self._handleParsedSource(
-                    match['library'], source_path, match['flags'])
-                if build_info:
-                    source_build_list.append(build_info)
+            elif match['path']:
+                for source_path in self._getSourcePaths(match['path']):
+                    source_path_list += [source_path]
+                    # Try to get the build info for this source. If we get nothing
+                    # we just skip it
+                    build_info = self._handleParsedSource(
+                        match['library'], source_path, match['flags'])
+                    if build_info:
+                        source_build_list.append(build_info)
 
         return source_path_list, source_build_list
 
@@ -440,7 +439,7 @@ class ConfigParser(object):
         else:
             raise hdlcc.exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePath(self, path):
+    def _getSourcePaths(self, path):
         """
         Normalizes and handles absolute/relative paths
         """
@@ -451,7 +450,7 @@ class ConfigParser(object):
             fname_base_dir = p.dirname(p.abspath(self.filename))
             source_path = p.join(fname_base_dir, source_path)
 
-        return source_path
+        return glob(source_path) or [source_path]
 
     def _handleParsedSource(self, library, path, flags):
         """
@@ -492,7 +491,6 @@ class ConfigParser(object):
     def simpleParse(filename):
         """
         """
-        assert p.exists(filename), "Filename '%s' doesn't exists" % filename
         target_dir = None
         builder_name = None
         for _line in open(filename, mode='rb').readlines():

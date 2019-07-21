@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,10 +23,10 @@ import logging
 import subprocess as subp
 from threading import Lock
 
-import hdlcc.options as options
 from hdlcc.exceptions import SanityCheckError
+from hdlcc.diagnostics import DiagType
 
-class BaseBuilder(object):
+class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """
     Class that implements the base builder flow
     """
@@ -37,15 +37,15 @@ class BaseBuilder(object):
     default_flags = {
         'batch_build_flags' : {},
         'single_build_flags' : {},
-        'global_build_flags' : {}}
+        'global_build_flags' : {}} # type: dict
 
     _external_libraries = {
         'vhdl' : [],
-        'verilog' : []}
+        'verilog' : []}  # type: dict
 
     _include_paths = {
         'vhdl' : [],
-        'verilog' : []}
+        'verilog' : []}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
@@ -84,8 +84,8 @@ class BaseBuilder(object):
         self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
         self._target_folder = p.abspath(p.expanduser(target_folder))
         self._build_info_cache = {}
-        self._builtin_libraries = []
-        self._added_libraries = []
+        self._builtin_libraries = set()
+        self._added_libraries = set()
 
         # Skip creating a folder for the fallback builder
         if self.builder_name != 'fallback':
@@ -115,9 +115,12 @@ class BaseBuilder(object):
         """
         # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
-        obj._logger = logging.getLogger(state['_logger'])
-        del state['_logger']
+        obj._logger = logging.getLogger(state.pop('_logger'))
+        obj._builtin_libraries = set(state.pop('_builtin_libraries'))
+        obj._added_libraries = set(state.pop('_added_libraries'))
+
         obj._lock = Lock()
+        obj._build_info_cache = {}
         obj.__dict__.update(state)
         # pylint: enable=protected-access
 
@@ -129,6 +132,9 @@ class BaseBuilder(object):
         """
         state = self.__dict__.copy()
         state['_logger'] = self._logger.name
+        state['_builtin_libraries'] = list(self._builtin_libraries)
+        state['_added_libraries'] = list(self._added_libraries)
+        del state['_build_info_cache']
         del state['_lock']
         return state
 
@@ -159,7 +165,7 @@ class BaseBuilder(object):
         """
 
     @abc.abstractmethod
-    def _makeRecords(self, message):
+    def _makeRecords(self, line):
         """
         Static method that converts a string into a dict that has
         elements identifying its fields
@@ -222,7 +228,8 @@ class BaseBuilder(object):
         Return a list with the libraries this compiler currently knows
         """
 
-    def _subprocessRunner(self, cmd_with_args, shell=False, env=None):
+    def _subprocessRunner(self, cmd_with_args, shell=False, env=None,
+                          cwd=None):
         """
         Runs a shell command and handles stdout catching
         """
@@ -237,7 +244,7 @@ class BaseBuilder(object):
         try:
             stdout = list(
                 subp.check_output(cmd_with_args, stderr=subp.STDOUT,
-                                  shell=shell, env=subp_env).splitlines())
+                                  shell=shell, env=subp_env, cwd=cwd).splitlines())
         except subp.CalledProcessError as exc:
             stdout = list(exc.output.splitlines())
             self._logger.debug(
@@ -270,42 +277,42 @@ class BaseBuilder(object):
             if lib not in self.getBuiltinLibraries():
                 self._createLibrary(lib)
 
-        records = []
+        diagnostics = set()
         rebuilds = []
-        # We must give precedence to the buffer content over the file
-        # content, so we dump the buffer content to a temporary file
-        # and tell the compiler to compile it instead
-        if source.hasBufferContent():
-            build_path = source.getDumpPath()
-            self._logger.debug("Source has buffered content, using %s",
-                               build_path)
-        else:
-            build_path = source.filename
 
-        for line in self._buildSource(build_path, source.library, flags):
+        for line in self._buildSource(source.filename, source.library, flags):
             if self._shouldIgnoreLine(line):
                 continue
 
-            line = line.replace(build_path, source.filename)
+            # In case we're compiling a temporary dump, replace in the lines
+            # all references to the temp name with the original (shadow)
+            # filename
+            if source.shadow_filename:
+                line = line.replace(source.filename, source.shadow_filename)
 
-            records += [x for x in self._makeRecords(line) if x not in records]
+            diagnostics = diagnostics.union(set(self._makeRecords(line)))
             rebuilds += [x for x in self._getRebuilds(source, line) if x not in
                          rebuilds]
 
-        self._logBuildResults(records, rebuilds)
+        # If no filename is set, assume it's for the current path
+        for diag in diagnostics:
+            if diag.filename is None:
+                diag.filename = source.filename
 
-        return records, rebuilds
+        self._logBuildResults(diagnostics, rebuilds)
 
-    def _logBuildResults(self, records, rebuilds): # pragma: no cover
+        return diagnostics, rebuilds
+
+    def _logBuildResults(self, diagnostics, rebuilds): # pragma: no cover
         """
-        Logs records and rebuilds only for debugging purposes
+        Logs diagnostics and rebuilds only for debugging purposes
         """
         if not self._logger.isEnabledFor(logging.DEBUG):
             return
 
-        if records:
-            self._logger.debug("Records found")
-            for record in records:
+        if diagnostics:
+            self._logger.debug("Diagnostic messages found")
+            for record in diagnostics:
                 self._logger.debug(record)
 
         if rebuilds:
@@ -314,7 +321,7 @@ class BaseBuilder(object):
                 self._logger.debug(rebuild)
 
     @abc.abstractmethod
-    def _createLibrary(self, source):
+    def _createLibrary(self, library):
         """
         Callback called to create a library
         """
@@ -337,10 +344,10 @@ class BaseBuilder(object):
                                source.filetype)
             return [], []
 
-        if source.abspath not in self._build_info_cache.keys():
+        if source.abspath not in self._build_info_cache:
             self._build_info_cache[source.abspath] = {
                 'compile_time' : 0,
-                'records' : [],
+                'diagnostics' : [],
                 'rebuilds' : []}
 
         cached_info = self._build_info_cache[source.abspath]
@@ -359,7 +366,7 @@ class BaseBuilder(object):
             # Build a list of flags and pass it as tuple
             build_flags = source.flags + flags
             with self._lock:
-                records, rebuilds = \
+                diagnostics, rebuilds = \
                         self._buildAndParse(source, flags=tuple(build_flags))
 
             for rebuild in rebuilds:
@@ -367,18 +374,16 @@ class BaseBuilder(object):
                     if rebuild['library_name'] == 'work':
                         rebuild['library_name'] = source.library
 
-            cached_info['records'] = records
+            cached_info['diagnostics'] = diagnostics
             cached_info['rebuilds'] = rebuilds
             cached_info['compile_time'] = source.getmtime()
 
-            if not options.cache_error_messages and \
-                    'E' in [x['error_type'] for x in records]:
+            if DiagType.ERROR in [x.severity for x in diagnostics]:
                 cached_info['compile_time'] = 0
 
         else:
             self._logger.debug("Nothing to do for %s", source)
-            records = cached_info['records']
+            diagnostics = cached_info['diagnostics']
             rebuilds = cached_info['rebuilds']
 
-        return records, rebuilds
-
+        return diagnostics, rebuilds

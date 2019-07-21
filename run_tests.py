@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2015-2019 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,18 +18,20 @@
 # PYTHON_ARGCOMPLETE_OK
 from __future__ import print_function
 
-import sys
-import os
-import os.path as p
 import argparse
 import logging
-import nose2
+import os
+import os.path as p
+import sys
+from glob import glob
+
 import coverage
+import nose2
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
-    import mock
+    import mock  # type: ignore
 
 try:
     import argcomplete
@@ -41,7 +43,7 @@ _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
 _ON_WINDOWS = sys.platform == 'win32'
-HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
+BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
@@ -63,20 +65,6 @@ TEST_ENVS['xvhdl'] = {
     'BUILDER_PATH' : p.expanduser('~/builders/xvhdl/bin/')}
 
 
-def _noseRunner(args):
-    "Runs nose2 with coverage"
-    _logger.info("nose2 args: %s", repr(args))
-    cov = coverage.Coverage(config_file='.coveragerc')
-    cov.start()
-
-    try:
-        result = nose2.discover(exit=False, argv=args)
-    finally:
-        cov.stop()
-        cov.save()
-
-    return result
-
 def _shell(cmd):
     _logger.info("$ %s", cmd)
     for line in os.popen(cmd).read().split('\n'):
@@ -89,36 +77,10 @@ def _clear():
                 'git submodule foreach --recursive git clean -fdx'):
         _shell(cmd)
 
-def _setupLogging(stream, level, color=True): # pragma: no cover
+def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, str):
-        class Stream(file):
-            """
-            File subclass that allows RainbowLoggingHandler to write
-            with colors
-            """
-            def isatty(self):
-                return color
-
-        stream = Stream(stream, 'ab', buffering=1)
-
-    from rainbow_logging_handler import RainbowLoggingHandler
-    rainbow_stream_handler = RainbowLoggingHandler(
-        stream,
-        #  Customizing each column's color
-        # pylint: disable=bad-whitespace
-        color_asctime          = ('dim white',  'black'),
-        color_name             = ('dim white',  'black'),
-        color_funcName         = ('green',      'black'),
-        color_lineno           = ('dim white',  'black'),
-        color_pathname         = ('black',      'red'),
-        color_module           = ('yellow',     None),
-        color_message_debug    = ('color_59',   None),
-        color_message_info     = (None,         None),
-        color_message_warning  = ('color_226',  None),
-        color_message_error    = ('red',        None),
-        color_message_critical = ('bold white', 'red'))
-        # pylint: enable=bad-whitespace
+    from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
+    rainbow_stream_handler = RainbowLoggingHandler(stream)
 
     logging.root.addHandler(rainbow_stream_handler)
     logging.root.setLevel(level)
@@ -164,14 +126,12 @@ def _parseArguments():
     parser.add_argument('--verbose', '-v', action='store_true')
 
     parser.add_argument('--log-file', action='store',
-                        default=p.abspath(p.expanduser("~/tests.log")))
+                        default=p.join(os.environ['TOX_ENV_DIR'], 'log',
+                                       'tests.log'))
 
     parser.add_argument('--log-level', action='store', default='INFO',
                         choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
                                  'WARNING',))
-
-    parser.add_argument('--log-stream', action='store', default=sys.stdout,
-                        help="File to use as log. If unset, uses stdout")
 
     if _HAS_ARGCOMPLETE: # pragma: no cover
         argcomplete.autocomplete(parser)
@@ -213,6 +173,9 @@ def _getNoseCommandLineArgs(args):
     if args.fail_fast:
         argv += ['--fail-fast']
 
+    if args.log_level:
+        argv += ['--log-level', args.log_level]
+
     return argv
 
 def _getDefaultTestByEnv(env):
@@ -222,16 +185,17 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_persistence',
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone')
-    elif env == 'standalone':
+    if env == 'standalone':
         return ('hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_static_check')
-    elif env == 'fallback':
-        return ('hdlcc.tests.test_builders',
+    if env == 'fallback':
+        return ('hdlcc.tests.test_lsp',
+                'hdlcc.tests.test_server',
+                'hdlcc.tests.test_builders',
                 'hdlcc.tests.test_vhdl_parser',
                 'hdlcc.tests.test_verilog_parser',
                 'hdlcc.tests.test_hdlcc_base',
                 'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_hdlcc_server',
                 'hdlcc.tests.test_standalone',
                 'hdlcc.tests.test_misc')
     assert False
@@ -250,7 +214,9 @@ def runTestsForEnv(env, args):
     if env in TEST_ENVS:
         test_env.update(TEST_ENVS[env])
 
-    test_env.update({'HDLCC_SERVER_LOG_LEVEL' : args.log_level})
+    test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
+
+    _logger.info("nose2 args: %s", nose_args)
 
     with mock.patch.dict('os.environ', test_env):
         successful = nose2.discover(exit=False,
@@ -260,20 +226,23 @@ def runTestsForEnv(env, args):
 
 def _setupPaths():
     "Add our dependencies to sys.path"
-    for path in (
-            p.join(HDLCC_BASE_PATH, 'dependencies', 'bottle'),
-            p.join(HDLCC_BASE_PATH, 'dependencies', 'requests'),
-        ):
+    # Pluggy is not standard...
+    sys.path.insert(0, p.join(BASE_PATH, 'dependencies', 'pluggy', 'src'))
+
+    for path in glob(p.join(BASE_PATH, 'dependencies', '*')):
+        assert p.exists(path), "Path '{}' doesn't exist".format(path)
         path = p.abspath(path)
         if path not in sys.path:
-            _logger.info("Adding '%s'", path)
+            print("Inserting %s" % path)
             sys.path.insert(0, path)
         else:
-            _logger.warning("WARNING: '%s' was already on sys.path!", path)
+            _logger.debug("Path '%s' was already on sys.path!", path)
 
 def main():
     args = _parseArguments()
-    _setupLogging(args.log_stream, args.log_level)
+    if _CI:
+        _setupLogging(sys.stdout, args.log_level)
+
     _setupPaths()
     #  _clear()
 
@@ -288,12 +257,13 @@ def main():
         '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
     file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
     logging.root.addHandler(file_handler)
+    logging.root.setLevel(args.log_level)
 
-    _logger.info("Environment info:")
-    _logger.info(" - CI:       %s", _CI)
-    _logger.info(" - APPVEYOR: %s", _APPVEYOR)
-    _logger.info(" - TRAVIS:   %s", _TRAVIS)
-    _logger.info(" - LOG:      %s", args.log_file)
+    print("Environment info:")
+    print(" - CI:       %s" % _CI)
+    print(" - APPVEYOR: %s" % _APPVEYOR)
+    print(" - TRAVIS:   %s" % _TRAVIS)
+    print(" - LOG:      %s" % args.log_file)
 
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
@@ -315,9 +285,9 @@ def main():
 
     cov.stop()
     cov.save()
-    for cmd in ('coverage combine',
-                'coverage html'):
-        _shell(cmd)
+    #  for cmd in ('coverage combine',
+    #              'coverage html'):
+    #      _shell(cmd)
 
     if not passed:
         _logger.warning("Some tests failed!")

@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -64,6 +64,7 @@ if (!(Test-Path "$env:BUILDER_PATH")) {
         set-location "$env:INSTALL_DIR\\bin"
         write-host "Current dir: $(get-location)"
         cmd /c "$env:BUILDER_PATH\\ghdl --dispconfig"
+        $env:PATH="$env:BUILDER_PATH;$env:PATH"
         set-location "$env:APPVEYOR_BUILD_FOLDER"
     }
 }

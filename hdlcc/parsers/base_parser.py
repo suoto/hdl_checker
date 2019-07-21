@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,18 +17,18 @@
 "Base source file parser"
 
 import abc
-import os
-import os.path as p
 import logging
+import os.path as p
 import re
 import time
 from contextlib import contextmanager
+from tempfile import NamedTemporaryFile
 
-from hdlcc.utils import getFileType, removeDuplicates
+from hdlcc.utils import getFileType, removeDuplicates, toBytes
 
 _logger = logging.getLogger(__name__)
 
-class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
+class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,useless-object-inheritance
     """
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
@@ -44,7 +44,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
 
     def __init__(self, filename, library='work', flags=None):
-        self.filename = p.normpath(filename)
+        self.filename = p.abspath(p.normpath(filename))
         self.library = library
         self.flags = flags if flags is not None else []
         self._cache = {}
@@ -52,9 +52,12 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         self._mtime = 0
         self.filetype = getFileType(self.filename)
 
-        self._prev = None
+        self.shadow_filename = None
 
-        self.abspath = p.abspath(filename)
+    @property
+    def abspath(self):
+        "Returns the absolute path of the source file"
+        return p.abspath(self.filename)
 
     def getState(self):
         """
@@ -62,7 +65,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
         state = {
             'filename' : self.filename,
-            'abspath' : self.abspath,
+            #  'abspath' : self.abspath,
             'library' : self.library,
             'flags' : self.flags,
             '_cache' : self._cache,
@@ -79,12 +82,13 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         # pylint: disable=protected-access
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
-        obj.abspath = state['abspath']
+        #  obj.abspath = state['abspath']
         obj.library = state['library']
         obj.flags = state['flags']
         obj._cache = state['_cache']
         obj._content = None
-        obj._prev = None
+        #  obj._prev = None
+        obj.shadow_filename = None
         obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
         # pylint: enable=protected-access
@@ -135,7 +139,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         if self._changed():
             # Since the content was set by the caller, we can't really clear
             # this unless we're handling with a proper file
-            if not self.hasBufferContent():  # pragma: no cover
+            if not self.shadow_filename:
                 self._content = None
             self._cache = {}
 
@@ -143,11 +147,16 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
         Gets file modification time as defined in p.getmtime
         """
-        if self.hasBufferContent():
+        if self.shadow_filename:
             return 0
         if not p.exists(self.filename):
             return None
         return p.getmtime(self.filename)
+
+    def _getTemporaryFile(self):
+        "Gets the temporary dump file context"
+        return NamedTemporaryFile(suffix='.' + self.filename.split('.')[-1],
+                                  prefix='temp_' + p.basename(self.filename))
 
     @contextmanager
     def havingBufferContent(self, content):
@@ -156,55 +165,35 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         that is different from the file it points to. This is intended to
         allow as-you-type checking
         """
-        self._setBufferContent(content)
-        yield
-        self._clearBufferContent()
+        with self._getTemporaryFile() as tmp_file:
+            _logger.debug("Dumping content to %s", tmp_file.name)
+            # Save attributes that will be overwritten
+            mtime, prev_content = self._mtime, self._content
 
-    def getDumpPath(self):
-        """
-        Returns the dump path in use while inside the havingBufferContent
-        context
-        """
-        return p.join(p.dirname(self.filename), '.dump_' +
-                      p.basename(self.filename))
+            self.shadow_filename = self.filename
 
-    def hasBufferContent(self):
-        """
-        Returns true whenever the source is inside the havingBufferContent
-        context
-        """
-        return self._prev is not None
+            # Overwrite attributes
+            self.filename = tmp_file.name
+            self._content = content
+            self._mtime = time.time()
+            # Dump data to the temporary file
+            tmp_file.file.write(toBytes(self._content))
+            tmp_file.file.flush()
 
-    def _setBufferContent(self, content):
-        """
-        Setup portion of the havingBufferContent context
-        """
-        _logger.debug("Setting source content")
-        self._prev = (self._mtime, self._content)
-        self._content = content
-        self._mtime = time.time()
+            try:
+                yield
+            finally:
+                _logger.debug("Clearing buffer content")
 
-        buffer_dump_path = self.getDumpPath()
-        _logger.debug("Dumping buffer content to '%s'", buffer_dump_path)
-        open(buffer_dump_path, 'w').write(self._content)
-
-    def _clearBufferContent(self):
-        """
-        Tear down portion of the havingBufferContent context
-        """
-        _logger.debug("Clearing buffer content")
-        buffer_dump_path = self.getDumpPath()
-        if p.exists(buffer_dump_path):
-            os.remove(buffer_dump_path)
-
-        self._mtime, self._content = self._prev
-        self._prev = None
+                # Restore previous values
+                self._mtime, self._content = mtime, prev_content
+                self.filename = self.shadow_filename
+                self.shadow_filename = None
 
     def getSourceContent(self):
         """
         Cached version of the _getSourceContent method
         """
-
         self._clearCachesIfChanged()
 
         if self._content is None:
@@ -220,7 +209,7 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         """
         self._clearCachesIfChanged()
 
-        if self.hasBufferContent():
+        if self.shadow_filename:
             return self._content
         if 'raw_content' not in self._cache or self._changed():
             self._cache['raw_content'] = \
@@ -282,8 +271,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         Returns the design units using the <library>.<design_unit>
         representation
         """
-        return set(["%s.%s" % (self.library, x['name']) \
-                    for x in self.getDesignUnits()])
+        return {"%s.%s" % (self.library, x['name']) \
+                    for x in self.getDesignUnits()}
 
     @abc.abstractmethod
     def _getSourceContent(self):
@@ -315,13 +304,11 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes
         describe its dependencies
         """
 
-    def _getMatchingLibrary(self, unit_type, unit_name):
+    def _getMatchingLibrary(self, unit_type, unit_name):  # pylint: disable=inconsistent-return-statements
         if unit_type == 'package':
             match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
                               self.getSourceContent(), flags=re.S)
             if match.groupdict()['library_name'] == 'work':
                 return self.library
-            else:
-                return match.groupdict()['library_name']
+            return match.groupdict()['library_name']
         assert False, "%s, %s" % (unit_type, unit_name)
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,32 +19,24 @@
 
 # PYTHON_ARGCOMPLETE_OK
 
-import sys
+import argparse
+import logging
 import os
 import os.path as p
-import logging
-import argparse
+import sys
 from threading import Timer
 
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
 
-def _setupPaths():  # pragma: no cover
-    "Add our dependencies to sys.path"
-    hdlcc_base_path = p.abspath(p.join(p.dirname(__file__), '..'))
-    for path in (
-            hdlcc_base_path,
-            p.join(hdlcc_base_path, 'dependencies', 'requests'),
-            p.join(hdlcc_base_path, 'dependencies', 'waitress'),
-            p.join(hdlcc_base_path, 'dependencies', 'bottle')):
-        path = p.abspath(path)
-        if path not in sys.path:
-            print("Adding '%s'" % path)
-            sys.path.insert(0, path)
-        else:
-            msg = "WARNING: '%s' was already on sys.path!" % path
-            print(msg)
-            _logger.warning(msg)
+_LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
+                           "jsonrpc": "2.0"}
+
+# Bootstrap the path if this is being called directly
+if __name__ == '__main__':
+    sys.path.insert(0, p.abspath(p.join(p.dirname(__file__), '..')))
+    import hdlcc.utils as utils
+    utils.setupPaths()
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
@@ -53,11 +45,12 @@ def parseArguments():
 
     # Options
     parser.add_argument('--host', action='store',)
-    parser.add_argument('--port', action='store',)
+    parser.add_argument('--port', action='store', type=int)
     parser.add_argument('--attach-to-pid', action='store', type=int)
     parser.add_argument('--log-level', action='store', )
     parser.add_argument('--log-stream', action='store', )
     parser.add_argument('--nocolor', action='store_true', default=False)
+    parser.add_argument('--lsp', action='store_true', default=False)
 
     parser.add_argument('--stdout', action='store')
     parser.add_argument('--stderr', action='store')
@@ -74,7 +67,7 @@ def parseArguments():
     args.port = args.port or 50000
     args.log_level = args.log_level or logging.INFO
     args.log_stream = args.log_stream or sys.stdout
-    args.color = False if args.nocolor else True
+    args.color = not args.nocolor
 
     del args.nocolor
 
@@ -105,16 +98,63 @@ def _setupPipeRedirection(stdout, stderr): # pragma: no cover
     if stderr is not None:
         sys.stderr = openForStdHandle(stderr)
 
-def main(): # pylint: disable=missing-docstring
-    args = parseArguments()
+def _binaryStdio():
+    """
+    (from https://github.com/palantir/python-language-server)
 
-    _setupPipeRedirection(args.stdout, args.stderr)
-    _setupPaths()
+    This seems to be different for Window/Unix Python2/3, so going by:
+        https://stackoverflow.com/questions/2850893/reading-binary-data-from-stdin
+    """
 
+    if not PY2:
+        # pylint: disable=no-member
+        stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
+    else:
+        # Python 2 on Windows opens sys.stdin in text mode, and
+        # binary data that read from it becomes corrupted on \r\n
+        if sys.platform == "win32":
+            # set sys.stdin to binary mode
+            # pylint: disable=no-member,import-error
+            import msvcrt
+            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+        stdin, stdout = sys.stdin, sys.stdout
+
+    return stdin, stdout
+
+def main(args): # pylint: disable=missing-docstring
+    try:
+        # LSP will use stdio to communicate
+        _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
+        import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+        utils.patchPyls()
+
+        startServer(args)
+    except Exception as exc:
+        if args.lsp:  # pragma: no cover
+            msg = ["Unable to start HDLCC LSP server: '%s'!" % repr(exc)]
+            if args.stderr:
+                msg += ["Check %s for more info" % args.stderr]
+            else:
+                msg += ["Use --stderr to redirect the output to a file for "
+                        "more info"]
+            _reportException(' '.join(msg))
+        _logger.exception("Failed to start server")
+        raise
+
+def startServer(args):
+    """
+    Import modules and tries to start a hdlcc server
+    """
     # Call it again to log the paths we added
     import hdlcc
     from hdlcc import handlers
-    import hdlcc.utils as utils # pylint: disable=redefined-outer-name
+    import hdlcc.lsp
+    from pyls.python_ls import start_io_lang_server
+
+    utils.setupLogging(args.log_stream, args.log_level, True) #args.color)
+
+    _logger = logging.getLogger(__name__)
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
@@ -134,7 +174,6 @@ def main(): # pylint: disable=missing-docstring
 
         Timer(2, _watchPidWrapper).start()
 
-    utils.setupLogging(args.log_stream, args.log_level, args.color)
     _logger.info(
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),
@@ -142,12 +181,43 @@ def main(): # pylint: disable=missing-docstring
         "our parent is %s" % args.attach_to_pid,
         hdlcc.__version__)
 
-    if args.attach_to_pid is not None:
-        _attachPids(args.attach_to_pid, os.getpid())
+    if args.lsp:
+        stdin, stdout = _binaryStdio()
+        start_io_lang_server(stdin, stdout, True,
+                             hdlcc.lsp.HdlccLanguageServer)
+    else:
+        if args.attach_to_pid is not None:
+            _attachPids(args.attach_to_pid, os.getpid())
 
-    handlers.app.run(host=args.host, port=args.port, threads=20,
-                     server='waitress')
+        handlers.app.run(host=args.host, port=args.port, threads=10,
+                         server='waitress')
+
+# This is a redefinition to be used as last resort if failed to setup
+# the server
+class MessageType:  # pylint: disable=too-few-public-methods
+    "LSP message types"
+    Error = 1
+    Warning = 2
+    Info = 3
+    Log = 4
+
+
+def _reportException(text):
+    "Hand crafted message to report issues when starting up the HDLCC server"
+    import json
+    message = _LSP_ERROR_MSG_TEMPLATE.copy()
+    message['params'] = {'message': text,
+                         'type': MessageType.Error}
+
+    body = json.dumps(message)
+
+    # Ensure we get the byte length, not the character length
+    content_length = len(body) if isinstance(body, bytes) else len(body.encode('utf-8'))
+    response = ("Content-Length: {}\r\n"
+                "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
+                "{}".format(content_length, body))
+
+    sys.stdout.write(response)
 
 if __name__ == '__main__':
-    main()
-
+    main(parseArguments())

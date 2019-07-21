@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,27 +19,29 @@
 
 from __future__ import print_function
 
+import argparse
+import logging
 import os
 import os.path as p
-import logging
-import time
-import argparse
-from prettytable import PrettyTable
 import sys
+import time
+
+from prettytable import PrettyTable
+
+import hdlcc
+from hdlcc.utils import setupLogging
 
 try:
     import cProfile as profile
 except ImportError:
-    import profile
+    import profile  # type: ignore
 
 try:
-    import argcomplete
+    import argcomplete  # type: ignore
     _HAS_ARGCOMPLETE = True
 except ImportError: # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
-import hdlcc
-from hdlcc.utils import setupLogging
 
 _logger = logging.getLogger(__name__)
 
@@ -163,34 +165,35 @@ def runStandaloneStaticCheck(fname):
     for record in getStaticMessages(lines):
         print(record)
 
-def buildSource(project, source):
+def printSourceDiags(project, source):
+    "Print diagnostics for the given source"
     start = time.time()
     records = project.getMessagesByPath(source)
     end = time.time()
     _logger.info("Building source '%s' took %.4fs", source, (end - start))
     for record in records:
-        if record['filename'] is not None:
-            message = [record['filename']]
+        if record.filename is not None:
+            message = [record.filename]
         else:
             message = [source]
 
         location = []
-        if record['line_number'] is not None:
-            location += ["line %s" % record['line_number']]
+        if record.line_number is not None:
+            location += ["line %s" % record.line_number]
 
-        if record['column'] is not None:
-            location += ["column %s" % record['column']]
+        if record.column is not None:
+            location += ["column %s" % record.column]
 
         if location:
             message += ["(%s)" % ', '.join(location)]
 
-        if record['error_number'] is None:
-            message += ["(%s):" % record['error_type']]
+        if record.error_code is None:
+            message += ["(%s):" % record.severity]
         else:
-            message += ["(%s-%s):" % (record['error_type'],
-                                      record['error_number'])]
+            message += ["(%s-%s):" % (record.severity,
+                                      record.error_code)]
 
-        message += [record['error_message']]
+        message += [record.text]
 
         print(' '.join(message))
 
@@ -215,7 +218,7 @@ def runner(args):
         print(sources)
 
     for source in args.sources:
-        buildSource(project, source)
+        printSourceDiags(project, source)
 
     if args.debug_parse_source_file:
         for source in args.sources:
@@ -264,4 +267,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-

@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,10 @@ import os.path as p
 import re
 from glob import glob
 
+from hdlcc.diagnostics import BuilderDiag, DiagType
+
 from .base_builder import BaseBuilder
+
 
 class GHDL(BaseBuilder):
     """
@@ -30,7 +33,7 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'ghdl'
-    file_types = ['vhdl', 'vhd']
+    file_types = {'vhdl', 'vhd'}
 
     # Default build flags
     default_flags = {
@@ -62,40 +65,43 @@ class GHDL(BaseBuilder):
     def __init__(self, target_folder):
         self._version = ''
         super(GHDL, self).__init__(target_folder)
-        self._builtin_libraries = []
         self._parseBuiltinLibraries()
 
     def _makeRecords(self, line):
-        record = {
-            'checker'       : self.builder_name,
-            'line_number'   : None,
-            'column'        : None,
-            'filename'      : None,
-            'error_number'  : None,
-            'error_type'    : None,
-            'error_message' : None}
-
         for match in self._stdout_message_parser(line):
-            _dict = match.groupdict()
-            for key in record.keys():
-                if key in _dict.keys():
-                    record[key] = _dict[key]
+            info = match.groupdict()
+            diag = BuilderDiag(
+                builder_name=self.builder_name,
+                text=info.get('error_message', None))
 
-            if _dict['is_warning']:
-                record['error_type'] = 'W'
+            if info['is_warning']:
+                diag.severity = DiagType.WARNING
             else:
-                record['error_type'] = 'E'
+                diag.severity = DiagType.ERROR
 
-        return [record]
+            filename = info.get('filename')
+            line_number = info.get('line_number')
+            column = info.get('column')
+
+            if filename is not None:
+                diag.filename = filename
+            if line_number is not None:
+                diag.line_number = line_number
+            if column is not None:
+                diag.column = column
+
+            self._logger.info("Diag: %s", diag)
+            yield diag
+
+        #  return [diag, ]
 
     def _checkEnvironment(self):
         stdout = self._subprocessRunner(['ghdl', '--version'])
-        self._version = \
-                re.findall(r"(?<=GHDL)\s+([^\s]+)\s+", \
-                stdout[0])[0]
-        self._logger.info("GHDL version string: '%s'. " + \
-                "Version number is '%s'", \
-                stdout[:-1], self._version)
+        self._version = re.findall(r"(?<=GHDL)\s+([^\s]+)\s+",
+                                   stdout[0])[0]
+        self._logger.info("GHDL version string: '%s'. "
+                          "Version number is '%s'",
+                          stdout[:-1], self._version)
 
     @staticmethod
     def isAvailable():
@@ -125,7 +131,7 @@ class GHDL(BaseBuilder):
 
                 for path in filter(p.isdir, libraries_paths):
                     name = path.split(p.sep)[-1]
-                    self._builtin_libraries.append(name.strip().lower())
+                    self._builtin_libraries.add(name.strip().lower())
 
         self._logger.debug("Found %d builtin libraries: %s",
                            len(self._builtin_libraries),
@@ -197,4 +203,3 @@ class GHDL(BaseBuilder):
                                  'unit_name' : mdict['unit_name']})
 
         return rebuilds
-

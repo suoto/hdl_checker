@@ -1,6 +1,6 @@
 # This file is part of HDL Code Checker.
 #
-# Copyright (c) 2016 Andre Souto
+# Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
 # HDL Code Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ from hdlcc.utils import writeListToFile, handlePathPlease
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(p.dirname(__file__), '..', '..', '.ci', 'test_support')
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 
 TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
@@ -254,13 +254,13 @@ with such.A('config parser object') as it:
 
             # Consider non absolute paths are relative to the configuration
             # file path
-            it.assertEquals(file_path,
-                            it.parser._getSourcePath(p.join('foo', 'bar.vhd')))
+            it.assertEquals([file_path, ],
+                            it.parser._getSourcePaths(p.join('foo', 'bar.vhd')))
 
             # Absolute paths should refer to the current path
             it.assertEquals(
-                p.abspath(p.join('foo', 'bar.vhd')),
-                it.parser._getSourcePath(p.abspath(p.join('foo', 'bar.vhd'))))
+                [p.abspath(p.join('foo', 'bar.vhd')), ],
+                it.parser._getSourcePaths(p.abspath(p.join('foo', 'bar.vhd'))))
 
     with it.having("no project file"):
         @it.should("create the object without error")
