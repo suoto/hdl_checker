@@ -16,27 +16,59 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "hdlcc installation script"
 
-from distutils.core import setup
+import setuptools
 import versioneer
 
+LONG_DESCRIPTION = open("README.md", "r").read()
+
+CLASSIFIERS = """\
+Development Status :: 5 - Production/Stable
+Environment :: Console
+Intended Audience :: Developers
+License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Operating System :: Microsoft :: Windows
+Operating System :: POSIX :: Linux
+Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 3
+Programming Language :: Python :: 2.7
+Programming Language :: Python :: 3.5
+Programming Language :: Python :: 3.6
+Programming Language :: Python :: 3.7
+Topic :: Software Development
+Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)
+Topic :: Text Editors :: Integrated Development Environments (IDE)
+"""
+
 # pylint: disable=bad-whitespace
-setup(
-    name             = 'hdlcc',
-    version          = versioneer.get_version(),
-    description      = 'HDL code checker',
-    author           = 'Andre Souto',
-    author_email     = 'andre820@gmail.com',
-    url              = 'https://github.com/suoto/hdlcc',
-    license          = 'GPLv3',
-    packages         = ['hdlcc', 'hdlcc.builders', 'hdlcc.parsers',
-                        'hdlcc.config_generators'],
-    install_requires = ['argcomplete', 'argparse', 'prettytable',
-                        'future>=0.14.0',
-                        'futures; python_version<"3.2"',
-                        'backports.functools_lru_cache; python_version<"3.2"',],
-    cmdclass         = versioneer.get_cmdclass(),
-    entry_points={
-        'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
-    }
+setuptools.setup(
+    name                          = 'hdlcc',
+    version                       = versioneer.get_version(),
+    description                   = 'HDL code checker',
+    long_description              = LONG_DESCRIPTION,
+    long_description_content_type = "text/markdown",
+    author                        = 'Andre Souto',
+    author_email                  = 'andre820@gmail.com',
+    url                           = 'https://github.com/suoto/hdlcc',
+    license                       = 'GPLv3',
+    keywords                      = 'VHDL Verilog SystemVerilog linter LSP language server protocol vimhdl vim-hdl',
+    platforms                     = 'any',
+    packages                      = setuptools.find_packages(),
+    install_requires              = ['argcomplete',
+                                     'argparse',
+                                     'bottle>=0.12.9',
+                                     'waitress>=0.9.0',
+                                     'prettytable>=0.7.2',
+                                     'requests==2.20.0',
+                                     'future>=0.14.0',
+                                     'futures; python_version<"3.2"',
+                                     'python-language-server>=0.26.1',
+                                     'backports.functools_lru_cache; python_version<"3.2"',],
+    cmdclass                      = versioneer.get_cmdclass(),
+    entry_points                  = {
+        'console_scripts' : ['hdlcc_standalone=hdlcc.standalone:main',
+                             'hdlcc=hdlcc.server:main', ]
+    },
+    classifiers=CLASSIFIERS.splitlines(),
 )
 # pylint: enable=bad-whitespace

@@ -330,39 +330,6 @@ def toBytes(value):  # pragma: no cover
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
 
-def setupPaths():
-    "Add our dependencies to sys.path"
-    # Pluggy is not standard...
-    base_path = p.abspath(p.join(p.dirname(__file__), '..'))
-    _logger.info("Base path: %s", base_path)
-    sys.path.insert(0, p.join(base_path, 'dependencies', 'pluggy', 'src'))
-
-    dependencies = list(glob(p.join(base_path, 'dependencies', '*')))
-
-    if not dependencies:  # pragma: no cover
-        _logger.error("Found nothing inside %s",
-                      p.join(base_path, 'dependencies', '*'))
-
-    for path in dependencies:
-        if not p.exists(path):
-            _logger.error("Path '%s' doesn't exist", path)
-        path = p.abspath(path)
-        if path not in sys.path:
-            _logger.debug("Inserting %s", path)
-            sys.path.insert(0, path)
-        else:  # pragma: no cover
-            _logger.debug("Path '%s' was already on sys.path!", path)
-
-def patchPyls():
-    """
-    We're using part of python-language-server, we don't really need all of its
-    dependencies nor want the user to install unrelated packages, so we'll mock
-    them.
-    """
-    import mock
-    sys.modules['importlib_metadata'] = mock.MagicMock()
-    sys.modules['jedi'] = mock.MagicMock()
-
 def isFileReadable(path):
     """
     Checks if a given file is readable
