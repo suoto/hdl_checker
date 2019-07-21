@@ -16,49 +16,45 @@
 language: python
 matrix:
   include:
-  # - name: Python 2.7 - msim
-  #   python: '2.7'
-  #   env: TOX_PYTHON_VERSION=py27 BUILDER=msim
-  # - name: Python 2.7 - msim
-  #   python: '2.7'
-  #   env: TOX_PYTHON_VERSION=py27 BUILDER=msim
-  # - name: Python 2.7 - ghdl
-  #   python: '2.7'
-  #   env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
-  # - name: Python 2.7 - xvhdl
-  #   python: '2.7'
-  #   env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
-  # - name: Python 2.7 - standalone and fallback
-  #   python: '2.7'
-  #   env: TOX_PYTHON_VERSION=py27 BUILDER=other
-  # - name: Python 3.7 - msim
-  #   python: '3.7'
-  #   dist: xenial
-  #   env: TOX_PYTHON_VERSION=py37 BUILDER=msim
-  # - name: Python 3.7 - ghdl
-  #   python: '3.7'
-  #   dist: xenial
-  #   env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
-  # - name: Python 3.7 - xvhdl
-  #   python: '3.7'
-  #   dist: xenial
-  #   env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
-  # - name: Python 3.7 - standalone and fallback
-  #   python: '3.7'
-  #   dist: xenial
-  #   env: TOX_PYTHON_VERSION=py37 BUILDER=other
-  - name: Testing
+  - name: Python 2.7 - msim
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=msim
+  - name: Python 2.7 - msim
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=msim
+  - name: Python 2.7 - ghdl
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
+  - name: Python 2.7 - xvhdl
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
+  - name: Python 2.7 - standalone and fallback
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=other
+  - name: Python 3.7 - msim
     python: '3.7'
     dist: xenial
-    env: BUILDER=none
+    env: TOX_PYTHON_VERSION=py37 BUILDER=msim
+  - name: Python 3.7 - ghdl
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
+  - name: Python 3.7 - xvhdl
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
+  - name: Python 3.7 - standalone and fallback
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=other
 deploy:
   provider: pypi
   user: suoto
   on:
     tags: true
-  server: https://test.pypi.org/legacy/
+  skip_existing: true
   password:
-    secure: zRETTCMz20Z6l1eadyL3fmysmH7Ssj8OG0R34bd36YkTMNKQFSNR1fxXQS+kMIWlO4zR8+D2Rc6blHl3zX3n5VWu8T/JF3/L4eJtLlLGv9JFHiZ/ckli9/g7rLH01x19VRxbesx+Q+X+d6lFU4G3avtV0CnkhEsdMroNvfZE3iaWvrKBuagY/JCOGr/DowiDDGvxc9mIQPeNg89gNI/DjqHnbmSyM3S0A86ObaOt/gCveA3Eb0BmuNA0ZIVX0J/lWHhe7oV7i4PTCTab3ixL2VL8mIzfErLHKk/cPFZ35qU64zV7EM03Wqq8mmoV3ZYfxzHcgTb0xhQs/4XoLkho6TqX4cLYfSsrACdiE0DMYcR2aG/PJwJa9J2tEoOpaqM5I1BlahUoiB2Eb2pf8Xt3tPvKtv4Ol6G+HIiGASJy65qRNBwiBmf8B5pbjwCm6JfcDBswVqMdU2eQxz5n/MDwXNt6IFnxVp7h1Qn/dIBkYmbQiJI4ZAdQSH8SynQfJ4f/FyMoetwGw3Joz94fZfnGNjeLo7oAMY91ssdm6oJnYHwyJseAJrsGU8JRv01k4CZpDswSon136AOcK6Uy1lJ4o/7gd5gXGXVXJXsTpom+Ylca9wRTeggDzP8gvNNWcxlWiDaUuRlbYM+jsUWwrzH/4/aSJZfbI+bqkW+FkPTM0So=
+    secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
 
 before_install:
 - sudo apt-get update -qq;
