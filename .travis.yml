@@ -16,57 +16,54 @@
 language: python
 matrix:
   include:
-    - name: "Python 2.7 - msim"
-      python: "2.7"
-      env: TOX_PYTHON_VERSION=py27 BUILDER=msim
-    - name: "Python 2.7 - ghdl"
-      python: "2.7"
-      env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
-    - name: "Python 2.7 - xvhdl"
-      python: "2.7"
-      env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
-    - name: "Python 2.7 - standalone and fallback"
-      python: "2.7"
-      env: TOX_PYTHON_VERSION=py27 BUILDER=other
-
-    - name: "Python 3.7 - msim"
-      python: "3.7"
-      dist: xenial
-      env: TOX_PYTHON_VERSION=py37 BUILDER=msim
-    - name: "Python 3.7 - ghdl"
-      python: "3.7"
-      dist: xenial
-      env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
-    - name: "Python 3.7 - xvhdl"
-      python: "3.7"
-      dist: xenial
-      env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
-    - name: "Python 3.7 - standalone and fallback"
-      python: "3.7"
-      dist: xenial
-      env: TOX_PYTHON_VERSION=py37 BUILDER=other
-
-# env:
-#   matrix:
-#     - BUILDER=msim
-#     - BUILDER=ghdl
-#     - BUILDER=fallback
-#     - BUILDER=standalone
-#     - BUILDER=xvhdl
+  - name: Python 2.7 - msim
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=msim
+  - name: Python 2.7 - ghdl
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
+  - name: Python 2.7 - xvhdl
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=xvhdl
+  - name: Python 2.7 - standalone and fallback
+    python: '2.7'
+    env: TOX_PYTHON_VERSION=py27 BUILDER=other
+  - name: Python 3.7 - msim
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=msim
+  - name: Python 3.7 - ghdl
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=ghdl
+  - name: Python 3.7 - xvhdl
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=xvhdl
+  - name: Python 3.7 - standalone and fallback
+    python: '3.7'
+    dist: xenial
+    env: TOX_PYTHON_VERSION=py37 BUILDER=other
+deploy:
+  provider: pypi
+  user: suoto
+  on:
+    tags: true
+  server: https://test.pypi.org/legacy/
+  password:
+    secure: zRETTCMz20Z6l1eadyL3fmysmH7Ssj8OG0R34bd36YkTMNKQFSNR1fxXQS+kMIWlO4zR8+D2Rc6blHl3zX3n5VWu8T/JF3/L4eJtLlLGv9JFHiZ/ckli9/g7rLH01x19VRxbesx+Q+X+d6lFU4G3avtV0CnkhEsdMroNvfZE3iaWvrKBuagY/JCOGr/DowiDDGvxc9mIQPeNg89gNI/DjqHnbmSyM3S0A86ObaOt/gCveA3Eb0BmuNA0ZIVX0J/lWHhe7oV7i4PTCTab3ixL2VL8mIzfErLHKk/cPFZ35qU64zV7EM03Wqq8mmoV3ZYfxzHcgTb0xhQs/4XoLkho6TqX4cLYfSsrACdiE0DMYcR2aG/PJwJa9J2tEoOpaqM5I1BlahUoiB2Eb2pf8Xt3tPvKtv4Ol6G+HIiGASJy65qRNBwiBmf8B5pbjwCm6JfcDBswVqMdU2eQxz5n/MDwXNt6IFnxVp7h1Qn/dIBkYmbQiJI4ZAdQSH8SynQfJ4f/FyMoetwGw3Joz94fZfnGNjeLo7oAMY91ssdm6oJnYHwyJseAJrsGU8JRv01k4CZpDswSon136AOcK6Uy1lJ4o/7gd5gXGXVXJXsTpom+Ylca9wRTeggDzP8gvNNWcxlWiDaUuRlbYM+jsUWwrzH/4/aSJZfbI+bqkW+FkPTM0So=
 
 before_install:
-  - sudo apt-get update -qq;
-  - sudo apt-get install -qq libtcl8.5
-  - sudo dpkg --add-architecture i386
-  - sudo apt-get install -qq build-essential
-  - sudo apt-get install -qq gcc-multilib
-    g++-multilib lib32z1 lib32stdc++6 lib32gcc1 expat:i386 fontconfig:i386
-    libfreetype6:i386 libexpat1:i386 libc6:i386 libgtk-3-0:i386
-    libcanberra0:i386  libice6:i386 libsm6:i386 libncurses5:i386 zlib1g:i386
-    libx11-6:i386 libxau6:i386 libxdmcp6:i386 libxext6:i386 libxft2:i386
-    libxrender1:i386 libxt6:i386 libxtst6:i386 libharfbuzz-dev:i386
-  - export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
-
+- sudo apt-get update -qq;
+- sudo apt-get install -qq libtcl8.5
+- sudo dpkg --add-architecture i386
+- sudo apt-get install -qq build-essential
+- sudo apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1
+  expat:i386 fontconfig:i386 libfreetype6:i386 libexpat1:i386 libc6:i386 libgtk-3-0:i386
+  libcanberra0:i386  libice6:i386 libsm6:i386 libncurses5:i386 zlib1g:i386 libx11-6:i386
+  libxau6:i386 libxdmcp6:i386 libxext6:i386 libxft2:i386 libxrender1:i386 libxt6:i386
+  libxtst6:i386 libharfbuzz-dev:i386
+- export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
 before_script:
   # - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
   - pip install tox
@@ -83,17 +80,20 @@ before_script:
 #   - pip install -e .
 # command to run tests
 script:
-  - if [ "${BUILDER}" == "msim" ] ; then  tox -e ${TOX_PYTHON_VERSION}-msim-linux ; fi
-  - if [ "${BUILDER}" == "ghdl" ] ; then  tox -e ${TOX_PYTHON_VERSION}-ghdl-linux ; fi
-  - if [ "${BUILDER}" == "xvhdl" ] ; then tox -e ${TOX_PYTHON_VERSION}-xvhdl-linux ; fi
-  - if [ "${BUILDER}" == "other" ] ; then tox -e ${TOX_PYTHON_VERSION}-fallback-linux -e ${TOX_PYTHON_VERSION}-standalone-linux ; fi
+- if [ "${BUILDER}" == "msim" ] ; then  tox -e ${TOX_PYTHON_VERSION}-msim-linux ; fi
+- if [ "${BUILDER}" == "ghdl" ] ; then  tox -e ${TOX_PYTHON_VERSION}-ghdl-linux ; fi
+- if [ "${BUILDER}" == "xvhdl" ] ; then tox -e ${TOX_PYTHON_VERSION}-xvhdl-linux ; fi
+- if [ "${BUILDER}" == "other" ] ; then \
+    tox -e ${TOX_PYTHON_VERSION}-fallback-linux \
+        -e ${TOX_PYTHON_VERSION}-standalone-linux ; \
+  fi
 after_success:
-  - "coverage combine"
-  - "coverage report"
-  - "export COVERALLS_PARALLEL=true"
-  - "coveralls"
-  - "codecov"
+- coverage combine
+- coverage report
+- export COVERALLS_PARALLEL=true
+- coveralls
+- codecov
 cache:
   pip: true
   directories:
-    - ~/cache/
+  - "~/cache/"
