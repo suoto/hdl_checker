@@ -35,9 +35,13 @@ setuptools.setup(
     packages                      = setuptools.find_packages(),
     install_requires              = ['argcomplete',
                                      'argparse',
+                                     'bottle>=0.12.9',
+                                     'waitress>=0.9.0',
                                      'prettytable',
+                                     'requests==2.20.0',
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
+                                     'python-language-server>=0.26.1',
                                      'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {

@@ -22,31 +22,26 @@
 # pylint: disable=function-redefined
 
 
-import sys
 import logging
 import os
 import os.path as p
-from threading import Timer
+import sys
 import threading
+from threading import Timer
 import time
 
 import mock
 import unittest2
 from nose2.tools import such
 
-from hdlcc.utils import patchPyls, onWindows
-patchPyls()
-
-# pylint: disable=ungrouped-imports
-
-import hdlcc.lsp as lsp
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-
 import pyls.lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
 
+import hdlcc.lsp as lsp
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.utils import onWindows
 
 _logger = logging.getLogger(__name__)
 

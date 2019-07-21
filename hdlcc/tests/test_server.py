@@ -17,21 +17,24 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import json
 import logging
 import os
 import os.path as p
 import subprocess as subp
 import time
-
-from multiprocessing import Queue, Process
+from multiprocessing import Process, Queue
 from threading import Thread
-import json
-
-from nose2.tools import such
 
 import mock
+from nose2.tools import such
+
+from pyls import uris
+from pyls.python_ls import start_io_lang_server
 
 import requests
+
+import hdlcc
 import hdlcc.utils as utils
 from hdlcc.tests.mocks import disableVunit
 
@@ -70,9 +73,6 @@ def _startClient(client):
 class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-few-public-methods
     """ A class to setup a client/server pair """
     def __init__(self):
-        from pyls.python_ls import start_io_lang_server
-        import hdlcc
-        import hdlcc.lsp
         # Client to Server pipe
         csr, csw = os.pipe()
         # Server to client pipe
@@ -219,17 +219,9 @@ with such.A("hdlcc server") as it:
                 requests.post(it._url + '/get_diagnose_info')
 
     with it.having('LSP server'):
-        @it.has_setup
-        def setup():
-            import hdlcc
-            from hdlcc.utils import patchPyls
-            patchPyls()
-
         @it.should("initialize with no project file")
         @disableVunit
         def test():
-            from pyls import uris
-
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
                 'initialize',
@@ -242,9 +234,8 @@ with such.A("hdlcc server") as it:
         @it.should("show message with reason for failing to start")
         @disableVunit
         def test():
-            import hdlcc
 
-            def startServer(*args):
+            def startServer(*_):
                 assert False
 
             args = type('args', (object, ),

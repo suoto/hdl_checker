@@ -353,16 +353,6 @@ def setupPaths():
         else:  # pragma: no cover
             _logger.debug("Path '%s' was already on sys.path!", path)
 
-def patchPyls():
-    """
-    We're using part of python-language-server, we don't really need all of its
-    dependencies nor want the user to install unrelated packages, so we'll mock
-    them.
-    """
-    import mock
-    sys.modules['importlib_metadata'] = mock.MagicMock()
-    sys.modules['jedi'] = mock.MagicMock()
-
 def isFileReadable(path):
     """
     Checks if a given file is readable
