@@ -21,6 +21,26 @@ import versioneer
 
 LONG_DESCRIPTION = open("README.md", "r").read()
 
+CLASSIFIERS = """\
+Development Status :: 5 - Production/Stable
+Environment :: Console
+Intended Audience :: Developers
+License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Operating System :: Microsoft :: Windows
+Operating System :: POSIX :: Linux
+Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 3
+Programming Language :: Python :: 2.7
+Programming Language :: Python :: 3.5
+Programming Language :: Python :: 3.6
+Programming Language :: Python :: 3.7
+Topic :: Software Development
+Topic :: Software Development :: Text Editors
+Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)
+Topic :: Text Editors :: Integrated Development Environments (IDE)
+"""
+
 # pylint: disable=bad-whitespace
 setuptools.setup(
     name                          = 'hdlcc',
@@ -32,12 +52,14 @@ setuptools.setup(
     author_email                  = 'andre820@gmail.com',
     url                           = 'https://github.com/suoto/hdlcc',
     license                       = 'GPLv3',
+    keywords                      = 'VHDL Verilog SystemVerilog linter LSP language server protocol vimhdl vim-hdl',
+    platforms                     = 'any',
     packages                      = setuptools.find_packages(),
     install_requires              = ['argcomplete',
                                      'argparse',
                                      'bottle>=0.12.9',
                                      'waitress>=0.9.0',
-                                     'prettytable',
+                                     'prettytable>=0.7.2',
                                      'requests==2.20.0',
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
@@ -46,6 +68,7 @@ setuptools.setup(
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {
         'console_scripts' : ['hdlcc=hdlcc.standalone:main',]
-    }
+    },
+    classifiers=CLASSIFIERS.splitlines(),
 )
 # pylint: enable=bad-whitespace
