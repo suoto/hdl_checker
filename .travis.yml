@@ -19,9 +19,6 @@ matrix:
   - name: Python 2.7 - msim
     python: '2.7'
     env: TOX_PYTHON_VERSION=py27 BUILDER=msim
-  - name: Python 2.7 - msim
-    python: '2.7'
-    env: TOX_PYTHON_VERSION=py27 BUILDER=msim
   - name: Python 2.7 - ghdl
     python: '2.7'
     env: TOX_PYTHON_VERSION=py27 BUILDER=ghdl
@@ -47,7 +44,6 @@ matrix:
     python: '3.7'
     dist: xenial
     env: TOX_PYTHON_VERSION=py37 BUILDER=other
-
 deploy:
   provider: pypi
   user: suoto
@@ -69,6 +65,7 @@ before_install:
   libxau6:i386 libxdmcp6:i386 libxext6:i386 libxft2:i386 libxrender1:i386 libxt6:i386
   libxtst6:i386 libharfbuzz-dev:i386
 - export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
+
 before_script:
   # - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
   - pip install tox
