@@ -312,7 +312,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         self._logger.debug("Checking build sequence for %s", source)
         for dependency in self._resolveRelativeNames(source):
-
             # Get a list of source files that contains this design unit.
             # At this point, all the info we have pretty much depends on
             # parsed text. Since Verilog is case sensitive and VHDL is not,

@@ -22,9 +22,15 @@
 import argparse
 import logging
 import os
-import os.path as p
 import sys
 from threading import Timer
+
+from pyls.python_ls import start_io_lang_server
+
+import hdlcc
+import hdlcc.lsp
+import hdlcc.utils as utils
+from hdlcc import handlers
 
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
@@ -32,14 +38,13 @@ PY2 = sys.version_info[0] == 2
 _LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
                            "jsonrpc": "2.0"}
 
-# Bootstrap the path if this is being called directly
-if __name__ == '__main__':
-    sys.path.insert(0, p.abspath(p.join(p.dirname(__file__), '..')))
-    import hdlcc.utils as utils
-    utils.setupPaths()
 
 def parseArguments():
     "Argument parser for standalone hdlcc"
+
+    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):  # pragma: no cover
+        print(hdlcc.__version__)
+        sys.exit(0)
 
     parser = argparse.ArgumentParser()
 
@@ -63,10 +68,15 @@ def parseArguments():
 
     args = parser.parse_args()
 
-    args.host = args.host or 'localhost'
-    args.port = args.port or 50000
+    if args.lsp:
+        args.host = None
+        args.port = None
+    else:
+        args.host = args.host or 'localhost'
+        args.port = args.port or 50000
+        args.log_stream = args.log_stream or sys.stdout
+
     args.log_level = args.log_level or logging.INFO
-    args.log_stream = args.log_stream or sys.stdout
     args.color = not args.nocolor
 
     del args.nocolor
@@ -122,12 +132,10 @@ def _binaryStdio():
 
     return stdin, stdout
 
-def main(args): # pylint: disable=missing-docstring
+def run(args): # pylint: disable=missing-docstring
     try:
         # LSP will use stdio to communicate
         _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
-        import hdlcc.utils as utils # pylint: disable=redefined-outer-name
-        utils.patchPyls()
 
         startServer(args)
     except Exception as exc:
@@ -146,13 +154,8 @@ def startServer(args):
     """
     Import modules and tries to start a hdlcc server
     """
-    # Call it again to log the paths we added
-    import hdlcc
-    from hdlcc import handlers
-    import hdlcc.lsp
-    from pyls.python_ls import start_io_lang_server
-
-    utils.setupLogging(args.log_stream, args.log_level, True) #args.color)
+    if args.log_stream:
+        utils.setupLogging(args.log_stream, args.log_level, args.color)
 
     _logger = logging.getLogger(__name__)
 
@@ -219,5 +222,8 @@ def _reportException(text):
 
     sys.stdout.write(response)
 
+def main():
+    return run(parseArguments())
+
 if __name__ == '__main__':
-    main(parseArguments())
+    main()

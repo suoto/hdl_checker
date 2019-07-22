@@ -18,10 +18,10 @@
 
 # pylint: disable=useless-object-inheritance
 
+import sys
 import functools
 import logging
 import os.path as p
-import sys
 
 import pyls.lsp as defines
 from pyls._utils import debounce
@@ -30,13 +30,6 @@ from pyls.uris import to_fs_path
 
 from hdlcc.diagnostics import DiagType, FailedToCreateProject
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
-
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache
-
-
 
 MONITORED_FILES = ('.vhd', '.vhdl', '.sv', '.svh', '.v', '.vh')
 CONFIG_FILES = ()
@@ -154,17 +147,14 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
         super(HdlCodeCheckerServer, self)._setupEnvIfNeeded()
 
-    @lru_cache(maxsize=16)
     def _handleUiInfo(self, message):
         self._logger.debug("UI info: %s", message)
         self._workspace.show_message(message, defines.MessageType.Info)
 
-    @lru_cache(maxsize=16)
     def _handleUiWarning(self, message):
         self._logger.debug("UI warning: %s", message)
         self._workspace.show_message(message, defines.MessageType.Warning)
 
-    @lru_cache(maxsize=16)
     def _handleUiError(self, message):
         self._logger.debug("UI error: %s", message)
         self._workspace.show_message(message, defines.MessageType.Error)

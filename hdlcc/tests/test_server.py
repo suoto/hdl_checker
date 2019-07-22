@@ -17,21 +17,26 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import json
 import logging
 import os
 import os.path as p
 import subprocess as subp
 import time
-
-from multiprocessing import Queue, Process
+from multiprocessing import Process, Queue
+import tempfile
 from threading import Thread
-import json
-
-from nose2.tools import such
 
 import mock
+from nose2.tools import such
+
+from pyls import uris
+from pyls.python_ls import start_io_lang_server
 
 import requests
+
+import hdlcc
+import hdlcc.lsp
 import hdlcc.utils as utils
 from hdlcc.tests.mocks import disableVunit
 
@@ -70,9 +75,6 @@ def _startClient(client):
 class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-few-public-methods
     """ A class to setup a client/server pair """
     def __init__(self):
-        from pyls.python_ls import start_io_lang_server
-        import hdlcc
-        import hdlcc.lsp
         # Client to Server pipe
         csr, csw = os.pipe()
         # Server to client pipe
@@ -219,17 +221,9 @@ with such.A("hdlcc server") as it:
                 requests.post(it._url + '/get_diagnose_info')
 
     with it.having('LSP server'):
-        @it.has_setup
-        def setup():
-            import hdlcc
-            from hdlcc.utils import patchPyls
-            patchPyls()
-
         @it.should("initialize with no project file")
         @disableVunit
         def test():
-            from pyls import uris
-
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
                 'initialize',
@@ -242,26 +236,27 @@ with such.A("hdlcc server") as it:
         @it.should("show message with reason for failing to start")
         @disableVunit
         def test():
-            import hdlcc
 
-            def startServer(*args):
+            def start_io_lang_server(*_):
                 assert False
 
             args = type('args', (object, ),
                         {'lsp': True,
                          'log_level': SERVER_LOG_LEVEL,
                          'stderr': p.join(TEST_LOG_PATH, 'hdlcc-stderr.log'),
-                         'log_stream': p.join(TEST_LOG_PATH, 'tests.log')})
+                         'log_stream': p.join(TEST_LOG_PATH, 'tests.log'),
+                         'color': None,
+                         'attach_to_pid': None})
 
             # Python 2 won't allow to mock sys.stdout.write directly
             import sys
             stdout = mock.MagicMock(spec=sys.stdout)
             stdout.write = mock.MagicMock(spec=sys.stdout.write)
 
-            with mock.patch('hdlcc.server.startServer', startServer):
+            with mock.patch('hdlcc.server.start_io_lang_server', start_io_lang_server):
                 with mock.patch('hdlcc.server.sys.stdout', stdout):
                     with it.assertRaises(AssertionError):
-                        hdlcc.server.main(args)
+                        hdlcc.server.run(args)
 
             # Build up the expected response
             body = json.dumps({
@@ -279,5 +274,55 @@ with such.A("hdlcc server") as it:
                         "{}".format(len(body), body))
 
             stdout.write.assert_called_once_with(response)
+
+    with it.having('LSP server executable'):
+        def assertCommandPrints(cmd, stdout, **kwargs):
+            _logger.debug("Running command: %s", cmd)
+            output = subp.check_output(cmd, **kwargs).decode().strip()
+            it.assertEqual(output, stdout)
+
+        @it.should("report version correctly")
+        def test():
+            assertCommandPrints(['hdlcc', '--version'], hdlcc.__version__)
+
+        @it.should("start server given the --lsp flag")
+        def test():
+            log_file = tempfile.mktemp()
+
+            cmd = ['hdlcc', '--lsp', '--nocolor', '--log-stream', log_file]
+
+            server = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
+
+            # Close stdin so the server exits
+            stdout, stderr = server.communicate('')
+
+            it.assertEqual(stdout, b'')
+            it.assertEqual(stderr, b'')
+
+            # On Windows the Popen PID and the *actual* PID don't always match
+            # for some reason. Since we're not testing this, just skip the
+            # first line
+            log_content = open(log_file, 'rb').read().decode().split('\n')
+
+            expected = [
+                "Starting server. Our PID is {}, no parent PID to attach to. "
+                 "Version string for hdlcc is '{}'".format(
+                     server.pid, hdlcc.__version__),
+                 "Starting HdlccLanguageServer IO language server",
+                 "No configuration file given, using fallback",
+                 "Using Fallback builder",
+                 "Selected builder is 'fallback'",
+                 ""]
+
+            _logger.info("Log content: %s", log_content)
+
+            if utils.onWindows():
+                log_content = log_content[1:]
+                expected = expected[1:]
+
+            it.assertEqual(log_content, expected)
+
+            os.remove(log_file)
+
 
 it.createTests(globals())

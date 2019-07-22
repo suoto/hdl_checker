@@ -263,7 +263,6 @@ with such.A("hdlcc project") as it:
                 DependencySpec(library='some_lib', name='indirect_dependency'),
                 DependencySpec(library='some_lib', name='common_dependency')])
 
-
         indirect_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'indirect_dependency',
@@ -271,7 +270,6 @@ with such.A("hdlcc project") as it:
             dependencies=[
                 DependencySpec(library='some_lib', name='indirect_dependency'),
                 DependencySpec(library='some_lib', name='common_dependency')])
-
 
         common_dependency = SourceMock(
             library='some_lib',
@@ -296,7 +294,6 @@ with such.A("hdlcc project") as it:
                            'type' : 'entity'}],
             dependencies=[DependencySpec(library='some_lib',
                                          name='direct_dependency')])
-
 
         direct_dependency = SourceMock(
             library='some_lib',
@@ -415,7 +412,7 @@ with such.A("hdlcc project") as it:
         # hdlcc should flag which one it picked, although the exact one might
         # vary
         it.assertEqual(len(project._outstanding_diags), 1,
-                      "Should have exactly one outstanding diagnostics by now")
+                       "Should have exactly one outstanding diagnostics by now")
         it.assertIn(
             project._outstanding_diags.pop(),
             [DependencyNotUnique(filename="some_lib_target.vhd",

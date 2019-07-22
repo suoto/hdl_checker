@@ -59,9 +59,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         "Returns the absolute path of the source file"
         return p.abspath(self.filename)
 
-    def __jsonEncode__(self):
-        return self.getState()
-
     def getState(self):
         """
         Gets a dict that describes the current state of this object
@@ -88,7 +85,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         obj.library = state['library']
         obj.flags = state['flags']
         obj._cache = state['_cache']
-        #  obj._cache = {}
         obj._content = None
         #  obj._prev = None
         obj.shadow_filename = None
