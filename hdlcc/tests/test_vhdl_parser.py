@@ -33,21 +33,21 @@ _logger = logging.getLogger(__name__)
 _FILENAME = 'source.vhd'
 
 with such.A('VHDL source file object') as it:
-    #  # Workaround for Python 2.x and 3.x differences
-    #  if six.PY3:
-    #      it.assertItemsEqual = it.assertCountEqual
+    # Workaround for Python 2.x and 3.x differences
+    if six.PY3:
+        it.assertItemsEqual = it.assertCountEqual
 
-    def _compareLists(first, second):
-        temp = list(second)   # make a mutable copy
-        try:
-            for elem in first:
-                temp.remove(elem)
-        except ValueError:
-            return False
-        if not temp:
-            it.fail("Lists {} and {} differ".format(first, second))
+    #  def _compareLists(first, second):
+    #      temp = list(second)   # make a mutable copy
+    #      try:
+    #          for elem in first:
+    #              temp.remove(elem)
+    #      except ValueError:
+    #          return False
+    #      if not temp:
+    #          it.fail("Lists {} and {} differ".format(first, second))
 
-    it.assertItemsEqual = _compareLists
+    #  it.assertItemsEqual = _compareLists
 
 
     with it.having('an entity code'):
@@ -116,37 +116,11 @@ with such.A('VHDL source file object') as it:
 
         @it.should('return its dependencies')
         def test():
-            _logger.debug("")
-            dependencies = list(it.source.getDependencies())
-            it.assertNotEqual(dependencies, None, "No dependencies found")
-            for dependency in dependencies:
-                _logger.debug("- %s", dependency)
-
-            expected = [DependencySpec(library='ieee', name='std_logic_1164'),
+            it.assertItemsEqual(
+                it.source.getDependencies(),
+                [DependencySpec(library='ieee', name='std_logic_1164'),
                  DependencySpec(library='ieee', name='std_logic_arith'),
-                 DependencySpec(library='work', name='package_with_constants')]
-
-            for name, l in (('deps', dependencies),
-                            ('expected', expected)):
-                _logger.info("## %s ##", name)
-                for item in l:
-                    _logger.info("repr: %s", repr(item))
-                    _logger.info("id: %s", id(item))
-                    _logger.info("hash: %s", hash(item))
-
-            for i in expected:
-                it.assertIn(i, dependencies)
-
-            for i in dependencies:
-                it.assertIn(i, expected)
-
-            #  it.assertListEqual(sorted(expected), sorted(dependencies))
-            #  it.assertEqual(sorted(expected), sorted(dependencies))
-            #  it.assertTrue(compare(expected, dependencies))
-            it.assertItemsEqual(expected, dependencies)
-
-            it.fail('soioi')
-
+                 DependencySpec(library='work', name='package_with_constants')])
 
         @it.should('return source modification time')
         def test():
@@ -173,15 +147,12 @@ with such.A('VHDL source file object') as it:
             code.insert(1, '    use some_library.some_package;')
             writeListToFile(_FILENAME, code)
 
-            dependencies = it.source.getDependencies()
-            _logger.info("Dependencies: %s", dependencies)
-            it.assertNotEqual(dependencies, None, "No dependencies found")
             it.assertItemsEqual(
+                it.source.getDependencies(),
                 {DependencySpec(library='ieee', name='std_logic_1164'),
                  DependencySpec(library='ieee', name='std_logic_arith'),
                  DependencySpec(library='some_library', name='some_package'),
-                 DependencySpec(library='work', name='package_with_constants')},
-                dependencies)
+                 DependencySpec(library='work', name='package_with_constants')})
 
         @it.should('handle implicit libraries')
         def test():

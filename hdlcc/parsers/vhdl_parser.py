@@ -79,8 +79,8 @@ class VhdlParser(BaseSourceFile):
             # Library 'work' means 'this' library, so we replace it
             # by the library name itself
             dependency = DependencySpec(
-                library=str(self.library if library == 'work' else library),
-                name=str(unit))
+                library=self.library if library == 'work' else library,
+                name=unit)
                 #  location=SourceLocation(
                 #      filename=self.filename,
                 #      line_number=text[:match.start()].count('\n'),
@@ -97,8 +97,8 @@ class VhdlParser(BaseSourceFile):
                                           column_number=None)
 
                 dependencies.add(
-                    DependencySpec(library=str(self.library),
-                                   name=str(package_body_name),
+                    DependencySpec(library=self.library,
+                                   name=package_body_name,
                                    location=None)) #location))
 
         return dependencies
@@ -128,13 +128,13 @@ class VhdlParser(BaseSourceFile):
         for match, line_number in self._iterDesignUnitMatches():
             unit = None
             if match['package_name'] is not None:
-                unit = {'name' : match['package_name'],
+                unit = {'name' : str(match['package_name']),
                         'type' : 'package'}
             elif match['entity_name'] is not None:
-                unit = {'name' : match['entity_name'],
+                unit = {'name' : str(match['entity_name']),
                         'type' : 'entity'}
             elif match['context_name'] is not None:
-                unit = {'name' : match['context_name'],
+                unit = {'name' : str(match['context_name']),
                         'type' : 'context'}
 
             if unit:

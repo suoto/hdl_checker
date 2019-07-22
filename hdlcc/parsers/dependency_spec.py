@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 ""
 
+from functools import total_ordering
+
 class SourceLocation(object):
     def __init__(self, filename, line_number, column_number=None):
         self.filename = filename
@@ -27,26 +29,15 @@ class SourceLocation(object):
             __name__, self.__class__.__name__, repr(self.filename),
             repr(self.line_number), repr(self.column_number))
 
-    #  def __hash__(self):
-    #      return hash((self.filename, self.line_number, self.column_number))
-
-    def __eq__(self, other):
-        try:
-            for attr in ('filename', 'line_number', 'column_number'):
-                if getattr(self, attr) != getattr(other, attr):
-                    return False
-
-        except AttributeError:
-            return False
-
-        return True
-
-
+@total_ordering
 class DependencySpec(object):
     def __init__(self, library, name, location=None):
         self._library = library
         self._name = name
         self._location = location
+
+    def __lt__(self, other):
+        return hash(self) < hash(other)
 
     @property
     def library(self):
@@ -61,11 +52,7 @@ class DependencySpec(object):
         return self._location
 
     @property
-    def _hash_key(self):
-        return self.library, self.name
-
-    @property
-    def _eq_key(self):
+    def __hash_key__(self):
         return self.library, self.name
 
     def __repr__(self):
@@ -75,12 +62,12 @@ class DependencySpec(object):
 
     def __hash__(self):
         """Overrides the default implementation"""
-        return hash(tuple(sorted(self._hash_key)))
+        return hash(tuple(sorted(self.__hash_key__)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(other, DependencySpec):
-            return self._eq_key == other._eq_key
+            return self.__hash_key__ == other.__hash_key__
         return NotImplemented
 
     def __ne__(self, other):
