@@ -197,7 +197,11 @@ with such.A("hdlcc project") as it:
                       'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
         source, remarks = project.getSourceByPath(path)
-        it.assertEquals(source, VhdlParser(path, library='undefined'))
+
+        it.assertSameFile(source.filename, path)
+        it.assertEquals(source.library, 'undefined')
+        it.assertEquals(source.filetype, 'vhdl')
+
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(remarks,
                             [PathNotInProjectFile(p.abspath(path)), ])
@@ -210,7 +214,14 @@ with such.A("hdlcc project") as it:
     def test(_, path):
         project = StandaloneProjectBuilder()
         source, remarks = project.getSourceByPath(path)
-        it.assertEquals(source, VerilogParser(path, library='undefined'))
+
+        it.assertSameFile(source.filename, path)
+        it.assertEquals(source.library, 'undefined')
+        if path.endswith('.v'):
+            it.assertEquals(source.filetype, 'verilog')
+        elif path.endswith('.v'):
+            it.assertEquals(source.filetype, 'systemverilog')
+
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(remarks,
                             [PathNotInProjectFile(p.abspath(path)), ])

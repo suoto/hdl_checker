@@ -39,7 +39,8 @@ class Encoder(json.JSONEncoder):
             dct = o.__jsonEncode__()
             #  assert '__class__' not in dct
             dct['__class__'] = o.__class__.__name__
-            return json.dumps(dct)
+            _logger.warning("It's got %s", repr(dct))
+            return dct
         # Let the base class default method raise the TypeError
         try:
             return json.JSONEncoder.default(self, o)
@@ -47,8 +48,6 @@ class Encoder(json.JSONEncoder):
             _logger.fatal("object: %s", o)
             raise
 
-def json_object_hook(dict_):
-    return dict_
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"

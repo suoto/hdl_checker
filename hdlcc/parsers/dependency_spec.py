@@ -16,17 +16,35 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 ""
 
-from functools import total_ordering
+import logging
 
-@total_ordering
+_logger = logging.getLogger(__name__)
+
 class DependencySpec(object):
+    __hash__ = None # Force unhashable, locations can change
+
     def __init__(self, library, name, locations=None):
         self._library = library
         self._name = name
         self._locations = set(locations or [])
+        for filename, line_number, column_number in locations or []:
+            self.addLocation(filename, line_number, column_number)
 
-    def __lt__(self, other):
-        return hash(self) < hash(other)
+    def __jsonEncode__(self):
+        state = self.__dict__.copy()
+        state['_locations'] = list(state['_locations'])
+        return state
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        """Returns an object of cls based on a given state"""
+        # pylint: disable=protected-access
+        _logger.info("Recovering from %s", state)
+        obj = super(DependencySpec, cls).__new__(cls)
+        obj._library = state['_library']
+        obj._name = state['_name']
+        obj._locations = {tuple(x) for x in state['_locations']}
+        return obj
 
     def addLocation(self, filename, line_number, column_number):
         self._locations.add((filename, line_number, column_number))
@@ -40,22 +58,18 @@ class DependencySpec(object):
         return self._name
 
     @property
-    def __hash_key__(self):
+    def __eq_key__(self):
         return self.library, self.name, self._locations
 
     def __repr__(self):
-        return '{}.{}(library={}, name={}, location={})'.format(
+        return '{}.{}(library={}, name={}, locations={})'.format(
             __name__, self.__class__.__name__, repr(self.library),
             repr(self.name), repr(self._locations))
-
-    #  def __hash__(self):
-    #      """Overrides the default implementation"""
-    #      return hash(tuple(sorted(self.__hash_key__)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
         if isinstance(other, DependencySpec):
-            return self.__hash_key__ == other.__hash_key__
+            return self.__eq_key__ == other.__eq_key__
         return NotImplemented
 
     def __ne__(self, other):

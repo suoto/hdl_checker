@@ -31,9 +31,9 @@ from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
+#  from hdlcc.serialization import json_object_hook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import (Encoder, getFileType, json_object_hook,
-                         removeDuplicates)
+from hdlcc.utils import Encoder, getFileType, removeDuplicates
 
 _logger = logging.getLogger('build messages')
 

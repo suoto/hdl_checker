@@ -17,13 +17,16 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import os
+import json
 import logging
-from nose2.tools import such
+import os
+
 import six
+from nose2.tools import such
 
 from hdlcc.parsers import VerilogParser
-from hdlcc.utils import writeListToFile
+from hdlcc.serialization import json_object_hook
+from hdlcc.utils import Encoder, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -78,6 +81,13 @@ module clock_divider
         @it.should('return only its own library')
         def test():
             it.assertEqual(['work', ], it.source.getLibraries())
+
+        @it.should('report as equal after recovering from cache via json')
+        def test():
+            state = json.dumps(it.source, cls=Encoder)
+            _logger.info("State before: %s", state)
+            recovered = json.loads(state, object_hook=json_object_hook)
+            it.assertEqual(it.source.filename, recovered.filename)
 
     with it.having('a package code'):
         @it.has_setup

@@ -102,7 +102,7 @@ class VhdlParser(BaseSourceFile):
                                    line_number=text[:match.start()].count('\n'),
                                    column_number=None)
 
-        return dependencies.values()
+        return list(dependencies.values())
 
     def _getLibraries(self):
         """

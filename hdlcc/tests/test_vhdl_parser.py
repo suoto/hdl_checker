@@ -23,13 +23,12 @@ import os
 import os.path as p
 
 import six
-import nose2
-
 from nose2.tools import such
 from nose2.tools.params import params
 
 from hdlcc.parsers import DependencySpec, VhdlParser
-from hdlcc.utils import writeListToFile, Encoder, json_object_hook
+from hdlcc.serialization import json_object_hook
+from hdlcc.utils import Encoder, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -39,22 +38,35 @@ _FILENAME = p.join(TEST_SUPPORT_PATH, 'source.vhd')
 such.unittest.TestCase.maxDiff = None
 
 with such.A('VHDL source file object') as it:
-    # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    def _assertSameFile(first, second):
+        if not samefile(p.abspath(first), p.abspath(second)):
+            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
+                                                        p.abspath(second)))
 
-    #  def _compareLists(first, second):
-    #      temp = list(second)   # make a mutable copy
-    #      try:
-    #          for elem in first:
-    #              temp.remove(elem)
-    #      except ValueError:
-    #          return False
-    #      if not temp:
-    #          it.fail("Lists {} and {} differ".format(first, second))
+    it.assertSameFile = _assertSameFile
 
-    #  it.assertItemsEqual = _compareLists
+    def _assertCountEqual(first, second):
+        temp = list(second)   # make a mutable copy
+        not_found = []
+        for elem in first:
+            try:
+                temp.remove(elem)
+            except ValueError:
+                not_found.append(elem)
+        msg = []
+        if not_found:
+            msg += ['Second list is missing item {}'.format(x) for x in not_found]
 
+        msg += ['First list is missing item {}'.format(x) for x in temp]
+
+        if msg:
+            msg += ['', "Lists {} and {} differ".format(first, second)]
+            it.fail('\n'.join(msg))
+
+    if six.PY2:
+        # Can't use assertItemsEqual for lists of unhashable types.
+        # Workaround for https://bugs.python.org/issue10242
+        it.assertCountEqual = _assertCountEqual
 
     with it.having('an entity code'):
         @it.has_setup
@@ -107,7 +119,7 @@ with such.A('VHDL source file object') as it:
             design_units = list(it.source.getDesignUnits())
             _logger.info("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
-            it.assertItemsEqual([{'type' : 'entity',
+            it.assertCountEqual([{'type' : 'entity',
                                   'name' : 'clock_divider',
                                   'line_number': 12}],
                                 design_units)
@@ -118,13 +130,13 @@ with such.A('VHDL source file object') as it:
             _logger.info("Libraries found: %s",
                          ", ".join([repr(x) for x in libraries]))
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 ['mylibrary', 'work', 'ieee', 'lib1', 'lib2', 'lib3', 'lib4'],
                 libraries)
 
         @it.should('return its dependencies')
         def test():
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.source.getDependencies(),
                 [DependencySpec(library='ieee', name='std_logic_1164',
                                 locations=[(_FILENAME, 1, None),]),
@@ -163,7 +175,7 @@ with such.A('VHDL source file object') as it:
             code.insert(1, '    use some_library.some_package;')
             writeListToFile(_FILENAME, code)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.source.getDependencies(),
                 [DependencySpec(library='ieee', name='std_logic_1164',
                                 locations=[(_FILENAME, 3, None),]),
@@ -184,7 +196,7 @@ with such.A('VHDL source file object') as it:
             code.insert(0, '    use work.another_package;')
             writeListToFile(_FILENAME, code)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.source.getDependencies(),
                 [DependencySpec(library='ieee', name='std_logic_1164',
                                 locations=[(_FILENAME, 2, None),]),
@@ -205,7 +217,7 @@ with such.A('VHDL source file object') as it:
             code.insert(0, 'library remove_me;')
             writeListToFile(_FILENAME, code)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.source.getDependencies(),
                 [DependencySpec(library='ieee', name='std_logic_1164',
                                 locations=[(_FILENAME, 2, None),]),
@@ -223,33 +235,8 @@ with such.A('VHDL source file object') as it:
         def test():
             state = json.dumps(it.source, cls=Encoder)
             _logger.info("State before: %s", state)
-            cls = type(it.source)
-            recovered = cls.recoverFromState(json.loads(state))
-            it.assertEqual(it.source, recovered, "Sources are not equal")
-            _logger.info("State after: %s", it.source.getState())
-            it.fail("stop")
-
-        @it.should('report as equal after recovering from cache')
-        def test():
-            state = it.source.getState()
-            _logger.info("State before: %s", state)
-            cls = type(it.source)
-            recovered = cls.recoverFromState(state)
-            it.assertEqual(it.source, recovered, "Sources are not equal")
-            _logger.info("State after: %s", it.source.getState())
-            it.fail("stop")
-
-        @it.should('report different sources as not equal')
-        def test():
-            state = it.source.getState()
-            other = VhdlParser('other.vhd')
-            it.assertNotEqual(it.source, other, "Sources should not be equal")
-
-        @it.should('not fail when comparing with misc types')
-        def test():
-            it.assertNotEqual(it.source, "string")
-            it.assertNotEqual(it.source, 10)
-            it.assertNotEqual(it.source, None)
+            recovered = json.loads(state, object_hook=json_object_hook)
+            it.assertEqual(it.source.filename, recovered.filename)
 
     with it.having('a package code'):
         @it.has_setup
@@ -290,31 +277,29 @@ with such.A('VHDL source file object') as it:
 
         @it.should('return the names of the packages found')
         def test():
-            design_units = list(it.source.getDesignUnits())
-            _logger.info("Design units: %s", design_units)
-            it.assertNotEqual(design_units, None, "No design_units units found")
-            it.assertItemsEqual(
-                [{'type' : 'package', 'name' : 'package_with_constants'}],
-                design_units)
+            it.assertCountEqual(
+                list(it.source.getDesignUnits()),
+                [{'type' : 'package',
+                  'name' : 'package_with_constants',
+                  'line_number': 7}])
 
         @it.should('return its dependencies')
         def test():
-            dependencies = it.source.getDependencies()
-            _logger.info("Dependencies: %s", dependencies)
-            it.assertNotEqual(dependencies, None, "No dependencies found")
-            it.assertItemsEqual(
-                [DependencySpec(library='ieee', name='std_logic_1164'),
-                 DependencySpec(library='ieee', name='std_logic_arith'),
-                 DependencySpec(library='ieee', name='std_logic_unsigned'),
-                 DependencySpec(library='basic_library', name='very_common_pkg'),
-                 DependencySpec(library='mylibrary', name='package_with_constants')],
-                dependencies)
-
+            it.assertCountEqual(
+                it.source.getDependencies(),
+                [DependencySpec(library='ieee', name='std_logic_1164',
+                                locations={(it.source.filename, 1, None)}),
+                 DependencySpec(library='ieee', name='std_logic_arith',
+                                locations={(it.source.filename, 2, None)}),
+                 DependencySpec(library='ieee', name='std_logic_unsigned',
+                                locations={(it.source.filename, 3, None)}),
+                 DependencySpec(library='basic_library', name='very_common_pkg',
+                                locations={(it.source.filename, 12, None)}),
+                 DependencySpec(library='work', name='package_with_constants',
+                                locations={(it.source.filename, 15, None)})])
 
         @it.should('return source modification time')
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-
 it.createTests(globals())
-
