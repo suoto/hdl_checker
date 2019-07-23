@@ -20,7 +20,7 @@ import logging
 import re
 
 from hdlcc.parsers.base_parser import BaseSourceFile
-from hdlcc.parsers import DependencySpec, SourceLocation
+from hdlcc.parsers import DependencySpec
 
 _logger = logging.getLogger(__name__)
 
@@ -35,9 +35,8 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
 _LIBRARY_SCANNER = re.compile(
     r"\blibrary\s+(?P<library_name>[^;]+)", flags=re.M)
 
-_ADDITIONAL_DEPS_SCANNER = re.compile('|'.join([
-    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
-    r"\bcomponent\s+(?P<component_name>\w+)\s+(generic|port|is)\b"]), flags=re.M)
+_ADDITIONAL_DEPS_SCANNER = re.compile(
+    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.M)
 
 
 class VhdlParser(BaseSourceFile):
@@ -71,37 +70,39 @@ class VhdlParser(BaseSourceFile):
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
-        dependencies = set()
+        dependencies = {}
+
         text = self.getSourceContent()
         for match in lib_deps_regex.finditer(text):
             library, unit = match.group().split('.')[:2]
 
-            # Library 'work' means 'this' library, so we replace it
-            # by the library name itself
-            dependency = DependencySpec(
-                library=self.library if library == 'work' else library,
-                name=unit)
-                #  location=SourceLocation(
-                #      filename=self.filename,
-                #      line_number=text[:match.start()].count('\n'),
-                #      column_number=None))
+            if library == 'work':
+                library = self.library
 
-            dependencies.add(dependency)
+            key = hash((library, unit))
+
+            if key not in dependencies:
+                dependencies[key] = DependencySpec(library=library, name=unit)
+
+            dependency = dependencies[key]
+            dependency.addLocation(filename=self.filename,
+                                   line_number=text[:match.start()].count('\n'),
+                                   column_number=None)
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
-            _dict = match.groupdict()
-            package_body_name = _dict['package_body_name']
-            if package_body_name is not None:
-                location = SourceLocation(filename=self.filename,
-                                          line_number=text[:match.start()].count('\n'),
-                                          column_number=None)
+            package_body_name = match.groupdict()['package_body_name']
+            key = hash((self.library, package_body_name))
 
-                dependencies.add(
-                    DependencySpec(library=self.library,
-                                   name=package_body_name,
-                                   location=None)) #location))
+            if key not in dependencies:
+                dependencies[key] = DependencySpec(library=self.library,
+                                                   name=package_body_name)
 
-        return dependencies
+            dependency = dependencies[key]
+            dependency.addLocation(filename=self.filename,
+                                   line_number=text[:match.start()].count('\n'),
+                                   column_number=None)
+
+        return dependencies.values()
 
     def _getLibraries(self):
         """

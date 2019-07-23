@@ -194,6 +194,9 @@ def writeListToFile(filename, _list): # pragma: no cover
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 
+    for i, line in enumerate(_list):
+        _logger.debug('%2d | %s', i, line)
+
     if onWindows():
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
         _logger.debug(cmd)

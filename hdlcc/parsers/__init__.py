@@ -20,7 +20,7 @@ import logging
 #  from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool as Pool
 
-from hdlcc.parsers.dependency_spec import DependencySpec, SourceLocation
+from hdlcc.parsers.dependency_spec import DependencySpec
 from hdlcc.parsers.verilog_parser import VerilogParser
 from hdlcc.parsers.vhdl_parser import VhdlParser
 

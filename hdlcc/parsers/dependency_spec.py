@@ -18,26 +18,18 @@
 
 from functools import total_ordering
 
-class SourceLocation(object):
-    def __init__(self, filename, line_number, column_number=None):
-        self.filename = filename
-        self.line_number = line_number
-        self.column_number = column_number
-
-    def __repr__(self):
-        return '{}.{}(filename={}, line_number={}, column_number={})'.format(
-            __name__, self.__class__.__name__, repr(self.filename),
-            repr(self.line_number), repr(self.column_number))
-
 @total_ordering
 class DependencySpec(object):
-    def __init__(self, library, name, location=None):
+    def __init__(self, library, name, locations=None):
         self._library = library
         self._name = name
-        self._location = location
+        self._locations = set(locations or [])
 
     def __lt__(self, other):
         return hash(self) < hash(other)
+
+    def addLocation(self, filename, line_number, column_number):
+        self._locations.add((filename, line_number, column_number))
 
     @property
     def library(self):
@@ -48,21 +40,17 @@ class DependencySpec(object):
         return self._name
 
     @property
-    def location(self):
-        return self._location
-
-    @property
     def __hash_key__(self):
-        return self.library, self.name
+        return self.library, self.name, self._locations
 
     def __repr__(self):
         return '{}.{}(library={}, name={}, location={})'.format(
             __name__, self.__class__.__name__, repr(self.library),
-            repr(self.name), repr(self.location))
+            repr(self.name), repr(self._locations))
 
-    def __hash__(self):
-        """Overrides the default implementation"""
-        return hash(tuple(sorted(self.__hash_key__)))
+    #  def __hash__(self):
+    #      """Overrides the default implementation"""
+    #      return hash(tuple(sorted(self.__hash_key__)))
 
     def __eq__(self, other):
         """Overrides the default implementation"""
