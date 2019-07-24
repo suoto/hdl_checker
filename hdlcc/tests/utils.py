@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=useless-object-inheritance
 
 import logging
 import os
@@ -23,6 +24,7 @@ import os.path as p
 from multiprocessing import Queue
 
 import mock
+import six
 
 import hdlcc
 
@@ -122,13 +124,13 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
     def isAvailable():
         return True
 
-    def _buildSource(self, source, flags=None): # pragma: no cover
+    def _buildSource(self, path, library, flags=None):  # pylint: disable=unused-argument
         return [], []
 
-    def _createLibrary(self, source): # pragma: no cover
+    def _createLibrary(self, library):  # pylint: disable=unused-argument
         pass
 
-    def getBuiltinLibraries(self): # pragma: no cover
+    def getBuiltinLibraries(self):  # pylint: disable=unused-argument
         return []
 
 
@@ -141,3 +143,38 @@ class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
 
 def disableVunit(func):
     return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
+
+
+def assertCountEqual(it):  # pylint: disable=invalid-name
+    """
+
+    """
+
+    assert six.PY2, "Only needed on Python2"
+
+    def wrapper(first, second):
+        temp = list(second)   # make a mutable copy
+        not_found = []
+        for elem in first:
+            try:
+                temp.remove(elem)
+            except ValueError:
+                not_found.append(elem)
+        msg = []
+        if not_found:
+            msg += ['Second list is missing item {}'.format(x) for x in not_found]
+
+        msg += ['First list is missing item {}'.format(x) for x in temp]
+
+        if msg:
+            msg += ['', "Lists {} and {} differ".format(first, second)]
+            it.fail('\n'.join(msg))
+
+    return wrapper
+
+def assertSameFile(it):  # pylint: disable=invalid-name
+    def wrapper(first, second):
+        if not hdlcc.utils.samefile(p.abspath(first), p.abspath(second)):
+            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
+                                                        p.abspath(second)))
+    return wrapper

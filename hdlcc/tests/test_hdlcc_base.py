@@ -33,7 +33,7 @@ from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
 from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
-from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
+from hdlcc.tests.utils import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
 from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
 

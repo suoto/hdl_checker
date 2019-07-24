@@ -34,7 +34,7 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.mocks import disableVunit
+from hdlcc.tests.utils import disableVunit
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module

@@ -67,8 +67,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
-        state['_content'] = None
-        state['shadow_filename'] = None
+        del state['_content']
+        del state['shadow_filename']
         if 'raw_content' in state['_cache']:
             del state['_cache']['raw_content']
         return state
@@ -77,19 +77,19 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
     def __jsonDecode__(cls, state):
         """
         Returns an object of cls based on a given state"""
-        # pylint: disable=protected-access
+
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
-        #  obj.abspath = state['abspath']
         obj.library = state['library']
         obj.flags = state['flags']
-        obj._cache = state['_cache']
-        obj._content = None
-        #  obj._prev = None
         obj.shadow_filename = None
-        obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
-        # pylint: enable=protected-access
+        obj._cache = state['_cache']  # pylint: disable=protected-access
+        obj._content = None  # pylint: disable=protected-access
+        obj._mtime = state['_mtime']  # pylint: disable=protected-access
+        obj._dependencies = state['_dependencies']  # pylint: disable=protected-access
+        obj._design_units = state['_design_units']  # pylint: disable=protected-access
+        obj._libraries = state['_libraries']  # pylint: disable=protected-access
 
         return obj
 

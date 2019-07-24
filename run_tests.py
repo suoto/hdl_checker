@@ -188,8 +188,9 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone')
     if env == 'standalone':
-        return ('hdlcc.tests.test_config_parser',
-                'hdlcc.tests.test_static_check')
+        return ('hdlcc.tests.test_config_parser',)
+        #  return ('hdlcc.tests.test_config_parser',
+        #          'hdlcc.tests.test_static_check')
     if env == 'fallback':
         return ('hdlcc.tests.test_lsp',
                 'hdlcc.tests.test_server',

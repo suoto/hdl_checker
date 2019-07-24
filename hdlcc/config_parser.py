@@ -213,6 +213,13 @@ class ConfigParser(object):
 
         return "\n".join(_repr)
 
+    def __jsonEncode__(self):
+        return self.getState()
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        return cls.recoverFromState(state)
+
     def getState(self):
         """
         Gets a dict that describes the current state of this object
@@ -228,9 +235,9 @@ class ConfigParser(object):
             for lang in ('vhdl', 'verilog', 'systemverilog'):
                 state['_parms'][context][lang] = list(self._parms[context][lang])
 
-        state['_sources'] = {}
-        for path, source in self._sources.items():
-            state['_sources'][path] = source.getState()
+        state['_sources'] = self._sources.copy()
+        #  for path, source in self._sources.items():
+        #      state['_sources'][path] = source.getState()
 
         return state
 
@@ -252,12 +259,12 @@ class ConfigParser(object):
         obj._parms['single_build_flags'] = state['_parms']['single_build_flags']
         obj._parms['global_build_flags'] = state['_parms']['global_build_flags']
 
-        obj._sources = {}
-        for path, src_state in sources.items():
-            if src_state['filetype'] == 'vhdl':
-                obj._sources[path] = VhdlParser.recoverFromState(src_state)
-            else:
-                obj._sources[path] = VerilogParser.recoverFromState(src_state)
+        obj._sources = sources
+        #  for path, src_state in sources.items():
+        #      if src_state['filetype'] == 'vhdl':
+        #          obj._sources[path] = VhdlParser.recoverFromState(src_state)
+        #      else:
+        #          obj._sources[path] = VerilogParser.recoverFromState(src_state)
 
         # pylint: enable=protected-access
 

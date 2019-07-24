@@ -29,7 +29,7 @@ from nose2.tools import such
 
 import hdlcc
 import hdlcc.utils as utils
-from hdlcc.tests.mocks import disableVunit
+from hdlcc.tests.utils import disableVunit
 
 _logger = logging.getLogger(__name__)
 

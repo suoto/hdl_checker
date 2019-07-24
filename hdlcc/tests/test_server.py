@@ -38,7 +38,7 @@ import requests
 import hdlcc
 import hdlcc.lsp
 import hdlcc.utils as utils
-from hdlcc.tests.mocks import disableVunit
+from hdlcc.tests.utils import disableVunit
 
 _logger = logging.getLogger(__name__)
 

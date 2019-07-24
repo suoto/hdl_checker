@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 CLASS_MAP = {
     'VhdlParser': hdlcc.parsers.VhdlParser,
     'VerilogParser': hdlcc.parsers.VerilogParser,
+    'ConfigParser': hdlcc.config_parser.ConfigParser,
     'DependencySpec': hdlcc.parsers.DependencySpec
 }
 

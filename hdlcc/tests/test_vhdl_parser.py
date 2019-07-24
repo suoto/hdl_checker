@@ -26,9 +26,10 @@ import six
 from nose2.tools import such
 from nose2.tools.params import params
 
+import hdlcc
 from hdlcc.parsers import DependencySpec, VhdlParser
 from hdlcc.serialization import json_object_hook
-from hdlcc.utils import Encoder, samefile, writeListToFile
+from hdlcc.utils import Encoder, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -38,35 +39,14 @@ _FILENAME = p.join(TEST_SUPPORT_PATH, 'source.vhd')
 such.unittest.TestCase.maxDiff = None
 
 with such.A('VHDL source file object') as it:
-    def _assertSameFile(first, second):
-        if not samefile(p.abspath(first), p.abspath(second)):
-            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
-                                                        p.abspath(second)))
 
-    it.assertSameFile = _assertSameFile
-
-    def _assertCountEqual(first, second):
-        temp = list(second)   # make a mutable copy
-        not_found = []
-        for elem in first:
-            try:
-                temp.remove(elem)
-            except ValueError:
-                not_found.append(elem)
-        msg = []
-        if not_found:
-            msg += ['Second list is missing item {}'.format(x) for x in not_found]
-
-        msg += ['First list is missing item {}'.format(x) for x in temp]
-
-        if msg:
-            msg += ['', "Lists {} and {} differ".format(first, second)]
-            it.fail('\n'.join(msg))
+    it.assertSameFile = hdlcc.tests.utils.assertSameFile(it)
 
     if six.PY2:
-        # Can't use assertItemsEqual for lists of unhashable types.
+        # Can't use assertCountEqual for lists of unhashable types.
         # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = _assertCountEqual
+        it.assertCountEqual = hdlcc.tests.utils.assertCountEqual(it)
+
 
     with it.having('an entity code'):
         @it.has_setup
