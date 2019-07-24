@@ -77,6 +77,10 @@ def parseArguments():
         args.port = args.port or 50000
         args.log_stream = args.log_stream or sys.stdout
 
+    # If not set, create a temporary file safely so there's no clashes
+    args.log_stream = args.log_stream or NamedTemporaryFile(prefix='hdlcc_log_', delete=False).name
+    args.stderr = args.stderr or NamedTemporaryFile(prefix='hdlcc_stderr_', delete=False).name
+
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor
 
