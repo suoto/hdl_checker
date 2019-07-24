@@ -251,11 +251,6 @@ class ConfigParser(object):
         obj._parms['global_build_flags'] = state['_parms']['global_build_flags']
 
         obj._sources = sources
-        #  for path, src_state in sources.items():
-        #      if src_state['filetype'] == 'vhdl':
-        #          obj._sources[path] = VhdlParser.recoverFromState(src_state)
-        #      else:
-        #          obj._sources[path] = VerilogParser.recoverFromState(src_state)
 
         # pylint: enable=protected-access
 
