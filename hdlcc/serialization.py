@@ -22,14 +22,19 @@ import hdlcc
 _logger = logging.getLogger(__name__)
 
 CLASS_MAP = {
-    'VhdlParser': hdlcc.parsers.VhdlParser,
-    'VerilogParser': hdlcc.parsers.VerilogParser,
     'ConfigParser': hdlcc.config_parser.ConfigParser,
-    'DependencySpec': hdlcc.parsers.DependencySpec
+
+    'DependencySpec': hdlcc.parsers.DependencySpec,
+    'VerilogParser': hdlcc.parsers.VerilogParser,
+    'VhdlParser': hdlcc.parsers.VhdlParser,
+
+    'GHDL': hdlcc.builders.GHDL,
+    'MSim': hdlcc.builders.MSim,
+    'XVHDL': hdlcc.builders.XVHDL,
 }
 
 def json_object_hook(dict_):
-    _logger.warning("Handling %s", dict_)
+    _logger.debug("Handling %s", dict_)
     if '__class__' not in dict_:
         return dict_
 

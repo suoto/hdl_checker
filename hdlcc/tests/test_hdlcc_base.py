@@ -42,6 +42,12 @@ _logger = logging.getLogger(__name__)
 TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.join(TEMP_PATH, "vim-hdl-examples")
 
+
+def patchClassMap(func):
+    class_map = hdlcc.serialization.CLASS_MAP.copy()
+    class_map['MSimMock'] = MSimMock
+    return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)(func)
+
 with such.A("hdlcc project") as it:
     if six.PY2:
         it.assertCountEqual = it.assertItemsEqual
@@ -123,6 +129,7 @@ with such.A("hdlcc project") as it:
     @it.should("recover from cache when recreating a project object")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @patchClassMap
     def test():
         # First create a project file with something in it
         project_file = p.join(TEMP_PATH, 'myproject.prj')
@@ -157,6 +164,7 @@ with such.A("hdlcc project") as it:
     @it.should("warn when failing to recover from cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @patchClassMap
     def test():
         # First create a project file with something in it
         project_file = p.join(TEMP_PATH, 'myproject.prj')

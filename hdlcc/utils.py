@@ -34,12 +34,12 @@ PY2 = sys.version_info[0] == 2
 _logger = logging.getLogger(__name__)
 class Encoder(json.JSONEncoder):
     def default(self, o):  # pylint: disable=method-hidden
-        _logger.warning("Checking %s (%s)", o, type(o))
+        #  _logger.debug("Checking %s (%s)", o, type(o))
         if hasattr(o, '__jsonEncode__'):
             dct = o.__jsonEncode__()
             #  assert '__class__' not in dct
             dct['__class__'] = o.__class__.__name__
-            _logger.warning("It's got %s", repr(dct))
+            _logger.debug("Encoded output:\n%s", repr(dct))
             return dct
         # Let the base class default method raise the TypeError
         try:

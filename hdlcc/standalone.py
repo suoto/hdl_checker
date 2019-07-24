@@ -155,7 +155,7 @@ def runStandaloneSourceFileParse(fname):
     if dependencies: # pragma: no cover
         print(" - Dependencies:")
         for dependency in dependencies:
-            print(" -- %s.%s" % (dependency['library'], dependency['unit']))
+            print(" -- %s.%s" % (dependency.library, dependency.name))
 
 def runStandaloneStaticCheck(fname):
     """Standalone source_file.VhdlParser run"""

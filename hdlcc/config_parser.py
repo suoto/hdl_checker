@@ -214,13 +214,6 @@ class ConfigParser(object):
         return "\n".join(_repr)
 
     def __jsonEncode__(self):
-        return self.getState()
-
-    @classmethod
-    def __jsonDecode__(cls, state):
-        return cls.recoverFromState(state)
-
-    def getState(self):
         """
         Gets a dict that describes the current state of this object
         """
@@ -236,13 +229,11 @@ class ConfigParser(object):
                 state['_parms'][context][lang] = list(self._parms[context][lang])
 
         state['_sources'] = self._sources.copy()
-        #  for path, source in self._sources.items():
-        #      state['_sources'][path] = source.getState()
 
         return state
 
     @classmethod
-    def recoverFromState(cls, state):
+    def __jsonDecode__(cls, state):
         """
         Returns an object of cls based on a given state
         """

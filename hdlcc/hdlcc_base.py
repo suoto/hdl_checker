@@ -31,7 +31,7 @@ from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
-#  from hdlcc.serialization import json_object_hook
+from hdlcc.serialization import json_object_hook
 from hdlcc.static_check import getStaticMessages
 from hdlcc.utils import Encoder, getFileType, removeDuplicates
 
@@ -83,8 +83,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         state = {'_logger': {'name': self._logger.name,
                              'level': self._logger.level},
-                 'builder': self.builder.getState(),
-                 '_config': self._config.getState()}
+                 'builder': self.builder,
+                 '_config': self._config}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
@@ -109,8 +109,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return
 
         try:
-            cache = json.load(open(cache_fname, 'r'))
+            cache = json.load(open(cache_fname, 'r'), object_hook=json_object_hook)
             self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
+            self._logger.debug("cache:\n%s", cache)
             self._setState(cache)
             self.builder.checkEnvironment()
         except ValueError:
@@ -182,12 +183,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
 
-        self._config = ConfigParser.recoverFromState(state['_config'])
+        self._config = state['_config']
 
         builder_name = self._config.getBuilder()
         self._logger.debug("Recovered builder is '%s'", builder_name)
-        builder_class = hdlcc.builders.getBuilderByName(builder_name)
-        self.builder = builder_class.recoverFromState(state['builder'])
+        #  builder_class = hdlcc.builders.getBuilderByName(builder_name)
+        #  self.builder = builder_class.recoverFromState(state['builder'])
+        self.builder = state['builder']
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):
@@ -253,7 +255,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                     continue
                 yield dependency
             except:
-                self._logger.warning("Dependency: %s", dependency)
+                self._logger.error("Error handling %s", dependency)
                 raise
 
     @staticmethod
@@ -323,8 +325,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             if not dependencies_list:
                 continue
             selected_dependency = dependencies_list[0]
-
-            self._logger.warning("Dependencies: %s", dependencies_list)
 
             # If we found more than a single file, then multiple files
             # have the same entity or package name and we failed to
