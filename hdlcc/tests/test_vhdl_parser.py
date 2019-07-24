@@ -28,7 +28,7 @@ from nose2.tools.params import params
 
 import hdlcc
 from hdlcc.parsers import DependencySpec, VhdlParser
-from hdlcc.serialization import json_object_hook
+from hdlcc.serialization import jsonObjectHook
 from hdlcc.utils import Encoder, writeListToFile
 
 _logger = logging.getLogger(__name__)
@@ -215,7 +215,7 @@ with such.A('VHDL source file object') as it:
         def test():
             state = json.dumps(it.source, cls=Encoder)
             _logger.info("State before: %s", state)
-            recovered = json.loads(state, object_hook=json_object_hook)
+            recovered = json.loads(state, object_hook=jsonObjectHook)
             it.assertEqual(it.source.filename, recovered.filename)
 
     with it.having('a package code'):

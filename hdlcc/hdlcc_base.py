@@ -31,7 +31,7 @@ from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
-from hdlcc.serialization import json_object_hook
+from hdlcc.serialization import jsonObjectHook
 from hdlcc.static_check import getStaticMessages
 from hdlcc.utils import Encoder, getFileType, removeDuplicates
 
@@ -109,7 +109,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return
 
         try:
-            cache = json.load(open(cache_fname, 'r'), object_hook=json_object_hook)
+            cache = json.load(open(cache_fname, 'r'), object_hook=jsonObjectHook)
             self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
             self._logger.debug("cache:\n%s", cache)
             self._setState(cache)

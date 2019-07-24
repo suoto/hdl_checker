@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-
+"""Serialization specifics"""
 
 import logging
 import hdlcc
@@ -33,7 +33,7 @@ CLASS_MAP = {
     'XVHDL': hdlcc.builders.XVHDL,
 }
 
-def json_object_hook(dict_):
+def jsonObjectHook(dict_):
     _logger.debug("Handling %s", dict_)
     if '__class__' not in dict_:
         return dict_
@@ -41,16 +41,10 @@ def json_object_hook(dict_):
     cls_name = dict_['__class__']
     cls = CLASS_MAP.get(cls_name, None)
     assert cls is not None, "We should handle {}".format(cls_name)
-    if cls_name:
-        try:
-            obj = cls.__jsonDecode__(dict_)
-        except:
-            _logger.error("Something went wrong, cls_name: %s => %s", cls_name, cls)
-            raise
-        return obj
 
-    return dict_
-    #  return type(str(dict_['__class__']), (object, ), {'__dict__': dict_})()
-    #  obj = object()
-    #  obj.__dict__ = dict_
-    #  return obj
+    try:
+        obj = cls.__jsonDecode__(dict_)
+    except:  #pragma: no cover
+        _logger.error("Something went wrong, cls_name: %s => %s", cls_name, cls)
+        raise
+    return obj

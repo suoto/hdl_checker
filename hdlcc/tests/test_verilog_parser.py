@@ -25,7 +25,7 @@ import six
 from nose2.tools import such
 
 from hdlcc.parsers import VerilogParser
-from hdlcc.serialization import json_object_hook
+from hdlcc.serialization import jsonObjectHook
 from hdlcc.utils import Encoder, samefile, writeListToFile
 
 _logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ module clock_divider
         def test():
             state = json.dumps(it.source, cls=Encoder)
             _logger.info("State before: %s", state)
-            recovered = json.loads(state, object_hook=json_object_hook)
+            recovered = json.loads(state, object_hook=jsonObjectHook)
             it.assertEqual(it.source.filename, recovered.filename)
 
     with it.having('a package code'):

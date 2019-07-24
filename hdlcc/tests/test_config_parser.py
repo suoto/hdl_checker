@@ -32,7 +32,7 @@ from nose2.tools.params import params
 import hdlcc
 import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
-from hdlcc.serialization import json_object_hook
+from hdlcc.serialization import jsonObjectHook
 from hdlcc.utils import Encoder, handlePathPlease, writeListToFile
 
 _logger = logging.getLogger(__name__)
@@ -213,7 +213,7 @@ with such.A('config parser object') as it:
             state = json.dumps(it.parser, cls=Encoder)
             #  state = it.parser.getState()
             #  restored = ConfigParser.recoverFromState(state)
-            restored = json.loads(state, object_hook=json_object_hook)
+            restored = json.loads(state, object_hook=jsonObjectHook)
 
             it.assertEqual(it.parser._parms, restored._parms)
             it.assertEqual(it.parser._list_parms, restored._list_parms)
