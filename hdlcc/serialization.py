@@ -16,11 +16,15 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 """Serialization specifics"""
 
+import json
 import logging
+
 import hdlcc
 
 _logger = logging.getLogger(__name__)
 
+# Maps class names added by the decoder to the actual class on Python side to
+# recreate an object
 CLASS_MAP = {
     'ConfigParser': hdlcc.config_parser.ConfigParser,
 
@@ -33,7 +37,33 @@ CLASS_MAP = {
     'XVHDL': hdlcc.builders.XVHDL,
 }
 
+class StateEncoder(json.JSONEncoder):
+    """
+    Custom encoder that handles hdlcc classes
+    """
+    def default(self, o):  # pylint: disable=method-hidden
+        if hasattr(o, '__jsonEncode__'):
+            dct = o.__jsonEncode__()
+            prev = dct.get('__class__', None)
+            if o.__class__.__name__ != prev:
+                _logger.warning("Class has been set to %s, overwriting it "
+                                "to %s", prev, o.__class__.__name__)
+            dct['__class__'] = o.__class__.__name__
+            _logger.debug("Encoded output:\n%s", repr(dct))
+            return dct
+        # Let the base class default method raise the TypeError
+        try:
+            return json.JSONEncoder.default(self, o)
+        except:
+            _logger.fatal("object: %s", o)
+            raise
+
+
 def jsonObjectHook(dict_):
+    """
+    json hook for decoding entries added the StateEncoder back to Python
+    objects
+    """
     _logger.debug("Handling %s", dict_)
     if '__class__' not in dict_:
         return dict_

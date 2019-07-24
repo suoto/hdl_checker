@@ -25,8 +25,8 @@ import six
 from nose2.tools import such
 
 from hdlcc.parsers import VerilogParser
-from hdlcc.serialization import jsonObjectHook
-from hdlcc.utils import Encoder, samefile, writeListToFile
+from hdlcc.serialization import StateEncoder, jsonObjectHook
+from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ module clock_divider
 
         @it.should('report as equal after recovering from cache via json')
         def test():
-            state = json.dumps(it.source, cls=Encoder)
+            state = json.dumps(it.source, cls=StateEncoder)
             _logger.info("State before: %s", state)
             recovered = json.loads(state, object_hook=jsonObjectHook)
             it.assertEqual(it.source.filename, recovered.filename)
@@ -120,4 +120,3 @@ endpackage
             it.assertEqual(['work', ], it.source.getLibraries())
 
 it.createTests(globals())
-

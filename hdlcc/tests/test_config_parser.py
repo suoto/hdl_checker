@@ -32,8 +32,8 @@ from nose2.tools.params import params
 import hdlcc
 import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
-from hdlcc.serialization import jsonObjectHook
-from hdlcc.utils import Encoder, handlePathPlease, writeListToFile
+from hdlcc.serialization import StateEncoder, jsonObjectHook
+from hdlcc.utils import handlePathPlease, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ with such.A('config parser object') as it:
 
         @it.should("restore from cached state")
         def test():
-            state = json.dumps(it.parser, cls=Encoder)
+            state = json.dumps(it.parser, cls=StateEncoder)
             #  state = it.parser.getState()
             #  restored = ConfigParser.recoverFromState(state)
             restored = json.loads(state, object_hook=jsonObjectHook)
@@ -225,7 +225,7 @@ with such.A('config parser object') as it:
             # dumped from a restored version of it since they both represent
             # the same set of info
             it.assertDictEqual(json.loads(state),
-                               json.loads(json.dumps(restored, cls=Encoder)))
+                               json.loads(json.dumps(restored, cls=StateEncoder)))
 
         @it.should("find the correct source defining a design unit")
         def test():

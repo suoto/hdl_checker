@@ -25,29 +25,10 @@ import subprocess as subp
 import sys
 import time
 from threading import Lock
-from glob import glob
-
-import json
 
 PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
-class Encoder(json.JSONEncoder):
-    def default(self, o):  # pylint: disable=method-hidden
-        #  _logger.debug("Checking %s (%s)", o, type(o))
-        if hasattr(o, '__jsonEncode__'):
-            dct = o.__jsonEncode__()
-            #  assert '__class__' not in dct
-            dct['__class__'] = o.__class__.__name__
-            _logger.debug("Encoded output:\n%s", repr(dct))
-            return dct
-        # Let the base class default method raise the TypeError
-        try:
-            return json.JSONEncoder.default(self, o)
-        except:
-            _logger.fatal("object: %s", o)
-            raise
-
 
 def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"

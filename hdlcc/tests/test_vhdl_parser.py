@@ -28,8 +28,8 @@ from nose2.tools.params import params
 
 import hdlcc
 from hdlcc.parsers import DependencySpec, VhdlParser
-from hdlcc.serialization import jsonObjectHook
-from hdlcc.utils import Encoder, writeListToFile
+from hdlcc.serialization import StateEncoder, jsonObjectHook
+from hdlcc.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ with such.A('VHDL source file object') as it:
 
         @it.should('report as equal after recovering from cache via json')
         def test():
-            state = json.dumps(it.source, cls=Encoder)
+            state = json.dumps(it.source, cls=StateEncoder)
             _logger.info("State before: %s", state)
             recovered = json.loads(state, object_hook=jsonObjectHook)
             it.assertEqual(it.source.filename, recovered.filename)

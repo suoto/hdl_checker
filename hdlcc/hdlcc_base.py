@@ -31,9 +31,9 @@ from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
-from hdlcc.serialization import jsonObjectHook
+from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import Encoder, getFileType, removeDuplicates
+from hdlcc.utils import getFileType, removeDuplicates
 
 _logger = logging.getLogger('build messages')
 
@@ -89,7 +89,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
             os.mkdir(p.dirname(cache_fname))
-        json.dump(state, open(cache_fname, 'w'), indent=True, cls=Encoder)
+        json.dump(state, open(cache_fname, 'w'), indent=True, cls=StateEncoder)
 
     def _recoverCache(self, target_dir):
         """
