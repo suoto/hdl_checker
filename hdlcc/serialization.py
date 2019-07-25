@@ -45,7 +45,7 @@ class StateEncoder(json.JSONEncoder):
         if hasattr(o, '__jsonEncode__'):
             dct = o.__jsonEncode__()
             prev = dct.get('__class__', None)
-            if o.__class__.__name__ != prev:
+            if prev is not None and o.__class__.__name__ != prev:
                 _logger.warning("Class has been set to %s, overwriting it "
                                 "to %s", prev, o.__class__.__name__)
             dct['__class__'] = o.__class__.__name__
