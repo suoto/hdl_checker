@@ -117,7 +117,7 @@ with such.A("hdlcc project") as it:
         it.assertCountEqual(
             [StaticCheckerDiag(
                 line_number=7,
-                column=5,
+                column_number=5,
                 severity=DiagType.STYLE_INFO,
                 text=expected)],
             static_check._getCommentTags(text))
@@ -195,7 +195,7 @@ with such.A("hdlcc project") as it:
             it.assertCountEqual(
                 [LibraryShouldBeOmited(
                     line_number=4,
-                    column=9,
+                    column_number=9,
                     library='work')],
                 static_check._getMiscChecks(objects))
 

@@ -181,8 +181,8 @@ def printSourceDiags(project, source):
         if record.line_number is not None:
             location += ["line %s" % record.line_number]
 
-        if record.column is not None:
-            location += ["column %s" % record.column]
+        if record.column_number is not None:
+            location += ["column %s" % record.column_number]
 
         if location:
             message += ["(%s)" % ', '.join(location)]

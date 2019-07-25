@@ -44,7 +44,7 @@ class GHDL(BaseBuilder):
     _stdout_message_parser = re.compile(
         r"^(?P<filename>.*):(?=\d)"
         r"(?P<line_number>\d+):"
-        r"(?P<column>\d+):"
+        r"(?P<column_number>\d+):"
         r"((?P<is_warning>warning:)\s*|\s*)"
         r"(?P<error_message>.*)", re.I).finditer
 
@@ -81,14 +81,14 @@ class GHDL(BaseBuilder):
 
             filename = info.get('filename')
             line_number = info.get('line_number')
-            column = info.get('column')
+            column_number= info.get('column_number')
 
             if filename is not None:
                 diag.filename = filename
             if line_number is not None:
                 diag.line_number = line_number
-            if column is not None:
-                diag.column = column
+            if column_number is not None:
+                diag.column_number = column_number
 
             self._logger.info("Diag: %s", diag)
             yield diag

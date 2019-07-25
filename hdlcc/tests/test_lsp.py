@@ -80,7 +80,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
 
             diag = CheckerDiagnostic(
                 checker='hdlcc test', text='some diag', filename='filename',
-                line_number=1, column=1, error_code='error code',
+                line_number=1, column_number=1, error_code='error code',
                 severity=diag_type)
 
             self.assertEqual(

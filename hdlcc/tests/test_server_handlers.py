@@ -381,7 +381,7 @@ with such.A("hdlcc bottle app") as it:
 
         expected = StaticCheckerDiag(
             filename=data['path'],
-            line_number=1, column=4,
+            line_number=1, column_number=4,
             text='TODO: Nothing to see here',
             severity=DiagType.STYLE_INFO)
 

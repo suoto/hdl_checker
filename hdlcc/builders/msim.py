@@ -124,14 +124,14 @@ class MSim(BaseBuilder):
 
             filename = info.get('filename')
             line_number = info.get('line_number')
-            column = info.get('column')
+            column_number = info.get('column_number')
 
             if filename is not None:
                 diag.filename = filename
             if line_number is not None:
                 diag.line_number = line_number
-            if column is not None:
-                diag.column = column
+            if column_number is not None:
+                diag.column_number = column_number
 
             if info.get('severity', None) in ('W', 'e'):
                 diag.severity = DiagType.WARNING

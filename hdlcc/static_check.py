@@ -159,7 +159,7 @@ def _getCommentTags(vbuffer):
             result += [
                 StaticCheckerDiag(
                     line_number=lnum,
-                    column=match.start(match.lastindex - 1) + 1,
+                    column_number=match.start(match.lastindex - 1) + 1,
                     severity=DiagType.STYLE_INFO,
                     text="%s: %s" % (_dict['tag'].upper(), _dict['text']))]
     return result
@@ -177,7 +177,7 @@ def _getMiscChecks(objects):
         if library == 'work':
             yield LibraryShouldBeOmited(
                 line_number=obj['lnum'] + 1,
-                column=obj['start'] + 1,
+                column_number=obj['start'] + 1,
                 library=library)
 
 def getStaticMessages(vbuffer=None):
@@ -190,7 +190,7 @@ def getStaticMessages(vbuffer=None):
         obj_dict = objects[_object]
         result += [ObjectIsNeverUsed(
             line_number=obj_dict['lnum'] + 1,
-            column=obj_dict['start'] + 1,
+            column_number=obj_dict['start'] + 1,
             object_type=obj_dict['type'],
             object_name=_object)]
 

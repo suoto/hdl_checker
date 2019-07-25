@@ -582,7 +582,7 @@ with such.A("hdlcc project") as it:
             it.assertIn(
                 ObjectIsNeverUsed(
                     filename=filename,
-                    line_number=43, column=12,
+                    line_number=43, column_number=12,
                     object_type='signal', object_name='neat_signal'),
                 diagnostics)
 
@@ -619,10 +619,10 @@ with such.A("hdlcc project") as it:
 
             expected = [
                 ObjectIsNeverUsed(filename=p.abspath(filename), line_number=43,
-                                  column=12, object_type='signal',
+                                  column_number=12, object_type='signal',
                                   object_name='neat_signal'),
                 ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
-                                  column=8, object_type='signal',
+                                  column_number=8, object_type='signal',
                                   object_name='another_signal')]
 
             #  if it.BUILDER_NAME == 'msim':
@@ -664,7 +664,7 @@ with such.A("hdlcc project") as it:
                 expected = [
                     LibraryShouldBeOmited(library='work',
                                           filename=p.abspath(filename),
-                                          column=9,
+                                          column_number=9,
                                           line_number=1),
                     PathNotInProjectFile(p.abspath(filename)),]
 
@@ -681,7 +681,7 @@ with such.A("hdlcc project") as it:
                 it.assertCountEqual(
                     [LibraryShouldBeOmited(library='work',
                                            filename=p.abspath(filename),
-                                           column=9,
+                                           column_number=9,
                                            line_number=1)],
                     diagnostics)
 
@@ -708,7 +708,7 @@ with such.A("hdlcc project") as it:
                     ObjectIsNeverUsed(object_type='constant',
                                       object_name='ADDR_WIDTH',
                                       line_number=29,
-                                      column=14),
+                                      column_number=14),
                     diagnostics)
             finally:
                 # Remove the comment we added
