@@ -22,8 +22,8 @@
 import argparse
 import logging
 import os
+import os.path as p
 import sys
-from tempfile import NamedTemporaryFile
 from threading import Timer
 
 from pyls.python_ls import start_io_lang_server
@@ -78,8 +78,8 @@ def parseArguments():
         args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
-    args.log_stream = args.log_stream or NamedTemporaryFile(prefix='hdlcc_log_', delete=False).name
-    args.stderr = args.stderr or NamedTemporaryFile(prefix='hdlcc_stderr_', delete=False).name
+    args.log_stream = args.log_stream or _getTemporaryFilename('log')
+    args.stderr = args.stderr or _getTemporaryFilename('stderr')
 
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor
@@ -87,6 +87,10 @@ def parseArguments():
     del args.nocolor
 
     return args
+
+def _getTemporaryFilename(name):
+    return p.join(p.sep, 'tmp', 'hdlcc_' + name + '_pid{}'.format(os.getpid()) +
+                  '.log')
 
 # Copied from ycmd!
 def openForStdHandle(filepath):
