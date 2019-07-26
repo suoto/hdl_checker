@@ -40,6 +40,8 @@ import hdlcc.lsp
 import hdlcc.utils as utils
 from hdlcc.tests.utils import disableVunit
 
+such.unittest.TestCase.maxDiff = None
+
 _logger = logging.getLogger(__name__)
 
 TEST_LOG_PATH = p.join(os.environ['TOX_ENV_DIR'], 'log')
@@ -289,15 +291,19 @@ with such.A("hdlcc server") as it:
         def test():
             log_file = tempfile.mktemp()
 
-            cmd = ['hdlcc', '--lsp', '--nocolor', '--log-stream', log_file]
+            cmd = ['hdlcc', '--lsp', '--nocolor', '--log-stream', log_file,
+                   '--stderr', p.join(TEST_LOG_PATH, 'hdlcc_stderr.log')]
 
             server = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
 
             # Close stdin so the server exits
             stdout, stderr = server.communicate('')
 
-            it.assertEqual(stdout, b'')
-            it.assertEqual(stderr, b'')
+            it.assertEqual(stdout, b'',
+                           "stdout should be empty but got\n{}".format(stdout))
+
+            it.assertEqual(stderr, b'',
+                           "stderr should be empty but got\n{}".format(stdout))
 
             # On Windows the Popen PID and the *actual* PID don't always match
             # for some reason. Since we're not testing this, just skip the
