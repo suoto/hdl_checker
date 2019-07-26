@@ -34,6 +34,8 @@ from hdlcc.parsers import VhdlParser
 
 _logger = logging.getLogger(__name__)
 
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+
 with such.A("builder object") as it:
     def _assertSameFile(first, second):
         if not utils.samefile(first, second):
@@ -75,7 +77,8 @@ with such.A("builder object") as it:
                 it.patch.start()
 
             cls = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
-            it.builder = cls('._%s' % it.BUILDER_NAME)
+            it.builder = cls(p.join(TEST_SUPPORT_PATH,
+                                    '._%s' % it.BUILDER_NAME))
             it.cls = cls
 
         @it.has_teardown
@@ -240,7 +243,7 @@ with such.A("builder object") as it:
                     builder_name=it.BUILDER_NAME,
                     filename=path,
                     line_number=11,
-                    column=35,
+                    column_number=35,
                     severity=DiagType.ERROR,
                     text="extra ';' at end of interface list")])
 
@@ -321,7 +324,7 @@ with such.A("builder object") as it:
                     builder_name=it.BUILDER_NAME,
                     text='no declaration for "some_lib"',
                     line_number=4,
-                    column=5,
+                    column_number=5,
                     severity=DiagType.ERROR)]
             elif it.BUILDER_NAME == 'xvhdl':
                 expected = [

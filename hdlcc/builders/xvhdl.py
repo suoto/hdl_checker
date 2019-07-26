@@ -97,9 +97,10 @@ class XVHDL(BaseBuilder):
         "(Not used by XVHDL)"
 
     def _checkEnvironment(self):
-        stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'])
-        self._version = \
-                re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
+        stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'],
+                                        cwd=self._target_folder)
+        self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)",
+                                   stdout[0])[0]
         self._logger.info("xvhdl version string: '%s'. "
                           "Version number is '%s'",
                           stdout[:-1], self._version)
@@ -139,11 +140,11 @@ class XVHDL(BaseBuilder):
         cmd = ['xvhdl',
                '--nolog',
                '--verbose', '0',
-               '--initfile', p.abspath(self._xvhdlini),
+               '--initfile', self._xvhdlini,
                '--work', library]
         cmd += flags
         cmd += [path]
-        return self._subprocessRunner(cmd)
+        return self._subprocessRunner(cmd, cwd=self._target_folder)
 
     def _searchForRebuilds(self, line):
         rebuilds = []

@@ -22,6 +22,7 @@
 import argparse
 import logging
 import os
+import os.path as p
 import sys
 from threading import Timer
 
@@ -75,6 +76,10 @@ def parseArguments():
         args.host = args.host or 'localhost'
         args.port = args.port or 50000
         args.log_stream = args.log_stream or sys.stdout
+
+    # If not set, create a temporary file safely so there's no clashes
+    args.log_stream = args.log_stream or utils.getTemporaryFilename('log')
+    args.stderr = args.stderr or utils.getTemporaryFilename('stderr')
 
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor

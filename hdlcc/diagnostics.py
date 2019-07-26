@@ -42,7 +42,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
     Base container for diagnostics
     """
     def __init__(self, # pylint: disable=too-many-arguments
-                 checker, text, filename=None, line_number=None, column=None,
+                 checker, text, filename=None, line_number=None, column_number=None,
                  error_code=None, severity=None):
 
         # Checker can't be changed
@@ -55,13 +55,13 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
 
         # Modifiable with rules
         self.__line_number = None if line_number is None else int(line_number)
-        self.__column = None if column is None else int(column)
+        self.__column = None if column_number is None else int(column_number)
         self.__severity = severity
 
         if line_number is not None:
             self.line_number = line_number
-        if column is not None:
-            self.column = column
+        if column_number is not None:
+            self.column_number = column_number
         if severity is not None:
             self.severity = severity
 
@@ -70,14 +70,14 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         error_code = None if self.error_code is None else self.error_code
 
         return ('{}(checker="{}", filename="{}", line_number="{}", '
-                'column={}, error_code={}, severity="{}", text="{}")'
+                'column_number={}, error_code={}, severity="{}", text="{}")'
                 .format(self.__class__.__name__, self.checker, filename,
-                        self.line_number, self.column, error_code,
+                        self.line_number, self.column_number, error_code,
                         self.severity, self.text))
 
     def _hash_data(self):
         return b'|'.join([toBytes(x) for x in
-                          (self.checker, self.column, self.error_code,
+                          (self.checker, self.column_number, self.error_code,
                            self.filename, self.line_number, self.severity,
                            self.text)])
 
@@ -105,7 +105,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
             - error_code: (string)
             - text: (string)
             - line_number: (int or None)
-            - column: (int or None)
+            - column_number: (int or None)
             - severity: (string) Values taken from DiagType
         """
         return {'checker': self.checker,
@@ -113,7 +113,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
                 'error_code': self.error_code,
                 'text': self.text,
                 'line_number': self.line_number,
-                'column': self.column,
+                'column_number': self.column_number,
                 'severity': self.severity}
 
     @classmethod
@@ -125,7 +125,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
             error_code=state['error_code'],
             text=state['text'],
             line_number=state['line_number'],
-            column=state['column'],
+            column_number=state['column_number'],
             severity=state['severity'])
 
     @property
@@ -145,14 +145,14 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         self.__line_number = int(value)
 
     @property
-    def column(self):
-        "Diagnostics column"
+    def column_number(self):
+        "Diagnostics column_number"
         if self.__column is not None:
             return int(self.__column)
         return self.__column
 
-    @column.setter
-    def column(self, value):
+    @column_number.setter
+    def column_number(self, value):
         self.__column = int(value)
 
     @property
@@ -179,7 +179,7 @@ class PathNotInProjectFile(CheckerDiagnostic):
 class StaticCheckerDiag(CheckerDiagnostic):
     "Base diagnostics issues from static checks"
     def __init__(self, # pylint: disable=too-many-arguments
-                 text, severity, filename=None, line_number=None, column=None,
+                 text, severity, filename=None, line_number=None, column_number=None,
                  error_code=None):
 
         assert severity in (DiagType.STYLE_INFO, DiagType.STYLE_WARNING,
@@ -188,14 +188,14 @@ class StaticCheckerDiag(CheckerDiagnostic):
 
         super(StaticCheckerDiag, self).__init__(
             checker=STATIC_CHECKER_NAME, text=text, severity=severity,
-            filename=filename, line_number=line_number, column=column,
+            filename=filename, line_number=line_number, column_number=column_number,
             error_code=error_code)
 
 class LibraryShouldBeOmited(StaticCheckerDiag):
     "Library declaration should be ommited"
-    def __init__(self, library, filename=None, line_number=None, column=None):
+    def __init__(self, library, filename=None, line_number=None, column_number=None):
         super(LibraryShouldBeOmited, self).__init__(
-            line_number=line_number, column=column, filename=filename,
+            line_number=line_number, column_number=column_number, filename=filename,
             severity=DiagType.STYLE_INFO,
             text="Declaration of library '{library}' can be omitted" \
                     .format(library=library))
@@ -203,10 +203,10 @@ class LibraryShouldBeOmited(StaticCheckerDiag):
 class ObjectIsNeverUsed(StaticCheckerDiag):
     "Reports an object that was created but never used"
     def __init__(self,  # pylint: disable=too-many-arguments
-                 filename=None, line_number=None, column=None,
+                 filename=None, line_number=None, column_number=None,
                  object_name=None, object_type=None):
         super(ObjectIsNeverUsed, self).__init__(
-            filename=filename, line_number=line_number, column=column,
+            filename=filename, line_number=line_number, column_number=column_number,
             severity=DiagType.STYLE_WARNING,
             text="{} '{}' is never used".format(str(object_type).capitalize(),
                                                 object_name))
@@ -217,12 +217,12 @@ class BuilderDiag(CheckerDiagnostic):
     project file
     """
     def __init__(self, # pylint: disable=too-many-arguments
-                 builder_name, text, filename=None, line_number=None, column=None,
+                 builder_name, text, filename=None, line_number=None, column_number=None,
                  error_code=None, severity=None):
         super(BuilderDiag, self).__init__(
             checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
-            filename=filename, line_number=line_number, column=column,
-            error_code=error_code, severity=severity)
+            filename=filename, severity=severity, line_number=line_number,
+            column_number=column_number, error_code=error_code)
 
 
 class FailedToCreateProject(CheckerDiagnostic):
@@ -241,7 +241,8 @@ class DependencyNotUnique(CheckerDiagnostic):
     """
     Searching for a dependency should yield a single source file
     """
-    def __init__(self, filename, design_unit, actual, choices):
+    def __init__(self, filename, design_unit, actual, choices, line_number=None,
+                 column_number=None):
         text = ("Returning dependency '{}' for {}, but there were {} other "
                 "matches:\n{}. The selected option may not be the correct "
                 "one".format(actual, design_unit, len(choices),
@@ -249,4 +250,4 @@ class DependencyNotUnique(CheckerDiagnostic):
 
         super(DependencyNotUnique, self).__init__(
             checker=None, filename=filename, severity=DiagType.STYLE_WARNING,
-            text=text)
+            line_number=line_number, column_number=column_number, text=text)

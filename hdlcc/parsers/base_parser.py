@@ -51,6 +51,9 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
+        self._dependencies = None
+        self._design_units = None
+        self._libraries = None
 
         self.shadow_filename = None
 
@@ -59,58 +62,36 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         "Returns the absolute path of the source file"
         return p.abspath(self.filename)
 
-    def getState(self):
+    def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
         """
-        state = {
-            'filename' : self.filename,
-            #  'abspath' : self.abspath,
-            'library' : self.library,
-            'flags' : self.flags,
-            '_cache' : self._cache,
-            '_mtime' : self._mtime,
-            'filetype' : self.filetype}
+        state = self.__dict__.copy()
+        del state['_content']
+        del state['shadow_filename']
         if 'raw_content' in state['_cache']:
             del state['_cache']['raw_content']
         return state
 
     @classmethod
-    def recoverFromState(cls, state):
+    def __jsonDecode__(cls, state):
         """
         Returns an object of cls based on a given state"""
-        # pylint: disable=protected-access
+
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
-        #  obj.abspath = state['abspath']
         obj.library = state['library']
         obj.flags = state['flags']
-        obj._cache = state['_cache']
-        obj._content = None
-        #  obj._prev = None
         obj.shadow_filename = None
-        obj._mtime = state['_mtime']
         obj.filetype = state['filetype']
-        # pylint: enable=protected-access
+        obj._cache = state['_cache']  # pylint: disable=protected-access
+        obj._content = None  # pylint: disable=protected-access
+        obj._mtime = state['_mtime']  # pylint: disable=protected-access
+        obj._dependencies = state['_dependencies']  # pylint: disable=protected-access
+        obj._design_units = state['_design_units']  # pylint: disable=protected-access
+        obj._libraries = state['_libraries']  # pylint: disable=protected-access
 
         return obj
-
-    # We'll use Python data model to make easier to check if a recovered object
-    # matches its original counterpart
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return False
-
-        for attr in ('filename', 'library', 'flags', 'filetype', 'abspath'):
-            if not hasattr(other, attr):  # pragma: no cover
-                return False
-            if getattr(self, attr) != getattr(other, attr):
-                return False
-
-        return True
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def __repr__(self):
         return "BaseSourceFile('%s', library='%s', flags=%s)" % \
@@ -141,6 +122,9 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             # this unless we're handling with a proper file
             if not self.shadow_filename:
                 self._content = None
+            self._dependencies = None
+            self._design_units = None
+            self._libraries = None
             self._cache = {}
 
     def getmtime(self):
@@ -224,10 +208,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         if not p.exists(self.filename):
             return []
         self._clearCachesIfChanged()
-        if 'design_units' not in self._cache:
-            self._cache['design_units'] = self._getDesignUnits()
+        if self._design_units is None:
+            self._design_units = self._getDesignUnits()
 
-        return self._cache['design_units']
+        return self._design_units
 
     def getDependencies(self):
         """
@@ -237,10 +221,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             return []
 
         self._clearCachesIfChanged()
-        if 'dependencies' not in self._cache:
-            self._cache['dependencies'] = self._getDependencies()
+        if self._dependencies is None:
+            self._dependencies = self._getDependencies()
 
-        return self._cache['dependencies']
+        return self._dependencies
 
     def getLibraries(self):
         """
@@ -250,10 +234,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             return []
 
         self._clearCachesIfChanged()
-        if 'libraries' not in self._cache:
-            self._cache['libraries'] = removeDuplicates(self._getLibraries())
+        if self._libraries is None:
+            self._libraries = removeDuplicates(self._getLibraries())
 
-        return self._cache['libraries']
+        return self._libraries
 
     def getMatchingLibrary(self, unit_type, unit_name):
         """

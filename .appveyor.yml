@@ -18,6 +18,11 @@ skip_tags: true
 # Maximum number of concurrent jobs for the project
 max_jobs: 3
 
+
+artifacts:
+  - path: .tox
+    name: Tox runtime
+
 # ---------------------------------#
 #    environment configuration    #
 # ---------------------------------#
@@ -59,6 +64,7 @@ install:
   # We need wheel installed to build wheels
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
   - "%PYTHON%\\python.exe -m pip install wheel tox"
+
   - ps: . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\appveyor_env.ps1"
   # - ps: if ($env:BUILDER "msim") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_msim.ps1" }
   # - ps: if ($env:BUILDER "ghdl") { . "$env:APPVEYOR_BUILD_FOLDER\\.ci\\scripts\\setup_ghdl.ps1" }
@@ -67,8 +73,8 @@ install:
 test_script:
   - tox
 after_test:
-  # - 7z a hdlcc_success.zip ".tox\\*\\log\\*"
-  # - appveyor PushArtifact hdlcc_success.zip
+  - 7z a tox.zip ".tox"
+  - appveyor PushArtifact tox.zip
   - ps: |
       $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
       Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
@@ -77,6 +83,6 @@ after_test:
 # We won't build or run tests from here
 build: off
 
-# on_failure:
-#   - 7z a hdlcc_failure.zip ".tox\\*\\log\\*"
-#   - appveyor PushArtifact hdlcc_failure.zip
+on_failure:
+  - 7z a tox.zip ".tox"
+  - appveyor PushArtifact tox.zip

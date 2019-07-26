@@ -109,7 +109,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             pass
 
     @classmethod
-    def recoverFromState(cls, state):
+    def __jsonDecode__(cls, state):
         """
         Returns an object of cls based on a given state
         """
@@ -126,7 +126,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return obj
 
-    def getState(self):
+    def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
         """
@@ -190,7 +190,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             rebuild_info = None
             if None not in (unit_type, unit_name):
                 for dependency in source.getDependencies():
-                    if dependency['unit'] == rebuild['unit_name']:
+                    if dependency.name == rebuild['unit_name']:
                         rebuild_info = {'unit_type' : unit_type,
                                         'unit_name' : unit_name}
                         break

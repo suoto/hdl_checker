@@ -86,10 +86,10 @@ def checkerDiagToLspDict(diag):
     result = {
         'source': diag.checker,
         'range': {
-            'start': {'line': max((diag.line_number or 0) - 1, 0),
-                      'character': 0, },
-            'end': {'line': max((diag.line_number or 0) - 1, 0),
-                    'character': 0, },
+            'start': {'line': (diag.line_number or 1) - 1,
+                      'character': (diag.column_number or 1) - 1, },
+            'end': {'line': (diag.line_number or 1) - 1,
+                    'character': (diag.column_number or 1) - 1, },
         },
         'message': diag.text,
         'severity': severity,

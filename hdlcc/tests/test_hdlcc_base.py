@@ -32,8 +32,8 @@ import hdlcc
 from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
-from hdlcc.parsers import VerilogParser, VhdlParser
-from hdlcc.tests.mocks import (FailingBuilder, MSimMock, SourceMock,
+from hdlcc.parsers import DependencySpec
+from hdlcc.tests.utils import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
 from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
 
@@ -41,6 +41,12 @@ _logger = logging.getLogger(__name__)
 
 TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 VIM_HDL_EXAMPLES = p.join(TEMP_PATH, "vim-hdl-examples")
+
+
+def patchClassMap(func):
+    class_map = hdlcc.serialization.CLASS_MAP.copy()
+    class_map['MSimMock'] = MSimMock
+    return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)(func)
 
 with such.A("hdlcc project") as it:
     if six.PY2:
@@ -123,6 +129,7 @@ with such.A("hdlcc project") as it:
     @it.should("recover from cache when recreating a project object")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @patchClassMap
     def test():
         # First create a project file with something in it
         project_file = p.join(TEMP_PATH, 'myproject.prj')
@@ -157,6 +164,7 @@ with such.A("hdlcc project") as it:
     @it.should("warn when failing to recover from cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
     @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @patchClassMap
     def test():
         # First create a project file with something in it
         project_file = p.join(TEMP_PATH, 'myproject.prj')
@@ -197,7 +205,11 @@ with such.A("hdlcc project") as it:
                       'very_common_pkg.vhd')
         project = StandaloneProjectBuilder()
         source, remarks = project.getSourceByPath(path)
-        it.assertEquals(source, VhdlParser(path, library='undefined'))
+
+        it.assertSameFile(source.filename, path)
+        it.assertEquals(source.library, 'undefined')
+        it.assertEquals(source.filetype, 'vhdl')
+
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(remarks,
                             [PathNotInProjectFile(p.abspath(path)), ])
@@ -210,7 +222,14 @@ with such.A("hdlcc project") as it:
     def test(_, path):
         project = StandaloneProjectBuilder()
         source, remarks = project.getSourceByPath(path)
-        it.assertEquals(source, VerilogParser(path, library='undefined'))
+
+        it.assertSameFile(source.filename, path)
+        it.assertEquals(source.library, 'undefined')
+        if path.endswith('.v'):
+            it.assertEquals(source.filetype, 'verilog')
+        elif path.endswith('.v'):
+            it.assertEquals(source.filetype, 'systemverilog')
+
         if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
             it.assertEquals(remarks,
                             [PathNotInProjectFile(p.abspath(path)), ])
@@ -222,20 +241,21 @@ with such.A("hdlcc project") as it:
         source = mock.MagicMock()
         source.library = 'some_lib'
         source.getDependencies = mock.MagicMock(
-            return_value=[{'library' : 'some_lib',
-                           'unit' : 'some_dependency'}])
+            return_value=[DependencySpec(library='some_lib',
+                                         name='some_dependency')])
 
         project = StandaloneProjectBuilder()
         it.assertEqual(list(project._resolveRelativeNames(source)),
-                       [('some_lib', 'some_dependency')])
+                       [DependencySpec(library='some_lib',
+                                       name='some_dependency')])
 
     @it.should("eliminate the dependency of a source on itself")
     def test():
         source = mock.MagicMock()
         source.library = 'some_lib'
         source.getDependencies = mock.MagicMock(
-            return_value=[{'library' : 'some_lib',
-                           'unit' : 'some_package'}])
+            return_value=[DependencySpec(library='some_lib',
+                                         name='some_package')])
 
         source.getDesignUnits = mock.MagicMock(
             return_value=[{'type' : 'package',
@@ -250,28 +270,25 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='direct_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
 
         direct_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'direct_dependency',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'indirect_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='indirect_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
 
         indirect_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'indirect_dependency',
                            'type' : 'package'}],
-            dependencies=[{'unit' : 'indirect_dependency',
-                           'library' : 'some_lib'},
-                          {'unit' : 'common_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[
+                DependencySpec(library='some_lib', name='indirect_dependency'),
+                DependencySpec(library='some_lib', name='common_dependency')])
 
         common_dependency = SourceMock(
             library='some_lib',
@@ -294,8 +311,8 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         direct_dependency = SourceMock(
             library='some_lib',
@@ -322,8 +339,8 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         project = StandaloneProjectBuilder()
         project._config._sources = {}
@@ -353,15 +370,15 @@ with such.A("hdlcc project") as it:
             library='some_lib',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency')])
 
         direct_dependency = SourceMock(
             library='some_lib',
             design_units=[{'name' : 'direct_dependency',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'target',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='target')])
 
         project = StandaloneProjectBuilder()
         project._config._sources = {}
@@ -375,10 +392,12 @@ with such.A("hdlcc project") as it:
     def test():
         target_source = SourceMock(
             library='some_lib',
+            filename='target_source.vhd',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
-            dependencies=[{'unit' : 'direct_dependency',
-                           'library' : 'some_lib'}])
+            dependencies=[DependencySpec(library='some_lib',
+                                         name='direct_dependency',
+                                         locations=[('target_source.vhd', 1, 2), ])])
 
         implementation_a = SourceMock(
             library='some_lib',
@@ -396,8 +415,7 @@ with such.A("hdlcc project") as it:
 
         project = StandaloneProjectBuilder()
         messages = []
-        project._handleUiWarning = mock.MagicMock(    # pylint: disable=invalid-name
-            side_effect=lambda x: messages.append(x)) # pylint: disable=unnecessary-lambda
+        project._handleUiWarning = mock.MagicMock(side_effect=messages.append)
 
         #  lambda message: messages += [message]
         project._config._sources = {}
@@ -417,14 +435,16 @@ with such.A("hdlcc project") as it:
                        "Should have exactly one outstanding diagnostics by now")
         it.assertIn(
             project._outstanding_diags.pop(),
-            [DependencyNotUnique(filename="some_lib_target.vhd",
+            [DependencyNotUnique(filename="target_source.vhd", line_number=1,
+                                 column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_a.vhd',
-                                 choices=[implementation_a, implementation_b]),
-             DependencyNotUnique(filename="some_lib_target.vhd",
+                                 choices=[implementation_b, ]),
+             DependencyNotUnique(filename="target_source.vhd", line_number=1,
+                                 column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_b.vhd',
-                                 choices=[implementation_a, implementation_b])])
+                                 choices=[implementation_a, ])])
 
     @it.should("get builder messages by path")
     def test():
@@ -485,8 +505,7 @@ with such.A("hdlcc project") as it:
                         "systemverilog": []}},
                 "_timestamp": 1474839625.2375762,
                 "_sources": {},
-                "filename": p.join(TEMP_PATH, "/myproject.prj")},
-            "serializer": "json"}
+                "filename": p.join(TEMP_PATH, "/myproject.prj")}}
 
         cache_path = p.join(TEMP_PATH, '.hdlcc', '.hdlcc.cache')
         if p.exists(p.dirname(cache_path)):
@@ -566,7 +585,7 @@ with such.A("hdlcc project") as it:
             it.assertIn(
                 ObjectIsNeverUsed(
                     filename=filename,
-                    line_number=43, column=12,
+                    line_number=43, column_number=12,
                     object_type='signal', object_name='neat_signal'),
                 diagnostics)
 
@@ -603,10 +622,10 @@ with such.A("hdlcc project") as it:
 
             expected = [
                 ObjectIsNeverUsed(filename=p.abspath(filename), line_number=43,
-                                  column=12, object_type='signal',
+                                  column_number=12, object_type='signal',
                                   object_name='neat_signal'),
                 ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
-                                  column=8, object_type='signal',
+                                  column_number=8, object_type='signal',
                                   object_name='another_signal')]
 
             #  if it.BUILDER_NAME == 'msim':
@@ -648,7 +667,7 @@ with such.A("hdlcc project") as it:
                 expected = [
                     LibraryShouldBeOmited(library='work',
                                           filename=p.abspath(filename),
-                                          column=9,
+                                          column_number=9,
                                           line_number=1),
                     PathNotInProjectFile(p.abspath(filename)),]
 
@@ -665,7 +684,7 @@ with such.A("hdlcc project") as it:
                 it.assertCountEqual(
                     [LibraryShouldBeOmited(library='work',
                                            filename=p.abspath(filename),
-                                           column=9,
+                                           column_number=9,
                                            line_number=1)],
                     diagnostics)
 
@@ -692,7 +711,7 @@ with such.A("hdlcc project") as it:
                     ObjectIsNeverUsed(object_type='constant',
                                       object_name='ADDR_WIDTH',
                                       line_number=29,
-                                      column=14),
+                                      column_number=14),
                     diagnostics)
             finally:
                 # Remove the comment we added

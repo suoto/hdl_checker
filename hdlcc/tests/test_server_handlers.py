@@ -34,7 +34,7 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.mocks import disableVunit
+from hdlcc.tests.utils import disableVunit
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -381,7 +381,7 @@ with such.A("hdlcc bottle app") as it:
 
         expected = StaticCheckerDiag(
             filename=data['path'],
-            line_number=1, column=4,
+            line_number=1, column_number=4,
             text='TODO: Nothing to see here',
             severity=DiagType.STYLE_INFO)
 
@@ -410,7 +410,7 @@ with such.A("hdlcc bottle app") as it:
             ["ieee.std_logic_1164",
              "ieee.numeric_std",
              "basic_library.clock_divider"],
-            dependencies)
+            [x for x in dependencies])
 
     @it.should("get source build sequence")
     def test():

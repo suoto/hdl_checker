@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=useless-object-inheritance
 
 import logging
 import os
@@ -23,6 +24,7 @@ import os.path as p
 from multiprocessing import Queue
 
 import mock
+import six
 
 import hdlcc
 
@@ -33,17 +35,17 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
 
-    def _handleUiInfo(self, message):
-        self._msg_queue.put(('info', message))
-        self._ui_handler.info(message)
+    def _handleUiInfo(self, msg):
+        self._msg_queue.put(('info', msg))
+        self._ui_handler.info(msg)
 
-    def _handleUiWarning(self, message):
-        self._msg_queue.put(('warning', message))
-        self._ui_handler.warning(message)
+    def _handleUiWarning(self, msg):
+        self._msg_queue.put(('warning', msg))
+        self._ui_handler.warning(msg)
 
-    def _handleUiError(self, message):
-        self._msg_queue.put(('error', message))
-        self._ui_handler.error(message)
+    def _handleUiError(self, msg):
+        self._msg_queue.put(('error', msg))
+        self._ui_handler.error(msg)
 
 class SourceMock(object):
     def __init__(self, library, design_units, dependencies=None, filename=None):
@@ -68,14 +70,14 @@ class SourceMock(object):
     def _createMockFile(self):
         with open(self.filename, 'w') as fd:
             libs = hdlcc.utils.removeDuplicates(
-                [x['library'] for x in self._dependencies])
+                [x.library for x in self._dependencies])
 
             for lib in libs:
                 fd.write("library {0};\n".format(lib))
 
             for dependency in self._dependencies:
-                fd.write("use {0}.{1};\n".format(dependency['library'],
-                                                 dependency['unit']))
+                fd.write("use {0}.{1};\n".format(dependency.library,
+                                                 dependency.name))
 
             for design_unit in self._design_units:
                 fd.write("{0} is {1} end {0} {1};\n".
@@ -122,13 +124,13 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
     def isAvailable():
         return True
 
-    def _buildSource(self, source, flags=None): # pragma: no cover
+    def _buildSource(self, path, library, flags=None):  # pylint: disable=unused-argument
         return [], []
 
-    def _createLibrary(self, source): # pragma: no cover
+    def _createLibrary(self, library):  # pylint: disable=unused-argument
         pass
 
-    def getBuiltinLibraries(self): # pragma: no cover
+    def getBuiltinLibraries(self):  # pylint: disable=unused-argument
         return []
 
 
@@ -141,3 +143,44 @@ class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
 
 def disableVunit(func):
     return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
+
+
+def assertCountEqual(it):  # pylint: disable=invalid-name
+    """
+
+    """
+
+    assert six.PY2, "Only needed on Python2"
+
+    def wrapper(first, second, msg=None):
+        temp = list(second)   # make a mutable copy
+        not_found = []
+        for elem in first:
+            try:
+                temp.remove(elem)
+            except ValueError:
+                not_found.append(elem)
+
+        error_details = []
+
+        if not_found:
+            error_details += ['Second list is missing item {}'.format(x)
+                              for x in not_found]
+
+        error_details += ['First list is missing item {}'.format(x) for x in
+                          temp]
+
+        if error_details:
+            # Add user message at the top
+            error_details = [msg, ] + error_details
+            error_details += ['', "Lists {} and {} differ".format(first, second)]
+            it.fail('\n'.join(error_details))
+
+    return wrapper
+
+def assertSameFile(it):  # pylint: disable=invalid-name
+    def wrapper(first, second):
+        if not hdlcc.utils.samefile(p.abspath(first), p.abspath(second)):
+            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
+                                                        p.abspath(second)))
+    return wrapper

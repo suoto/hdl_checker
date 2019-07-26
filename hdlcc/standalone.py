@@ -155,7 +155,7 @@ def runStandaloneSourceFileParse(fname):
     if dependencies: # pragma: no cover
         print(" - Dependencies:")
         for dependency in dependencies:
-            print(" -- %s.%s" % (dependency['library'], dependency['unit']))
+            print(" -- %s.%s" % (dependency.library, dependency.name))
 
 def runStandaloneStaticCheck(fname):
     """Standalone source_file.VhdlParser run"""
@@ -181,8 +181,8 @@ def printSourceDiags(project, source):
         if record.line_number is not None:
             location += ["line %s" % record.line_number]
 
-        if record.column is not None:
-            location += ["column %s" % record.column]
+        if record.column_number is not None:
+            location += ["column %s" % record.column_number]
 
         if location:
             message += ["(%s)" % ', '.join(location)]

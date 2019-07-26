@@ -17,21 +17,23 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import json
+import logging
 import os
 import os.path as p
-import sys
 import shutil
-import logging
+import sys
 
+import mock
+import six
 from nose2.tools import such
 from nose2.tools.params import params
 
-import six
-import mock
-
 import hdlcc
+import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
-from hdlcc.utils import writeListToFile, handlePathPlease
+from hdlcc.serialization import StateEncoder, jsonObjectHook
+from hdlcc.utils import handlePathPlease, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -40,10 +42,14 @@ TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
     p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
 
+such.unittest.TestCase.maxDiff = None
+
 with such.A('config parser object') as it:
-    # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+
+    if six.PY2:
+        # Can't use assertCountEqual for lists of unhashable types.
+        # Workaround for https://bugs.python.org/issue10242
+        it.assertCountEqual = hdlcc.tests.utils.assertCountEqual(it)
 
     @it.has_teardown
     def teardown():
@@ -105,19 +111,19 @@ with such.A('config parser object') as it:
 
         @it.should("extract build flags for single build")
         def test():
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_file.vhd'),
                                         batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-f0']))
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_package.vhd'),
                                         batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-f1']))
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_testbench.vhd'),
                                         batch_mode=False),
@@ -125,13 +131,13 @@ with such.A('config parser object') as it:
 
         @it.should("extract build flags for batch builds")
         def test():
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_file.vhd'),
                                         batch_mode=True),
                 set(['-b0', '-b1', '-g0', '-g1', '-f0']))
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_package.vhd'),
                                         batch_mode=True),
@@ -139,7 +145,7 @@ with such.A('config parser object') as it:
 
         @it.should("include VHDL and Verilog sources")
         def test():
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 [p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
                  p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
                  p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
@@ -204,9 +210,22 @@ with such.A('config parser object') as it:
 
         @it.should("restore from cached state")
         def test():
-            state = it.parser.getState()
-            restored = ConfigParser.recoverFromState(state)
-            it.assertEqual(it.parser, restored)
+            state = json.dumps(it.parser, cls=StateEncoder)
+            #  state = it.parser.getState()
+            #  restored = ConfigParser.recoverFromState(state)
+            restored = json.loads(state, object_hook=jsonObjectHook)
+
+            it.assertEqual(it.parser._parms, restored._parms)
+            it.assertEqual(it.parser._list_parms, restored._list_parms)
+            it.assertEqual(it.parser._single_value_parms, restored._single_value_parms)
+            it.assertCountEqual(it.parser._sources, restored._sources)
+            it.assertEqual(it.parser.filename, restored.filename)
+
+            # Raw dictionary provided by state should be the same the a dict
+            # dumped from a restored version of it since they both represent
+            # the same set of info
+            it.assertDictEqual(json.loads(state),
+                               json.loads(json.dumps(restored, cls=StateEncoder)))
 
         @it.should("find the correct source defining a design unit")
         def test():
@@ -234,12 +253,12 @@ with such.A('config parser object') as it:
 
             it.assertNotEqual(lower_insensitive, [])
             it.assertNotEqual(lower_sensitive, [])
-            it.assertItemsEqual(lower_insensitive, lower_sensitive)
+            it.assertCountEqual(lower_insensitive, lower_sensitive)
 
             it.assertNotEqual(upper_insensitive, [])
             it.assertEquals(upper_sensitive, [])
 
-            it.assertItemsEqual(lower_insensitive, upper_insensitive)
+            it.assertCountEqual(lower_insensitive, upper_insensitive)
 
             for source in lower_insensitive:
                 it.assertTrue(
@@ -429,7 +448,7 @@ with such.A('config parser object') as it:
             for source in sources_pre:
                 _logger.info(" - %s", source)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 sources_pre.keys(),
                 [handlePathPlease('another_library', 'foo.vhd'),
                  handlePathPlease('basic_library', 'clock_divider.vhd')])
@@ -444,7 +463,7 @@ with such.A('config parser object') as it:
             for source in sources_post:
                 _logger.info(" - %s", source)
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 sources_post.keys(),
                 [handlePathPlease('another_library', 'foo.vhd'),
                  handlePathPlease('basic_library', 'clock_divider.vhd'),
@@ -464,7 +483,7 @@ with such.A('config parser object') as it:
                 it.sources +
                 [('foo_lib', p.join('basic_library', 'very_common_pkg.vhd'))])
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 sources_post.keys(),
                 [handlePathPlease('another_library', 'foo.vhd'),
                  handlePathPlease('basic_library', 'clock_divider.vhd'),
@@ -498,7 +517,7 @@ with such.A('config parser object') as it:
                 it.sources +
                 [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 sources_pre.keys(),
                 [handlePathPlease('another_library', 'foo.vhd'),
                  handlePathPlease('basic_library', 'clock_divider.vhd'),
@@ -506,7 +525,7 @@ with such.A('config parser object') as it:
 
             sources_post = getSourcesFrom()
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 sources_post.keys(),
                 [handlePathPlease('another_library', 'foo.vhd'),
                  handlePathPlease('basic_library', 'clock_divider.vhd')])

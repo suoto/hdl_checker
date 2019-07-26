@@ -24,24 +24,8 @@ import signal
 import subprocess as subp
 import sys
 import time
+from tempfile import NamedTemporaryFile
 from threading import Lock
-from glob import glob
-
-# Make the serializer transparent
-try:
-    import json as serializer
-    def dump(*args, **kwargs):
-        """
-        Wrapper for json.dump
-        """
-        return serializer.dump(indent=True, *args, **kwargs)
-except ImportError:  # pragma: no cover
-    try:
-        import cPickle as serializer  # type: ignore
-    except ImportError:
-        import pickle as serializer   # type: ignore
-
-    dump = serializer.dump  # type: ignore # pylint: disable=invalid-name
 
 PY2 = sys.version_info[0] == 2
 
@@ -191,6 +175,9 @@ def writeListToFile(filename, _list): # pragma: no cover
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 
+    for i, line in enumerate(_list):
+        _logger.debug('%2d | %s', i, line)
+
     if onWindows():
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
         _logger.debug(cmd)
@@ -329,6 +316,19 @@ def toBytes(value):  # pragma: no cover
 
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
+
+def getTemporaryFilename(name):
+    """
+    Gets a temporary filename following the format 'hdlcc_pid<>.log' on Linux
+    and 'hdlcc_pid<>_<unique>.log' on Windows
+    """
+    basename = 'hdlcc_' + name + '_pid{}'.format(os.getpid())
+
+    if onWindows():
+        return NamedTemporaryFile(prefix=basename + '_', suffix='.log',
+                                  delete=False).name
+
+    return p.join(p.sep, 'tmp', basename + '.log')
 
 def isFileReadable(path):
     """

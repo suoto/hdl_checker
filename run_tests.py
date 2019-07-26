@@ -23,7 +23,6 @@ import logging
 import os
 import os.path as p
 import sys
-from glob import glob
 
 import coverage
 import nose2
