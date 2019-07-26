@@ -287,14 +287,15 @@ with such.A("hdlcc server") as it:
         def test():
             assertCommandPrints(['hdlcc', '--version'], hdlcc.__version__)
 
-        @it.should("start server given the --lsp flag")
-        def test():
+        def startServerWrapper(cmd):
             log_file = tempfile.mktemp()
 
-            cmd = ['hdlcc', '--lsp', '--nocolor', '--log-stream', log_file,
-                   '--stderr', p.join(TEST_LOG_PATH, 'hdlcc_stderr.log')]
+            actual_cmd = cmd + ['--nocolor', '--log-stream', log_file]
 
-            server = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
+            _logger.info("Actual command: %s", actual_cmd)
+
+            server = subp.Popen(actual_cmd, stdin=subp.PIPE, stdout=subp.PIPE,
+                                stderr=subp.PIPE)
 
             # Close stdin so the server exits
             stdout, stderr = server.communicate('')
@@ -312,13 +313,13 @@ with such.A("hdlcc server") as it:
 
             expected = [
                 "Starting server. Our PID is {}, no parent PID to attach to. "
-                 "Version string for hdlcc is '{}'".format(
-                     server.pid, hdlcc.__version__),
-                 "Starting HdlccLanguageServer IO language server",
-                 "No configuration file given, using fallback",
-                 "Using Fallback builder",
-                 "Selected builder is 'fallback'",
-                 ""]
+                "Version string for hdlcc is '{}'".format(
+                    server.pid, hdlcc.__version__),
+                "Starting HdlccLanguageServer IO language server",
+                "No configuration file given, using fallback",
+                "Using Fallback builder",
+                "Selected builder is 'fallback'",
+                ""]
 
             _logger.info("Log content: %s", log_content)
 
@@ -330,5 +331,14 @@ with such.A("hdlcc server") as it:
 
             os.remove(log_file)
 
+
+        @it.should("start server given the --lsp flag and setting stderr")
+        def test():
+            startServerWrapper(['hdlcc', '--lsp',
+                                '--stderr', p.join(TEST_LOG_PATH, 'hdlcc_stderr.log')])
+
+        @it.should("start server given the --lsp flag")
+        def test():
+            startServerWrapper(['hdlcc', '--lsp', ])
 
 it.createTests(globals())

@@ -325,7 +325,8 @@ def getTemporaryFilename(name):
     basename = 'hdlcc_' + name + '_pid{}'.format(os.getpid())
 
     if not onWindows():
-        return NamedTemporaryFile(prefix=basename + '_', suffix='.log').name
+        return NamedTemporaryFile(prefix=basename + '_', suffix='.log',
+                                  delete=False).name
 
     return p.join(p.sep, 'tmp', basename + '.log')
 
