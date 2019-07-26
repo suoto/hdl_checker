@@ -104,6 +104,7 @@ before_script:
 - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
 - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 after_success:
+- pip install coverage coveralls codecov
 - coverage combine
 - coverage report
 - export COVERALLS_PARALLEL=true
