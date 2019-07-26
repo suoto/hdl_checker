@@ -324,7 +324,7 @@ def getTemporaryFilename(name):
     """
     basename = 'hdlcc_' + name + '_pid{}'.format(os.getpid())
 
-    if not onWindows():
+    if onWindows():
         return NamedTemporaryFile(prefix=basename + '_', suffix='.log',
                                   delete=False).name
 
