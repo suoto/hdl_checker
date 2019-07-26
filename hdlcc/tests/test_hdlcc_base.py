@@ -439,12 +439,12 @@ with such.A("hdlcc project") as it:
                                  column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_a.vhd',
-                                 choices=[implementation_a, implementation_b]),
+                                 choices=[implementation_b, ]),
              DependencyNotUnique(filename="target_source.vhd", line_number=1,
                                  column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_b.vhd',
-                                 choices=[implementation_a, implementation_b])])
+                                 choices=[implementation_a, ])])
 
     @it.should("get builder messages by path")
     def test():

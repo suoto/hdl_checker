@@ -333,22 +333,23 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         self._logger.debug("Checking build sequence for %s", source)
         for dependency in self._resolveRelativeNames(source):
-            # Get a list of source files that contains this design unit.
-            # At this point, all the info we have pretty much depends on
-            # parsed text. Since Verilog is case sensitive and VHDL is not,
-            # we need to make sure we've got it right when mapping dependencies
-            # on mixed language projects
+            # Get a list of source files that contains this design unit. At
+            # this point, all the info we have pretty much depends on parsed
+            # text. Since Verilog is case sensitive and VHDL is not, we need to
+            # make sure we've got it right when mapping dependencies on mixed
+            # language projects
             dependencies_list = self._config.discoverSourceDependencies(
                 dependency.name, dependency.library, case_sensitive=source.filetype != 'vhdl')
 
             if not dependencies_list:
                 continue
             selected_dependency = dependencies_list[0]
+            dependencies_list = dependencies_list[1:]
 
-            # If we found more than a single file, then multiple files
-            # have the same entity or package name and we failed to
-            # identify the real file
-            if len(dependencies_list) != 1:
+            # If we found more than a single file, then multiple files have the
+            # same entity or package name and we failed to identify the real
+            # file
+            if len(dependencies_list):
                 _logger.warning("Dependency %s (%s)", dependency, type(dependency))
                 self._reportDependencyNotUnique(
                     non_resolved_dependency=dependency,
