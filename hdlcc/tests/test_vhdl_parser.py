@@ -274,9 +274,9 @@ with such.A('VHDL source file object') as it:
                  DependencySpec(library='ieee', name='std_logic_unsigned',
                                 locations={(it.source.filename, 4, 5)}),
                  DependencySpec(library='basic_library', name='very_common_pkg',
-                                locations={(it.source.filename, 13, 5)}),
+                                locations={(it.source.filename, 13, 38)}),
                  DependencySpec(library='work', name='package_with_constants',
-                                locations={(it.source.filename, 16, 5)})])
+                                locations={(it.source.filename, 16, 1)})])
 
         @it.should('return source modification time')
         def test():

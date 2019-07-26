@@ -209,8 +209,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 0},
-                                'end': {'line': 42, 'character': 0}},
+                      'range': {'start': {'line': 42, 'character': 11},
+                                'end': {'line': 42, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -260,8 +260,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 0},
-                                'end': {'line': 42, 'character': 0}},
+                      'range': {'start': {'line': 42, 'character': 11},
+                                'end': {'line': 42, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -306,8 +306,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 0},
-                                'end': {'line': 42, 'character': 0}},
+                      'range': {'start': {'line': 42, 'character': 11},
+                                'end': {'line': 42, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information},
                      {'source': 'HDL Code Checker',
@@ -351,8 +351,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 0},
-                                'end': {'line': 42, 'character': 0}},
+                      'range': {'start': {'line': 42, 'character': 11},
+                                'end': {'line': 42, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -390,8 +390,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 0},
-                                'end': {'line': 42, 'character': 0}},
+                      'range': {'start': {'line': 42, 'character': 11},
+                                'end': {'line': 42, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
