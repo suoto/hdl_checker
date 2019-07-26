@@ -78,8 +78,8 @@ def parseArguments():
         args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
-    args.log_stream = args.log_stream or _getTemporaryFilename('log')
-    args.stderr = args.stderr or _getTemporaryFilename('stderr')
+    args.log_stream = args.log_stream or utils.getTemporaryFilename('log')
+    args.stderr = args.stderr or utils.getTemporaryFilename('stderr')
 
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor
@@ -87,10 +87,6 @@ def parseArguments():
     del args.nocolor
 
     return args
-
-def _getTemporaryFilename(name):
-    return p.join(p.sep, 'tmp', 'hdlcc_' + name + '_pid{}'.format(os.getpid()) +
-                  '.log')
 
 # Copied from ycmd!
 def openForStdHandle(filepath):

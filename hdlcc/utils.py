@@ -24,6 +24,7 @@ import signal
 import subprocess as subp
 import sys
 import time
+from tempfile import NamedTemporaryFile
 from threading import Lock
 
 PY2 = sys.version_info[0] == 2
@@ -315,6 +316,18 @@ def toBytes(value):  # pragma: no cover
 
     # This is meant to catch `int` and similar non-string/bytes types.
     return toBytes(str(value))
+
+def getTemporaryFilename(name):
+    """
+    Gets a temporary filename following the format 'hdlcc_pid<>.log' on Linux
+    and 'hdlcc_pid<>_<unique>.log' on Windows
+    """
+    basename = 'hdlcc_' + name + '_pid{}'.format(os.getpid())
+
+    if not onWindows():
+        return NamedTemporaryFile(prefix=basename + '_', suffix='.log').name
+
+    return p.join(p.sep, 'tmp', basename + '.log')
 
 def isFileReadable(path):
     """
