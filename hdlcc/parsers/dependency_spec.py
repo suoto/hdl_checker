@@ -24,8 +24,8 @@ class DependencySpec(object):
     __hash__ = None # Force unhashable, locations can change
 
     def __init__(self, library, name, locations=None):
-        self._library = library
-        self._name = name
+        self._library = str(library)
+        self._name = str(name)
         self.locations = set()
         for filename, line_number, column_number in locations or []:
             self.addLocation(filename, line_number, column_number)
@@ -52,7 +52,7 @@ class DependencySpec(object):
         numbers indexes start at 1.
         """
         self.locations.add((
-            filename,
+            str(filename),
             None if line_number is None else str(line_number),
             None if column_number is None else str(column_number)))
 

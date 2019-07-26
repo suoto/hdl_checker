@@ -35,17 +35,17 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
 
-    def _handleUiInfo(self, message):
-        self._msg_queue.put(('info', message))
-        self._ui_handler.info(message)
+    def _handleUiInfo(self, msg):
+        self._msg_queue.put(('info', msg))
+        self._ui_handler.info(msg)
 
-    def _handleUiWarning(self, message):
-        self._msg_queue.put(('warning', message))
-        self._ui_handler.warning(message)
+    def _handleUiWarning(self, msg):
+        self._msg_queue.put(('warning', msg))
+        self._ui_handler.warning(msg)
 
-    def _handleUiError(self, message):
-        self._msg_queue.put(('error', message))
-        self._ui_handler.error(message)
+    def _handleUiError(self, msg):
+        self._msg_queue.put(('error', msg))
+        self._ui_handler.error(msg)
 
 class SourceMock(object):
     def __init__(self, library, design_units, dependencies=None, filename=None):
@@ -152,7 +152,7 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
 
     assert six.PY2, "Only needed on Python2"
 
-    def wrapper(first, second):
+    def wrapper(first, second, msg=None):
         temp = list(second)   # make a mutable copy
         not_found = []
         for elem in first:
@@ -160,15 +160,21 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
                 temp.remove(elem)
             except ValueError:
                 not_found.append(elem)
-        msg = []
+
+        error_details = []
+
         if not_found:
-            msg += ['Second list is missing item {}'.format(x) for x in not_found]
+            error_details += ['Second list is missing item {}'.format(x)
+                              for x in not_found]
 
-        msg += ['First list is missing item {}'.format(x) for x in temp]
+        error_details += ['First list is missing item {}'.format(x) for x in
+                          temp]
 
-        if msg:
-            msg += ['', "Lists {} and {} differ".format(first, second)]
-            it.fail('\n'.join(msg))
+        if error_details:
+            # Add user message at the top
+            error_details = [msg, ] + error_details
+            error_details += ['', "Lists {} and {} differ".format(first, second)]
+            it.fail('\n'.join(error_details))
 
     return wrapper
 
