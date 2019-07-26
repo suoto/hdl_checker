@@ -85,9 +85,12 @@ class VhdlParser(BaseSourceFile):
                 dependencies[key] = DependencySpec(library=library, name=unit)
 
             dependency = dependencies[key]
+            line_number = text[:match.end()].count('\n')
+            column_number = len(text[:match.start()].split('\n')[-1])
+
             dependency.addLocation(filename=self.filename,
-                                   line_number=text[:match.start()].count('\n'),
-                                   column_number=None)
+                                   line_number=line_number + 1,
+                                   column_number=column_number + 1)
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             package_body_name = match.groupdict()['package_body_name']
@@ -98,9 +101,11 @@ class VhdlParser(BaseSourceFile):
                                                    name=package_body_name)
 
             dependency = dependencies[key]
+            line_number = text[:match.end()].count('\n')
+            column_number = len(text[:match.start()].split('\n')[-1])
             dependency.addLocation(filename=self.filename,
-                                   line_number=text[:match.start()].count('\n'),
-                                   column_number=None)
+                                   line_number=line_number + 1,
+                                   column_number=column_number + 1)
 
         return list(dependencies.values())
 

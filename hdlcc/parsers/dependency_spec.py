@@ -26,13 +26,13 @@ class DependencySpec(object):
     def __init__(self, library, name, locations=None):
         self._library = library
         self._name = name
-        self._locations = set(locations or [])
+        self.locations = set()
         for filename, line_number, column_number in locations or []:
             self.addLocation(filename, line_number, column_number)
 
     def __jsonEncode__(self):
         state = self.__dict__.copy()
-        state['_locations'] = list(state['_locations'])
+        state['locations'] = list(state['locations'])
         return state
 
     @classmethod
@@ -43,11 +43,18 @@ class DependencySpec(object):
         obj = super(DependencySpec, cls).__new__(cls)
         obj._library = state['_library']
         obj._name = state['_name']
-        obj._locations = {tuple(x) for x in state['_locations']}
+        obj.locations = {tuple(x) for x in state['locations']}
         return obj
 
-    def addLocation(self, filename, line_number, column_number):
-        self._locations.add((filename, line_number, column_number))
+    def addLocation(self, filename, line_number=None, column_number=None):
+        """
+        Adds an entry to the set of locations this dependency. Line and column
+        numbers indexes start at 1.
+        """
+        self.locations.add((
+            filename,
+            None if line_number is None else str(line_number),
+            None if column_number is None else str(column_number)))
 
     @property
     def library(self):
@@ -59,12 +66,12 @@ class DependencySpec(object):
 
     @property
     def __eq_key__(self):
-        return self.library, self.name, self._locations
+        return self.library, self.name, self.locations
 
     def __repr__(self):
         return '{}.{}(library={}, name={}, locations={})'.format(
             __name__, self.__class__.__name__, repr(self.library),
-            repr(self.name), repr(self._locations))
+            repr(self.name), repr(self.locations))
 
     def __eq__(self, other):
         """Overrides the default implementation"""

@@ -32,7 +32,7 @@ import hdlcc
 from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
-from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
+from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder)
 from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
@@ -392,10 +392,12 @@ with such.A("hdlcc project") as it:
     def test():
         target_source = SourceMock(
             library='some_lib',
+            filename='target_source.vhd',
             design_units=[{'name' : 'target',
                            'type' : 'entity'}],
             dependencies=[DependencySpec(library='some_lib',
-                                         name='direct_dependency')])
+                                         name='direct_dependency',
+                                         locations=[('target_source.vhd', 1, 2), ])])
 
         implementation_a = SourceMock(
             library='some_lib',
@@ -413,8 +415,7 @@ with such.A("hdlcc project") as it:
 
         project = StandaloneProjectBuilder()
         messages = []
-        project._handleUiWarning = mock.MagicMock(    # pylint: disable=invalid-name
-            side_effect=lambda x: messages.append(x)) # pylint: disable=unnecessary-lambda
+        project._handleUiWarning = mock.MagicMock(side_effect=messages.append)
 
         #  lambda message: messages += [message]
         project._config._sources = {}
@@ -434,11 +435,13 @@ with such.A("hdlcc project") as it:
                        "Should have exactly one outstanding diagnostics by now")
         it.assertIn(
             project._outstanding_diags.pop(),
-            [DependencyNotUnique(filename="some_lib_target.vhd",
+            [DependencyNotUnique(filename="target_source.vhd", line_number=1,
+                                 column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_a.vhd',
                                  choices=[implementation_a, implementation_b]),
-             DependencyNotUnique(filename="some_lib_target.vhd",
+             DependencyNotUnique(filename="target_source.vhd", line_number=1,
+                                 column_number=2,
                                  design_unit="some_lib.direct_dependency",
                                  actual='implementation_b.vhd',
                                  choices=[implementation_a, implementation_b])])

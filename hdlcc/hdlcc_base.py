@@ -308,6 +308,25 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         return self._build_sequence_cache[key]['sequence']
 
+    def _reportDependencyNotUnique(self, non_resolved_dependency, actual, choices):
+        """
+        Reports a dependency failed to be resolved due to multiple files
+        defining the required design unit
+        """
+        locations = non_resolved_dependency.locations or \
+                    (non_resolved_dependency.filename, 1, None)
+
+        for filename, line_number, column_number in locations:
+            self._outstanding_diags.add(
+                DependencyNotUnique(
+                    filename=filename,
+                    line_number=line_number,
+                    column_number=column_number,
+                    design_unit='{}.{}'.format(non_resolved_dependency.library,
+                                               non_resolved_dependency.name),
+                    actual=actual.filename,
+                    choices=list(choices)))
+
     def _getBuildSequence(self, source, build_sequence, reference=None):
         """
         Recursively finds out the dependencies of the given source file
@@ -330,11 +349,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # have the same entity or package name and we failed to
             # identify the real file
             if len(dependencies_list) != 1:
-                self._outstanding_diags.add(
-                    DependencyNotUnique(filename=source.filename,
-                                        design_unit='{}.{}'.format(dependency.library, dependency.name),
-                                        actual=selected_dependency.filename,
-                                        choices=list(dependencies_list)))
+                _logger.warning("Dependency %s (%s)", dependency, type(dependency))
+                self._reportDependencyNotUnique(
+                    non_resolved_dependency=dependency,
+                    actual=selected_dependency,
+                    choices=dependencies_list)
 
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
