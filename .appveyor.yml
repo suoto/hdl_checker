@@ -72,9 +72,6 @@ install:
 
 test_script:
   - tox
-  - pip install coverage coveralls codecov
-  - coverage report
-  - codecov
 after_test:
   - 7z a tox.zip ".tox"
   - appveyor PushArtifact tox.zip
