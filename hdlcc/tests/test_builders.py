@@ -23,25 +23,21 @@ import os.path as p
 import shutil
 
 import mock
-
 from nose2.tools import such
 from nose2.tools.params import params
 
-import hdlcc.builders
-import hdlcc.utils as utils
+from hdlcc.builders import getBuilderByName
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers import VhdlParser
+from hdlcc.tests.utils import assertSameFile
 
 _logger = logging.getLogger(__name__)
 
 TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 
 with such.A("builder object") as it:
-    def _assertSameFile(first, second):
-        if not utils.samefile(first, second):
-            it.fail("Paths '{}' and '{}' differ".format(first, second))
 
-    it.assertSameFile = _assertSameFile
+    it.assertSameFile = assertSameFile(it)
 
     @it.has_setup
     def setup():
@@ -76,7 +72,7 @@ with such.A("builder object") as it:
                     {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
                 it.patch.start()
 
-            cls = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
+            cls = getBuilderByName(it.BUILDER_NAME)
             it.builder = cls(p.join(TEST_SUPPORT_PATH,
                                     '._%s' % it.BUILDER_NAME))
             it.cls = cls

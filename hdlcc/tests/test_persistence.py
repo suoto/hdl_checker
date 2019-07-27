@@ -28,8 +28,8 @@ import mock
 from nose2.tools import such
 
 import hdlcc
-import hdlcc.utils as utils
-from hdlcc.tests.utils import disableVunit
+from hdlcc.tests.utils import (cleanProjectCache, disableVunit,
+                               getDefaultCachePath)
 
 _logger = logging.getLogger(__name__)
 
@@ -66,12 +66,11 @@ with such.A("hdlcc project with persistence") as it:
         it.PROJECT_FILE = p.join(BASE_PATH, it.BUILDER_NAME + '.prj')
 
         #  StandaloneProjectBuilder.cleanProjectCache(it.PROJECT_FILE)
-        utils.cleanProjectCache(it.PROJECT_FILE)
+        cleanProjectCache(it.PROJECT_FILE)
 
         it.original_env = os.environ.copy()
         it.builder_env = os.environ.copy()
 
-        #  utils.addToPath(it.BUILDER_PATH)
         it.patch = mock.patch.dict(
             'os.environ',
             {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
@@ -110,11 +109,11 @@ with such.A("hdlcc project with persistence") as it:
             if not it.BUILDER_NAME:
                 return
             #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-            utils.cleanProjectCache(it.PROJECT_FILE)
+            cleanProjectCache(it.PROJECT_FILE)
             target_dir = hdlcc.config_parser.ConfigParser(it.PROJECT_FILE).getTargetDir()
             if p.exists(target_dir):
                 shutil.rmtree(target_dir)
-            cache_fname = utils.getDefaultCachePath(it.PROJECT_FILE)
+            cache_fname = getDefaultCachePath(it.PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
@@ -157,7 +156,7 @@ with such.A("hdlcc project with persistence") as it:
         def setup():
             if not it.BUILDER_NAME:
                 return
-            #  cache_fname = utils.getDefaultCachePath(it.PROJECT_FILE)
+            #  cache_fname = getDefaultCachePath(it.PROJECT_FILE)
             target_dir, _ = hdlcc.config_parser.ConfigParser.simpleParse(it.PROJECT_FILE)
             if p.exists(target_dir):
                 _logger.info("Target dir '%s' removed", target_dir)
@@ -244,7 +243,7 @@ with such.A("hdlcc project with persistence") as it:
         def setup():
             if not it.BUILDER_NAME:
                 return
-            cache_fname = utils.getDefaultCachePath(it.PROJECT_FILE)
+            cache_fname = getDefaultCachePath(it.PROJECT_FILE)
             if p.exists(cache_fname):
                 os.remove(cache_fname)
 
@@ -252,7 +251,7 @@ with such.A("hdlcc project with persistence") as it:
         def teardown():
             if not it.BUILDER_NAME:
                 return
-            utils.cleanProjectCache(it.PROJECT_FILE)
+            cleanProjectCache(it.PROJECT_FILE)
 
         @it.should('use fallback builder if recovering cache failed')
         @disableVunit
@@ -295,4 +294,3 @@ with such.A("hdlcc project with persistence") as it:
             return matches, messages
 
 it.createTests(globals())
-

@@ -22,14 +22,13 @@ import logging
 import os
 import os.path as p
 import subprocess as subp
+import tempfile
 import time
 from multiprocessing import Process, Queue
-import tempfile
 from threading import Thread
 
 import mock
 from nose2.tools import such
-
 from pyls import uris
 from pyls.python_ls import start_io_lang_server
 
@@ -37,8 +36,8 @@ import requests
 
 import hdlcc
 import hdlcc.lsp
-import hdlcc.utils as utils
 from hdlcc.tests.utils import disableVunit
+from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 such.unittest.TestCase.maxDiff = None
 
@@ -121,7 +120,15 @@ with such.A("hdlcc server") as it:
 
             _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
-            it._server = subp.Popen(cmd, env=os.environ.copy())
+            stdout_r, stdout_w = os.pipe()
+            stderr_r, stderr_w = os.pipe()
+
+            it.stdout = os.fdopen(stdout_r, 'rb')
+            it.stderr = os.fdopen(stderr_r, 'rb')
+
+            it._server = subp.Popen(cmd, env=os.environ.copy(),
+                                    stdout=os.fdopen(stdout_w, 'wb'),
+                                    stderr=os.fdopen(stderr_w, 'wb'))
             waitForServer()
 
         def startCodeCheckerServerAttachedToPid(pid):
@@ -150,8 +157,9 @@ with such.A("hdlcc server") as it:
                 time.sleep(0.1)
 
             _logger.error("Server is not replying")
+            _logger.error("stderr: %s", it.stderr.read())
             it._server.terminate()
-            utils.terminateProcess(it._server.pid)
+            terminateProcess(it._server.pid)
             assert False, "Server is not replying"
 
         def waitUntilBuildFinishes(data):
@@ -171,7 +179,7 @@ with such.A("hdlcc server") as it:
         @it.has_teardown
         def teardown():
             it._server.terminate()
-            utils.terminateProcess(it._server.pid)
+            terminateProcess(it._server.pid)
 
         @it.should("start and respond a request")
         @disableVunit
@@ -191,7 +199,7 @@ with such.A("hdlcc server") as it:
                 it.assertFalse(reply.ok)
 
             it._server.terminate()
-            utils.terminateProcess(it._server.pid)
+            terminateProcess(it._server.pid)
 
         @it.should("terminate when the parent PID is not running anymore")
         def test():
@@ -208,11 +216,11 @@ with such.A("hdlcc server") as it:
             queue.put(1)
             proc.join()
 
-            if utils.isProcessRunning(proc.pid):
+            if isProcessRunning(proc.pid):
                 _logger.warning("Dummy process %d was still running", proc.pid)
                 proc.terminate()
                 time.sleep(1)
-                it.assertFalse(utils.isProcessRunning(proc.pid),
+                it.assertFalse(isProcessRunning(proc.pid),
                                "Process %d is still running after terminating "
                                "it!" % proc.pid)
 
@@ -323,7 +331,7 @@ with such.A("hdlcc server") as it:
 
             _logger.info("Log content: %s", log_content)
 
-            if utils.onWindows():
+            if onWindows():
                 log_content = log_content[1:]
                 expected = expected[1:]
 

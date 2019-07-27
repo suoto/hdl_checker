@@ -24,11 +24,12 @@ import signal
 from multiprocessing import Queue
 
 import bottle
+
 import hdlcc
-import hdlcc.utils as utils
 from hdlcc.builders import getWorkingBuilders
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.utils import terminateProcess
 
 _logger = logging.getLogger(__name__)
 
@@ -265,7 +266,7 @@ def shutdownServer():
     Terminates the current process to shutdown the server
     """
     _logger.info("Shutting down server")
-    utils.terminateProcess(os.getpid())
+    terminateProcess(os.getpid())
 
 
 @app.post('/get_dependencies')

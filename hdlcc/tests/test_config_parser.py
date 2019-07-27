@@ -33,7 +33,8 @@ import hdlcc
 import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.utils import handlePathPlease, writeListToFile
+from hdlcc.tests.utils import (assertCountEqual, handlePathPlease,
+                               writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ with such.A('config parser object') as it:
     if six.PY2:
         # Can't use assertCountEqual for lists of unhashable types.
         # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = hdlcc.tests.utils.assertCountEqual(it)
+        it.assertCountEqual = assertCountEqual(it)
 
     @it.has_teardown
     def teardown():

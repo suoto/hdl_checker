@@ -26,7 +26,7 @@ from nose2.tools import such
 
 from hdlcc.parsers import VerilogParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.utils import writeListToFile
+from hdlcc.tests.utils import writeListToFile
 
 _logger = logging.getLogger(__name__)
 

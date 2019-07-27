@@ -22,7 +22,6 @@
 import argparse
 import logging
 import os
-import os.path as p
 import sys
 from threading import Timer
 
@@ -30,8 +29,9 @@ from pyls.python_ls import start_io_lang_server
 
 import hdlcc
 import hdlcc.lsp
-import hdlcc.utils as utils
 from hdlcc import handlers
+from hdlcc.utils import (getTemporaryFilename, isProcessRunning, setupLogging,
+                         terminateProcess)
 
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
@@ -78,8 +78,8 @@ def parseArguments():
         args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
-    args.log_stream = args.log_stream or utils.getTemporaryFilename('log')
-    args.stderr = args.stderr or utils.getTemporaryFilename('stderr')
+    args.log_stream = args.log_stream or getTemporaryFilename('log')
+    args.stderr = args.stderr or getTemporaryFilename('stderr')
 
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor
@@ -160,7 +160,7 @@ def startServer(args):
     Import modules and tries to start a hdlcc server
     """
     if args.log_stream:
-        utils.setupLogging(args.log_stream, args.log_level, args.color)
+        setupLogging(args.log_stream, args.log_level, args.color)
 
     _logger = logging.getLogger(__name__)
 
@@ -169,11 +169,11 @@ def startServer(args):
         def _watchPidWrapper():
             "PID attachment monitor"
             try:
-                if utils.isProcessRunning(source_pid):
+                if isProcessRunning(source_pid):
                     Timer(1, _watchPidWrapper).start()
                 else:
                     _logger.warning("Process %d is not running anymore", source_pid)
-                    utils.terminateProcess(target_pid)
+                    terminateProcess(target_pid)
             except (TypeError, AttributeError):  # pragma: no cover
                 return
 

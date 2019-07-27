@@ -29,7 +29,7 @@ from nose2.tools.params import params
 import hdlcc
 from hdlcc.parsers import DependencySpec, VhdlParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.utils import writeListToFile
+from hdlcc.tests.utils import assertCountEqual, assertSameFile, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -40,12 +40,12 @@ such.unittest.TestCase.maxDiff = None
 
 with such.A('VHDL source file object') as it:
 
-    it.assertSameFile = hdlcc.tests.utils.assertSameFile(it)
+    it.assertSameFile = assertSameFile(it)
 
     if six.PY2:
         # Can't use assertCountEqual for lists of unhashable types.
         # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = hdlcc.tests.utils.assertCountEqual(it)
+        it.assertCountEqual = assertCountEqual(it)
 
 
     with it.having('an entity code'):

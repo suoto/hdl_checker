@@ -34,7 +34,7 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.utils import disableVunit
+from hdlcc.tests.utils import deleteFileOrDir, disableVunit
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -190,7 +190,7 @@ with such.A("hdlcc bottle app") as it:
                 p.exists(target_folder),
                 "Target folder '%s' doesn't exists" % target_folder)
             for path in glob(p.join(target_folder, '*')):
-                hdlcc.utils.deleteFileOrDir(path)
+                deleteFileOrDir(path)
 
             it.assertEqual([], glob(p.join(target_folder, '*')),
                            "Target folder '%s' still exists!" % target_folder)
@@ -325,7 +325,7 @@ with such.A("hdlcc bottle app") as it:
             _logger.info("Terminating PID %d", pid)
             pids.append(pid)
 
-        with mock.patch('hdlcc.utils.terminateProcess', terminateProcess):
+        with mock.patch('hdlcc.handlers.terminateProcess', terminateProcess):
             reply = it.app.post('/shutdown')
             it.assertEqual(pids, [os.getpid(),])
 

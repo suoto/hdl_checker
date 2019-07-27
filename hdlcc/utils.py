@@ -19,11 +19,8 @@
 import logging
 import os
 import os.path as p
-import shutil
 import signal
-import subprocess as subp
 import sys
-import time
 from tempfile import NamedTemporaryFile
 from threading import Lock
 
@@ -165,44 +162,14 @@ def _isProcessRunningOnWindows(pid):
     pid_list = [i for i in list_of_pids][:number_of_pids]
     return int(pid) in pid_list
 
-def writeListToFile(filename, _list): # pragma: no cover
-    "Well... writes '_list' to 'filename'. This is for testing only"
-    _logger.debug("Writing to %s", filename)
-
-    open(filename, mode='w').write(
-        '\n'.join([str(x) for x in _list]))
-
-    mtime = p.getmtime(filename)
-    time.sleep(0.01)
-
-    for i, line in enumerate(_list):
-        _logger.debug('%2d | %s', i, line)
-
-    if onWindows():
-        cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
-        _logger.debug(cmd)
-        subp.check_call(cmd, shell=True)
-    else:
-        subp.check_call(['touch', filename])
-
-    for i in range(10):
-        if p.getmtime(filename) != mtime:
-            break
-        _logger.debug("Waiting...[%d]", i)
-        time.sleep(0.1)
-
 
 def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'win32'
 
+
 def onMac():      # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == 'darwin'
 
-def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
-    return 'TRAVIS' in os.environ
-
-def onCI():       # pragma: no cover # pylint: disable=missing-docstring
-    return 'CI' in os.environ
 
 class UnknownTypeExtension(Exception):
     """
@@ -215,6 +182,7 @@ class UnknownTypeExtension(Exception):
 
     def __str__(self):
         return "Couldn't determine file type for path '%s'" % self._path
+
 
 def getFileType(filename):
     "Gets the file type of a source file"
@@ -237,36 +205,6 @@ if not hasattr(p, 'samefile'):
 else:
     samefile = p.samefile # pylint: disable=invalid-name
 
-def getDefaultCachePath(project_file): # pragma: no cover
-    """
-    Gets the default path of hdlcc cache.
-    Intended for testing only.
-    """
-    return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
-
-def cleanProjectCache(project_file): # pragma: no cover
-    """
-    Removes the default hdlcc cache folder.
-    Intended for testing only.
-    """
-    if project_file is None:
-        _logger.debug("Can't clean None")
-    else:
-        cache_folder = getDefaultCachePath(project_file)
-        if p.exists(cache_folder):
-            shutil.rmtree(cache_folder)
-
-def deleteFileOrDir(path):
-    if p.isdir(path):
-        shutil.rmtree(path)
-    else:
-        os.remove(path)
-
-def handlePathPlease(*args):
-    """
-    Join args with pathsep, gets the absolute path and normalizes
-    """
-    return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 def removeDuplicates(seq):
     """

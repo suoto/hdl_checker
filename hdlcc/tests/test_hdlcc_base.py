@@ -34,8 +34,9 @@ from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MSimMock, SourceMock,
-                               StandaloneProjectBuilder)
-from hdlcc.utils import cleanProjectCache, onCI, samefile, writeListToFile
+                               StandaloneProjectBuilder, cleanProjectCache,
+                               onCI, writeListToFile)
+from hdlcc.utils import samefile
 
 _logger = logging.getLogger(__name__)
 
