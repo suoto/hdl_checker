@@ -16,14 +16,17 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
-
-"$PATH_TO_THIS_SCRIPT"/.ci/scripts/docker_build.sh
-
 set -xe
 
-docker run                                                      \
-  --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdlcc \
-  --env USER_ID="$(id -u)"                                      \
-  --env GROUP_ID="$(id -g)"                                     \
-  suoto/hdlcc:latest
+echo "USER_ID=$USER_ID"
+echo "GROUP_ID=$GROUP_ID"
+
+addgroup "$USERNAME" --gid "$GROUP_ID"
+
+adduser --disabled-password \
+  --gid "$GROUP_ID"         \
+  --uid "$USER_ID"          \
+  --home "/home/$USERNAME" "$USERNAME"
+
+exec su -l "$USERNAME" -c "ls -la $PWD && ls -la / && cd /hdlcc && tox -e local"
+

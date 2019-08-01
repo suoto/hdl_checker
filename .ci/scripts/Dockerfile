@@ -17,21 +17,19 @@
 
 FROM ubuntu:19.04
 
+ENV USERNAME user
+ENV BUILDERS /builders
+
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
 RUN apt-get update -qq
-
 RUN apt-get install -qq python2 python3 python3-pip wget git
 RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6
 
 RUN pip3 install tox
 
-ENV USER root
-ENV HOME /root
-ENV CACHE_DIR $HOME/cache
-
-WORKDIR $HOME
+WORKDIR /data
 
 # Download files
 RUN wget --quiet http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz
@@ -39,8 +37,8 @@ RUN wget --quiet http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_i
 RUN wget --quiet http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/modelsim-part2-19.2.0.57-linux.qdz
 
 # Install GHDL
-RUN mkdir -p $HOME/builders/ghdl
-RUN tar zxvf ghdl-0.33-x86_64-linux.tgz --directory $HOME/builders/ghdl
+RUN mkdir -p $BUILDERS/ghdl
+RUN tar zxvf ghdl-0.33-x86_64-linux.tgz --directory $BUILDERS/ghdl
 
 # Install ModelSim
 RUN chmod +x ModelSimProSetup-19.2.0.57-linux.run
@@ -48,10 +46,10 @@ RUN mkdir -p $HOME/builders
 RUN ./ModelSimProSetup-19.2.0.57-linux.run --mode unattended \
         --modelsim_edition modelsim_ase                      \
         --accept_eula 1                                      \
-        --installdir $HOME/builders/msim
+        --installdir $BUILDERS/msim
 
 # Test installations
-RUN $HOME/builders/ghdl/bin/ghdl --version
-RUN $HOME/builders/msim/modelsim_ase/linuxaloem/vcom -version
-
-VOLUME $HOME/hdlcc
+RUN $BUILDERS/ghdl/bin/ghdl --version
+RUN $BUILDERS/msim/modelsim_ase/linuxaloem/vcom -version
+VOLUME /hdlcc
+ENTRYPOINT "/hdlcc/.ci/scripts/docker_entry_point.sh"
