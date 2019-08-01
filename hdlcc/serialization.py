@@ -49,7 +49,6 @@ class StateEncoder(json.JSONEncoder):
                 _logger.warning("Class has been set to %s, overwriting it "
                                 "to %s", prev, o.__class__.__name__)
             dct['__class__'] = o.__class__.__name__
-            _logger.debug("Encoded output:\n%s", repr(dct))
             return dct
         # Let the base class default method raise the TypeError
         try:
@@ -64,7 +63,6 @@ def jsonObjectHook(dict_):
     json hook for decoding entries added the StateEncoder back to Python
     objects
     """
-    _logger.debug("Handling %s", dict_)
     if '__class__' not in dict_:
         return dict_
 
