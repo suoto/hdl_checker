@@ -81,7 +81,7 @@ class GHDL(BaseBuilder):
 
             filename = info.get('filename')
             line_number = info.get('line_number')
-            column_number= info.get('column_number')
+            column_number = info.get('column_number')
 
             if filename is not None:
                 diag.filename = filename
