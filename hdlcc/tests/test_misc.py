@@ -49,23 +49,12 @@ with such.A("hdlcc sources") as it:
     def test():
 
         def _fileFilter(path):
-            # Exclude dependencies
-            if 'bottle' in path.split(p.sep):
-                return False
-            if 'requests' in path.split(p.sep):
-                return False
-            if 'waitress' in path.split(p.sep):
-                return False
             # Exclude versioneer files
             if p.basename(path) in ('_version.py', 'versioneer.py'):
                 return False
-            # Exclude files copied almost as is from
-            # https://github.com/palantir/python-language-server/
-            if p.basename(path) in ('defines.py', 'uris.py'):
-                return False
             return path.split('.')[-1] in ('py', 'sh', 'ps1')
 
-        files = list(getFiles(_fileFilter))
+        files = list(filter(_fileFilter, getFiles()))
 
         it.assertNotEquals(files, [], "Couldn't find any files!")
         _logger.info("Files found: %s", ", ".join(files))
@@ -80,11 +69,10 @@ with such.A("hdlcc sources") as it:
         it.assertEquals(bad_files, [],
                         "Some files have problems: %s" % ", ".join(bad_files))
 
-    def getFiles(func):
+    def getFiles():
         for filename in subp.check_output(
                 ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
-            if func(filename.decode()):
-                yield p.abspath(filename).decode()
+            yield p.abspath(filename).decode()
 
     def checkFile(filename):
         lines = open(filename, mode='rb').read().decode(errors='replace')
