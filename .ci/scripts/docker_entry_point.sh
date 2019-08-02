@@ -27,5 +27,5 @@ adduser --disabled-password            \
 
 ln -s /builders /home/user/builders
 
-exec su -l "$USERNAME" -c "cd /hdlcc && tox"
+exec su -l "$USERNAME" -c "cd /hdlcc && tox ${TOX_ARGS[*]}"
 

@@ -20,8 +20,12 @@ set -e
 
 PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
 
+TOX_ARGS="$*"
+
 docker run                                                      \
+  --rm                                                          \
   --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdlcc \
   --env USER_ID="$(id -u)"                                      \
   --env GROUP_ID="$(id -g)"                                     \
+  --env TOX_ARGS="$TOX_ARGS"                                    \
   suoto/hdlcc:latest
