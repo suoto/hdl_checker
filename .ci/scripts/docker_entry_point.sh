@@ -23,10 +23,12 @@ echo "GROUP_ID=$GROUP_ID"
 
 addgroup "$USERNAME" --gid "$GROUP_ID"
 
-adduser --disabled-password \
-  --gid "$GROUP_ID"         \
-  --uid "$USER_ID"          \
+adduser --disabled-password            \
+  --gid "$GROUP_ID"                    \
+  --uid "$USER_ID"                     \
   --home "/home/$USERNAME" "$USERNAME"
 
-exec su -l "$USERNAME" -c "ls -la $PWD && ls -la / && cd /hdlcc && tox -e local"
+ln -s /builders /home/user/builders
+
+exec su -l "$USERNAME" -c "cd /hdlcc && tox -e local"
 

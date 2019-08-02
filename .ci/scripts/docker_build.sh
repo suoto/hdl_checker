@@ -16,12 +16,70 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-set -xe
+set -e
 
 DOCKER_TAG="${DOCKER_TAG:-latest}"
 PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
 DOCKERFILE=$PATH_TO_THIS_SCRIPT/Dockerfile
-CONTEXT=$(realpath "$PATH_TO_THIS_SCRIPT"/../../)
+CONTEXT=$HOME/context
+DOWNLOAD_DIR=$HOME/Downloads
+
+mkdir -p "$CONTEXT"
+
+# $1 Test filename
+# $2 URL
+function download_if_needed {
+  filename=$1
+  url=$2
+
+  if [ ! -f "$filename" ]; then
+    wget "$url" -O "$filename"
+  fi
+}
+
+function setup_msim {
+
+  pushd "$CONTEXT" || exit 1
+
+  URL_MAIN=http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/ModelSimProSetup-19.2.0.57-linux.run
+  URL_PART_2=http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/modelsim-part2-19.2.0.57-linux.qdz
+
+  installer=$(basename $URL_MAIN)
+
+  download_if_needed "$DOWNLOAD_DIR/$installer" $URL_MAIN
+  download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
+
+  if [ ! -f "$CONTEXT/msim/modelsim_ase/linuxaloem/vsim" ]; then
+    "$DOWNLOAD_DIR/$installer" --mode unattended \
+          --modelsim_edition modelsim_ase        \
+          --accept_eula 1                        \
+          --installdir "$CONTEXT"/msim
+
+    rm -rf "$CONTEXT"/msim/modelsim_ase/altera
+  fi
+
+  popd || exit 1
+
+}
+
+function setup_ghdl {
+  URL=http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz
+
+  installer=$(basename $URL)
+
+  download_if_needed "$DOWNLOAD_DIR/$installer" "$URL"
+  if [ ! -d "$CONTEXT/ghdl/bin" ]; then
+    mkdir -p "$CONTEXT/ghdl"
+    tar zxvf "$DOWNLOAD_DIR/$installer" --directory "$CONTEXT/ghdl"
+  fi
+
+}
+
+setup_msim
+setup_ghdl
+
+"$CONTEXT"/msim/modelsim_ase/linuxaloem/vsim -version
+"$CONTEXT/ghdl/bin/ghdl" --version
 
 docker build -t suoto/hdlcc:"$DOCKER_TAG" -f "$DOCKERFILE" "$CONTEXT"
 

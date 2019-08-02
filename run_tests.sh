@@ -18,8 +18,6 @@
 
 PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
 
-"$PATH_TO_THIS_SCRIPT"/.ci/scripts/docker_build.sh
-
 set -xe
 
 docker run                                                      \
