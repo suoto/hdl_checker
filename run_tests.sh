@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
+set -e
 
-set -xe
+PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
 
 docker run                                                      \
   --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdlcc \

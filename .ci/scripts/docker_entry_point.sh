@@ -16,19 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-set -xe
+set -e
 
-echo "USER_ID=$USER_ID"
-echo "GROUP_ID=$GROUP_ID"
-
-addgroup "$USERNAME" --gid "$GROUP_ID"
+addgroup "$USERNAME" --gid "$GROUP_ID" > /dev/null 2>&1
 
 adduser --disabled-password            \
   --gid "$GROUP_ID"                    \
   --uid "$USER_ID"                     \
-  --home "/home/$USERNAME" "$USERNAME"
+  --home "/home/$USERNAME" "$USERNAME" > /dev/null 2>&1
 
 ln -s /builders /home/user/builders
 
-exec su -l "$USERNAME" -c "cd /hdlcc && tox -e local"
+exec su -l "$USERNAME" -c "cd /hdlcc && tox"
 
