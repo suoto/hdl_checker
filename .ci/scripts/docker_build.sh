@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-set -e
+set -xe
 
 DOCKER_TAG="${DOCKER_TAG:-latest}"
 PATH_TO_THIS_SCRIPT=$(readlink -f "$(dirname "$0")")

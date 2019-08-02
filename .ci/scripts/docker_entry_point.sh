@@ -17,6 +17,9 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 set -e
+set -x
+
+USERNAME="${USERNAME:-user}"
 
 addgroup "$USERNAME" --gid "$GROUP_ID" > /dev/null 2>&1
 
@@ -25,7 +28,11 @@ adduser --disabled-password            \
   --uid "$USER_ID"                     \
   --home "/home/$USERNAME" "$USERNAME" > /dev/null 2>&1
 
-ln -s /builders /home/user/builders
+ln -s /builders "/home/$USERNAME/builders"
 
-exec su -l "$USERNAME" -c "cd /hdlcc && tox ${TOX_ARGS[*]}"
-
+su -l "$USERNAME" -c "    \
+  cd /hdlcc            && \
+  tox ${TOX_ARGS[*]}   && \
+  coverage combine     && \
+  coverage xml         && \
+  coverage report"

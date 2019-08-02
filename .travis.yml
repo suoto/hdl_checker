@@ -20,16 +20,26 @@ services:
 
 stages:
 - test
-- deploy 
+- deploy
 
 jobs:
   include:
+    # XVHDL is the slowest of all, start them first
+    - name: Python 2.7 - xvhdl
+      python: '2.7'
+      env: BUILDER=xvhdl
+      script: tox -e py27-xvhdl-linux
+
+    - name: Python 3.7 - xvhdl
+      python: '3.7'
+      dist: xenial
+      env: BUILDER=xvhdl
+      script: tox -e py37-xvhdl-linux
+
+
     # Python 2.7 land
     - name: Python 2.7 - msim
       script: ./run_tests.sh -e py27-msim-linux
-
-    - name: Python 2.7 - xvhdl
-      script: ./run_tests.sh -e py27-xvhdl-linux
 
     - name: Python 2.7 - standalone and fallback
       script: ./run_tests.sh -e py27-fallback-linux -e py27-standalone-linux
@@ -47,12 +57,7 @@ jobs:
     - name: Python 3.7 - ghdl
       script: ./run_tests.sh -e py37-ghdl-linux
 
-    - name: Python 3.7 - xvhdl
-      script: ./run_tests.sh -e py37-xvhdl-linux
-
-
     - stage: deploy
-      python: 3.7
       before_install: skip
       before_script: skip
       install: skip  # no tests, no depedencies needed
@@ -66,37 +71,17 @@ jobs:
           secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
 
 before_install:
-- docker pull suoto/hdlcc:latest
-# - echo "BUILDER is $BUILDER"
-# - sudo apt-get update -qq;
-# - sudo apt-get install -qq coreutils
-# - sudo apt-get install -qq libtcl8.5
-# - sudo dpkg --add-architecture i386
-# - sudo apt-get install -qq build-essential
-# - sudo apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1
-#   expat:i386 fontconfig:i386 libfreetype6:i386 libexpat1:i386 libc6:i386 libgtk-3-0:i386
-#   libcanberra0:i386  libice6:i386 libsm6:i386 libncurses5:i386 zlib1g:i386 libx11-6:i386
-#   libxau6:i386 libxdmcp6:i386 libxext6:i386 libxft2:i386 libxrender1:i386 libxt6:i386
-#   libxtst6:i386 libharfbuzz-dev:i386
-# - export LD_LIBRARY_PATH=$HOME/freetype-2.4.12/objs/.libs
+- if [ "${BUILDER}" != "xvhdl" ] ; then docker pull suoto/hdlcc:latest; fi
+- sudo apt-get update -qq;
+- sudo apt-get install -qq libtcl8.5
 
 before_script:
-# - "git clone https://github.com/suoto/grlib .ci/test_support/grlib --depth 1"
-# - pip install tox
-# - "git submodule update"
-# - "mkdir -p ~/cache"
-# - if [ "${BUILDER}" == "msim" ]  ; then "./.ci/scripts/setup_msim.sh"; fi
-# - if [ "${BUILDER}" == "ghdl" ]  ; then "./.ci/scripts/setup_ghdl.sh"; fi
-# - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
+- pip install tox
+- if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 
 after_success:
-- pip install coverage coveralls codecov
-- coverage combine
-- coverage report
-- export COVERALLS_PARALLEL=true
-- coveralls
-- codecov
+- bash <(curl -s https://codecov.io/bash)
+- if [ "${BUILDER}" == "xvhdl" ] ; then pip install coverage coveralls; coverage report; COVERALLS_PARALLEL=true coveralls; fi
+
 cache:
   pip: true
-  directories:
-  - "~/cache/"

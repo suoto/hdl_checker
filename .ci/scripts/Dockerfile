@@ -17,7 +17,6 @@
 
 FROM ubuntu:19.04
 
-ENV USERNAME user
 ENV BUILDERS /builders
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -28,7 +27,7 @@ RUN apt-get install -qq python2 python3 python3-pip wget git
 RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6
 
 RUN pip3 install tox
-
+RUN pip3 install codecov==2.0.5 coveralls==1.1 coverage==4.1
 WORKDIR $BUILDERS
 
 COPY ghdl $BUILDERS/ghdl

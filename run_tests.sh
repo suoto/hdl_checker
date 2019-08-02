@@ -22,10 +22,14 @@ PATH_TO_THIS_SCRIPT=$(readlink -f "$(dirname "$0")")
 
 TOX_ARGS="$*"
 
+# Need to add some variables so that uploading coverage from witihin the
+# container to codecov works
 docker run                                                      \
   --rm                                                          \
   --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdlcc \
   --env USER_ID="$(id -u)"                                      \
   --env GROUP_ID="$(id -g)"                                     \
   --env TOX_ARGS="$TOX_ARGS"                                    \
+  --env TOX_ARGS="$TOX_ARGS"                                    \
+  --env USERNAME="$USER"                                        \
   suoto/hdlcc:latest
