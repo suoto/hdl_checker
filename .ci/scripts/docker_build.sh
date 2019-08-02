@@ -19,7 +19,7 @@
 set -e
 
 DOCKER_TAG="${DOCKER_TAG:-latest}"
-PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
+PATH_TO_THIS_SCRIPT=$(readlink -f "$(dirname "$0")")
 DOCKERFILE=$PATH_TO_THIS_SCRIPT/Dockerfile
 CONTEXT=$HOME/context
 DOWNLOAD_DIR=$HOME/Downloads

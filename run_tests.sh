@@ -18,7 +18,7 @@
 
 set -e
 
-PATH_TO_THIS_SCRIPT=$(realpath "$(dirname "$0")")
+PATH_TO_THIS_SCRIPT=$(readlink -f "$(dirname "$0")")
 
 TOX_ARGS="$*"
 
