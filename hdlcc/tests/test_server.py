@@ -49,7 +49,7 @@ SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 JSONRPC_VERSION = '2.0'
-CALL_TIMEOUT = 2
+CALL_TIMEOUT = 5
 
 def doNothing(queue):
     _logger.debug("I'm ready")
