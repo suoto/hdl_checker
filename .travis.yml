@@ -80,8 +80,8 @@ before_script:
 - if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
 
 after_success:
+- if [ "${BUILDER}" == "xvhdl" ] ; then pip install coverage coveralls; coverage xml; coverage report; COVERALLS_PARALLEL=true coveralls; fi
 - bash <(curl -s https://codecov.io/bash)
-- if [ "${BUILDER}" == "xvhdl" ] ; then pip install coverage coveralls; coverage report; COVERALLS_PARALLEL=true coveralls; fi
 
 cache:
   pip: true
