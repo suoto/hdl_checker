@@ -17,7 +17,9 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 set -e
-set -x
+
+# Mimic the username, user ID and group ID of the env outside the container to
+# avoid permission issues
 
 USERNAME="${USERNAME:-user}"
 
@@ -35,4 +37,4 @@ su -l "$USERNAME" -c "    \
   tox ${TOX_ARGS[*]}   && \
   coverage combine     && \
   coverage xml         && \
-  coverage report"
+  coverage html"
