@@ -43,23 +43,32 @@ _LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
 def parseArguments():
     "Argument parser for standalone hdlcc"
 
-    if ('--version' in sys.argv[1:]) or ('-V' in sys.argv[1:]):  # pragma: no cover
-        print(hdlcc.__version__)
-        sys.exit(0)
-
     parser = argparse.ArgumentParser()
 
     # Options
-    parser.add_argument('--host', action='store',)
-    parser.add_argument('--port', action='store', type=int)
-    parser.add_argument('--attach-to-pid', action='store', type=int)
-    parser.add_argument('--log-level', action='store', )
-    parser.add_argument('--log-stream', action='store', )
-    parser.add_argument('--nocolor', action='store_true', default=False)
-    parser.add_argument('--lsp', action='store_true', default=False)
+    parser.add_argument('--host', action='store',
+                        help='[HTTP] Host to serve')
+    parser.add_argument('--port', action='store', type=int,
+                        help='[HTTP] Port to serve')
+    parser.add_argument('--lsp', action='store_true', default=False,
+                        help='Starts the server in LSP mode. Defaults to false')
 
-    parser.add_argument('--stdout', action='store')
-    parser.add_argument('--stderr', action='store')
+    parser.add_argument('--attach-to-pid', action='store', type=int,
+                        help='[HTTP, LSP] Stops the server if given PID is not active')
+    parser.add_argument('--log-level', action='store',
+                        help='[HTTP, LSP] Logging level')
+    parser.add_argument('--log-stream', action='store',
+                        help='[HTTP, LSP] Log file, defaults to stdout when in HTTP or a temporary file named hdlcc_log_pid<PID>.log when in LSP mode')
+    parser.add_argument('--nocolor', action='store_true', default=False,
+                        help='[HTTP, LSP] Enables colored logging (defaults to false)')
+
+    parser.add_argument('--stdout', action='store',
+                        help='[HTTP] File to redirect stdout to. Defaults to a temporary file named hdlcc_stdout_pid<PID>.log')
+    parser.add_argument('--stderr', action='store',
+                        help='[HTTP] File to redirect stdout to. Defaults to a temporary file named hdlcc_stderr_pid<PID>.log')
+
+    parser.add_argument('--version', '-V', action='store_true',
+                        help='Prints hdlcc version and exit')
 
     try:
         import argcomplete
@@ -68,6 +77,10 @@ def parseArguments():
         pass
 
     args = parser.parse_args()
+
+    if args.version:
+        print(hdlcc.__version__)
+        sys.exit(0)
 
     if args.lsp:
         args.host = None
