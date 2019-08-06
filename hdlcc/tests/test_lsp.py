@@ -182,10 +182,7 @@ with such.A("LSP server") as it:
         def test():
             _initializeServer(
                 it.server,
-                params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
-                    'initializationOptions': {
-                        'project_file': None}})
+                params={'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES)})
 
         @it.should('lint file when opening it')
         def test():
