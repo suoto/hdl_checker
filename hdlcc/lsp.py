@@ -206,6 +206,8 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         path = self._getProjectFilePath(options)
 
+        _logger.debug("Config file path is %s", path)
+
         try:
             self._checker = HdlCodeCheckerServer(self.workspace, path)
         except (FileNotFoundError, OSError) as exc:
@@ -221,14 +223,17 @@ class HdlccLanguageServer(PythonLanguageServer):
         the root URI as provided by the workspace
         """
         path = (options or {}).get('project_file', DEFAULT_PROJECT_FILENAME)
-        if 'project_file' in options and path is None:
-            # Path has been explicitly set to none
-            return None
 
-        # Project file will be related to the root path
-        root_path = self.workspace.root_path
-        if root_path:
-            path = p.join(root_path, path)
+        # If path is set and it's absolute, just use that
+        if path and p.isabs(path):
+            return path
+
+        # When path is not absolute, it will be based on the workspace's root
+        # path if set
+        if self.workspace is not None:
+            root_path = self.workspace.root_path
+            if root_path:
+                path = p.join(root_path, path)
         return path
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
