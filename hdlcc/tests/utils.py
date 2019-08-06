@@ -146,14 +146,6 @@ class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
             self.builder_name, "Fake error")
 
 
-def onTravis():   # pragma: no cover # pylint: disable=missing-docstring
-    return 'TRAVIS' in os.environ
-
-
-def onCI():       # pragma: no cover # pylint: disable=missing-docstring
-    return 'CI' in os.environ
-
-
 def disableVunit(func):
     return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
 

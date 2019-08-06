@@ -16,26 +16,20 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-set -x
-set +e
+set -e
 
-URL=http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz
-CACHE_DIR="${HOME}/cache/"
-GHDL_TAR_GZ="${CACHE_DIR}/ghdl.tar.gz"
-INSTALLATION_DIR="${HOME}/builders/ghdl/"
+PATH_TO_THIS_SCRIPT=$(readlink -f "$(dirname "$0")")
 
-mkdir -p "${CACHE_DIR}"
-mkdir -p "${INSTALLATION_DIR}"
-# CWD=$(pwd)
+TOX_ARGS="$*"
 
-if [ ! -f "${GHDL_TAR_GZ}" ]; then
-  wget ${URL} -O "${GHDL_TAR_GZ}" --quiet
-fi
-
-if [ ! -d "${INSTALLATION_DIR}/bin" ]; then
-  mkdir -p "${INSTALLATION_DIR}"
-  tar zxvf "${GHDL_TAR_GZ}" --directory "${INSTALLATION_DIR}"
-fi
-
-"${INSTALLATION_DIR}"/bin/ghdl --version
-
+# Need to add some variables so that uploading coverage from witihin the
+# container to codecov works
+docker run                                                      \
+  --rm                                                          \
+  --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdlcc \
+  --env USER_ID="$(id -u)"                                      \
+  --env GROUP_ID="$(id -g)"                                     \
+  --env TOX_ARGS="$TOX_ARGS"                                    \
+  --env TOX_ARGS="$TOX_ARGS"                                    \
+  --env USERNAME="$USER"                                        \
+  suoto/hdlcc:latest

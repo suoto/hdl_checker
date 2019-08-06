@@ -21,7 +21,6 @@ import logging
 import os
 import os.path as p
 import shutil
-import time
 from multiprocessing import Queue
 
 import mock
@@ -92,30 +91,6 @@ with such.A("hdlcc project with persistence") as it:
             os.remove('xvhdl.pb')
         if p.exists('.xvhdl.init'):
             os.remove('.xvhdl.init')
-
-    with it.having('a performance requirement'):
-
-        @it.has_setup
-        def setup():
-            it.parse_times = []
-            it.build_times = []
-            #  it.target_file = p.join(BASE_PATH, 'another_library',
-            #                          'foo.vhd')
-            it.target_file = p.join(BASE_PATH, 'designs',
-                                    'leon3-ahbfile', 'leon3mp.vhd')
-
-        @it.has_teardown
-        def teardown():
-            if not it.BUILDER_NAME:
-                return
-            #  hdlcc.HdlCodeCheckerBase.cleanProjectCache(it.PROJECT_FILE)
-            cleanProjectCache(it.PROJECT_FILE)
-            target_dir = hdlcc.config_parser.ConfigParser(it.PROJECT_FILE).getTargetDir()
-            if p.exists(target_dir):
-                shutil.rmtree(target_dir)
-            cache_fname = getDefaultCachePath(it.PROJECT_FILE)
-            if p.exists(cache_fname):
-                os.remove(cache_fname)
 
     @disableVunit
     def _buildWithoutCache():
@@ -267,7 +242,6 @@ with such.A("hdlcc project with persistence") as it:
             _logger.info("Building with changed env")
 
             project = StandaloneProjectBuilder(it.PROJECT_FILE)
-            time.sleep(1)
 
             _logger.info("Searching UI messages")
 

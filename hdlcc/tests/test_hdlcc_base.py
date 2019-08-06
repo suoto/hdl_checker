@@ -35,7 +35,7 @@ from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
 from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MSimMock, SourceMock,
                                StandaloneProjectBuilder, cleanProjectCache,
-                               onCI, writeListToFile)
+                               writeListToFile)
 from hdlcc.utils import samefile
 
 _logger = logging.getLogger(__name__)
@@ -544,7 +544,7 @@ with such.A("hdlcc project") as it:
 
             builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
 
-            if onCI() and it.BUILDER_NAME is not None:
+            if it.BUILDER_NAME is not None:
                 with it.assertRaises(hdlcc.exceptions.SanityCheckError):
                     builder(it.DUMMY_PROJECT_FILE)
 
