@@ -24,6 +24,7 @@ import shutil
 import time
 
 import mock
+from mock import patch
 import six
 from nose2.tools import such
 from nose2.tools.params import params
@@ -49,6 +50,22 @@ def patchClassMap(func):
     class_map['MSimMock'] = MSimMock
     return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)(func)
 
+from contextlib import contextmanager
+
+@contextmanager
+def mockBuilder():
+    with mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock):
+        with mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ]):
+            _logger.fatal("Entered mock")
+            yield
+            _logger.fatal("Exited mock")
+
+ #  patchBuilder = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)(
+ #                 mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ]))
+
+#  mockBuilder = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)(
+#          mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ]))
+
 with such.A("hdlcc project") as it:
     if six.PY2:
         it.assertCountEqual = it.assertItemsEqual
@@ -71,21 +88,19 @@ with such.A("hdlcc project") as it:
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
 
-    it.DUMMY_PROJECT_FILE = p.join(TEMP_PATH, 'remove_me')
+    it.BUILDER_TARGET_FOLDER = p.join(TEMP_PATH, 'builder_target_folder')
 
     @it.has_setup
     def setup():
-        it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-        it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
-        if it.BUILDER_NAME:
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
-        else:
-            it.PROJECT_FILE = None
+        #  it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
+        #  if it.BUILDER_NAME:
+        it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, 'msim.prj')
+        #  else:
+        #      it.PROJECT_FILE = None
 
         cleanProjectCache(it.PROJECT_FILE)
 
-        _logger.info("Builder name: %s", it.BUILDER_NAME)
-        _logger.info("Builder path: %s", it.BUILDER_PATH)
+        #  _logger.info("Builder name: %s", it.BUILDER_NAME)
 
         it._patch = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         it._patch.start()
@@ -128,10 +143,10 @@ with such.A("hdlcc project") as it:
         project._recoverCache(project._getCacheFilename())
 
     @it.should("recover from cache when recreating a project object")
-    @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
-    @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @mockBuilder()
     @patchClassMap
     def test():
+        _logger.fatal("#################################")
         # First create a project file with something in it
         project_file = p.join(TEMP_PATH, 'myproject.prj')
         writeListToFile(project_file, [])
@@ -163,8 +178,7 @@ with such.A("hdlcc project") as it:
         it.assertTrue(project.builder.builder_name, 'MSimMock')
 
     @it.should("warn when failing to recover from cache")
-    @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MSimMock)
-    @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [MSimMock, ])
+    @mockBuilder()
     @patchClassMap
     def test():
         # First create a project file with something in it
@@ -201,6 +215,7 @@ with such.A("hdlcc project") as it:
         it.assertIsNone(project.builder)
 
     @it.should("provide a VHDL source code object given its path")
+    @mockBuilder()
     def test():
         path = p.join(VIM_HDL_EXAMPLES, 'basic_library',
                       'very_common_pkg.vhd')
@@ -211,11 +226,8 @@ with such.A("hdlcc project") as it:
         it.assertEquals(source.library, 'undefined')
         it.assertEquals(source.filetype, 'vhdl')
 
-        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(remarks,
-                            [PathNotInProjectFile(p.abspath(path)), ])
-        else:
-            it.assertEquals(remarks, [])
+        it.assertEquals(remarks,
+                        [PathNotInProjectFile(p.abspath(path)), ])
 
     @it.should("provide a Verilog source code object given a Verilog path")
     @params(p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.v'),
@@ -231,11 +243,7 @@ with such.A("hdlcc project") as it:
         elif path.endswith('.v'):
             it.assertEquals(source.filetype, 'systemverilog')
 
-        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(remarks,
-                            [PathNotInProjectFile(p.abspath(path)), ])
-        else:
-            it.assertEquals(remarks, [])
+        it.assertEquals(remarks, [])
 
     @it.should("resolve dependencies into a list of libraries and units")
     def test():
@@ -448,6 +456,7 @@ with such.A("hdlcc project") as it:
                                  choices=[implementation_a, ])])
 
     @it.should("get builder messages by path")
+    @mockBuilder()
     def test():
         sources = (
             SourceMock(
@@ -467,12 +476,9 @@ with such.A("hdlcc project") as it:
         project = StandaloneProjectBuilder()
         path = sources[0].filename
         messages = project.getMessagesByPath(path)
-        if project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-            it.assertEquals(
-                messages,
-                [PathNotInProjectFile(p.abspath(path)), ])
-        else:
-            it.assertEquals(messages, [])
+        it.assertEquals(
+            messages,
+            [PathNotInProjectFile(p.abspath(path)), ])
 
     @it.should("warn when unable to recreate a builder described in cache")
     @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: FailingBuilder)
@@ -535,6 +541,7 @@ with such.A("hdlcc project") as it:
 
         @it.has_setup
         def setup():
+            _logger.fatal("Setting up...")
             if p.exists('modelsim.ini'):
                 _logger.warning("Modelsim ini found at %s",
                                 p.abspath('modelsim.ini'))
@@ -542,33 +549,42 @@ with such.A("hdlcc project") as it:
 
             cleanProjectCache(it.PROJECT_FILE)
 
-            builder = hdlcc.builders.getBuilderByName(it.BUILDER_NAME)
+            builder = hdlcc.builders.getBuilderByName('msim')
 
-            if it.BUILDER_NAME is not None:
-                with it.assertRaises(hdlcc.exceptions.SanityCheckError):
-                    builder(it.DUMMY_PROJECT_FILE)
+            it.assertNotEqual(builder, hdlcc.builders.Fallback)
+
+            with it.assertRaises(hdlcc.exceptions.SanityCheckError):
+                builder(it.BUILDER_TARGET_FOLDER)
 
             # Add the builder path to the environment so we can call it
-            if it.BUILDER_PATH:
-                it.patch = mock.patch.dict(
-                    'os.environ',
-                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-                it.patch.start()
+            #  it.patch = patchBuilder
+            #  it.patch.start()
+            #  it.patch = mock.patch.dict(
+            #      'os.environ',
+            #      {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
+            #  it.patch.__enter__()
 
-            try:
-                builder(it.DUMMY_PROJECT_FILE)
-            except hdlcc.exceptions.SanityCheckError:
-                it.fail("Builder creation failed even after configuring "
-                        "the builder path")
 
-            _logger.info("Creating project builder object")
-            it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
+            with mockBuilder():
+
+                builder = hdlcc.builders.getBuilderByName('MSimMock')
+                it.assertEqual(builder, MSimMock)
+
+                try:
+                    builder(it.BUILDER_TARGET_FOLDER)
+                except hdlcc.exceptions.SanityCheckError:
+                    it.fail("Builder creation failed even after configuring "
+                            "the builder path")
+
+                _logger.info("Creating project builder object")
+                it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
 
         @it.has_teardown
         def teardown():
             cleanProjectCache(it.PROJECT_FILE)
-            if it.BUILDER_PATH:
-                it.patch.stop()
+            #  it.patch.__next__()
+            #  it.patch.__exit__(None, None, None)
+            #  it.patch.stop()
 
             if p.exists(it.project._config.getTargetDir()):
                 shutil.rmtree(it.project._config.getTargetDir())
@@ -627,18 +643,11 @@ with such.A("hdlcc project") as it:
                                   object_name='neat_signal'),
                 ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
                                   column_number=8, object_type='signal',
-                                  object_name='another_signal')]
+                                  object_name='another_signal'),]
 
-            #  if it.BUILDER_NAME == 'msim':
-            #      expected += [
-            #          BuilderDiag(builder_name='msim',
-            #                      filename=p.abspath(filename), line_number=58,
-            #                      severity=DiagType.WARNING,
-            #                      text="Synthesis Warning: Reset signal 'reset' "
-            #                      "is not in the sensitivity list of process "
-            #                      "'line__58'.")]
 
-            it.assertCountEqual([hash(x) for x in expected], [hash(x) for x in diagnostics])
+            #  it.assertCountEqual([hash(x) for x in expected], [hash(x) for x in diagnostics])
+            it.assertCountEqual(expected, diagnostics)
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text for file outside the project file")
@@ -664,30 +673,21 @@ with such.A("hdlcc project") as it:
             for diagnostic in diagnostics:
                 it.assertSameFile(filename, diagnostic.filename)
 
-            if it.project.builder.builder_name in ('msim', 'ghdl', 'xvhdl'):
-                expected = [
-                    LibraryShouldBeOmited(library='work',
-                                          filename=p.abspath(filename),
-                                          column_number=9,
-                                          line_number=1),
-                    PathNotInProjectFile(p.abspath(filename)),]
+            expected = [
+                LibraryShouldBeOmited(library='work',
+                                      filename=p.abspath(filename),
+                                      column_number=9,
+                                      line_number=1),
+                PathNotInProjectFile(p.abspath(filename)),]
 
-                try:
-                    it.assertCountEqual(expected, diagnostics)
-                except:
-                    _logger.warning("Expected:")
-                    for exp in expected:
-                        _logger.warning(exp)
+            try:
+                it.assertCountEqual(expected, diagnostics)
+            except:
+                _logger.warning("Expected:")
+                for exp in expected:
+                    _logger.warning(exp)
 
-                    raise
-
-            else:
-                it.assertCountEqual(
-                    [LibraryShouldBeOmited(library='work',
-                                           filename=p.abspath(filename),
-                                           column_number=9,
-                                           line_number=1)],
-                    diagnostics)
+                raise
 
             it.assertMsgQueueIsEmpty(it.project)
 
@@ -737,22 +737,22 @@ with such.A("hdlcc project") as it:
                 it.assertSameFile(filename, diagnostic.filename)
                 diagnostics += [diagnostic]
 
-            if it.BUILDER_NAME == 'msim':
-                expected_records = [
-                    BuilderDiag(
-                        filename=filename,
-                        builder_name='msim',
-                        text="Synthesis Warning: Reset signal 'reset' "
-                             "is not in the sensitivity list of process "
-                             "'line__58'.",
-                        severity=DiagType.WARNING,
-                        line_number=58)]
-            elif it.BUILDER_NAME == 'ghdl':
-                expected_records = []
-            elif it.BUILDER_NAME == 'xvhdl':
-                expected_records = []
+            #  if it.BUILDER_NAME == 'msim':
+            #      expected_records = [
+            #          BuilderDiag(
+            #              filename=filename,
+            #              builder_name='msim',
+            #              text="Synthesis Warning: Reset signal 'reset' "
+            #                   "is not in the sensitivity list of process "
+            #                   "'line__58'.",
+            #              severity=DiagType.WARNING,
+            #              line_number=58)]
+            #  elif it.BUILDER_NAME == 'ghdl':
+            #      expected_records = []
+            #  elif it.BUILDER_NAME == 'xvhdl':
+            #      expected_records = []
 
-            it.assertEqual(diagnostics, expected_records)
+            it.assertEqual(diagnostics, [])
 
             it.assertMsgQueueIsEmpty(it.project)
 
@@ -836,9 +836,9 @@ with such.A("hdlcc project") as it:
 
         @it.should("rebuild sources when changing a package on different libraries")
         def test011():
-            if not it.BUILDER_NAME:
-                _logger.info("Test requires a builder")
-                return
+            #  if not it.BUILDER_NAME:
+            #      _logger.info("Test requires a builder")
+            #      return
 
             filenames = (
                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
@@ -890,9 +890,9 @@ with such.A("hdlcc project") as it:
 
         @it.should("rebuild sources when changing an entity on different libraries")
         def test012():
-            if not it.BUILDER_NAME:
-                _logger.info("Test requires a builder")
-                return
+            #  if not it.BUILDER_NAME:
+            #      _logger.info("Test requires a builder")
+            #      return
 
             filenames = (
                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
