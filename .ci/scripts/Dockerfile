@@ -24,18 +24,20 @@ RUN dpkg --add-architecture i386
 
 RUN apt-get update -qq
 RUN apt-get install -qq python2 python3 python3-pip wget git
-RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6
+RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6 libtinfo5
 
 RUN pip3 install tox
-RUN pip3 install codecov==2.0.5 coveralls==1.1 coverage==4.1
+RUN pip3 install coverage==4.1
 WORKDIR $BUILDERS
 
 COPY ghdl $BUILDERS/ghdl
 COPY msim $BUILDERS/msim
+COPY xvhdl $BUILDERS/xvhdl
 
 # Test installations
 RUN $BUILDERS/ghdl/bin/ghdl --version
 RUN $BUILDERS/msim/modelsim_ase/linuxaloem/vcom -version
+RUN $BUILDERS/xvhdl/bin/xvhdl -version
 
 VOLUME /hdlcc
 ENTRYPOINT "/hdlcc/.ci/scripts/docker_entry_point.sh"
