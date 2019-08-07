@@ -28,6 +28,7 @@ from multiprocessing import Queue
 
 import mock
 import six
+from parameterized import parameterized_class
 
 import hdlcc
 from hdlcc.utils import getFileType, onWindows, removeDuplicates, samefile
@@ -247,3 +248,20 @@ def writeListToFile(filename, _list): # pragma: no cover
             break
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
+
+
+TEST_ENVS = {
+    'ghdl': p.expanduser('~/builders/ghdl/bin/'),
+    'msim': p.expanduser('~/builders/msim/modelsim_ase/linux/'),
+    'xvhdl': p.expanduser('~/builders/xvhdl/bin/')}
+
+
+def parametrizeClassWithBuilders(cls):
+    cls.assertSameFile = assertSameFile(cls)
+
+    keys = ['builder_name', 'builder_path']
+    values = []
+    for name, path in TEST_ENVS.items():
+        values += [(name, path)]
+
+    return parameterized_class(keys, values)(cls)
