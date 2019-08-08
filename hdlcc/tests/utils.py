@@ -40,17 +40,21 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
 
-    def _handleUiInfo(self, msg):
-        self._msg_queue.put(('info', msg))
-        self._ui_handler.info(msg)
+    def _handleUiInfo(self, message):
+        self._msg_queue.put(('info', message))
+        self._ui_handler.info('[UI INFO]: %s', message)
 
-    def _handleUiWarning(self, msg):
-        self._msg_queue.put(('warning', msg))
-        self._ui_handler.warning(msg)
+    def _handleUiWarning(self, message):
+        self._msg_queue.put(('warning', message))
+        self._ui_handler.info('[UI WARNING]: %s', message)
 
-    def _handleUiError(self, msg):
-        self._msg_queue.put(('error', msg))
-        self._ui_handler.error(msg)
+    def _handleUiError(self, message):
+        self._msg_queue.put(('error', message))
+        self._ui_handler.info('[UI ERROR]: %s', message)
+
+    def getUiMessages(self):
+        while not self._msg_queue.empty():
+            yield self._msg_queue.get()
 
 class SourceMock(object):
     def __init__(self, library, design_units, dependencies=None, filename=None):
@@ -71,6 +75,9 @@ class SourceMock(object):
             self._dependencies = []
 
         self._createMockFile()
+
+    def getLibraries(self):
+        return [x.library for x in self._dependencies]
 
     def _createMockFile(self):
         with open(self.filename, 'w') as fd:
@@ -105,8 +112,11 @@ class SourceMock(object):
     def getDependencies(self):
         return self._dependencies
 
-class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
-    _logger = logging.getLogger('MSimMock')
+    def getRawSourceContent(self):
+        return open(self.filename).read()
+
+class MockBuilder(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
+    _logger = logging.getLogger('MockBuilder')
     builder_name = 'msim_mock'
     file_types = ('vhdl', )
     def __init__(self, target_folder):
@@ -114,7 +124,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
-        super(MSimMock, self).__init__(target_folder)
+        super(MockBuilder, self).__init__(target_folder)
 
     def _makeRecords(self, _): # pragma: no cover
         return []
@@ -139,7 +149,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
         return []
 
 
-class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
+class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
     builder_name = 'FailingBuilder'
     def _checkEnvironment(self):

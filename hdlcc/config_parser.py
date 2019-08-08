@@ -512,13 +512,6 @@ class ConfigParser(object):
                                   repr(builder_name))
         return target_dir, builder_name
 
-    def getTargetDir(self):
-        """
-        Returns the target folder that should be used by the builder
-        """
-        self._parseIfNeeded()
-        return self._parms['target_dir']
-
     def getBuildFlags(self, path, batch_mode):
         """
         Return a list of flags configured to build a source in batch or

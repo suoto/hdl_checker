@@ -277,3 +277,11 @@ def isFileReadable(path):
         return True
     except IOError:
         return False
+
+def getCachePath():
+    """
+    Get the base path of a folder used to cache data. MacOS is treated as Unix
+    """
+    if onWindows():
+        return p.join(os.environ['LOCALAPPDATA'], 'Caches', 'hdlcc')
+    return p.join(os.environ['HOME'], '.cache', 'hdlcc')

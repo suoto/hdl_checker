@@ -33,7 +33,9 @@ from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import getFileType, removeDuplicates
+from hdlcc.utils import getCachePath, getFileType, removeDuplicates
+
+CACHE_NAME = 'cache.json'
 
 _logger = logging.getLogger('build messages')
 
@@ -56,30 +58,29 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self.project_file = project_file
 
-        self._config = None
+        self._config = ConfigParser(self.project_file)
         self.builder = None
 
+        self._recoverCacheIfPossible()
         self._setupEnvIfNeeded()
         self._saveCache()
 
-    def _getCacheFilename(self, target_dir=None):
+    def _getCacheDirectory(self):
+        cache = p.abspath('.' if self.project_file is None else self.project_file)
+        return p.join(getCachePath(), cache.replace(p.sep, '_'))
+
+    def _getCacheFilename(self):
         """
         Returns the cache file name for a given project file
         """
-        if target_dir is None:
-            if self._config is None or self._config.getBuilder() == 'fallback':
-                return None
-            target_dir = self._config.getTargetDir()
-        return p.join(target_dir, '.hdlcc.cache')
+        cache_dir = self._getCacheDirectory()
+        return p.join(cache_dir, CACHE_NAME)
 
     def _saveCache(self):
         """
         Dumps project object to a file to recover its state later
         """
         cache_fname = self._getCacheFilename()
-        if self.builder.builder_name == 'fallback' or cache_fname is None:
-            self._logger.debug("Skipping cache save")
-            return
 
         state = {'_logger': {'name': self._logger.name,
                              'level': self._logger.level},
@@ -88,25 +89,23 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
-            os.mkdir(p.dirname(cache_fname))
+            os.makedirs(p.dirname(cache_fname))
         json.dump(state, open(cache_fname, 'w'), indent=True, cls=StateEncoder)
 
-    def _recoverCache(self, target_dir):
+    def _recoverCacheIfPossible(self):
         """
         Tries to recover cached info for the given project_file. If
         something goes wrong, assume the cache is invalid and return
         nothing. Otherwise, return the cached object
         """
-        cache_fname = self._getCacheFilename(target_dir)
-        #  if self.project_file is None or cache_fname is None:
-        if cache_fname is None:
-            self._logger.warning("Cache file name is none, aborting recovery")
+        cache_fname = self._getCacheFilename()
+
+        if not p.exists(cache_fname):
+            self._logger.debug("Won't recover from %s, file not found",
+                               cache_fname)
             return
 
         self._logger.debug("Trying to recover from '%s'", cache_fname)
-        if not p.exists(cache_fname):  # pragma: no cover
-            self._logger.debug("File not found")
-            return
 
         try:
             cache = json.load(open(cache_fname, 'r'), object_hook=jsonObjectHook)
@@ -117,8 +116,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         except ValueError:
             self._handleUiError(
                 "Unable to recover cache from '{}'\n"
-                "Traceback:\n{}".format(cache_fname,
-                                        traceback.format_exc()))
+                "Traceback:\n{}".format(cache_fname, traceback.format_exc()))
 
     def _setupEnvIfNeeded(self):
         """
@@ -127,30 +125,23 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         appropriate builder objects
         """
         try:
-            # If the configuration is undefined, try to extract the
-            # target dir from the project file so we can have a hint of
-            # where the cache file should be
-            if self._config is None and self.project_file is not None:
-                target_dir, _ = ConfigParser.simpleParse(self.project_file)
-                self._recoverCache(target_dir)
-
-            # No configuration defined means we failed to recover it
-            # from the cache
-            if self._config is None:
-                self._config = ConfigParser(self.project_file)
-
             # If the builder is still undefined we failed to recover
             # from cache
             if self.builder is None:
                 builder_name = self._config.getBuilder()
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
-                self.builder = builder_class(self._config.getTargetDir())
+
+                cache_dir = self._getCacheDirectory()
+                if not p.exists(cache_dir):
+                    os.makedirs(cache_dir)
+
+                self.builder = builder_class(cache_dir)
 
                 self._logger.info("Selected builder is '%s'",
                                   self.builder.builder_name)
         except hdlcc.exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
-            self.builder = hdlcc.builders.Fallback(self._config.getTargetDir())
+            self.builder = hdlcc.builders.Fallback(self._getCacheDirectory())
 
         assert self.builder is not None
 
@@ -165,14 +156,14 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             os.remove(cache_fname)
 
         if self._config:
-            target_dir = self._config.getTargetDir()
+            target_dir = self._getCacheDirectory()
             if p.exists(target_dir):
                 self._logger.debug("Removing target dir '%s'", target_dir)
                 shutil.rmtree(target_dir)
 
         del self._config
         del self.builder
-        self._config = None
+        self._config = ConfigParser(self.project_file)
         self.builder = None
 
     def _setState(self, state):
@@ -349,7 +340,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # If we found more than a single file, then multiple files have the
             # same entity or package name and we failed to identify the real
             # file
-            if len(dependencies_list):
+            if dependencies_list:
                 _logger.warning("Dependency %s (%s)", dependency, type(dependency))
                 self._reportDependencyNotUnique(
                     non_resolved_dependency=dependency,
