@@ -21,7 +21,6 @@ import json
 import logging
 import os
 import os.path as p
-import shutil
 import traceback
 from multiprocessing.pool import ThreadPool
 
@@ -33,7 +32,7 @@ from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import getCachePath, getFileType, removeDuplicates
+from hdlcc.utils import getCachePath, getFileType, removeDuplicates, removeIfExists, removeDirIfExists
 
 CACHE_NAME = 'cache.json'
 
@@ -113,10 +112,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             self._logger.debug("cache:\n%s", cache)
             self._setState(cache)
             self.builder.checkEnvironment()
-        except ValueError:
-            self._handleUiError(
-                "Unable to recover cache from '{}'\n"
-                "Traceback:\n{}".format(cache_fname, traceback.format_exc()))
+        except ValueError as exception:
+            self._handleUiWarning(
+                "Unable to recover cache from '{}': {}".format(cache_fname,
+                                                               str(exception)))
+
+            self._logger.warning("Unable to recover cache from '%s': %s",
+                                 cache_fname, traceback.format_exc())
 
     def _setupEnvIfNeeded(self):
         """
@@ -150,16 +152,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Clean up generated files
         """
         self._logger.debug("Cleaning up project")
-        cache_fname = self._getCacheFilename()
-        if cache_fname is not None and p.exists(cache_fname):
-            self._logger.debug("Removing cached info in '%s'", cache_fname)
-            os.remove(cache_fname)
-
-        if self._config:
-            target_dir = self._getCacheDirectory()
-            if p.exists(target_dir):
-                self._logger.debug("Removing target dir '%s'", target_dir)
-                shutil.rmtree(target_dir)
+        removeIfExists(self._getCacheFilename())
+        removeDirIfExists(self._getCacheDirectory())
 
         del self._config
         del self.builder
@@ -259,7 +253,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     def updateBuildSequenceCache(self, source):
         """
-        Wrapper to _getBuildSequence passing the initial build sequence
+        Wrapper to _resolveBuildSequence passing the initial build sequence
         list empty and caching the result
         """
         # Despite we renew the cache when on buffer enter, we must also
@@ -269,8 +263,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # sequence hasn't changed since we cached the build sequence
         key = str(source.filename)
         if key not in self._build_sequence_cache:
-            build_sequence = []
-            self._getBuildSequence(source, build_sequence)
+            build_sequence = self.getBuildSequence(source)
             if build_sequence:
                 timestamp = max([x.getmtime() for x in build_sequence])
             else:
@@ -291,10 +284,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             if current_timestamp > cached_timestamp:
                 self._logger.debug("Timestamp change, rescanning build "
                                    "sequence")
-                build_sequence = []
-                self._getBuildSequence(source, build_sequence)
                 self._build_sequence_cache[key] = {
-                    'sequence': build_sequence,
+                    'sequence': self.getBuildSequence(source),
                     'timestamp': current_timestamp}
 
         return self._build_sequence_cache[key]['sequence']
@@ -318,7 +309,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                     actual=actual.filename,
                     choices=list(choices)))
 
-    def _getBuildSequence(self, source, build_sequence, reference=None):
+
+    def getBuildSequence(self, source):
+        build_sequence = []
+        self._resolveBuildSequence(source, build_sequence)
+        return build_sequence
+
+    def _resolveBuildSequence(self, source, build_sequence, reference=None):
         """
         Recursively finds out the dependencies of the given source file
         """
@@ -354,8 +351,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 return
 
             if selected_dependency not in build_sequence:
-                self._getBuildSequence(selected_dependency, reference=source,
-                                       build_sequence=build_sequence)
+                self._resolveBuildSequence(selected_dependency, reference=source,
+                                           build_sequence=build_sequence)
 
             if selected_dependency not in build_sequence:
                 build_sequence.append(selected_dependency)

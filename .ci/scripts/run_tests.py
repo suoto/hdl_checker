@@ -95,8 +95,6 @@ def _uploadAppveyorArtifact(path):
         _logger.info(line)
 
 def _parseArguments():
-    "Argument parser for standalone hdlcc"
-
     parser = argparse.ArgumentParser()
 
     # Options

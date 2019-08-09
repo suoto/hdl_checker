@@ -94,8 +94,10 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         return obj
 
     def __repr__(self):
-        return "BaseSourceFile('%s', library='%s', flags=%s)" % \
-                (self.abspath, self.library, self.flags)
+        return ("{}(library='{}', design_units={}, dependencies={}, "
+                "filename={}".format(self.__class__.__name__, self.library,
+                                     self._design_units, self._dependencies,
+                                     self.filename))
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
