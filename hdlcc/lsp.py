@@ -146,15 +146,18 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
     def _handleUiInfo(self, message):
         self._logger.debug("UI info: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Info)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Info)
 
     def _handleUiWarning(self, message):
         self._logger.debug("UI warning: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Warning)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Warning)
 
     def _handleUiError(self, message):
         self._logger.debug("UI error: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Error)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Error)
 
 class HdlccLanguageServer(PythonLanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
