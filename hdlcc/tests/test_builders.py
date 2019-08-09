@@ -52,6 +52,7 @@ class TestBuilder(unittest2.TestCase):
 
         # Add the builder path to the environment so we can call it
         if cls.builder_path:
+            _logger.info("Adding '%s' to the system path", cls.builder_path)
             cls.patch = mock.patch.dict(
                 'os.environ',
                 {'PATH' : os.pathsep.join([cls.builder_path, os.environ['PATH']])})
@@ -59,7 +60,7 @@ class TestBuilder(unittest2.TestCase):
 
         builder_class = getBuilderByName(cls.builder_name)
         cls.builder = builder_class(p.join(TEST_SUPPORT_PATH,
-                                           '._%s' % cls.builder_name))
+                                           '_%s' % cls.builder_name))
         cls.builder_class = builder_class
 
         # Copy sources path to tox env

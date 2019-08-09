@@ -31,7 +31,8 @@ import six
 from parameterized import parameterized_class
 
 import hdlcc
-from hdlcc.utils import getFileType, onWindows, removeDuplicates, samefile
+from hdlcc.utils import (getCachePath, getFileType, onWindows,
+                         removeDuplicates, samefile)
 
 _logger = logging.getLogger(__name__)
 
@@ -57,29 +58,35 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
             yield self._msg_queue.get()
 
 class SourceMock(object):
+    _logger = logging.getLogger('SourceMock')
+    base_path = ''
+
     def __init__(self, library, design_units, dependencies=None, filename=None):
         if filename is not None:
-            self.filename = filename
+            self._filename = p.join(self.base_path, filename)
         else:
-            self.filename = library + '_' + design_units[0]['name'] + '.vhd'
+            self._filename = p.join(self.base_path,
+                                    library + '_' + design_units[0]['name'] + '.vhd')
 
         self.filetype = getFileType(self.filename)
         self.abspath = p.abspath(self.filename)
         self.flags = []
 
         self.library = library
-        self._design_units = design_units
-        if dependencies is not None:
-            self._dependencies = dependencies
-        else:
-            self._dependencies = []
+        self._design_units = list(design_units or [])
+        self._dependencies = list(dependencies or [])
 
         self._createMockFile()
+
+    @property
+    def filename(self):
+        return self._filename
 
     def getLibraries(self):
         return [x.library for x in self._dependencies]
 
     def _createMockFile(self):
+        self._logger.debug("Creating mock file: %s", self.filename)
         with open(self.filename, 'w') as fd:
             libs = removeDuplicates(
                 [x.library for x in self._dependencies])
@@ -91,14 +98,23 @@ class SourceMock(object):
                 fd.write("use {0}.{1};\n".format(dependency.library,
                                                  dependency.name))
 
+            fd.write('\n')
+
             for design_unit in self._design_units:
-                fd.write("{0} is {1} end {0} {1};\n".
+                fd.write("{0} {1} is\n\nend {0} {1};\n".
                          format(design_unit['type'],
                                 design_unit['name']))
 
-    def __del__(self):
-        if p.exists(self.filename):
-            os.remove(self.filename)
+    #  def __del__(self):
+    #      if p.exists(self.filename):
+    #          self._logger.debug("Deleting %s", self.filename)
+    #          os.remove(self.filename)
+
+    def __repr__(self):
+        return ("{}(library='{}', design_units={}, dependencies={}, "
+                "filename={}".format(self.__class__.__name__, self.library,
+                                     self._design_units, self._dependencies,
+                                     self.filename))
 
     def getmtime(self):
         return p.getmtime(self.filename)
@@ -157,8 +173,7 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
             self.builder_name, "Fake error")
 
 
-def disableVunit(func):
-    return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
+disableVunit = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
 
 
 def deleteFileOrDir(path):
@@ -261,9 +276,9 @@ def writeListToFile(filename, _list): # pragma: no cover
 
 
 TEST_ENVS = {
-    'ghdl': p.expanduser('~/builders/ghdl/bin/'),
-    'msim': p.expanduser('~/builders/msim/modelsim_ase/linux/'),
-    'xvhdl': p.expanduser('~/builders/xvhdl/bin/')}
+    'ghdl': os.environ['GHDL_PATH'],
+    'msim': os.environ['MODELSIM_PATH'],
+    'xvhdl': os.environ['XSIM_PATH']}
 
 
 def parametrizeClassWithBuilders(cls):
@@ -275,3 +290,9 @@ def parametrizeClassWithBuilders(cls):
         values += [(name, path)]
 
     return parameterized_class(keys, values)(cls)
+
+def removeCacheData():
+    cache_path = getCachePath()
+    if p.exists(cache_path):
+        shutil.rmtree(cache_path)
+        _logger.info("Removed %s", cache_path)

@@ -27,20 +27,20 @@ import os
 import os.path as p
 import sys
 import threading
-from threading import Timer
 import time
+from threading import Timer
 
 import mock
+import pyls.lsp as defines
 import unittest2
 from nose2.tools import such
-
-import pyls.lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
 
 import hdlcc.lsp as lsp
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.tests.utils import removeCacheData
 from hdlcc.utils import onWindows
 
 _logger = logging.getLogger(__name__)
@@ -148,7 +148,9 @@ with such.A("LSP server") as it:
 
     @it.has_setup
     def setup():
-        _logger.debug("Sever")
+        removeCacheData()
+
+        _logger.debug("Creating server")
         tx_r, tx_w = os.pipe()
         it.tx = JsonRpcStreamReader(os.fdopen(tx_r, 'rb'))
 

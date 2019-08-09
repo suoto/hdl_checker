@@ -110,11 +110,8 @@ def _parseArguments():
     parser.add_argument('--xvhdl', action='store_true',
                         help="Runs tests with XHDL environment")
 
-    parser.add_argument('--fallback', action='store_true',
-                        help="Runs tests for the fallback builder")
-
-    parser.add_argument('--standalone', action='store_true',
-                        help="Runs tests for standalone hdlcc")
+    parser.add_argument('--others', action='store_true',
+                        help="Runs tests that don't need a builder")
 
     parser.add_argument('--fail-fast', '-F', action='store_true')
 
@@ -139,11 +136,9 @@ def _parseArguments():
     args.log_level = str(args.log_level).upper()
 
     # Set the default behaviour: run all tests
-    env_list = [getattr(args, x) for x in ('msim', 'ghdl', 'xvhdl', 'fallback',
-                                           'standalone')]
+    env_list = [getattr(args, x) for x in ('msim', 'ghdl', 'xvhdl', 'others')]
     if True not in env_list:
-        _ = [setattr(args, x, True) for x in ('msim', 'ghdl', 'xvhdl', 'fallback',
-                                              'standalone')]
+        _ = [setattr(args, x, True) for x in ('msim', 'ghdl', 'xvhdl', 'others')]
     test_list = []
     if args.tests:
         test_list = [source for sublist in args.tests for source in sublist]
@@ -179,25 +174,23 @@ def _getNoseCommandLineArgs(args):
 
 def _getDefaultTestByEnv(env):
     if env in ('msim', 'ghdl', 'xvhdl'):
-        return ('hdlcc.tests.test_builders',
-                'hdlcc.tests.test_hdlcc_base',
+        return (
                 'hdlcc.tests.test_persistence',
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone')
-    if env == 'standalone':
-        return ('hdlcc.tests.test_config_parser',
-                'hdlcc.tests.test_static_check')
-    if env == 'fallback':
-        return ('hdlcc.tests.test_lsp',
-                'hdlcc.tests.test_server',
-                'hdlcc.tests.test_builders',
-                'hdlcc.tests.test_vhdl_parser',
-                'hdlcc.tests.test_verilog_parser',
+    if env == 'others':
+        return ('hdlcc.tests.test_builders',
+                'hdlcc.tests.test_config_parser',
                 'hdlcc.tests.test_hdlcc_base',
+                'hdlcc.tests.test_lsp',
+                'hdlcc.tests.test_misc',
+                'hdlcc.tests.test_server',
                 'hdlcc.tests.test_server_handlers',
                 'hdlcc.tests.test_standalone',
-                'hdlcc.tests.test_misc')
-    assert False
+                'hdlcc.tests.test_static_check',
+                'hdlcc.tests.test_verilog_parser',
+                'hdlcc.tests.test_vhdl_parser')
+    assert False, 'Invalid env {}'.format(repr(env))
 
 def runTestsForEnv(env, args):
     nose_base_args = _getNoseCommandLineArgs(args)
@@ -214,6 +207,11 @@ def runTestsForEnv(env, args):
         test_env.update(TEST_ENVS[env])
 
     test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
+
+    home = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'home')
+    os.makedirs(home)
+
+    test_env.update({'HOME' : home})
 
     _logger.info("nose2 args: %s", nose_args)
 
@@ -251,7 +249,7 @@ def main():
     cov.start()
 
     passed = True
-    for env in ('ghdl', 'msim', 'xvhdl', 'fallback', 'standalone'):
+    for env in ('ghdl', 'msim', 'xvhdl', 'others'):
         if getattr(args, env):
             _logger.info("Running env '%s'", env)
 

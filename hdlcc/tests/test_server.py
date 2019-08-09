@@ -248,7 +248,7 @@ with such.A("hdlcc server") as it:
         def test():
 
             def start_io_lang_server(*_):
-                assert False
+                assert False, 'Expected fail to trigger the test'
 
             args = type('args', (object, ),
                         {'lsp': True,

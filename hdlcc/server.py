@@ -225,6 +225,8 @@ class MessageType:  # pylint: disable=too-few-public-methods
 
 def _reportException(text):
     "Hand crafted message to report issues when starting up the HDLCC server"
+    _logger.warning("Reporting exception with text %s", text)
+
     import json
     message = _LSP_ERROR_MSG_TEMPLATE.copy()
     message['params'] = {'message': text,
