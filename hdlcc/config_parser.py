@@ -23,7 +23,7 @@ from glob import glob
 from threading import Lock
 
 import hdlcc.exceptions
-from hdlcc.builders import AVAILABLE_BUILDERS, getBuilderByName
+from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
 from hdlcc.parsers import VerilogParser, VhdlParser, getSourceFileObjects
 
 # pylint: disable=invalid-name
@@ -217,6 +217,8 @@ class ConfigParser(object):
         """
         Gets a dict that describes the current state of this object
         """
+        self._parseIfNeeded()
+
         state = {}
         state['filename'] = self.filename
         state['_timestamp'] = self._timestamp
@@ -331,23 +333,15 @@ class ConfigParser(object):
         self._logger.debug("Searching for builder among %s",
                            AVAILABLE_BUILDERS)
         for builder_class in AVAILABLE_BUILDERS:
-            if builder_class.builder_name == 'fallback':
+            if builder_class is Fallback:
                 continue
             if builder_class.isAvailable():
-                break
-            else:
-                self._logger.debug("'%s' failed", builder_class.builder_name)
-                continue
+                self._logger.info("Builder '%s' has worked",
+                                  builder_class.builder_name)
+                self._parms['builder'] = builder_class.builder_name
+                return
 
-        if builder_class is not None:
-            self._logger.info("Builder '%s' has worked",
-                              builder_class.builder_name)
-            self._parms['builder'] = builder_class.builder_name
-        else: # pragma: no cover
-            # Fallback is tested in the list above, so we shouldn't
-            # reach this
-            self._logger.info("Couldn't find any builder, using fallback")
-            self._parms['builder'] = 'fallback'
+        self._parms['builder'] = Fallback.builder_name
 
     # TODO: Add a test for this
     def _setDefaultBuildFlagsIfNeeded(self):
@@ -563,6 +557,8 @@ class ConfigParser(object):
         unit. Case sensitive mode should be used when tracking
         dependencies on Verilog files. VHDL should use VHDL
         """
+        self._parseIfNeeded()
+
         # Default to lower case if we're not handling case sensitive. VHDL
         # source files are all converted to lower case when parsed, so the
         # units they define are in lower case already
