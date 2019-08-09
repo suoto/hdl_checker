@@ -275,8 +275,8 @@ with such.A("hdlcc server") as it:
                 "params": {
                     "message":
                         "Unable to start HDLCC LSP server: "
-                        "\'AssertionError()\'! Check " + p.abspath(args.stderr) +
-                        " for more info",
+                        "\'AssertionError(\'Expected fail to trigger the test\',)\'! "
+                        "Check " + p.abspath(args.stderr) + " for more info",
                     "type": 1}})
 
             response = ("Content-Length: {}\r\n"
@@ -327,6 +327,7 @@ with such.A("hdlcc server") as it:
                 "No configuration file given, using fallback",
                 "Using Fallback builder",
                 "Selected builder is 'fallback'",
+                "No configuration file given, using fallback",
                 ""]
 
             _logger.info("Log content: %s", log_content)
