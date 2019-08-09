@@ -18,10 +18,10 @@
 
 # pylint: disable=useless-object-inheritance
 
-import sys
 import functools
 import logging
 import os.path as p
+import sys
 
 import pyls.lsp as defines
 from pyls._utils import debounce
@@ -124,10 +124,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         return True
 
     def _shouldRecreateTargetDir(self):
-        if self._config is None:
-            return False
-
-        if p.exists(self._config.getTargetDir()):
+        if p.exists(self._getCacheFilename()):
             return False
 
         return self._config.getBuilder() != 'fallback'
@@ -188,7 +185,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         """
         result = super(HdlccLanguageServer, self).m_initialize(
             processId=processId, rootUri=rootUri, rootPath=rootPath,
-            initializationOptions=initializationOptions, **_kwargs)
+            initializationOptions={})
 
         self._onProjectFileUpdate(initializationOptions or {})
 
