@@ -22,6 +22,7 @@ import re
 from glob import glob
 
 from hdlcc.diagnostics import BuilderDiag, DiagType
+from hdlcc.utils import runShellCommand
 
 from .base_builder import BaseBuilder
 
@@ -96,7 +97,7 @@ class GHDL(BaseBuilder):
         #  return [diag, ]
 
     def _checkEnvironment(self):
-        stdout = self._subprocessRunner(['ghdl', '--version'])
+        stdout = runShellCommand(['ghdl', '--version'])
         self._version = re.findall(r"(?<=GHDL)\s+([^\s]+)\s+",
                                    stdout[0])[0]
         self._logger.info("GHDL version string: '%s'. "
@@ -105,7 +106,11 @@ class GHDL(BaseBuilder):
 
     @staticmethod
     def isAvailable():
-        return not os.system('ghdl --version')
+        try:
+            runShellCommand(['ghdl', '--version'])
+            return True
+        except OSError:
+            return False
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -114,7 +119,7 @@ class GHDL(BaseBuilder):
         """
         Discovers libraries that exist regardless before we do anything
         """
-        for line in self._subprocessRunner(['ghdl', '--dispconfig']):
+        for line in runShellCommand(['ghdl', '--dispconfig']):
             library_path_match = self._scan_library_paths(line)
             if library_path_match:
                 library_path = library_path_match.groupdict()['library_path']
@@ -176,14 +181,14 @@ class GHDL(BaseBuilder):
         stdout = []
         for cmd in (self._analyzeSource(path, library, flags),
                     self._checkSyntax(path, library, flags)):
-            stdout += self._subprocessRunner(cmd)
+            stdout += runShellCommand(cmd)
 
         return stdout
 
     def _createLibrary(self, _):
         workdir = p.join(self._target_folder)
         if not p.exists(workdir):
-            os.mkdir(workdir)
+            os.makedirs(workdir)
 
     def _searchForRebuilds(self, line):
         rebuilds = []

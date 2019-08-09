@@ -19,7 +19,9 @@
 import logging
 import os
 import os.path as p
+import shutil
 import signal
+import subprocess as subp
 import sys
 from tempfile import NamedTemporaryFile
 from threading import Lock
@@ -285,3 +287,41 @@ def getCachePath():
     if onWindows():
         return p.join(os.environ['LOCALAPPDATA'], 'Caches', 'hdlcc')
     return p.join(os.environ['HOME'], '.cache', 'hdlcc')
+
+def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
+    """
+    Runs a shell command and handles stdout catching
+    """
+    if env is not None: # pragma: no cover
+        subp_env = env
+    else:
+        subp_env = os.environ
+
+    _logger.debug(" ".join(cmd_with_args))
+
+    try:
+        stdout = list(
+            subp.check_output(cmd_with_args, stderr=subp.STDOUT,
+                              shell=shell, env=subp_env, cwd=cwd).splitlines())
+    except subp.CalledProcessError as exc:
+        stdout = list(exc.output.splitlines())
+        _logger.debug("Command '%s' failed with error code %d.\nStdout:\n%s",
+                      cmd_with_args, exc.returncode,
+                      '\n'.join([x.decode() for x in stdout]))
+    except OSError as exc:
+        _logger.debug("Command '%s' failed with %s", cmd_with_args, exc)
+        raise
+
+    return [x.decode() for x in stdout]
+
+def removeIfExists(filename):
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
+
+def removeDirIfExists(dirname):
+    try:
+        shutil.rmtree(dirname)
+    except OSError:
+        pass

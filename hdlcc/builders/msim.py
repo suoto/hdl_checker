@@ -22,7 +22,7 @@ import re
 from shutil import copyfile
 
 from hdlcc.diagnostics import DiagType, BuilderDiag
-from hdlcc.utils import getFileType
+from hdlcc.utils import getFileType, runShellCommand
 
 from .base_builder import BaseBuilder
 
@@ -141,7 +141,7 @@ class MSim(BaseBuilder):
             yield diag
 
     def _checkEnvironment(self):
-        stdout = self._subprocessRunner(['vcom', '-version'])
+        stdout = runShellCommand(['vcom', '-version'])
         self._version = \
                 re.findall(r"(?<=vcom)\s+([\w\.]+)\s+(?=Compiler)", \
                 stdout[0])[0]
@@ -151,14 +151,18 @@ class MSim(BaseBuilder):
 
     @staticmethod
     def isAvailable():
-        return ((not os.system('vcom -version')) and
-                (not os.system('vlog -version')))
+        try:
+            runShellCommand(['vcom', '-version'])
+            runShellCommand(['vlog', '-version'])
+            return True
+        except OSError:
+            return False
 
     def _parseBuiltinLibraries(self):
         "Discovers libraries that exist regardless before we do anything"
         if not self._iniFileExists():
             self._createIniFile()
-        for line in self._subprocessRunner(['vmap', ]):
+        for line in runShellCommand(['vmap', ]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 self._builtin_libraries.add(match.groupdict()['library_name'])
 
@@ -212,7 +216,7 @@ class MSim(BaseBuilder):
             cmd += flags
         cmd += [path]
 
-        return self._subprocessRunner(cmd)
+        return runShellCommand(cmd)
 
     def _buildVerilog(self, path, library, flags=None):
         "Builds a Verilog/SystemVerilog file"
@@ -226,7 +230,7 @@ class MSim(BaseBuilder):
         cmd += self._getExtraFlags('verilog')
         cmd += [path]
 
-        return self._subprocessRunner(cmd)
+        return runShellCommand(cmd)
 
     def _createLibrary(self, library):
         library = library.lower()
@@ -260,7 +264,7 @@ class MSim(BaseBuilder):
         _modelsim_ini = p.join(self._target_folder, 'modelsim.ini')
 
         if not p.exists(self._target_folder):  # pragma: no cover
-            os.mkdir(self._target_folder)
+            os.makedirs(self._target_folder)
 
         self._logger.info("modelsim.ini not found at '%s', creating",
                           p.abspath(_modelsim_ini))
@@ -274,14 +278,14 @@ class MSim(BaseBuilder):
             # variable
             copyfile(modelsim_env, _modelsim_ini)
         else:
-            self._subprocessRunner(['vmap', '-c'], cwd=self._target_folder)
+            runShellCommand(['vmap', '-c'], cwd=self._target_folder)
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
         if not p.exists(p.join(self._target_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
             return None
-        return self._subprocessRunner(
+        return runShellCommand(
             ['vdel', '-modelsimini', self._modelsim_ini, '-lib', library,
              '-all'])
 
@@ -289,8 +293,8 @@ class MSim(BaseBuilder):
         """
         Adds a library to an existing ModelSim init file
         """
-        self._subprocessRunner(['vlib', ] + self._vlib_args +
-                               [p.join(self._target_folder, library)])
+        runShellCommand(['vlib', ] + self._vlib_args +
+                        [p.join(self._target_folder, library)])
 
-        self._subprocessRunner(['vmap', '-modelsimini', self._modelsim_ini,
-                                library, p.join(self._target_folder, library)])
+        runShellCommand(['vmap', '-modelsimini', self._modelsim_ini,
+                         library, p.join(self._target_folder, library)])
