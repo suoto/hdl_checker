@@ -1,0 +1,9 @@
+builder = xvhdl
+
+target_dir = .build
+vhdl  basic_library    basic_library/very_common_pkg.vhd
+vhdl  basic_library    basic_library/package_with_constants.vhd
+vhdl  basic_library    basic_library/clock_divider.vhd
+vhdl  another_library  another_library/foo.vhd
+vhdl  basic_library    basic_library/package_with_functions.vhd
+vhdl  basic_library    basic_library/clk_en_generator.vhd

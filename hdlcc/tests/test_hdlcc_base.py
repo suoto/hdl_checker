@@ -233,10 +233,16 @@ with such.A("hdlcc project") as it:
             # Try to recreate
             it.project = StandaloneProjectBuilder(project_file)
 
-            it.assertIn(
-                ('warning', "Unable to recover cache from '{}': "
-                            "No JSON object could be decoded".format(cache_filename)),
-                list(it.project.getUiMessages()))
+            if six.PY2:
+                it.assertIn(
+                    ('warning', "Unable to recover cache from '{}': "
+                                "No JSON object could be decoded".format(cache_filename)),
+                    list(it.project.getUiMessages()))
+            else:
+                it.assertIn(
+                    ('warning', "Unable to recover cache from '{}': "
+                                "Expecting value: line 1 column 1 (char 0)".format(cache_filename)),
+                    list(it.project.getUiMessages()))
 
             it.assertTrue(isinstance(it.project.builder, MockBuilder),
                           "Builder should be MockBuilderbut it's {} instead"
