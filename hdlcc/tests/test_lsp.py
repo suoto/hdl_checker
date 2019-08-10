@@ -25,26 +25,24 @@
 import logging
 import os
 import os.path as p
-import sys
 import time
 from threading import Event, Timer
 
 import mock
-import pyls.lsp as defines
+import parameterized
 import unittest2
 from nose2.tools import such
+from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
 
 import hdlcc.lsp as lsp
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.tests.utils import removeCacheData
+from hdlcc.tests.utils import setupTestSuport
 from hdlcc.utils import onWindows
 
 _logger = logging.getLogger(__name__)
-
-# pylint: disable=bad-whitespace
 
 JSONRPC_VERSION = '2.0'
 LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION,
@@ -55,46 +53,43 @@ LSP_MSG_EMPTY_RESPONSE = {'jsonrpc': JSONRPC_VERSION, 'id': 1, 'result': None}
 
 MOCK_WAIT_TIMEOUT = 5
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-
-_ON_WINDOWS = sys.platform == "win32"
+TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_PROJECT = p.abspath(p.join(TEST_SUPPORT_PATH, 'test_project'))
 
 if onWindows():
-    VIM_HDL_EXAMPLES = VIM_HDL_EXAMPLES.lower()
+    TEST_PROJECT = TEST_PROJECT.lower()
 
 class TestCheckerDiagToLspDict(unittest2.TestCase):
 
-    def test_converting_to_lsp(self):
-        for diag_type, severity in (
-                (DiagType.INFO,           defines.DiagnosticSeverity.Hint),
-                (DiagType.STYLE_INFO,     defines.DiagnosticSeverity.Hint),
-                (DiagType.STYLE_WARNING,  defines.DiagnosticSeverity.Information),
-                (DiagType.STYLE_ERROR,    defines.DiagnosticSeverity.Information),
-                (DiagType.WARNING,        defines.DiagnosticSeverity.Warning),
-                (DiagType.ERROR,          defines.DiagnosticSeverity.Error),
-                (DiagType.NONE,           defines.DiagnosticSeverity.Error)):
+    @parameterized.parameterized.expand([
+        (DiagType.INFO, defines.DiagnosticSeverity.Hint),
+        (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Hint),
+        (DiagType.STYLE_WARNING, defines.DiagnosticSeverity.Information),
+        (DiagType.STYLE_ERROR, defines.DiagnosticSeverity.Information),
+        (DiagType.WARNING, defines.DiagnosticSeverity.Warning),
+        (DiagType.ERROR, defines.DiagnosticSeverity.Error),
+        (DiagType.NONE, defines.DiagnosticSeverity.Error)])
+    def test_converting_to_lsp(self, diag_type, severity):
+        _logger.info("Running %s and %s", diag_type, severity)
 
-            _logger.info("Running %s and %s", diag_type, severity)
+        diag = CheckerDiagnostic(
+            checker='hdlcc test', text='some diag', filename='filename',
+            line_number=1, column_number=1, error_code='error code',
+            severity=diag_type)
 
-            diag = CheckerDiagnostic(
-                checker='hdlcc test', text='some diag', filename='filename',
-                line_number=1, column_number=1, error_code='error code',
-                severity=diag_type)
-
-            self.assertEqual(
-                lsp.checkerDiagToLspDict(diag),
-                {'source': 'hdlcc test',
-                 'range': {
-                     'start': {
-                         'line': 0,
-                         'character': 0, },
-                     'end': {
-                         'line': 0,
-                         'character': 0, }},
-                 'message': 'some diag',
-                 'severity': severity,
-                 'code': 'error code'})
+        self.assertEqual(
+            lsp.checkerDiagToLspDict(diag),
+            {'source': 'hdlcc test',
+             'range': {
+                 'start': {
+                     'line': 0,
+                     'character': 0, },
+                 'end': {
+                     'line': 0,
+                     'character': 0, }},
+             'message': 'some diag',
+             'severity': severity,
+             'code': 'error code'})
 
     def test_workspace_notify(self):
         workspace = mock.MagicMock(spec=Workspace)
@@ -147,7 +142,7 @@ with such.A("LSP server") as it:
 
     @it.has_setup
     def setup():
-        removeCacheData()
+        setupTestSuport(TEST_SUPPORT_PATH)
 
         _logger.debug("Creating server")
         tx_r, tx_w = os.pipe()
@@ -173,7 +168,7 @@ with such.A("LSP server") as it:
         del it.server
         import shutil
         try:
-            shutil.rmtree(p.join(VIM_HDL_EXAMPLES, '.hdlcc'))
+            shutil.rmtree(p.join(TEST_PROJECT, '.hdlcc'))
         except OSError:
             pass
 
@@ -183,11 +178,11 @@ with such.A("LSP server") as it:
         def test():
             _initializeServer(
                 it.server,
-                params={'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES)})
+                params={'rootUri': uris.from_fs_path(TEST_PROJECT)})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -217,7 +212,7 @@ with such.A("LSP server") as it:
         @mock.patch.object(Workspace, 'publish_diagnostics',
                            mock.MagicMock(spec=Workspace.publish_diagnostics))
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+            source = p.join(TEST_PROJECT, 'basic_library',
                             'clock_divider.vhd')
 
             it.server.lint(doc_uri=uris.from_fs_path(source),
@@ -232,13 +227,13 @@ with such.A("LSP server") as it:
             _initializeServer(
                 it.server,
                 params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                    'rootUri': uris.from_fs_path(TEST_PROJECT),
                     'initializationOptions': {
                         'project_file': 'vimhdl.prj'}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -273,13 +268,13 @@ with such.A("LSP server") as it:
             _initializeServer(
                 it.server,
                 params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                    'rootUri': uris.from_fs_path(TEST_PROJECT),
                     'initializationOptions': {
                         'project_file': it.project_file}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -295,7 +290,7 @@ with such.A("LSP server") as it:
                 _logger.info("doc_uri: %s", doc_uri)
                 _logger.info("diagnostics: %s", diagnostics)
 
-                if _ON_WINDOWS:
+                if onWindows():
                     error = '[WinError 2] The system cannot find the file specified'
                 else:
                     error = '[Errno 2] No such file or directory'
@@ -313,7 +308,7 @@ with such.A("LSP server") as it:
                                 'end': {'line': 0, 'character': 0}},
                       'message': "Exception while creating server: '{}: {}'"
                                  .format(error,
-                                         repr(p.join(VIM_HDL_EXAMPLES,
+                                         repr(p.join(TEST_PROJECT,
                                                      it.project_file))),
                       'severity': defines.DiagnosticSeverity.Error}])
 
@@ -329,7 +324,7 @@ with such.A("LSP server") as it:
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -364,11 +359,11 @@ with such.A("LSP server") as it:
                 it.server,
                 params={
                     'initializationOptions': {
-                        'project_file': p.join(VIM_HDL_EXAMPLES, 'vimhdl.prj')}})
+                        'project_file': p.join(TEST_PROJECT, 'vimhdl.prj')}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
