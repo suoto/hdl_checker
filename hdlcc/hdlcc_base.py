@@ -99,19 +99,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         cache_fname = self._getCacheFilename()
 
-        if not p.exists(cache_fname):
-            self._logger.debug("Won't recover from %s, file not found",
-                               cache_fname)
-            return
-
-        self._logger.debug("Trying to recover from '%s'", cache_fname)
-
         try:
             cache = json.load(open(cache_fname, 'r'), object_hook=jsonObjectHook)
             self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
-            self._logger.debug("cache:\n%s", cache)
-            self._setState(cache)
-            self.builder.checkEnvironment()
+        except IOError:
+            self._logger.debug("Couldn't read cache file %s, skipping recovery",
+                               cache_fname)
+            return
         except ValueError as exception:
             self._handleUiWarning(
                 "Unable to recover cache from '{}': {}".format(cache_fname,
@@ -119,6 +113,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
             self._logger.warning("Unable to recover cache from '%s': %s",
                                  cache_fname, traceback.format_exc())
+            return
+
+        self._setState(cache)
+        self.builder.checkEnvironment()
 
     def _setupEnvIfNeeded(self):
         """
@@ -134,8 +132,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
 
                 cache_dir = self._getCacheDirectory()
-                if not p.exists(cache_dir):
+                try:
                     os.makedirs(cache_dir)
+                except OSError:
+                    pass
 
                 self.builder = builder_class(cache_dir)
 
