@@ -24,32 +24,8 @@ stages:
 
 jobs:
   include:
-    # XVHDL is the slowest of all, start them first
-    - name: Python 2.7 - xvhdl
-      script: ./run_tests.sh -e py27-xvhdl-linux
-
-    - name: Python 3.7 - xvhdl
-      script: ./run_tests.sh -e py37-xvhdl-linux
-
-    # Python 2.7 land
-    - name: Python 2.7 - msim
-      script: ./run_tests.sh -e py27-msim-linux
-
-    - name: Python 2.7 - standalone and fallback
-      script: ./run_tests.sh -e py27-fallback-linux -e py27-standalone-linux
-
-    - name: Python 2.7 - ghdl
-      script: ./run_tests.sh -e py27-ghdl-linux
-
-    # Python 3.7 land
-    - name: Python 3.7 - msim
-      script: ./run_tests.sh -e py37-msim-linux
-
-    - name: Python 3.7 - standalone and fallback
-      script: ./run_tests.sh -e py37-fallback-linux -e py37-standalone-linux
-
-    - name: Python 3.7 - ghdl
-      script: ./run_tests.sh -e py37-ghdl-linux
+    - name: Testing
+      script: ./run_tests.sh
 
     - stage: deploy
       before_install: skip

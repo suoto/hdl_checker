@@ -230,17 +230,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         project name space
         """
         for dependency in source.getDependencies():
-            try:
-                if dependency.library in self.builder.getBuiltinLibraries():
-                    continue
-                if dependency.name == 'all':
-                    continue
-                if (dependency.library == source.library and \
-                        dependency.name in [x['name'] for x in source.getDesignUnits()]):
-                    continue
-            except:
-                self._logger.exception("Error handling %s", dependency)
-                raise
+            if dependency.library in self.builder.getBuiltinLibraries():
+                continue
+            if dependency.name == 'all':
+                continue
+            if (dependency.library == source.library and \
+                    dependency.name in [x['name'] for x in source.getDesignUnits()]):
+                continue
             yield dependency
 
     @staticmethod

@@ -174,10 +174,7 @@ def _getNoseCommandLineArgs(args):
 
 def _getDefaultTestByEnv(env):
     if env in ('msim', 'ghdl', 'xvhdl'):
-        return (
-                'hdlcc.tests.test_persistence',
-                'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_standalone')
+        return ('hdlcc.tests.test_server_handlers',)
     if env == 'others':
         return ('hdlcc.tests.test_builders',
                 'hdlcc.tests.test_config_parser',
