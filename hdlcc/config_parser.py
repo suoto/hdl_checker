@@ -20,11 +20,11 @@ import logging
 import os.path as p
 import re
 from glob import glob
-from threading import Lock
+from threading import RLock
 
 import hdlcc.exceptions
 from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
-from hdlcc.parsers import VerilogParser, VhdlParser, getSourceFileObjects
+from hdlcc.parsers import getSourceFileObjects
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -70,7 +70,7 @@ _VUNIT_FLAGS = {
         '2008' : ['--std=08']}
     }
 
-class ConfigParser(object):
+class ConfigParser(object):  # pylint: disable=useless-object-inheritance
     """
     Configuration info provider
     """
@@ -110,7 +110,7 @@ class ConfigParser(object):
 
         self._sources = {}
         self._timestamp = 0
-        self._parse_lock = Lock()
+        self._is_parsing = RLock()
 
     def __eq__(self, other): # pragma: no cover
         if not isinstance(other, type(self)):
@@ -245,7 +245,7 @@ class ConfigParser(object):
         sources = state.pop('_sources')
         obj.filename = state.pop('filename', None)
         obj._timestamp = state.pop('_timestamp')
-        obj._parse_lock = Lock()
+        obj._is_parsing = RLock()
 
         obj._parms = state['_parms']
         obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
@@ -274,10 +274,10 @@ class ConfigParser(object):
 
     def _parseIfNeeded(self):
         """
-        Parses the configuration file
+        Locks accesses to parsed attributes and parses the configuration file
         """
-        if self._shouldParse():
-            with self._parse_lock:
+        with self._is_parsing:
+            if self._shouldParse():
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
