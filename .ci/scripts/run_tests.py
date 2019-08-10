@@ -183,7 +183,6 @@ def _getDefaultTestByEnv(env):
                 'hdlcc.tests.test_misc',
                 'hdlcc.tests.test_server',
                 'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_standalone',
                 'hdlcc.tests.test_static_check',
                 'hdlcc.tests.test_verilog_parser',
                 'hdlcc.tests.test_vhdl_parser')
