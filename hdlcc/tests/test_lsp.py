@@ -32,10 +32,23 @@ import mock
 import parameterized
 import unittest2
 from nose2.tools import such
+import pyls
 from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
+
+# Debouncing will hurt testing since it won't actually call the debounced
+# function if we call it too quickly.
+def _debounce(interval_s, keyed_by=None):
+    def wrapper(func):
+        def debounced(*args, **kwargs):
+            return func(*args, **kwargs)
+        return debounced
+    return wrapper
+
+# Mock debounce before it's applied
+pyls._utils.debounce = _debounce
 
 import hdlcc.lsp as lsp
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
@@ -143,6 +156,7 @@ with such.A("LSP server") as it:
     @it.has_setup
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
+
 
         _logger.debug("Creating server")
         tx_r, tx_w = os.pipe()
