@@ -238,10 +238,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 if (dependency.library == source.library and \
                         dependency.name in [x['name'] for x in source.getDesignUnits()]):
                     continue
-                yield dependency
             except:
-                self._logger.error("Error handling %s", dependency)
+                self._logger.exception("Error handling %s", dependency)
                 raise
+            yield dependency
 
     @staticmethod
     def _sortBuildMessages(diagnostics):

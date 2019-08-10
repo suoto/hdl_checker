@@ -272,8 +272,13 @@ def removeCacheData():
 
 def setupTestSuport(path):
     """Copy contents of .ci/test_support_path/ to the given path"""
+    _logger.info("Setting up test support at %s", path)
 
     test_support_path = os.environ['CI_TEST_SUPPORT_PATH']
+
+    if p.exists(path):
+        _logger.info("Path %s already existed, removing it first", path)
+        shutil.rmtree(path)
 
     # Create the parent directory
     if not p.exists(p.dirname(path)):

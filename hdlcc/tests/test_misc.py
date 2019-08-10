@@ -52,6 +52,8 @@ with such.A("hdlcc sources") as it:
             # Exclude versioneer files
             if p.basename(path) in ('_version.py', 'versioneer.py'):
                 return False
+            if p.join('.ci', 'test_support') in path:
+                return False
             return path.split('.')[-1] in ('py', 'sh', 'ps1')
 
         files = list(filter(_fileFilter, getFiles()))

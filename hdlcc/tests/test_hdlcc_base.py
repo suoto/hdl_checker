@@ -23,7 +23,6 @@ import os
 import os.path as p
 import shutil
 import tempfile
-#  import time
 
 import mock
 import six
@@ -41,16 +40,17 @@ from hdlcc.hdlcc_base import CACHE_NAME
 from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertSameFile,
-                               cleanProjectCache, writeListToFile)
+                               setupTestSuport, writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
-TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-CACHE_BASE_PATH = p.join(TEMP_PATH, 'cache')
-VIM_HDL_EXAMPLES = p.join(TEMP_PATH, "vim-hdl-examples")
+TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
+
+CACHE_BASE_PATH = p.join(TEST_TEMP_PATH, 'cache')
 
 class _SourceMock(SourceMock):
-    base_path = TEMP_PATH
+    base_path = TEST_TEMP_PATH
 
 
 def patchClassMap(**kwargs):
@@ -152,20 +152,20 @@ with such.A("hdlcc project") as it:
                 it.project.getMessagesBySource(source),
                 [LibraryShouldBeOmited(
                     library='work',
-                    filename=p.join(TEMP_PATH, "some_lib_target.vhd"),
+                    filename=p.join(TEST_TEMP_PATH, "some_lib_target.vhd"),
                     line_number=1,
                     column_number=9)])
 
     with it.having('an existing and valid project file'):
         @it.has_setup
         def setup():
+            setupTestSuport(TEST_TEMP_PATH)
+
             if p.exists(CACHE_BASE_PATH):
                 shutil.rmtree(CACHE_BASE_PATH)
 
-
-            it.project_file = tempfile.mktemp(prefix='project_file_', suffix='.prj', dir=TEMP_PATH)
+            it.project_file = tempfile.mktemp(prefix='project_file_', suffix='.prj', dir=TEST_TEMP_PATH)
             open(it.project_file, 'w').close()
-            #  it.project_file = 'project_file'
 
             it.config_parser_patch = mock.patch('hdlcc.hdlcc_base.ConfigParser', ConfigParserMock)
             it.msim_mock_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
@@ -215,7 +215,7 @@ with such.A("hdlcc project") as it:
 
             it.assertIn(
                 ('info', 'Recovered cache from \'{}\''.format(cache_filename)),
-                it.project.getUiMessages())
+                list(it.project.getUiMessages()))
 
         @it.should("warn when failing to recover from cache")
         def test():
@@ -250,7 +250,7 @@ with such.A("hdlcc project") as it:
 
         @it.should("provide a VHDL source code object given its path")
         def test():
-            path = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+            path = p.join(TEST_PROJECT, 'basic_library',
                           'very_common_pkg.vhd')
 
             source, remarks = it.project.getSourceByPath(path)
@@ -263,8 +263,8 @@ with such.A("hdlcc project") as it:
                            [PathNotInProjectFile(p.abspath(path)), ])
 
         @it.should("provide a Verilog source code object given a Verilog path")
-        @params(p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.v'),
-                p.join(VIM_HDL_EXAMPLES, 'verilog', 'parity.sv'))
+        @params(p.join(TEST_PROJECT, 'verilog', 'parity.v'),
+                p.join(TEST_PROJECT, 'verilog', 'parity.sv'))
         def test(_, path):
             source, remarks = it.project.getSourceByPath(path)
 
@@ -542,13 +542,13 @@ with such.A("hdlcc project") as it:
                             "systemverilog": []}},
                     "_timestamp": 1474839625.2375762,
                     "_sources": {},
-                    "filename": p.join(TEMP_PATH, "/myproject.prj")}}
+                    "filename": p.join(TEST_TEMP_PATH, "/myproject.prj")}}
 
-            cache_path = p.join(TEMP_PATH, '.hdlcc', CACHE_NAME)
+            cache_path = p.join(TEST_TEMP_PATH, '.hdlcc', CACHE_NAME)
             if p.exists(p.dirname(cache_path)):
                 shutil.rmtree(p.dirname(cache_path))
 
-            os.mkdir(p.join(TEMP_PATH, '.hdlcc'))
+            os.mkdir(p.join(TEST_TEMP_PATH, '.hdlcc'))
 
             with open(cache_path, 'w') as fd:
                 fd.write(repr(cache_content))
@@ -567,7 +567,7 @@ with such.A("hdlcc project") as it:
             it.assertTrue(found, "Failed to warn that cache recovering has failed")
             it.assertTrue(it.project.builder.builder_name, 'Fallback')
 
-        #  with it.having('vim-hdl-examples as reference and a valid project file'):
+        #  with it.having('test_project as reference and a valid project file'):
 
         #      @it.has_setup
         #      def setup():
@@ -622,7 +622,7 @@ with such.A("hdlcc project") as it:
 
         #      @it.should("get messages by path")
         #      def test005a():
-        #          filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+        #          filename = p.join(TEST_PROJECT, 'another_library',
         #                            'foo.vhd')
 
         #          it.assertMsgQueueIsEmpty(it.project)
@@ -640,7 +640,7 @@ with such.A("hdlcc project") as it:
 
         #      @it.should("get messages with text")
         #      def test005b():
-        #          filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+        #          filename = p.join(TEST_PROJECT, 'another_library',
         #                            'foo.vhd')
 
         #          original_content = open(filename, 'r').read().split('\n')
@@ -682,7 +682,7 @@ with such.A("hdlcc project") as it:
 
         #      @it.should("get messages with text for file outside the project file")
         #      def test005c():
-        #          filename = p.join(TEMP_PATH, 'some_file.vhd')
+        #          filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
         #          writeListToFile(filename, ["entity some_entity is end;", ])
 
         #          content = "\n".join(["library work;",
@@ -724,7 +724,7 @@ with such.A("hdlcc project") as it:
 
         #      @it.should("get updated messages")
         #      def test006():
-        #          filename = p.join(VIM_HDL_EXAMPLES, 'another_library',
+        #          filename = p.join(TEST_PROJECT, 'another_library',
         #                            'foo.vhd')
 
         #          it.assertMsgQueueIsEmpty(it.project)
@@ -757,7 +757,7 @@ with such.A("hdlcc project") as it:
         #              _logger.info("Requires a valid project file")
         #              return
 
-        #          filename = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+        #          filename = p.join(TEST_PROJECT, 'basic_library',
         #                            'clock_divider.vhd')
 
         #          it.assertMsgQueueIsEmpty(it.project)
@@ -791,7 +791,7 @@ with such.A("hdlcc project") as it:
         #          if not it.PROJECT_FILE:
         #              _logger.info("Requires a valid project file")
         #              return
-        #          filename = p.join(TEMP_PATH, 'some_file.vhd')
+        #          filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
         #          writeListToFile(filename, ['library some_lib;'])
 
         #          it.assertMsgQueueIsEmpty(it.project)
@@ -820,8 +820,8 @@ with such.A("hdlcc project") as it:
         #              return
 
         #          filenames = (
-        #              p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clk_en_generator.vhd'))
+        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+        #              p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'))
 
         #          # Count how many messages each source has
         #          source_msgs = {}
@@ -834,7 +834,7 @@ with such.A("hdlcc project") as it:
         #          _logger.info("Changing very_common_pkg to force rebuilding "
         #                       "synchronizer and another one I don't recall "
         #                       "right now")
-        #          very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
         #                                   'very_common_pkg.vhd')
 
         #          code = open(very_common_pkg, 'r').read().split('\n')
@@ -871,8 +871,8 @@ with such.A("hdlcc project") as it:
         #          #      return
 
         #          filenames = (
-        #              p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'))
+        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+        #              p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
 
         #          # Count how many messages each source has
         #          source_msgs = {}
@@ -887,7 +887,7 @@ with such.A("hdlcc project") as it:
         #          _logger.info("Changing very_common_pkg to force rebuilding "
         #                       "synchronizer and another one I don't recall "
         #                       "right now")
-        #          very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
         #                                   'very_common_pkg.vhd')
 
         #          code = open(very_common_pkg, 'r').read().split('\n')
@@ -925,8 +925,8 @@ with such.A("hdlcc project") as it:
         #          #      return
 
         #          filenames = (
-        #              p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'))
+        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+        #              p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
         #          # Count how many messages each source has
         #          source_msgs = {}
 
@@ -940,7 +940,7 @@ with such.A("hdlcc project") as it:
         #          _logger.info("Changing very_common_pkg to force rebuilding "
         #                       "synchronizer and another one I don't recall "
         #                       "right now")
-        #          very_common_pkg = p.join(VIM_HDL_EXAMPLES, 'basic_library',
+        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
         #                                   'very_common_pkg.vhd')
 
         #          code = open(very_common_pkg, 'r').read().split('\n')

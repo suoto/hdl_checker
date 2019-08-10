@@ -53,8 +53,8 @@ LSP_MSG_EMPTY_RESPONSE = {'jsonrpc': JSONRPC_VERSION, 'id': 1, 'result': None}
 
 MOCK_WAIT_TIMEOUT = 5
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
-TEST_PROJECT = p.abspath(p.join(TEST_SUPPORT_PATH, 'test_project'))
+TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, 'test_project'))
 
 if onWindows():
     TEST_PROJECT = TEST_PROJECT.lower()
@@ -142,7 +142,7 @@ with such.A("LSP server") as it:
 
     @it.has_setup
     def setup():
-        setupTestSuport(TEST_SUPPORT_PATH)
+        setupTestSuport(TEST_TEMP_PATH)
 
         _logger.debug("Creating server")
         tx_r, tx_w = os.pipe()
@@ -202,8 +202,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
+                      'range': {'start': {'line': 28, 'character': 11},
+                                'end': {'line': 28, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information}])
 
@@ -212,8 +212,7 @@ with such.A("LSP server") as it:
         @mock.patch.object(Workspace, 'publish_diagnostics',
                            mock.MagicMock(spec=Workspace.publish_diagnostics))
         def test():
-            source = p.join(TEST_PROJECT, 'basic_library',
-                            'clock_divider.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
 
             it.server.lint(doc_uri=uris.from_fs_path(source),
                            is_saved=True)
@@ -233,7 +232,7 @@ with such.A("LSP server") as it:
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -250,13 +249,7 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
+                it.assertItemsEqual(diagnostics, [])
 
     with it.having('a non existing project file'):
 
@@ -299,8 +292,8 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
+                      'range': {'start': {'line': 28, 'character': 11},
+                                'end': {'line': 28, 'character': 11}},
                       'message': "Signal 'neat_signal' is never used",
                       'severity': defines.DiagnosticSeverity.Information},
                      {'source': 'HDL Code Checker',
@@ -324,7 +317,7 @@ with such.A("LSP server") as it:
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -344,10 +337,12 @@ with such.A("LSP server") as it:
                 it.assertItemsEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
+                      'range': {'start': {'line': 26, 'character': 11},
+                                'end': {'line': 26, 'character': 11}},
+                      'message': "Signal 'clk_enable_unused' is never used",
+                      'severity': defines.DiagnosticSeverity.Information}
+                    ])
+
 
     with it.having('no root URI but project file set'):
 
@@ -363,7 +358,7 @@ with such.A("LSP server") as it:
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
             meth = mock.MagicMock()
             with mock.patch.object(it.server.workspace,
@@ -380,12 +375,6 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
+                it.assertItemsEqual(diagnostics, [])
 
 it.createTests(globals())

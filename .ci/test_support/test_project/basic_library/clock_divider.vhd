@@ -36,7 +36,7 @@ begin
         port map (
             reset     => reset,
             clk_input => clk_input,
-            clk_en    => clk_enable_unused);
+            clk_en    => open);
 
     -- We read 'reset' signal asynchronously inside the process to force
     -- msim issuing a synthesis warning
