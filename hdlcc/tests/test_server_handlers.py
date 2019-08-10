@@ -33,7 +33,7 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.utils import disableVunit
+from hdlcc.tests.utils import disableVunit, setupTestSuport
 from hdlcc.utils import getCachePath, removeDirIfExists
 
 try:  # Python 3.x
@@ -42,9 +42,9 @@ except ImportError:  # Python 2.x
     import mock
 
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, 'test_project'))
 
-VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
 SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'INFO')
 
 _logger = logging.getLogger(__name__)
@@ -57,12 +57,15 @@ with such.A("hdlcc bottle app") as it:
 
     @it.has_setup
     def setup():
+        setupTestSuport(TEST_TEMP_PATH)
+
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
         _logger.info("Builder name: %s", it.BUILDER_NAME)
         _logger.info("Builder path: %s", it.BUILDER_PATH)
+
         if it.BUILDER_NAME:
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
+            it.PROJECT_FILE = p.join(TEST_PROJECT, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
 
@@ -75,11 +78,11 @@ with such.A("hdlcc bottle app") as it:
 
     @it.has_teardown
     def teardown():
-        build_folder = p.join(VIM_HDL_EXAMPLES, '.build')
+        build_folder = p.join(TEST_PROJECT, '.build')
         if p.exists(build_folder):
             shutil.rmtree(build_folder)
 
-        cache = p.join(VIM_HDL_EXAMPLES, '.hdlcc')
+        cache = p.join(TEST_PROJECT, '.hdlcc')
         if p.exists(cache):
             shutil.rmtree(cache)
 
@@ -177,7 +180,7 @@ with such.A("hdlcc bottle app") as it:
             data = {
                 'project_file' : it.PROJECT_FILE,
                 'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+                    TEST_PROJECT, 'another_library', 'foo.vhd')}
 
             ui_reply = it.app.post('/get_ui_messages', data)
             reply = it.app.post('/get_messages_by_path', data)
@@ -207,7 +210,7 @@ with such.A("hdlcc bottle app") as it:
             it.app.post('/rebuild_project', data)
             data = {
                 'project_file' : it.PROJECT_FILE,
-                'path'         : p.join(VIM_HDL_EXAMPLES, 'basic_library',
+                'path'         : p.join(TEST_PROJECT, 'basic_library',
                                         'clock_divider.vhd')}
 
         def step_05_check_messages_are_the_same(msgs):
@@ -264,7 +267,7 @@ with such.A("hdlcc bottle app") as it:
             data = {
                 'project_file' : it.PROJECT_FILE,
                 'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+                    TEST_PROJECT, 'another_library', 'foo.vhd')}
             _logger.info("Waiting for any previous process to finish")
 
             ui_reply = it.app.post('/get_ui_messages', data)
@@ -278,7 +281,7 @@ with such.A("hdlcc bottle app") as it:
             data = {
                 'project_file' : it.PROJECT_FILE,
                 'path'         : p.join(
-                    VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')}
+                    TEST_PROJECT, 'basic_library', 'clock_divider.vhd')}
 
         def step_03_check_messages_are_the_same(msgs):
             step_03_msgs = step_01_check_file_builds_ok()
@@ -332,7 +335,7 @@ with such.A("hdlcc bottle app") as it:
             _logger.info("Test requires a builder, except fallback")
             return
 
-        test_file = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+        test_file = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
 
         def build_without_buffer_visit():
@@ -362,7 +365,7 @@ with such.A("hdlcc bottle app") as it:
         data = {
             'project_file' : it.PROJECT_FILE,
             'path'         : p.join(
-                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd'),
+                TEST_PROJECT, 'another_library', 'foo.vhd'),
             'content'      : '-- TODO: Nothing to see here'}
 
         ui_reply = it.app.post('/get_ui_messages', data)
@@ -389,7 +392,7 @@ with such.A("hdlcc bottle app") as it:
         data = {
             'project_file' : it.PROJECT_FILE,
             'path'         : p.join(
-                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+                TEST_PROJECT, 'another_library', 'foo.vhd')}
 
         for _ in range(10):
             ui_reply = it.app.post('/get_ui_messages', data)
@@ -406,14 +409,14 @@ with such.A("hdlcc bottle app") as it:
             ["ieee.std_logic_1164",
              "ieee.numeric_std",
              "basic_library.clock_divider"],
-            [x for x in dependencies])
+            dependencies)
 
     @it.should("get source build sequence")
     def test():
         data = {
             'project_file' : it.PROJECT_FILE,
             'path'         : p.join(
-                VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')}
+                TEST_PROJECT, 'another_library', 'foo.vhd')}
 
         reply = it.app.post('/get_build_sequence', data)
 
@@ -423,9 +426,9 @@ with such.A("hdlcc bottle app") as it:
 
         if it.BUILDER_NAME:
             it.assertEquals(
-                [p.join(VIM_HDL_EXAMPLES, 'basic_library', 'very_common_pkg.vhd'),
-                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'package_with_constants.vhd'),
-                 p.join(VIM_HDL_EXAMPLES, 'basic_library', 'clock_divider.vhd')],
+                [p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')],
                 sequence)
         else:
             it.assertEquals([], sequence, "%s error" % it.BUILDER_NAME)
