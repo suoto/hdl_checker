@@ -183,27 +183,6 @@ def handlePathPlease(*args):
     return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 
-#  def getDefaultCachePath(project_file): # pragma: no cover
-#      """
-#      Gets the default path of hdlcc cache.
-#      Intended for testing only.
-#      """
-#      return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
-
-
-def cleanProjectCache(project_file): # pragma: no cover
-    """
-    Removes the default hdlcc cache folder.
-    Intended for testing only.
-    """
-    if project_file is None:
-        _logger.debug("Can't clean None")
-    else:
-        cache_folder = getDefaultCachePath(project_file)
-        if p.exists(cache_folder):
-            shutil.rmtree(cache_folder)
-
-
 def assertCountEqual(it):  # pylint: disable=invalid-name
 
     assert six.PY2, "Only needed on Python2"
@@ -290,3 +269,15 @@ def removeCacheData():
     if p.exists(cache_path):
         shutil.rmtree(cache_path)
         _logger.info("Removed %s", cache_path)
+
+def setupTestSuport(path):
+    """Copy contents of .ci/test_support_path/ to the given path"""
+
+    test_support_path = os.environ['CI_TEST_SUPPORT_PATH']
+
+    # Create the parent directory
+    if not p.exists(p.dirname(path)):
+        _logger.info("Creating %s", p.dirname(path))
+        os.makedirs(p.dirname(path))
+
+    shutil.copytree(test_support_path, path)

@@ -28,13 +28,14 @@ from multiprocessing import Process, Queue
 from threading import Thread
 
 import mock
+import six
 from nose2.tools import such
 from pyls import uris
-from pyls.python_ls import start_io_lang_server
+from pyls.python_ls import PythonLanguageServer, start_io_lang_server
+import requests
 
 import hdlcc
 import hdlcc.lsp
-import requests
 from hdlcc.tests.utils import disableVunit, removeCacheData
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
@@ -80,8 +81,6 @@ class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-f
         # Server to client pipe
         scr, scw = os.pipe()
 
-        removeCacheData()
-
         self.server_thread = Thread(target=start_io_lang_server,
                                     args=(os.fdopen(csr, 'rb'),
                                           os.fdopen(scw, 'wb'),
@@ -91,9 +90,11 @@ class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-f
         self.server_thread.daemon = True
         self.server_thread.start()
 
-        self.client = hdlcc.lsp.HdlccLanguageServer(os.fdopen(scr, 'rb'),
-                                                    os.fdopen(csw, 'wb'),
-                                                    start_io_lang_server)
+        # Object being tested is the server thread. Avoid both objects
+        # competing for the same cache by using the raw Python language server
+        self.client = PythonLanguageServer(os.fdopen(scr, 'rb'),
+                                           os.fdopen(csw, 'wb'),
+                                           start_io_lang_server)
 
         self.client_thread = Thread(target=_startClient, args=[self.client])
         self.client_thread.daemon = True
@@ -269,6 +270,12 @@ with such.A("hdlcc server") as it:
                     with it.assertRaises(AssertionError):
                         hdlcc.server.run(args)
 
+            assertion_msg = "\'Expected fail to trigger the test\'"
+
+            # Don't know why Python 2 adds an extra comma to the msg
+            if six.PY2:
+                assertion_msg += ","
+
             # Build up the expected response
             body = json.dumps({
                 "method": "window/showMessage",
@@ -276,7 +283,7 @@ with such.A("hdlcc server") as it:
                 "params": {
                     "message":
                         "Unable to start HDLCC LSP server: "
-                        "\'AssertionError(\'Expected fail to trigger the test\')\'! "
+                        "\'AssertionError(" + assertion_msg + ")\'! "
                         "Check " + p.abspath(args.stderr) + " for more info",
                     "type": 1}})
 
