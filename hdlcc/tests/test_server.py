@@ -32,11 +32,10 @@ from nose2.tools import such
 from pyls import uris
 from pyls.python_ls import start_io_lang_server
 
-import requests
-
 import hdlcc
 import hdlcc.lsp
-from hdlcc.tests.utils import disableVunit
+import requests
+from hdlcc.tests.utils import disableVunit, removeCacheData
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 such.unittest.TestCase.maxDiff = None
@@ -80,6 +79,8 @@ class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-f
         csr, csw = os.pipe()
         # Server to client pipe
         scr, scw = os.pipe()
+
+        removeCacheData()
 
         self.server_thread = Thread(target=start_io_lang_server,
                                     args=(os.fdopen(csr, 'rb'),
@@ -275,7 +276,7 @@ with such.A("hdlcc server") as it:
                 "params": {
                     "message":
                         "Unable to start HDLCC LSP server: "
-                        "\'AssertionError(\'Expected fail to trigger the test\',)\'! "
+                        "\'AssertionError(\'Expected fail to trigger the test\')\'! "
                         "Check " + p.abspath(args.stderr) + " for more info",
                     "type": 1}})
 

@@ -239,11 +239,7 @@ def main():
     logging.root.addHandler(file_handler)
     logging.root.setLevel(args.log_level)
 
-    print("Environment info:")
-    print(" - CI:       %s" % _CI)
-    print(" - APPVEYOR: %s" % _APPVEYOR)
-    print(" - TRAVIS:   %s" % _TRAVIS)
-    print(" - LOG:      %s" % args.log_file)
+    print(" - Log file: " + args.log_file)
 
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()

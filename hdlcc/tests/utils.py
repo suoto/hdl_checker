@@ -176,13 +176,6 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
 disableVunit = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
 
 
-def deleteFileOrDir(path):
-    if p.isdir(path):
-        shutil.rmtree(path)
-    else:
-        os.remove(path)
-
-
 def handlePathPlease(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
@@ -190,12 +183,12 @@ def handlePathPlease(*args):
     return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 
-def getDefaultCachePath(project_file): # pragma: no cover
-    """
-    Gets the default path of hdlcc cache.
-    Intended for testing only.
-    """
-    return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
+#  def getDefaultCachePath(project_file): # pragma: no cover
+#      """
+#      Gets the default path of hdlcc cache.
+#      Intended for testing only.
+#      """
+#      return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
 
 
 def cleanProjectCache(project_file): # pragma: no cover
@@ -278,7 +271,8 @@ def writeListToFile(filename, _list): # pragma: no cover
 TEST_ENVS = {
     'ghdl': os.environ['GHDL_PATH'],
     'msim': os.environ['MODELSIM_PATH'],
-    'xvhdl': os.environ['XSIM_PATH']}
+    'xvhdl': os.environ['XSIM_PATH'],
+    'fallback': None}
 
 
 def parametrizeClassWithBuilders(cls):

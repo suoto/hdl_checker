@@ -100,7 +100,10 @@ class TestBuilder(unittest2.TestCase):
         self.builder._createLibrary('ieee')
 
     def test_finds_builtin_libraries(self):
-        expected = ['ieee', 'std']
+        expected = []
+
+        if self.builder_name != 'fallback':
+            expected += ['ieee', 'std']
 
         if self.builder_name == "msim":
             expected += ['modelsim_lib']
@@ -324,16 +327,19 @@ class TestBuilder(unittest2.TestCase):
                     error_code='VRFC 10-2989',
                     severity=DiagType.ERROR)]
 
-        self.assertEqual(len(records), 1)
-        record = records.pop()
-        assertSameFile(self)(record.filename, source.filename)
+        if self.builder_name != 'fallback':
+            self.assertEqual(len(records), 1)
+            record = records.pop()
+            assertSameFile(self)(record.filename, source.filename)
 
-        # By this time the path to the file is the same, so we'll force the
-        # expected record's filename to use the __eq__ operator
-        for expected_diag in expected:
-            expected_diag.filename = source.filename
+            # By this time the path to the file is the same, so we'll force the
+            # expected record's filename to use the __eq__ operator
+            for expected_diag in expected:
+                expected_diag.filename = source.filename
 
-        self.assertIn(record, expected)
+            self.assertIn(record, expected)
+        else:
+            self.assertEqual(records, set())
 
         self.assertEqual(rebuilds, [])
 

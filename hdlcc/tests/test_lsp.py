@@ -26,9 +26,8 @@ import logging
 import os
 import os.path as p
 import sys
-import threading
 import time
-from threading import Timer
+from threading import Event, Timer
 
 import mock
 import pyls.lsp as defines
@@ -126,7 +125,7 @@ with such.A("LSP server") as it:
         it.assertEqual(server.m_initialized(), None)
 
     def _waitOnMockCall(meth):
-        event = threading.Event()
+        event = Event()
 
         timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
         timer.start()

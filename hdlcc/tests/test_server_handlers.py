@@ -25,7 +25,6 @@ import logging
 import os
 import os.path as p
 import shutil
-from glob import glob
 
 import six
 from nose2.tools import such
@@ -34,7 +33,8 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.utils import deleteFileOrDir, disableVunit
+from hdlcc.tests.utils import disableVunit
+from hdlcc.utils import getCachePath, removeDirIfExists
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -185,15 +185,11 @@ with such.A("hdlcc bottle app") as it:
             return reply.json['messages'] + ui_reply.json['ui_messages']
 
         def step_02_erase_target_folder_contents():
-            target_folder = p.join(VIM_HDL_EXAMPLES, '.build')
+            target_folder = getCachePath()
             it.assertTrue(
                 p.exists(target_folder),
                 "Target folder '%s' doesn't exists" % target_folder)
-            for path in glob(p.join(target_folder, '*')):
-                deleteFileOrDir(path)
-
-            it.assertEqual([], glob(p.join(target_folder, '*')),
-                           "Target folder '%s' still exists!" % target_folder)
+            removeDirIfExists(target_folder)
 
         def step_03_check_build_fails():
             step_03_msgs = step_01_check_file_builds_ok()
