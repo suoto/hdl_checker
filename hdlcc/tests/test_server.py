@@ -44,7 +44,7 @@ such.unittest.TestCase.maxDiff = None
 _logger = logging.getLogger(__name__)
 
 TEST_LOG_PATH = p.join(os.environ['TOX_ENV_DIR'], 'log')
-TEST_TMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
@@ -239,7 +239,7 @@ with such.A("hdlcc server") as it:
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
                 'initialize',
-                {'rootPath': uris.from_fs_path(TEST_TMP_PATH),
+                {'rootPath': uris.from_fs_path(TEST_TEMP_PATH),
                  'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)

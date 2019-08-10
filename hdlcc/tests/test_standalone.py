@@ -18,15 +18,17 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
 import os
 import os.path as p
-import logging
 import re
-import subprocess as subp
 import shutil
+import subprocess as subp
 
 from nose2.tools import such
 from nose2.tools.params import params
+
+from hdlcc.tests.utils import setupTestSuport
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -38,8 +40,8 @@ _logger = logging.getLogger(__name__)
 HDLCC_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 HDLCC_STANDALONE = p.join(HDLCC_PATH, "hdlcc", "standalone.py")
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
+TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, "test_project"))
 
 def shell(cmd):
     """
@@ -74,10 +76,12 @@ def shell(cmd):
 with such.A("hdlcc standalone tool") as it:
     @it.has_setup
     def setup():
+        setupTestSuport(TEST_TEMP_PATH)
+
         it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
         it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
         if it.BUILDER_NAME in ('ghdl', 'msim', 'xvhdl'):
-            it.PROJECT_FILE = p.join(VIM_HDL_EXAMPLES, it.BUILDER_NAME + '.prj')
+            it.PROJECT_FILE = p.join(TEST_PROJECT, it.BUILDER_NAME + '.prj')
         else:
             it.PROJECT_FILE = None
 
@@ -105,8 +109,8 @@ with such.A("hdlcc standalone tool") as it:
             if p.exists(p.join(p.dirname(it.PROJECT_FILE), '.build')):
                 shutil.rmtree(p.join(p.dirname(it.PROJECT_FILE), '.build'))
 
-        if p.exists(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build')):
-            shutil.rmtree(p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build'))
+        if p.exists(p.join(TEST_TEMP_PATH, 'test_project', '.build')):
+            shutil.rmtree(p.join(TEST_TEMP_PATH, 'test_project', '.build'))
 
         it.patch.stop()
 
@@ -114,6 +118,7 @@ with such.A("hdlcc standalone tool") as it:
 
         @it.has_setup
         def setup():
+            setupTestSuport(TEST_TEMP_PATH)
             cleanUp()
 
         @it.has_teardown
@@ -122,7 +127,7 @@ with such.A("hdlcc standalone tool") as it:
 
         def cleanUp():
             # Ensure there is no leftover files from previous runs
-            path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', '.build')
+            path = p.join(TEST_TEMP_PATH, 'test_project', '.build')
             if p.exists(path):
                 shutil.rmtree(path)
 
@@ -140,20 +145,16 @@ with such.A("hdlcc standalone tool") as it:
                 ('--debug-print-sources', ),
 
                 ('-vvv', '-s',
-                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
-                        'another_library', 'foo.vhd')),
+                 p.join(TEST_TEMP_PATH, 'test_project', 'another_library', 'foo.vhd')),
 
                 ('--debug-parse-source-file', '-s',
-                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
-                        'another_library', 'foo.vhd')),
+                 p.join(TEST_TEMP_PATH, 'test_project', 'another_library', 'foo.vhd')),
 
                 ('--debug-parse-source-file', '-s',
-                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples', 'basic_library',
-                        'clk_en_generator.vhd')),
+                 p.join(TEST_TEMP_PATH, 'test_project', 'basic_library', 'clk_en_generator.vhd')),
 
                 ('--debug-run-static-check', '-s',
-                 p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples',
-                        'another_library', 'foo.vhd')),
+                 p.join(TEST_TEMP_PATH, 'test_project', 'another_library', 'foo.vhd')),
                 )
 
             def test(case, *args):
