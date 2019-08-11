@@ -33,15 +33,16 @@ import hdlcc
 import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import (assertCountEqual, handlePathPlease,
+from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
+                               handlePathPlease, setupTestSuport,
                                writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = getTestTempPath(__name__)
+TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
-TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
-    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
+TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, 'test_config_parser')
 
 such.unittest.TestCase.maxDiff = None
 
@@ -51,6 +52,10 @@ with such.A('config parser object') as it:
         # Can't use assertCountEqual for lists of unhashable types.
         # Workaround for https://bugs.python.org/issue10242
         it.assertCountEqual = assertCountEqual(it)
+
+    @it.has_setup
+    def setup():
+        setupTestSuport(TEST_TEMP_PATH)
 
     @it.has_teardown
     def teardown():
@@ -298,21 +303,21 @@ with such.A('config parser object') as it:
         #      it.assertEqual(it.parser.getTargetDir(), '.fallback')
 
         @it.should("return empty single build flags for any path")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=False), [])
 
         @it.should("return empty batch build flags for any path")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=True), [])
 
         @it.should("say every path is on the project file")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
             _logger.info("Running %s", case)
@@ -417,14 +422,13 @@ with such.A('config parser object') as it:
             return result
 
         @it.has_setup
-        #  @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def setup():
             it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
                                      lambda: False)
             it.no_vunit.start()
 
             it.project_filename = 'test.prj'
-            it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
+            it.lib_path = p.join(TEST_PROJECT)
             it.sources = [
                 ('work', p.join('another_library', 'foo.vhd')),
                 ('work', p.join('basic_library', 'clock_divider.vhd'))]
@@ -583,4 +587,3 @@ with such.A('config parser object') as it:
             it.assertEquals(parser.getBuilder(), 'fallback')
 
 it.createTests(globals())
-

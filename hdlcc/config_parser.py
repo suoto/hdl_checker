@@ -110,7 +110,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         self._sources = {}
         self._timestamp = 0
-        self._is_parsing = RLock()
+        self._parse_lock = RLock()
 
     def __eq__(self, other): # pragma: no cover
         if not isinstance(other, type(self)):
@@ -245,7 +245,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         sources = state.pop('_sources')
         obj.filename = state.pop('filename', None)
         obj._timestamp = state.pop('_timestamp')
-        obj._is_parsing = RLock()
+        obj._parse_lock = RLock()
 
         obj._parms = state['_parms']
         obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
@@ -272,11 +272,18 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         """
         self._timestamp = p.getmtime(self.filename)
 
+    def isParsing(self):
+        "Checks if parsing is ongoing in another thread"
+        locked = not self._parse_lock.acquire(False)
+        if not locked:
+            self._parse_lock.release()
+        return locked
+
     def _parseIfNeeded(self):
         """
         Locks accesses to parsed attributes and parses the configuration file
         """
-        with self._is_parsing:
+        with self._parse_lock:
             if self._shouldParse():
                 self._doParseConfigFile()
                 self._addVunitIfFound()

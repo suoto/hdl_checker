@@ -40,14 +40,13 @@ from hdlcc.hdlcc_base import CACHE_NAME
 from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertSameFile,
-                               setupTestSuport, writeListToFile)
+                               getTestTempPath, setupTestSuport,
+                               writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
-TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
+TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
-
-CACHE_BASE_PATH = p.join(TEST_TEMP_PATH, 'cache')
 
 class _SourceMock(SourceMock):
     base_path = TEST_TEMP_PATH
@@ -61,25 +60,8 @@ def patchClassMap(**kwargs):
     return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)
 
 class ConfigParserMock(hdlcc.config_parser.ConfigParser):
-    #  def __init__(self, filename):
-    #      self.filename = filename
-    #      self.sources = {}
-
-    #  def getSourceByPath(self, path):
-    #      return self.sources[path]
-
     def getBuilder(self):
         return 'MockBuilder'
-
-    #  def getBuildFlags(self, path, batch_mode):
-    #      return []
-
-    #  def __jsonEncode__(self):
-    #      return {}
-
-    #  @classmethod
-    #  def __jsonDecode__(cls, state):
-    #      return super(ConfigParserMock, cls).__new__(cls)
 
 such.unittest.TestCase.maxDiff = None
 
@@ -104,22 +86,15 @@ with such.A("hdlcc project") as it:
     @it.has_setup
     def setup():
         _logger.fatal("setup")
-        it.patch_cache = mock.patch('hdlcc.hdlcc_base.getCachePath',
-                                    lambda: CACHE_BASE_PATH)
-
-        it.patch_cache.start()
 
     @it.has_teardown
     def teardown():
         _logger.fatal("teardown")
-        it.patch_cache.stop()
 
     with it.having('non existing project file'):
         @it.has_setup
         def setup():
             it.project_file = 'non_existing_file'
-            if p.exists(CACHE_BASE_PATH):
-                shutil.rmtree(CACHE_BASE_PATH)
             it.assertFalse(p.exists(it.project_file))
 
         @it.should('raise exception when trying to instantiate')
@@ -130,9 +105,6 @@ with such.A("hdlcc project") as it:
     with it.having('no project file at all'):
         @it.has_setup
         def setup():
-            if p.exists(CACHE_BASE_PATH):
-                shutil.rmtree(CACHE_BASE_PATH)
-
             it.project = StandaloneProjectBuilder(project_file=None)
 
         @it.should('use fallback to Fallback builder')
@@ -160,9 +132,6 @@ with such.A("hdlcc project") as it:
         @it.has_setup
         def setup():
             setupTestSuport(TEST_TEMP_PATH)
-
-            if p.exists(CACHE_BASE_PATH):
-                shutil.rmtree(CACHE_BASE_PATH)
 
             it.project_file = tempfile.mktemp(prefix='project_file_', suffix='.prj', dir=TEST_TEMP_PATH)
             open(it.project_file, 'w').close()
@@ -335,7 +304,7 @@ with such.A("hdlcc project") as it:
                 design_units=[{'name' : 'common_dep',
                                'type' : 'package'}])
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src,
                              direct_dep.filename :  direct_dep,
                              indirect_dep.filename :  indirect_dep,
@@ -365,7 +334,7 @@ with such.A("hdlcc project") as it:
                                'type' : 'package'}],
                 dependencies=[])
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src,
                              direct_dep.filename :  direct_dep,
                              not_a_dependency.filename :  not_a_dependency}):
@@ -382,7 +351,7 @@ with such.A("hdlcc project") as it:
                 dependencies=[DependencySpec(library='some_lib',
                                              name='direct_dep')])
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src}):
 
                 it.assertEqual(it.project.getBuildSequence(target_src), [])
@@ -395,7 +364,7 @@ with such.A("hdlcc project") as it:
                                'type' : 'entity'}],
                 dependencies=[])
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src}):
 
                 it.assertEqual(it.project.getBuildSequence(target_src), [])
@@ -417,7 +386,7 @@ with such.A("hdlcc project") as it:
                 dependencies=[DependencySpec(library='some_lib',
                                              name='target')])
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src,
                              direct_dep.filename :  direct_dep}):
 
@@ -454,11 +423,11 @@ with such.A("hdlcc project") as it:
             it.project._handleUiWarning = mock.MagicMock(side_effect=messages.append)
 
             #  lambda message: messages += [message]
-            it.project._config._sources = {}
+            it.project.config_parser._sources = {}
             for source in (target_src, implementation_a, implementation_b):
-                it.project._config._sources[source.filename] = source
+                it.project.config_parser._sources[source.filename] = source
 
-            with mock.patch(__name__ + '.it.project._config._sources',
+            with mock.patch(__name__ + '.it.project.config_parser._sources',
                             {target_src.filename :  target_src,
                              implementation_a.filename :  implementation_a,
                              implementation_b.filename :  implementation_b}):
@@ -524,7 +493,7 @@ with such.A("hdlcc project") as it:
                     "_logger": "hdlcc.builders.msim_mock",
                     "_target_folder": "/home/souto/dev/vim-hdl/dependencies/hdlcc/.hdlcc",
                     "_build_info_cache": {}},
-                "_config": {
+                "config_parser": {
                     "_parms": {
                         "target_dir": "/home/souto/dev/vim-hdl/dependencies/hdlcc/.hdlcc",
                         "builder": "msim_mock",
@@ -616,8 +585,8 @@ with such.A("hdlcc project") as it:
         #          #  it.patch.__exit__(None, None, None)
         #          #  it.patch.stop()
 
-        #          if p.exists(it.project._config.getTargetDir()):
-        #              shutil.rmtree(it.project._config.getTargetDir())
+        #          if p.exists(it.project.config_parser.getTargetDir()):
+        #              shutil.rmtree(it.project.config_parser.getTargetDir())
         #          del it.project
 
         #      @it.should("get messages by path")

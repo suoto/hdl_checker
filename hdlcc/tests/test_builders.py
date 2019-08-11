@@ -26,17 +26,23 @@ import mock
 import parameterized
 import unittest2
 
-from hdlcc.builders import getBuilderByName
+from hdlcc.builders import AVAILABLE_BUILDERS, GHDL, XVHDL, Fallback, MSim
 from hdlcc.diagnostics import BuilderDiag, DiagType
+from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers import VhdlParser
-from hdlcc.tests.utils import assertSameFile, parametrizeClassWithBuilders
+from hdlcc.tests.utils import (assertSameFile, getTestTempPath,
+                               parametrizeClassWithBuilders, setupTestSuport)
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = getTestTempPath(__name__)
+SOURCES_PATH = p.join(TEST_TEMP_PATH, 'test_builders')
 
-SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci',
-                      'test_support', 'test_builders')
+BUILDER_CLASS_MAP = {
+    'msim': MSim,
+    'xvhdl': XVHDL,
+    'ghdl': GHDL,
+    'fallback': Fallback}
 
 @parametrizeClassWithBuilders
 class TestBuilder(unittest2.TestCase):
@@ -47,6 +53,7 @@ class TestBuilder(unittest2.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        setupTestSuport(TEST_TEMP_PATH)
         # Add builder path to the env
         cls.original_env = os.environ.copy()
 
@@ -58,16 +65,16 @@ class TestBuilder(unittest2.TestCase):
                 {'PATH' : os.pathsep.join([cls.builder_path, os.environ['PATH']])})
             cls.patch.start()
 
-        builder_class = getBuilderByName(cls.builder_name)
-        cls.builder = builder_class(p.join(TEST_SUPPORT_PATH,
+        builder_class = BUILDER_CLASS_MAP[cls.builder_name]
+        cls.builder = builder_class(p.join(TEST_TEMP_PATH,
                                            '_%s' % cls.builder_name))
         cls.builder_class = builder_class
 
-        # Copy sources path to tox env
-        cls.sources_path = p.join(TEST_SUPPORT_PATH,
-                                  'test_support_{}'.format(cls.builder_name))
+        #  # Copy sources path to tox env
+        #  cls.sources_path = p.join(TEST_TEMP_PATH,
+        #                            'test_support_{}'.format(cls.builder_name))
 
-        shutil.copytree(SOURCES_PATH, cls.sources_path)
+        #  shutil.copytree(SOURCES_PATH, cls.sources_path)
 
     @classmethod
     def tearDownClass(cls):
@@ -363,3 +370,16 @@ class TestBuilder(unittest2.TestCase):
         self.assertEqual(
             [{'unit_type': 'package', 'unit_name': 'leon3'}],
             self.builder._searchForRebuilds(line))
+
+class TestSanityError(unittest2.TestCase):
+
+    @parameterized.parameterized.expand(
+        [(x, ) for x in AVAILABLE_BUILDERS])
+    def test_raises_sanity_error(self, builder_class):
+        if builder_class is Fallback:
+            raise self.skipTest("Fallback won't raise any exception")
+
+        _logger.info("Testing builder %s", builder_class.builder_name)
+
+        with self.assertRaises(SanityCheckError):
+            _ = builder_class(p.join(TEST_TEMP_PATH, '_%s' % builder_class.builder_name))

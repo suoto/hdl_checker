@@ -16,12 +16,12 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 'Exceptions raised by hdlcc'
 
-class VimHdlBaseException(Exception):
+class HdlccBaseException(Exception):
     """
     Base class for exceptions raise by hdlcc
     """
 
-class SanityCheckError(VimHdlBaseException):
+class SanityCheckError(HdlccBaseException):
     """
     Exception raised when a builder fails to execute its sanity check
     """
@@ -35,7 +35,7 @@ class SanityCheckError(VimHdlBaseException):
         return "Failed to create builder '%s' with message '%s'" % \
                 (self.builder, self._msg)
 
-class UnknownParameterError(VimHdlBaseException):
+class UnknownParameterError(HdlccBaseException):
     """
     Exception raised when an unknown parameter is found in a
     configuration file

@@ -270,19 +270,33 @@ def removeCacheData():
         shutil.rmtree(cache_path)
         _logger.info("Removed %s", cache_path)
 
+def getTestTempPath(name):
+    name = name.replace('.', '_')
+    path = p.join(os.environ['TOX_ENV_DIR'], 'tmp', name)
+    if not p.exists(path):
+        os.makedirs(path)
+    return path
+
 def setupTestSuport(path):
     """Copy contents of .ci/test_support_path/ to the given path"""
     _logger.info("Setting up test support at %s", path)
 
     test_support_path = os.environ['CI_TEST_SUPPORT_PATH']
 
-    if p.exists(path):
-        _logger.info("Path %s already existed, removing it first", path)
-        shutil.rmtree(path)
+    paths_to_copy = os.listdir(test_support_path)
 
     # Create the parent directory
     if not p.exists(p.dirname(path)):
         _logger.info("Creating %s", p.dirname(path))
         os.makedirs(p.dirname(path))
 
-    shutil.copytree(test_support_path, path)
+    for path_to_copy in paths_to_copy:
+        src = p.join(test_support_path, path_to_copy)
+        dest = p.join(path, path_to_copy)
+
+        if p.exists(dest):
+            _logger.info("Destination path %s already exists, removing it", dest)
+            shutil.rmtree(dest)
+
+        _logger.info("Copying %s to %s", src, dest)
+        shutil.copytree(src, dest)

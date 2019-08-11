@@ -57,7 +57,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self.project_file = project_file
 
-        self._config = ConfigParser(self.project_file)
+        self.config_parser = ConfigParser(self.project_file)
         self.builder = None
 
         self._recoverCacheIfPossible()
@@ -84,7 +84,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         state = {'_logger': {'name': self._logger.name,
                              'level': self._logger.level},
                  'builder': self.builder,
-                 '_config': self._config}
+                 'config_parser': self.config_parser}
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
@@ -128,7 +128,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # If the builder is still undefined we failed to recover
             # from cache
             if self.builder is None:
-                builder_name = self._config.getBuilder()
+                builder_name = self.config_parser.getBuilder()
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
 
                 cache_dir = self._getCacheDirectory()
@@ -155,9 +155,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         removeIfExists(self._getCacheFilename())
         removeDirIfExists(self._getCacheDirectory())
 
-        del self._config
+        del self.config_parser
         del self.builder
-        self._config = ConfigParser(self.project_file)
+        self.config_parser = ConfigParser(self.project_file)
         self.builder = None
 
     def _setState(self, state):
@@ -168,9 +168,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._logger.setLevel(state['_logger']['level'])
         del state['_logger']
 
-        self._config = state['_config']
+        self.config_parser = state['config_parser']
 
-        builder_name = self._config.getBuilder()
+        builder_name = self.config_parser.getBuilder()
         self._logger.debug("Recovered builder is '%s'", builder_name)
         #  builder_class = hdlcc.builders.getBuilderByName(builder_name)
         #  self.builder = builder_class.recoverFromState(state['builder'])
@@ -205,7 +205,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         remarks = []
 
         try:
-            source = self._config.getSourceByPath(path)
+            source = self.config_parser.getSourceByPath(path)
         except KeyError:
             pass
 
@@ -322,7 +322,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # text. Since Verilog is case sensitive and VHDL is not, we need to
             # make sure we've got it right when mapping dependencies on mixed
             # language projects
-            dependencies_list = self._config.discoverSourceDependencies(
+            dependencies_list = self.config_parser.discoverSourceDependencies(
                 dependency.name, dependency.library, case_sensitive=source.filetype != 'vhdl')
 
             if not dependencies_list:
@@ -361,7 +361,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         dependencies first
         """
         try:
-            flags = self._config.getBuildFlags(source.filename, batch_mode)
+            flags = self.config_parser.getBuildFlags(source.filename, batch_mode)
         except KeyError:
             flags = []
 
@@ -375,8 +375,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         records = set()
         for _source in build_sequence:
-            _flags = self._config.getBuildFlags(_source.filename,
-                                                batch_mode=False)
+            _flags = self.config_parser.getBuildFlags(_source.filename,
+                                                      batch_mode=False)
 
             dep_records = self._buildAndHandleRebuilds(_source, forced=False,
                                                        flags=_flags)
@@ -429,12 +429,12 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 unit_type = rebuild.get('unit_type', None)
 
                 if library_name is not None:
-                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                    rebuild_sources = self.config_parser.findSourcesByDesignUnit(
                         unit_name, library_name)
                 elif unit_type is not None:
                     library = source.getMatchingLibrary(
                         unit_type, unit_name)
-                    rebuild_sources = self._config.findSourcesByDesignUnit(
+                    rebuild_sources = self.config_parser.findSourcesByDesignUnit(
                         unit_name, library)
                 else:  # pragma: no cover
                     assert False, ', '.join([x.filename for x in rebuild_sources])
@@ -448,7 +448,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Checks if all preconditions for calling the builder have been
         met
         """
-        if self._config.filename is None:
+        if self.config_parser.filename is None:
             return False
         return True
 
@@ -530,7 +530,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Returns a list of VhdlSourceFile objects parsed
         """
         self._setupEnvIfNeeded()
-        return self._config.getSources()
+        return self.config_parser.getSources()
 
     def onBufferVisit(self, path):
         """
@@ -541,8 +541,3 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._setupEnvIfNeeded()
         source, _ = self.getSourceByPath(path)
         self.updateBuildSequenceCache(source)
-
-    def onBufferLeave(self, _):
-        """
-        Runs actions when leaving a buffer.
-        """

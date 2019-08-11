@@ -30,13 +30,19 @@ from threading import Event, Timer
 
 import mock
 import parameterized
+import pyls
 import unittest2
 from nose2.tools import such
-import pyls
 from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
+
+import hdlcc.lsp as lsp
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.tests.utils import getTestTempPath, setupTestSuport
+from hdlcc.utils import onWindows
+
 
 # Debouncing will hurt testing since it won't actually call the debounced
 # function if we call it too quickly.
@@ -50,10 +56,6 @@ def _debounce(interval_s, keyed_by=None):
 # Mock debounce before it's applied
 pyls._utils.debounce = _debounce
 
-import hdlcc.lsp as lsp
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.tests.utils import setupTestSuport
-from hdlcc.utils import onWindows
 
 _logger = logging.getLogger(__name__)
 
@@ -66,8 +68,8 @@ LSP_MSG_EMPTY_RESPONSE = {'jsonrpc': JSONRPC_VERSION, 'id': 1, 'result': None}
 
 MOCK_WAIT_TIMEOUT = 5
 
-TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp', __name__)
-TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, 'test_project'))
+TEST_TEMP_PATH = getTestTempPath(__name__)
+TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
 if onWindows():
     TEST_PROJECT = TEST_PROJECT.lower()

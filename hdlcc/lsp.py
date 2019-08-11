@@ -40,10 +40,6 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 DEFAULT_PROJECT_FILENAME = 'vimhdl.prj'
 PY2 = sys.version_info[0] == 2
 
-if PY2:
-    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
-
-
 def _logCalls(func):  # pragma: no cover
     "Decorator to Log calls to func"
     import pprint
@@ -127,7 +123,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         if p.exists(self._getCacheFilename()):
             return False
 
-        return self._config.getBuilder() != 'fallback'
+        return self.config_parser.getBuilder() != 'fallback'
 
     def _setupEnvIfNeeded(self):
         # On LSP, user can't force a fresh rebuild, we'll force a full clean if
@@ -208,7 +204,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         try:
             self._checker = HdlCodeCheckerServer(self.workspace, path)
-        except (FileNotFoundError, OSError) as exc:
+        except (IOError, OSError) as exc:
             _logger.info("Failed to create checker, reverting to fallback")
             self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)

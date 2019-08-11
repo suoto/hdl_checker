@@ -28,24 +28,26 @@ from multiprocessing import Process, Queue
 from threading import Thread
 
 import mock
+import requests
 import six
 from nose2.tools import such
 from pyls import uris
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server
-import requests
 
 import hdlcc
 import hdlcc.lsp
-from hdlcc.tests.utils import disableVunit, removeCacheData
+from hdlcc.tests.utils import (disableVunit, getTestTempPath, removeCacheData,
+                               setupTestSuport)
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 such.unittest.TestCase.maxDiff = None
 
 _logger = logging.getLogger(__name__)
 
+TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_LOG_PATH = p.join(os.environ['TOX_ENV_DIR'], 'log')
-TEST_TEMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
+
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 JSONRPC_VERSION = '2.0'
