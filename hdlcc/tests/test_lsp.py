@@ -38,11 +38,6 @@ from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
 
-import hdlcc.lsp as lsp
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.tests.utils import getTestTempPath, setupTestSuport
-from hdlcc.utils import onWindows
-
 
 # Debouncing will hurt testing since it won't actually call the debounced
 # function if we call it too quickly.
@@ -56,6 +51,10 @@ def _debounce(interval_s, keyed_by=None):
 # Mock debounce before it's applied
 pyls._utils.debounce = _debounce
 
+import hdlcc.lsp as lsp  # isort:skip
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
+from hdlcc.tests.utils import getTestTempPath, setupTestSuport  # isort:skip
+from hdlcc.utils import onWindows  # isort:skip
 
 _logger = logging.getLogger(__name__)
 
