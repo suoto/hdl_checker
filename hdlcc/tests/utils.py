@@ -176,7 +176,7 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
 disableVunit = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
 
 
-def handlePathPlease(*args):
+def sanitizePath(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
     """

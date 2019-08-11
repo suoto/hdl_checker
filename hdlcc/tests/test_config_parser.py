@@ -34,7 +34,7 @@ import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
-                               handlePathPlease, setupTestSuport,
+                               sanitizePath, setupTestSuport,
                                writeListToFile)
 
 _logger = logging.getLogger(__name__)
@@ -415,11 +415,11 @@ with such.A('config parser object') as it:
                                      lambda: False)
             it.no_vunit.start()
 
-            it.project_filename = 'test.prj'
+            it.project_filename = p.join(TEST_TEMP_PATH, 'test.prj')
             it.lib_path = p.join(TEST_PROJECT)
             it.sources = [
-                ('work', p.join('another_library', 'foo.vhd')),
-                ('work', p.join('basic_library', 'clock_divider.vhd'))]
+                ('work', p.join(TEST_TEMP_PATH, 'another_library', 'foo.vhd')),
+                ('work', p.join(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'))]
 
             writeListToFile(
                 it.project_filename,
@@ -443,8 +443,8 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_pre.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
 
             _logger.info("Adding the extra source...")
 
@@ -458,9 +458,9 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
             # Check the files originally found weren't re-created
             for path, source in sources_pre.items():
@@ -470,27 +470,27 @@ with such.A('config parser object') as it:
         def test_02():
             sources_pre = getSourcesFrom(
                 it.sources +
-                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
+                [('work', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
 
             sources_post = getSourcesFrom(
                 it.sources +
-                [('foo_lib', p.join('basic_library', 'very_common_pkg.vhd'))])
+                [('foo_lib', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
-            added_path = handlePathPlease('basic_library', 'very_common_pkg.vhd')
+            added_path = sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')
 
             added_source = sources_post[added_path]
 
             # Check that the sources that have been previously added are
             # the same
             for path in [
-                    handlePathPlease('another_library', 'foo.vhd'),
-                    handlePathPlease('basic_library', 'clock_divider.vhd')]:
+                    sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                    sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')]:
                 it.assertEqual(sources_pre[path], sources_post[path])
 
             _logger.warning("added path: %s", added_path)
@@ -512,16 +512,16 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_pre.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
             sources_post = getSourcesFrom()
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
 
     with it.having("no builder configured on the project file"):
         @it.has_setup
