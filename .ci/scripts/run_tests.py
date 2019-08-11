@@ -115,7 +115,7 @@ def _parseArguments():
 def _getNoseCommandLineArgs(args):
     argv = []
     if args.verbose:
-        argv += ['--verbose']
+        argv += ['--verbose', '--verbose', ] # wtf?
     if args.debugger:
         argv += ['--debugger']
     if args.fail_fast:
