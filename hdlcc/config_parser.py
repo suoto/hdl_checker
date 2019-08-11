@@ -25,6 +25,7 @@ from threading import RLock
 import hdlcc.exceptions
 from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
 from hdlcc.parsers import getSourceFileObjects
+from hdlcc.utils import getFileType
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -67,7 +68,9 @@ _VUNIT_FLAGS = {
     'ghdl' : {
         '93'   : ['--std=93c'],
         '2002' : ['--std=02'],
-        '2008' : ['--std=08']}
+        '2008' : ['--std=08']},
+    'xvhdl' : {'93' : [], '2002' : [], '2008' : []},
+    'fallback' : {'93' : [], '2002' : [], '2008' : []},
     }
 
 class ConfigParser(object):  # pylint: disable=useless-object-inheritance
@@ -172,19 +175,11 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         # Communication library and array utility library are only
         # available on VHDL 2008
         if vunit_project.vhdl_standard == '2008':
-            for func in (vunit_project.add_com,
-                         vunit_project.add_array_util):
-                try:
-                    func()
-                except: # pragma: no cover pylint:disable=bare-except
-                    self._logger.exception("Error running '%s'", str(func))
-                    raise
+            vunit_project.add_com()
+            vunit_project.add_array_util()
 
         # Get extra flags for building VUnit sources
-        if self.getBuilder() in _VUNIT_FLAGS:
-            vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
-        else:
-            vunit_flags = []
+        vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
 
         _source_file_args = []
         for vunit_source_obj in vunit_project.get_compile_order():
@@ -399,12 +394,13 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         source_path_list = []
         source_build_list = []
 
-        for match in [x.groupdict() for x in _configFileScan(line)]:
+        for match in _configFileScan(line):
+            match = match.groupdict()
             self._logger.debug("match: '%s'", match)
             if match['parameter'] is not None:
                 self._handleParsedParameter(match['parameter'],
                                             match['parm_lang'], match['value'])
-            elif match['path']:
+            else:
                 for source_path in self._getSourcePaths(match['path']):
                     source_path_list += [source_path]
                     # Try to get the build info for this source. If we get nothing
@@ -481,38 +477,6 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         self._parseIfNeeded()
         return self._parms['builder']
 
-    @staticmethod
-    def simpleParse(filename):
-        """
-        """
-        target_dir = None
-        builder_name = None
-        for _line in open(filename, mode='rb').readlines():
-            line = _replaceCfgComments("", _line.decode(errors='ignore'))
-            for match in re.finditer(
-                    r"^\s*target_dir\s*=\s*(?P<target_dir>.+)\s*$"
-                    r"|"
-                    r"^\s*builder\s*=\s*(?P<builder>.+)\s*$",
-                    line):
-                match_dict = match.groupdict()
-                if match_dict['target_dir'] is not None:
-                    target_dir = match_dict['target_dir']
-                if match_dict['builder'] is not None:
-                    builder_name = match_dict['builder']
-
-        if target_dir:
-            target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
-        else:
-            target_dir = '.hdlcc'
-
-        if not p.isabs(target_dir):
-            target_dir = p.join(p.dirname(filename), target_dir)
-
-        ConfigParser._logger.info("Simple parse found target_dir = %s and "
-                                  "builder = %s", repr(target_dir),
-                                  repr(builder_name))
-        return target_dir, builder_name
-
     def getBuildFlags(self, path, batch_mode):
         """
         Return a list of flags configured to build a source in batch or
@@ -521,7 +485,8 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         self._parseIfNeeded()
         if self.filename is None:
             return []
-        lang = self.getSourceByPath(path).filetype
+        lang = getFileType(path)
+
         flags = list(self._parms['global_build_flags'][lang])
 
         if batch_mode:

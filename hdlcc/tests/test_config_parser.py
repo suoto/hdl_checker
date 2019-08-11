@@ -108,13 +108,6 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(it.parser.getBuilder(), 'msim')
 
-        #  @it.should("extract target dir")
-        #  def test():
-        #      it.assertTrue(p.isabs(it.parser.getTargetDir()))
-        #      it.assertEqual(
-        #          it.parser.getTargetDir(),
-        #          p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.build')))
-
         @it.should("extract build flags for single build")
         def test():
             it.assertCountEqual(
@@ -134,6 +127,14 @@ with such.A('config parser object') as it:
                                                'sample_testbench.vhd'),
                                         batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
+
+        @it.should("extract common flags for files outisde the project file")
+        def test():
+            it.assertCountEqual(
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'non_existing_file.vhd'),
+                                        batch_mode=False),
+                set(['-s0', '-s1', '-g0', '-g1', ]))
 
         @it.should("extract build flags for batch builds")
         def test():
@@ -207,12 +208,6 @@ with such.A('config parser object') as it:
                                                'bar.sv'),
                                         batch_mode=False),
                 ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
-
-        @it.should("Match the result of ConfigParser.simpleParse")
-        def test():
-            target_dir, builder_name = ConfigParser.simpleParse(it.parser.filename)
-            #  it.assertEqual(it.parser.getTargetDir(), target_dir)
-            it.assertEqual(it.parser.getBuilder(), builder_name)
 
         @it.should("restore from cached state")
         def test():
@@ -298,29 +293,22 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(it.parser.getBuilder(), 'fallback')
 
-        #  @it.should("return .fallback as target directory")
-        #  def test():
-        #      it.assertEqual(it.parser.getTargetDir(), '.fallback')
-
         @it.should("return empty single build flags for any path")
         @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=False), [])
 
         @it.should("return empty batch build flags for any path")
         @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=True), [])
 
         @it.should("say every path is on the project file")
         @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertTrue(it.parser.hasSource(path))
 
     with it.having("not installed VUnit"):

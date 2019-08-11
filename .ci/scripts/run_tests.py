@@ -66,16 +66,6 @@ def _setupLogging(stream, level): # pragma: no cover
     logging.root.addHandler(rainbow_stream_handler)
     logging.root.setLevel(level)
 
-def _uploadAppveyorArtifact(path):
-    "Uploads 'path' to Appveyor artifacts"
-    assert _APPVEYOR, "Appveyor artifacts can only be uploaded to Appveyor"
-    cmd = "appveyor PushArtifact \"%s\"" % path
-    print(cmd)
-    _logger.info(cmd)
-    for line in os.popen(cmd).read().splitlines():
-        print(line)
-        _logger.info(line)
-
 def _parseArguments():
     parser = argparse.ArgumentParser()
 

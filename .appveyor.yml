@@ -56,7 +56,6 @@ environment:
 
     - PYTHON_VERSION: 37
       PYTHON: "C:\\Python37"
-      TOXENV: py37-others-windows
 
 # scripts that run after cloning repository
 install:

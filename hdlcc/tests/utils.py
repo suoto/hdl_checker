@@ -209,7 +209,7 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
             # Add user message at the top
             error_details = [msg, ] + error_details
             error_details += ['', "Lists {} and {} differ".format(first, second)]
-            it.fail('\n'.join(error_details))
+            it.fail('\n'.join([str(x) for x in error_details]))
 
     return wrapper
 
@@ -272,7 +272,7 @@ def removeCacheData():
 
 def getTestTempPath(name):
     name = name.replace('.', '_')
-    path = p.join(os.environ['TOX_ENV_DIR'], 'tmp', name)
+    path = p.abspath(p.join(os.environ['TOX_ENV_DIR'], 'tmp', name))
     if not p.exists(path):
         os.makedirs(path)
     return path
