@@ -247,11 +247,14 @@ def writeListToFile(filename, _list): # pragma: no cover
         time.sleep(0.1)
 
 
-TEST_ENVS = {
-    'ghdl': os.environ['GHDL_PATH'],
-    'msim': os.environ['MODELSIM_PATH'],
-    'xvhdl': os.environ['XSIM_PATH'],
-    'fallback': None}
+if not onWindows():
+    TEST_ENVS = {
+        'ghdl': os.environ['GHDL_PATH'],
+        'msim': os.environ['MODELSIM_PATH'],
+        'xvhdl': os.environ['XSIM_PATH'],
+        'fallback': None}
+else:
+    TEST_ENVS = {'fallback': None}
 
 
 def parametrizeClassWithBuilders(cls):

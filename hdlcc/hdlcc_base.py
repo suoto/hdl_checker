@@ -474,7 +474,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         records = []
 
-        if self._USE_THREADS:
+        if self._USE_THREADS:  # pragma: no cover
             pool = ThreadPool()
 
             static_check = pool.apply_async(

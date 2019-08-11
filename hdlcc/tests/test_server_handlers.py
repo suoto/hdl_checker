@@ -20,11 +20,9 @@
 # pylint: disable=protected-access
 # pylint: disable=invalid-name
 
-import json
 import logging
 import os
 import os.path as p
-import shutil
 
 import six
 from nose2.tools import such
@@ -33,9 +31,8 @@ from webtest import TestApp
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.utils import (MockBuilder, disableVunit, getTestTempPath,
-                               setupTestSuport)
-from hdlcc.utils import getCachePath, removeDirIfExists
+from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
+from hdlcc.utils import removeIfExists
 
 try:  # Python 3.x
     import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
@@ -70,9 +67,9 @@ with such.A("hdlcc bottle app") as it:
 
         cache = p.join(TEST_PROJECT, '.hdlcc')
         it.assertFalse(p.exists(cache))
-
-        it.assertFalse(p.exists('xvhdl.pb'))
         it.assertFalse(p.exists('.xvhdl.init'))
+
+        removeIfExists('xvhdl.pb')
 
     @it.should("get diagnose info without any project")
     @disableVunit
@@ -104,7 +101,7 @@ with such.A("hdlcc bottle app") as it:
     def test():
         def _getServerByProjectFile(_):
             server = mock.MagicMock()
-            server.config_parser.isParsing = lambda : True
+            server.config_parser.isParsing = lambda: True
             return server
 
         with mock.patch('hdlcc.handlers._getServerByProjectFile',
