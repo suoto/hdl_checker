@@ -60,11 +60,22 @@ def _clear():
 
 def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
-    from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
-    rainbow_stream_handler = RainbowLoggingHandler(stream)
 
-    logging.root.addHandler(rainbow_stream_handler)
-    logging.root.setLevel(level)
+    if not _ON_WINDOWS:
+        from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
+        rainbow_stream_handler = RainbowLoggingHandler(stream)
+
+        logging.root.addHandler(rainbow_stream_handler)
+        logging.root.setLevel(level)
+    else:
+        handler = logging.StreamHandler(stream)
+        handler.formatter = logging.Formatter(
+            '%(levelname)-7s | %(asctime)s | ' +
+            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+            '|\t%(message)s', datefmt='%H:%M:%S')
+
+        logging.root.addHandler(handler)
+        logging.root.setLevel(level)
 
 def _parseArguments():
     parser = argparse.ArgumentParser()
@@ -140,7 +151,10 @@ def runTestsForEnv(args):
     home = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'home')
     os.makedirs(home)
 
-    test_env.update({'HOME' : home})
+    if not _ON_WINDOWS:
+        test_env.update({'HOME' : home})
+    else:
+        test_env.update({'LOCALAPPDATA' : home})
 
     _logger.info("nose2 args: %s", nose_args)
 
