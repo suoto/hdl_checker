@@ -70,12 +70,6 @@ class TestBuilder(unittest2.TestCase):
                                            '_%s' % cls.builder_name))
         cls.builder_class = builder_class
 
-        #  # Copy sources path to tox env
-        #  cls.sources_path = p.join(TEST_TEMP_PATH,
-        #                            'test_support_{}'.format(cls.builder_name))
-
-        #  shutil.copytree(SOURCES_PATH, cls.sources_path)
-
     @classmethod
     def tearDownClass(cls):
         if cls.builder_name == 'xvhdl':
