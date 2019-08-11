@@ -46,24 +46,6 @@ BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
-TEST_ENVS = {}
-
-TEST_ENVS['ghdl'] = {'BUILDER_NAME' : 'ghdl'}
-
-if _CI or not p.exists(p.expanduser('~/.local/bin/ghdl')):
-    TEST_ENVS['ghdl']['BUILDER_PATH'] = p.expanduser('~/builders/ghdl/bin/')
-else:
-    TEST_ENVS['ghdl']['BUILDER_PATH'] = p.expanduser('~/.local/bin/ghdl')
-
-TEST_ENVS['msim'] = {
-    'BUILDER_NAME' : 'msim',
-    'BUILDER_PATH' : p.expanduser('~/builders/msim/modelsim_ase/linux/')}
-
-TEST_ENVS['xvhdl'] = {
-    'BUILDER_NAME' : 'xvhdl',
-    'BUILDER_PATH' : p.expanduser('~/builders/xvhdl/bin/')}
-
-
 def _shell(cmd):
     _logger.info("$ %s", cmd)
     for line in os.popen(cmd).read().split('\n'):
@@ -100,19 +82,6 @@ def _parseArguments():
     # Options
     parser.add_argument('tests', action='append', nargs='*',
                         help="Test names or files to be run")
-
-    parser.add_argument('--msim', action='store_true',
-                        help="Runs tests with ModelSim environment")
-
-    parser.add_argument('--ghdl', action='store_true',
-                        help="Runs tests with GHDL environment")
-
-    parser.add_argument('--xvhdl', action='store_true',
-                        help="Runs tests with XHDL environment")
-
-    parser.add_argument('--others', action='store_true',
-                        help="Runs tests that don't need a builder")
-
     parser.add_argument('--fail-fast', '-F', action='store_true')
 
     parser.add_argument('--debugger', '-D', action='store_true')
@@ -135,11 +104,6 @@ def _parseArguments():
     args = parser.parse_args()
     args.log_level = str(args.log_level).upper()
 
-    # Set the default behaviour: run all tests
-    env_list = [getattr(args, x) for x in ('msim', 'ghdl', 'xvhdl', 'others')]
-    if True not in env_list:
-        _ = [setattr(args, x, True) for x in ('msim', 'ghdl', 'xvhdl', 'others')]
-    test_list = []
     if args.tests:
         test_list = [source for sublist in args.tests for source in sublist]
 
@@ -159,7 +123,7 @@ def _parseArguments():
     return args
 
 def _getNoseCommandLineArgs(args):
-    argv = [sys.argv[0]]
+    argv = []
     if args.verbose:
         argv += ['--verbose']
     if args.debugger:
@@ -172,35 +136,14 @@ def _getNoseCommandLineArgs(args):
 
     return argv
 
-def _getDefaultTestByEnv(env):
-    if env in ('msim', 'ghdl', 'xvhdl'):
-        return ('hdlcc.tests.test_server_handlers',)
-    if env == 'others':
-        return ('hdlcc.tests.test_builders',
-                'hdlcc.tests.test_config_parser',
-                'hdlcc.tests.test_hdlcc_base',
-                'hdlcc.tests.test_lsp',
-                'hdlcc.tests.test_misc',
-                'hdlcc.tests.test_server',
-                'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_static_check',
-                'hdlcc.tests.test_verilog_parser',
-                'hdlcc.tests.test_vhdl_parser')
-    assert False, 'Invalid env {}'.format(repr(env))
-
-def runTestsForEnv(env, args):
+def runTestsForEnv(args):
     nose_base_args = _getNoseCommandLineArgs(args)
     nose_args = list(nose_base_args)
 
     if args.tests:
         nose_args += args.tests
-    else:
-        nose_args += _getDefaultTestByEnv(env)
 
     test_env = os.environ.copy()
-
-    if env in TEST_ENVS:
-        test_env.update(TEST_ENVS[env])
 
     test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
 
@@ -240,20 +183,7 @@ def main():
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
 
-    passed = True
-    for env in ('ghdl', 'msim', 'xvhdl', 'others'):
-        if getattr(args, env):
-            _logger.info("Running env '%s'", env)
-
-            if not runTestsForEnv(env, args):
-                if passed:
-                    _logger.warning("Some tests failed while running '%s'", env)
-                passed = False
-
-            if not passed and args.fail_fast:
-                break
-        else:
-            _logger.info("Skipping env '%s'", env)
+    passed = runTestsForEnv(args)
 
     cov.stop()
     cov.save()
