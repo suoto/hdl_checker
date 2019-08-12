@@ -127,11 +127,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         appropriate builder objects
         """
         try:
-            # If the builder is still undefined we failed to recover
-            # from cache
+            # If still using Fallback builder, check if the config has a
+            # different one
             if isinstance(self.builder, Fallback):
                 builder_name = self.config_parser.getBuilder()
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
+                if builder_class is Fallback:
+                    return
 
                 cache_dir = self._getCacheDirectory()
                 try:
