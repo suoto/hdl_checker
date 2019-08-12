@@ -40,4 +40,4 @@ RUN $BUILDERS/msim/modelsim_ase/linuxaloem/vcom -version
 RUN $BUILDERS/xvhdl/bin/xvhdl -version
 
 VOLUME /hdlcc
-ENTRYPOINT "/hdlcc/.ci/scripts/docker_entry_point.sh"
+WORKDIR /hdlcc
