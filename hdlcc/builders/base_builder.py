@@ -39,12 +39,12 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         'global_build_flags' : {}} # type: dict
 
     _external_libraries = {
-        'vhdl' : [],
-        'verilog' : []}  # type: dict
+        'vhdl' : set(),
+        'verilog' : set()}  # type: dict
 
     _include_paths = {
-        'vhdl' : [],
-        'verilog' : []}  # type: dict
+        'vhdl' : set(),
+        'verilog' : set()}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
@@ -53,16 +53,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         directly
         """
         assert lang in cls._external_libraries, "Uknown language '%s'" & lang
-        if library_name not in cls._external_libraries[lang]:
-            cls._external_libraries[lang].append(library_name)
+        cls._external_libraries[lang].add(library_name)
 
     @classmethod
     def addIncludePath(cls, lang, path):
         """
         Adds an include path to be used by the builder where applicable
         """
-        if path not in cls._include_paths[lang]:
-            cls._include_paths[lang].append(path)
+        cls._include_paths[lang].add(path)
 
     @abc.abstractproperty
     def builder_name(self):

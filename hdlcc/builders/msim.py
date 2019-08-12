@@ -202,7 +202,7 @@ class MSim(BaseBuilder):
         Gets extra flags configured for the specific language
         """
         libs = []
-        for library in list(self._added_libraries) + self._external_libraries[lang]:
+        for library in self._added_libraries.union(self._external_libraries[lang]):
             libs = ['-L', library]
         for path in self._include_paths[lang]:
             libs += ['+incdir+' + str(path)]
