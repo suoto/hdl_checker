@@ -24,8 +24,10 @@ stages:
 
 jobs:
   include:
-    - name: Testing
-      script: ./run_tests.sh
+    - name: Python 2.7
+      script: ./run_tests.sh -e py27-linux
+    - name: Python 3.7
+      script: ./run_tests.sh -e py37-linux
 
     - stage: deploy
       before_install: skip
