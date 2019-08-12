@@ -26,13 +26,15 @@ from multiprocessing.pool import ThreadPool
 
 import hdlcc.builders
 import hdlcc.exceptions
+from hdlcc.builders import Fallback
 from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import getCachePath, getFileType, removeDuplicates, removeIfExists, removeDirIfExists
+from hdlcc.utils import (getCachePath, getFileType, removeDirIfExists,
+                         removeDuplicates, removeIfExists)
 
 CACHE_NAME = 'cache.json'
 
@@ -58,7 +60,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.project_file = project_file
 
         self.config_parser = ConfigParser(self.project_file)
-        self.builder = None
+        self.builder = Fallback(self._getCacheDirectory())
 
         self._recoverCacheIfPossible()
         self._setupEnvIfNeeded()
@@ -127,7 +129,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         try:
             # If the builder is still undefined we failed to recover
             # from cache
-            if self.builder is None:
+            if isinstance(self.builder, Fallback):
                 builder_name = self.config_parser.getBuilder()
                 builder_class = hdlcc.builders.getBuilderByName(builder_name)
 
@@ -143,7 +145,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                                   self.builder.builder_name)
         except hdlcc.exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
-            self.builder = hdlcc.builders.Fallback(self._getCacheDirectory())
+            self.builder = Fallback(self._getCacheDirectory())
 
         assert self.builder is not None
 
@@ -158,7 +160,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         del self.config_parser
         del self.builder
         self.config_parser = ConfigParser(self.project_file)
-        self.builder = None
+        self.builder = Fallback(self._getCacheDirectory())
 
     def _setState(self, state):
         """
@@ -214,7 +216,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # Also, create a source parser object with some library so the user can
         # at least have some info on the source
         if source is None:
-            if self.builder.builder_name != 'fallback':
+            if not isinstance(self.builder, Fallback):
                 remarks += [PathNotInProjectFile(p.abspath(path)), ]
 
             self._logger.info("Path %s not found in the project file",
