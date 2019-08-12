@@ -487,14 +487,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                                                  args=[source, batch_mode])
                 records += builder_check.get()
 
+            pool.close()
+            pool.join()
+
             # Static messages don't take the path, only the text, so we need to
             # set add that to the diagnostic
             for record in static_check.get():
                 record.filename = source.filename
                 records += [record]
 
-            pool.terminate()
-            pool.join()
         else:
             for record in getStaticMessages(source.getRawSourceContent().split('\n')):
                 record.filename = source.filename

@@ -156,6 +156,8 @@ class MockBuilder(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=a
         return True
 
     def _buildSource(self, path, library, flags=None):  # pylint: disable=unused-argument
+        self._logger.debug("Building path=%s, library=%s, flags=%s",
+                           path, library, flags)
         return [], []
 
     def _createLibrary(self, library):  # pylint: disable=unused-argument
