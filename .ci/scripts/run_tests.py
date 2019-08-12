@@ -140,6 +140,9 @@ def runTestsForEnv(args):
     nose_base_args = _getNoseCommandLineArgs(args)
     nose_args = list(nose_base_args)
 
+    nose_args = ['--log-capture', ]
+
+
     if args.tests:
         nose_args += args.tests
 
