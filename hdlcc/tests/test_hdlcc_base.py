@@ -750,150 +750,162 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
+        def basicRebuildTest(test_filename, rebuilds):
+            calls = []
+            ret_list = list(reversed(rebuilds))
+
+            # Rebuild formats are:
+            # - {unit_type: '', 'unit_name': }
+            # - {library_name: '', 'unit_name': }
+            # - {rebuild_path: ''}
+            def _buildAndParse(self, source, flags=None):
+                calls.append(str(source.filename))
+                if ret_list:
+                    return [], ret_list.pop()
+                return [], []
+
+            with mock.patch.object(hdlcc.tests.utils.MockBuilder,
+                                   '_buildAndParse', _buildAndParse):
+
+                it.assertEqual(it.project.getMessagesByPath(test_filename), [])
+
+            it.assertEqual(ret_list, [],
+                           'Some rebuilds were not used: {}'.format(ret_list))
+
+
+            return calls
+
         @it.should("rebuild sources when needed within the same library")
         def test():
-            filenames = (
-                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'))
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            rebuilds = [
+                [{'library_name': 'work', 'unit_name': 'clock_divider'}, ],
+            ]
 
-            # Count how many messages each source has
-            source_msgs = {}
+            calls = basicRebuildTest(filename, rebuilds)
 
-            for filename in filenames:
-                _logger.info("Getting messages for '%s'", filename)
-                source_msgs[filename] = \
-                    it.project.getMessagesByPath(filename)
-
-            _logger.info("Changing very_common_pkg to force rebuilding "
-                         "synchronizer and another one I don't recall "
-                         "right now")
-            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-                                     'very_common_pkg.vhd')
-
-            code = open(very_common_pkg, 'r').read().split('\n')
-
-            writeListToFile(very_common_pkg,
-                            code[:22] + \
-                            ["    constant TESTING : integer := 4;"] + \
-                            code[22:])
-
-            try:
-                # The number of messages on all sources should not change
-                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
-
-                for filename in filenames:
-                    if source_msgs[filename]:
-                        _logger.info(
-                            "Source %s had the following messages:\n%s",
-                            filename, "\n".join([str(x) for x in
-                                                 source_msgs[filename]]))
-                    else:
-                        _logger.info("Source %s has no previous messages",
-                                     filename)
-
-                    it.assertEqual(source_msgs[filename],
-                                   it.project.getMessagesByPath(filename))
-            finally:
-                _logger.info("Restoring previous content")
-                writeListToFile(very_common_pkg, code)
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
         @it.should("rebuild sources when changing a package on different libraries")
         def test():
-            filenames = (
-                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            rebuilds = [
+                [{'library_name': 'another_library', 'unit_name': 'foo'},],
+            ]
 
-            # Count how many messages each source has
-            source_msgs = {}
+            calls = basicRebuildTest(filename, rebuilds)
 
-            for filename in filenames:
-                _logger.info("Getting messages for '%s'", filename)
-                source_msgs[filename] = \
-                    it.project.getMessagesByPath(filename)
-                it.assertNotIn(
-                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-            _logger.info("Changing very_common_pkg to force rebuilding "
-                         "synchronizer and another one I don't recall "
-                         "right now")
-            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-                                     'very_common_pkg.vhd')
-
-            code = open(very_common_pkg, 'r').read().split('\n')
-
-            writeListToFile(very_common_pkg,
-                            code[:22] + \
-                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-                            code[22:])
-
-            try:
-                # The number of messages on all sources should not change
-                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
-
-                for filename in filenames:
-
-                    if source_msgs[filename]:
-                        _logger.info(
-                            "Source %s had the following messages:\n%s",
-                            filename, "\n".join([str(x) for x in
-                                                 source_msgs[filename]]))
-                    else:
-                        _logger.info("Source %s has no previous messages",
-                                     filename)
-
-                    it.assertEqual(source_msgs[filename],
-                                   it.project.getMessagesByPath(filename))
-            finally:
-                _logger.info("Restoring previous content")
-                writeListToFile(very_common_pkg, code)
-
-        @it.should("rebuild sources when changing an entity on different libraries")
+        @it.should("rebuild sources with path as a hint")
         def test():
-            filenames = (
-                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
-            # Count how many messages each source has
-            source_msgs = {}
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            for filename in filenames:
-                _logger.info("Getting messages for '%s'", filename)
-                source_msgs[filename] = \
-                    it.project.getMessagesByPath(filename)
-                it.assertNotIn(
-                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
+            rebuilds = [
+                [{'rebuild_path': '/some/absolute/path.vhd',}],
+            ]
 
-            _logger.info("Changing very_common_pkg to force rebuilding "
-                         "synchronizer and another one I don't recall "
-                         "right now")
-            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-                                     'very_common_pkg.vhd')
+            calls = basicRebuildTest(filename, rebuilds)
 
-            code = open(very_common_pkg, 'r').read().split('\n')
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                 '/some/absolute/path.vhd',
+                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-            writeListToFile(very_common_pkg,
-                            code[:22] + \
-                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-                            code[22:])
+        @it.should("rebuild package if needed")
+        def test():
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            try:
-                # The number of messages on all sources should not change
-                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
+            # - {unit_type: '', 'unit_name': }
+            rebuilds = [
+                [{'unit_type': 'package', 'unit_name': 'very_common_pkg'}, ],
+            ]
 
-                for filename in filenames:
+            calls = basicRebuildTest(filename, rebuilds)
 
-                    if source_msgs[filename]:
-                        _logger.info(
-                            "Source %s had the following messages:\n%s",
-                            filename, "\n".join([str(x) for x in
-                                                 source_msgs[filename]]))
-                    else:
-                        _logger.info("Source %s has no previous messages",
-                                     filename)
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-                    it.assertEqual(source_msgs[filename],
-                                   it.project.getMessagesByPath(filename))
-            finally:
-                _logger.info("Restoring previous content")
-                writeListToFile(very_common_pkg, code)
+        @it.should("rebuild a combination of all")
+        def test():
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
+            # - {unit_type: '', 'unit_name': }
+            rebuilds = [
+                [{'unit_type': 'package', 'unit_name': 'very_common_pkg'},
+                 {'rebuild_path': p.join(TEST_PROJECT, 'basic_library',
+                                         'package_with_constants.vhd')},
+                 {'library_name': 'another_library', 'unit_name': 'foo'}, ],
+            ]
+
+            calls = basicRebuildTest(filename, rebuilds)
+
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
+                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
+                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+
+        @it.should("give up trying to rebuild after 20 attempts")
+        def test():
+            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
+            # - {unit_type: '', 'unit_name': }
+            rebuilds = 20*[
+                 [ {'library_name': 'another_library', 'unit_name': 'foo'}, ],
+                 [],
+            ]
+
+            calls = basicRebuildTest(filename, rebuilds)
+
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                20*[p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                    p.join(TEST_PROJECT, 'another_library', 'foo.vhd')])
+
+            it.assertEqual(
+                list(it.project.getUiMessages()),
+                [('error',
+                  'Unable to build \'{}\' after 20 attempts'.format(filename))])
+
+
 
 it.createTests(globals())

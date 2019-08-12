@@ -31,6 +31,7 @@ import six
 from parameterized import parameterized_class
 
 import hdlcc
+from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.utils import (getCachePath, getFileType, onWindows,
                          removeDuplicates, samefile)
 
@@ -131,16 +132,19 @@ class SourceMock(object):
     def getRawSourceContent(self):
         return open(self.filename).read()
 
-class MockBuilder(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
+
+class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger('MockBuilder')
     builder_name = 'msim_mock'
     file_types = ('vhdl', )
+
     def __init__(self, target_folder):
         self._target_folder = target_folder
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
         super(MockBuilder, self).__init__(target_folder)
+
 
     def _makeRecords(self, _): # pragma: no cover
         return []

@@ -412,7 +412,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 return records
 
         self._handleUiError("Unable to build '%s' after %d attempts" %
-                            (source, self._MAX_REBUILD_ATTEMPTS))
+                            (source.filename, self._MAX_REBUILD_ATTEMPTS))
 
         return {}
 
@@ -441,7 +441,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                     rebuild_sources = self.config_parser.findSourcesByDesignUnit(
                         unit_name, library)
                 else:  # pragma: no cover
-                    assert False, ', '.join([x.filename for x in rebuild_sources])
+                    assert False, "Don't know how to handle %s" % rebuild
 
             for rebuild_source in rebuild_sources:
                 self._getBuilderMessages(rebuild_source,
@@ -478,7 +478,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         records = []
 
-        if self._USE_THREADS:  # pragma: no cover
+        if self._USE_THREADS:
             pool = ThreadPool()
 
             static_check = pool.apply_async(
@@ -498,7 +498,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 record.filename = source.filename
                 records += [record]
 
-        else:
+        else:  # pragma: no cover
             for record in getStaticMessages(source.getRawSourceContent().split('\n')):
                 record.filename = source.filename
                 records += [record]
