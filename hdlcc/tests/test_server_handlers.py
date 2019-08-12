@@ -30,7 +30,8 @@ from webtest import TestApp
 
 import hdlcc
 import hdlcc.handlers as handlers
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
+from hdlcc.diagnostics import (CheckerDiagnostic, DiagType, ObjectIsNeverUsed,
+                               StaticCheckerDiag)
 from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
 from hdlcc.utils import removeIfExists
 
@@ -185,78 +186,96 @@ with such.A("hdlcc bottle app") as it:
         server.onBufferVisit.assert_called_once_with(test_path)
 
 
-    #  @it.should("get messages with content")
-    #  def test():
-    #      data = {
-    #          'project_file' : it.project_file,
-    #          'path'         : p.join(
-    #              TEST_PROJECT, 'another_library', 'foo.vhd'),
-    #          'content'      : '-- TODO: Nothing to see here'}
+    @it.should("get messages with content")
+    def test():
+        data = {
+            'project_file' : it.project_file,
+            'path'         : p.join(
+                TEST_PROJECT, 'another_library', 'foo.vhd'),
+            'content'      : '-- TODO: Nothing to see here'}
 
-    #      ui_reply = it.app.post('/get_ui_messages', data)
-    #      reply = it.app.post('/get_messages_by_path', data)
+        ui_reply = it.app.post('/get_ui_messages', data)
+        reply = it.app.post('/get_messages_by_path', data)
 
-    #      _logger.info("UI reply: %s", ui_reply)
-    #      _logger.info("Reply: %s", reply)
+        _logger.info("UI reply: %s", ui_reply)
+        _logger.info("Reply: %s", reply)
 
-    #      messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
-    #      it.assertIn(data['path'], [x.filename for x in messages])
+        it.assertIn(data['path'], [x.filename for x in messages])
 
-    #      expected = StaticCheckerDiag(
-    #          filename=data['path'],
-    #          line_number=1, column_number=4,
-    #          text='TODO: Nothing to see here',
-    #          severity=DiagType.STYLE_INFO)
+        expected = StaticCheckerDiag(
+            filename=data['path'],
+            line_number=1, column_number=4,
+            text='TODO: Nothing to see here',
+            severity=DiagType.STYLE_INFO)
 
-    #      it.assertIn(expected, messages)
+        it.assertIn(expected, messages)
 
-    #  @it.should("get source dependencies")
-    #  @disableVunit
-    #  def test():
-    #      data = {
-    #          'project_file' : it.project_file,
-    #          'path'         : p.join(
-    #              TEST_PROJECT, 'another_library', 'foo.vhd')}
+    @it.should("get messages by path")
+    def test():
+        filename = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
+        data = {
+            'project_file' : it.project_file,
+            'path'         : filename}
 
-    #      for _ in range(10):
-    #          ui_reply = it.app.post('/get_ui_messages', data)
-    #          reply = it.app.post('/get_dependencies', data)
+        ui_reply = it.app.post('/get_ui_messages', data)
+        reply = it.app.post('/get_messages_by_path', data)
 
-    #          _logger.info("UI reply: %s", ui_reply)
-    #          _logger.info("Reply: %s", reply)
+        _logger.info("UI reply: %s", ui_reply)
+        _logger.info("Reply: %s", reply)
 
-    #      dependencies = reply.json['dependencies']
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
-    #      _logger.info("Dependencies: %s", ', '.join(dependencies))
+        it.assertItemsEqual(
+            messages,
+            [ObjectIsNeverUsed(filename=filename, line_number=27,
+                               column_number=12, object_type='signal',
+                               object_name='clk_enable_unused'),])
 
-    #      it.assertItemsEqual(
-    #          ["ieee.std_logic_1164",
-    #           "ieee.numeric_std",
-    #           "basic_library.clock_divider"],
-    #          dependencies)
+    @it.should("get source dependencies")
+    @disableVunit
+    def test():
+        data = {
+            'project_file' : it.project_file,
+            'path'         : p.join(
+                TEST_PROJECT, 'another_library', 'foo.vhd')}
 
-    #  @it.should("get source build sequence")
-    #  def test():
-    #      data = {
-    #          'project_file' : it.project_file,
-    #          'path'         : p.join(
-    #              TEST_PROJECT, 'another_library', 'foo.vhd')}
+        for _ in range(10):
+            ui_reply = it.app.post('/get_ui_messages', data)
+            reply = it.app.post('/get_dependencies', data)
 
-    #      reply = it.app.post('/get_build_sequence', data)
+            _logger.info("UI reply: %s", ui_reply)
+            _logger.info("Reply: %s", reply)
 
-    #      sequence = reply.json['sequence']
+        dependencies = reply.json['dependencies']
 
-    #      _logger.info("Sequence: %s", sequence)
+        _logger.info("Dependencies: %s", ', '.join(dependencies))
 
-    #      if it.BUILDER_NAME:
-    #          it.assertEquals(
-    #              [p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
-    #               p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
-    #               p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')],
-    #              sequence)
-    #      else:
-    #          it.assertEquals([], sequence, "%s error" % it.BUILDER_NAME)
+        it.assertItemsEqual(
+            ["ieee.std_logic_1164",
+             "ieee.numeric_std",
+             "basic_library.clock_divider"],
+            dependencies)
+
+    @it.should("get source build sequence")
+    def test():
+        data = {
+            'project_file' : it.project_file,
+            'path'         : p.join(
+                TEST_PROJECT, 'another_library', 'foo.vhd')}
+
+        reply = it.app.post('/get_build_sequence', data)
+
+        sequence = reply.json['sequence']
+
+        _logger.info("Sequence: %s", sequence)
+
+        it.assertItemsEqual(
+            [p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
+             p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
+             p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')],
+            sequence)
 
 
 it.createTests(globals())
