@@ -45,9 +45,6 @@ jobs:
 before_install:
   - docker pull suoto/hdlcc:latest
 
-before_script:
-  - pip install tox
-
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 
