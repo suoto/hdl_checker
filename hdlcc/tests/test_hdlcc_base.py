@@ -42,6 +42,7 @@ from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertCountEqual,
                                assertSameFile, disableVunit, getTestTempPath,
                                setupTestSuport, writeListToFile)
+from hdlcc.utils import onWindows
 
 _logger = logging.getLogger(__name__)
 
@@ -817,8 +818,12 @@ with such.A("hdlcc project") as it:
         def test():
             filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
+            some_abs_path = p.join(p.sep, 'some', 'absolute', 'path.vhd')
+            if onWindows():
+                some_abs_path = 'C:' + some_abs_path
+
             rebuilds = [
-                [{'rebuild_path': '/some/absolute/path.vhd',}],
+                [{'rebuild_path': some_abs_path,}],
             ]
 
             calls = basicRebuildTest(filename, rebuilds)
@@ -830,7 +835,7 @@ with such.A("hdlcc project") as it:
             it.assertEqual(
                 calls,
                 [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 '/some/absolute/path.vhd',
+                 some_abs_path,
                  p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
         @it.should("rebuild package if needed")
