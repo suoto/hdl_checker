@@ -69,8 +69,6 @@ _VUNIT_FLAGS = {
         '93'   : ['--std=93c'],
         '2002' : ['--std=02'],
         '2008' : ['--std=08']},
-    'xvhdl' : {'93' : [], '2002' : [], '2008' : []},
-    'fallback' : {'93' : [], '2002' : [], '2008' : []},
     }
 
 class ConfigParser(object):  # pylint: disable=useless-object-inheritance
@@ -179,7 +177,10 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             vunit_project.add_array_util()
 
         # Get extra flags for building VUnit sources
-        vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
+        try:
+            vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
+        except KeyError:
+            vunit_flags = []
 
         _source_file_args = []
         for vunit_source_obj in vunit_project.get_compile_order():
