@@ -40,7 +40,7 @@ from hdlcc.hdlcc_base import CACHE_NAME
 from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertCountEqual,
-                               assertSameFile, getTestTempPath,
+                               assertSameFile, disableVunit, getTestTempPath,
                                setupTestSuport, writeListToFile)
 
 _logger = logging.getLogger(__name__)
@@ -81,15 +81,6 @@ with such.A("hdlcc project") as it:
             it.fail('\n'.join(msg))
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
-
-    # Patch utils.getCachePath to avoid using a common directory
-    @it.has_setup
-    def setup():
-        _logger.fatal("setup")
-
-    @it.has_teardown
-    def teardown():
-        _logger.fatal("teardown")
 
     with it.having('non existing project file'):
         @it.has_setup
@@ -371,7 +362,6 @@ with such.A("hdlcc project") as it:
 
         @it.should("identify ciruclar dependencies")
         def test():
-            _logger.fatal("Circular dependencies")
             target_src = _SourceMock(
                 library='some_lib',
                 design_units=[{'name' : 'target',
@@ -548,7 +538,8 @@ with such.A("hdlcc project") as it:
             it.config_parser_patch.start()
             it.mock_builder_patch.start()
 
-            it.project = StandaloneProjectBuilder(it.project_file)
+            with disableVunit:
+                it.project = StandaloneProjectBuilder(it.project_file)
 
         @it.should('use mock builder')
         def test():
