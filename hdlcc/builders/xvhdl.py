@@ -19,6 +19,8 @@
 import os
 import os.path as p
 import re
+import shutil
+import tempfile
 
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.utils import runShellCommand
@@ -109,10 +111,13 @@ class XVHDL(BaseBuilder):
     @staticmethod
     def isAvailable():
         try:
-            runShellCommand(['xvhdl', '--nolog', '--version'])
+            temp_dir = tempfile.mkdtemp()
+            runShellCommand(['xvhdl', '--nolog', '--version'], cwd=temp_dir)
             return True
         except OSError:
             return False
+        finally:
+            shutil.rmtree(temp_dir)
 
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
