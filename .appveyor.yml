@@ -28,7 +28,6 @@ artifacts:
 # ---------------------------------#
 
 # Operating system (build VM template)
-# os: Windows Server 2012
 image: Visual Studio 2017
 
 # clone directory
@@ -57,6 +56,11 @@ environment:
 
     - PYTHON_VERSION: 37
       PYTHON: "C:\\Python37"
+      TOXENV: py27-windows
+
+    - PYTHON_VERSION: 37
+      PYTHON: "C:\\Python37"
+      TOXENV: py37-windows
 
 # scripts that run after cloning repository
 install:

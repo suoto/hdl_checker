@@ -166,7 +166,7 @@ def _isProcessRunningOnWindows(pid):
 
 
 def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
-    return sys.platform == 'win32'
+    return os.name == 'nt'
 
 
 def onMac():      # pragma: no cover # pylint: disable=missing-docstring

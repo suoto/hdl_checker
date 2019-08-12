@@ -30,9 +30,10 @@ from threading import Event, Timer
 
 import mock
 import parameterized
-import pyls
+import six
 import unittest2
 from nose2.tools import such
+import pyls
 from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
@@ -298,10 +299,16 @@ with such.A("LSP server") as it:
                 _logger.info("doc_uri: %s", doc_uri)
                 _logger.info("diagnostics: %s", diagnostics)
 
-                if onWindows():
-                    error = '[WinError 2] The system cannot find the file specified'
+                if onWindows() and six.PY3:
+                    error = '[WinError 2] The system cannot find the file specified: '
                 else:
-                    error = '[Errno 2] No such file or directory'
+                    error = '[Errno 2] No such file or directory: '
+
+                if onWindows() and six.PY2:
+                    # Got to get rid of these stupid string modifiers really or at
+                    # least make testing independent of them
+                    if six.PY2:
+                        error += 'u'
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
                 it.assertItemsEqual(
@@ -314,7 +321,7 @@ with such.A("LSP server") as it:
                      {'source': 'HDL Code Checker',
                       'range': {'start': {'line': 0, 'character': 0},
                                 'end': {'line': 0, 'character': 0}},
-                      'message': "Exception while creating server: '{}: {}'"
+                      'message': "Exception while creating server: '{}{}'"
                                  .format(error,
                                          repr(p.join(TEST_PROJECT,
                                                      it.project_file))),

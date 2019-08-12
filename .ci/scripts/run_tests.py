@@ -60,7 +60,6 @@ def _clear():
 
 def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
-
     if not _ON_WINDOWS:
         from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
         rainbow_stream_handler = RainbowLoggingHandler(stream)
