@@ -33,15 +33,15 @@ from nose2.tools.params import params
 
 import hdlcc
 from hdlcc.builders import Fallback
-from hdlcc.diagnostics import (BuilderDiag, DependencyNotUnique, DiagType,
+from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
 from hdlcc.hdlcc_base import CACHE_NAME
 from hdlcc.parsers import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
-                               StandaloneProjectBuilder, assertSameFile,
-                               getTestTempPath, setupTestSuport,
-                               writeListToFile)
+                               StandaloneProjectBuilder, assertCountEqual,
+                               assertSameFile, getTestTempPath,
+                               setupTestSuport, writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ such.unittest.TestCase.maxDiff = None
 
 with such.A("hdlcc project") as it:
     if six.PY2:
-        it.assertCountEqual = it.assertItemsEqual
+        it.assertCountEqual = assertCountEqual(it)
 
     it.assertSameFile = assertSameFile(it)
 
@@ -137,10 +137,10 @@ with such.A("hdlcc project") as it:
             open(it.project_file, 'w').close()
 
             it.config_parser_patch = mock.patch('hdlcc.hdlcc_base.ConfigParser', ConfigParserMock)
-            it.msim_mock_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
+            it.mock_builder_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
 
             it.config_parser_patch.start()
-            it.msim_mock_patch.start()
+            it.mock_builder_patch .start()
 
             it.project = StandaloneProjectBuilder(project_file=it.project_file)
 
@@ -149,7 +149,7 @@ with such.A("hdlcc project") as it:
             it.config_parser_patch.stop()
             _logger.info("Removing project file %s", it.project_file)
             #  os.remove(it.project_file)
-            it.msim_mock_patch.stop()
+            it.mock_builder_patch .stop()
 
         @it.should('use fallback to Fallback builder')
         def test():
@@ -536,408 +536,352 @@ with such.A("hdlcc project") as it:
             it.assertTrue(found, "Failed to warn that cache recovering has failed")
             it.assertTrue(it.project.builder.builder_name, 'Fallback')
 
-        #  with it.having('test_project as reference and a valid project file'):
+    with it.having('test_project as reference and a valid project file'):
 
-        #      @it.has_setup
-        #      def setup():
-        #          _logger.fatal("Setting up...")
-        #          if p.exists('modelsim.ini'):
-        #              _logger.warning("Modelsim ini found at %s",
-        #                              p.abspath('modelsim.ini'))
-        #              os.remove('modelsim.ini')
+        @it.has_setup
+        def setup():
+            it.project_file = p.join(TEST_PROJECT, 'vimhdl.prj')
 
-        #          cleanProjectCache(it.PROJECT_FILE)
+            it.config_parser_patch = mock.patch('hdlcc.hdlcc_base.ConfigParser', ConfigParserMock)
+            it.mock_builder_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
 
-        #          builder = hdlcc.builders.getBuilderByName('msim')
+            it.config_parser_patch.start()
+            it.mock_builder_patch.start()
 
-        #          it.assertNotEqual(builder, hdlcc.builders.Fallback)
+            it.project = StandaloneProjectBuilder(it.project_file)
 
-        #          with it.assertRaises(hdlcc.exceptions.SanityCheckError):
-        #              builder(it.BUILDER_TARGET_FOLDER)
+        @it.should('use mock builder')
+        def test():
+            it.assertTrue(isinstance(it.project.builder, MockBuilder),
+                          "Builder should be {} but got {} instead".format(MockBuilder, it.project.builder))
 
-        #          # Add the builder path to the environment so we can call it
-        #          #  it.patch = patchBuilder
-        #          #  it.patch.start()
-        #          #  it.patch = mock.patch.dict(
-        #          #      'os.environ',
-        #          #      {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-        #          #  it.patch.__enter__()
+        @it.has_teardown
+        def teardown():
+            it.config_parser_patch.stop()
+            it.mock_builder_patch.stop()
 
+        @it.should("get messages by path")
+        def test005a():
+            filename = p.join(TEST_PROJECT, 'another_library',
+                              'foo.vhd')
 
-        #          #  with mockBuilder():
+            it.assertMsgQueueIsEmpty(it.project)
 
-        #          #      builder = hdlcc.builders.getBuilderByName('MockBuilder')
-        #          #      it.assertEqual(builder, MockBuilder)
+            diagnostics = it.project.getMessagesByPath(filename)
 
-        #          #      try:
-        #          #          builder(it.BUILDER_TARGET_FOLDER)
-        #          #      except hdlcc.exceptions.SanityCheckError:
-        #          #          it.fail("Builder creation failed even after configuring "
-        #          #                  "the builder path")
+            it.assertIn(
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=29, column_number=12,
+                    object_type='signal', object_name='neat_signal'),
+                diagnostics)
 
-        #          #      _logger.info("Creating project builder object")
-        #          #      it.project = StandaloneProjectBuilder(it.PROJECT_FILE)
-
-        #      @it.has_teardown
-        #      def teardown():
-        #          cleanProjectCache(it.PROJECT_FILE)
-        #          #  it.patch.__next__()
-        #          #  it.patch.__exit__(None, None, None)
-        #          #  it.patch.stop()
-
-        #          if p.exists(it.project.config_parser.getTargetDir()):
-        #              shutil.rmtree(it.project.config_parser.getTargetDir())
-        #          del it.project
+            it.assertMsgQueueIsEmpty(it.project)
 
-        #      @it.should("get messages by path")
-        #      def test005a():
-        #          filename = p.join(TEST_PROJECT, 'another_library',
-        #                            'foo.vhd')
+        @it.should("get messages with text")
+        def test005b():
+            filename = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
-        #          it.assertMsgQueueIsEmpty(it.project)
+            original_content = open(filename, 'r').read().split('\n')
 
-        #          diagnostics = it.project.getMessagesByPath(filename)
+            content = '\n'.join(original_content[:28] +
+                                ['signal another_signal : std_logic;'] +
+                                original_content[28:])
 
-        #          it.assertIn(
-        #              ObjectIsNeverUsed(
-        #                  filename=filename,
-        #                  line_number=43, column_number=12,
-        #                  object_type='signal', object_name='neat_signal'),
-        #              diagnostics)
+            _logger.debug("File content")
+            for lnum, line in enumerate(content.split('\n')):
+                _logger.debug("%2d| %s", (lnum + 1), line)
 
-        #          it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
-        #      @it.should("get messages with text")
-        #      def test005b():
-        #          filename = p.join(TEST_PROJECT, 'another_library',
-        #                            'foo.vhd')
+            diagnostics = it.project.getMessagesWithText(filename, content)
 
-        #          original_content = open(filename, 'r').read().split('\n')
+            if diagnostics:
+                _logger.debug("Records received:")
+                for diagnostic in diagnostics:
+                    _logger.debug("- %s", diagnostic)
+            else:
+                _logger.warning("No diagnostics found")
 
-        #          content = '\n'.join(original_content[:43] +
-        #                              ['signal another_signal : std_logic;'] +
-        #                              original_content[43:])
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
+            # the remaining fields
+            for diagnostic in diagnostics:
+                if diagnostic.filename:
+                    it.assertSameFile(filename, diagnostic.filename)
 
-        #          it.assertMsgQueueIsEmpty(it.project)
+            expected = [
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=30,
+                                  column_number=12, object_type='signal',
+                                  object_name='neat_signal'),
+                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=29,
+                                  column_number=8, object_type='signal',
+                                  object_name='another_signal'),]
 
-        #          diagnostics = it.project.getMessagesWithText(filename, content)
 
-        #          if diagnostics:
-        #              _logger.debug("Records received:")
-        #              for diagnostic in diagnostics:
-        #                  _logger.debug("- %s", diagnostic)
-        #          else:
-        #              _logger.warning("No diagnostics found")
+            it.assertCountEqual(expected, diagnostics)
+            it.assertMsgQueueIsEmpty(it.project)
 
-        #          # Check that all diagnostics point to the original filename and
-        #          # remove them from the diagnostics so it's easier to compare
-        #          # the remaining fields
-        #          for diagnostic in diagnostics:
-        #              if diagnostic.filename:
-        #                  it.assertSameFile(filename, diagnostic.filename)
+        @it.should("get messages with text for file outside the project file")
+        def test005c():
+            filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
+            writeListToFile(filename, ["entity some_entity is end;", ])
 
-        #          expected = [
-        #              ObjectIsNeverUsed(filename=p.abspath(filename), line_number=43,
-        #                                column_number=12, object_type='signal',
-        #                                object_name='neat_signal'),
-        #              ObjectIsNeverUsed(filename=p.abspath(filename), line_number=44,
-        #                                column_number=8, object_type='signal',
-        #                                object_name='another_signal'),]
-
-
-        #          #  it.assertCountEqual([hash(x) for x in expected], [hash(x) for x in diagnostics])
-        #          it.assertCountEqual(expected, diagnostics)
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #      @it.should("get messages with text for file outside the project file")
-        #      def test005c():
-        #          filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
-        #          writeListToFile(filename, ["entity some_entity is end;", ])
-
-        #          content = "\n".join(["library work;",
-        #                               "use work.all;",
-        #                               "entity some_entity is end;"])
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #          diagnostics = it.project.getMessagesWithText(filename, content)
-
-        #          _logger.debug("Records received:")
-        #          for diagnostic in diagnostics:
-        #              _logger.debug("- %s", diagnostic)
-
-        #          # Check that all diagnostics point to the original filename and
-        #          # remove them from the diagnostics so it's easier to compare
-        #          # the remaining fields
-        #          for diagnostic in diagnostics:
-        #              it.assertSameFile(filename, diagnostic.filename)
-
-        #          expected = [
-        #              LibraryShouldBeOmited(library='work',
-        #                                    filename=p.abspath(filename),
-        #                                    column_number=9,
-        #                                    line_number=1),
-        #              PathNotInProjectFile(p.abspath(filename)),]
-
-        #          try:
-        #              it.assertCountEqual(expected, diagnostics)
-        #          except:
-        #              _logger.warning("Expected:")
-        #              for exp in expected:
-        #                  _logger.warning(exp)
-
-        #              raise
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-
-        #      @it.should("get updated messages")
-        #      def test006():
-        #          filename = p.join(TEST_PROJECT, 'another_library',
-        #                            'foo.vhd')
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #          code = open(filename, 'r').read().split('\n')
-
-        #          code[28] = '-- ' + code[28]
-
-        #          writeListToFile(filename, code)
-
-        #          diagnostics = it.project.getMessagesByPath(filename)
-
-        #          try:
-        #              it.assertNotIn(
-        #                  ObjectIsNeverUsed(object_type='constant',
-        #                                    object_name='ADDR_WIDTH',
-        #                                    line_number=29,
-        #                                    column_number=14),
-        #                  diagnostics)
-        #          finally:
-        #              # Remove the comment we added
-        #              code[28] = code[28][3:]
-        #              writeListToFile(filename, code)
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #      @it.should("get messages by path of a different source")
-        #      def test007():
-        #          if not it.PROJECT_FILE:
-        #              _logger.info("Requires a valid project file")
-        #              return
-
-        #          filename = p.join(TEST_PROJECT, 'basic_library',
-        #                            'clock_divider.vhd')
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #          diagnostics = []
-        #          for diagnostic in it.project.getMessagesByPath(filename):
-        #              it.assertSameFile(filename, diagnostic.filename)
-        #              diagnostics += [diagnostic]
-
-        #          #  if it.BUILDER_NAME == 'msim':
-        #          #      expected_records = [
-        #          #          BuilderDiag(
-        #          #              filename=filename,
-        #          #              builder_name='msim',
-        #          #              text="Synthesis Warning: Reset signal 'reset' "
-        #          #                   "is not in the sensitivity list of process "
-        #          #                   "'line__58'.",
-        #          #              severity=DiagType.WARNING,
-        #          #              line_number=58)]
-        #          #  elif it.BUILDER_NAME == 'ghdl':
-        #          #      expected_records = []
-        #          #  elif it.BUILDER_NAME == 'xvhdl':
-        #          #      expected_records = []
-
-        #          it.assertEqual(diagnostics, [])
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #      @it.should("get messages from a source outside the project file")
-        #      def test009():
-        #          if not it.PROJECT_FILE:
-        #              _logger.info("Requires a valid project file")
-        #              return
-        #          filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
-        #          writeListToFile(filename, ['library some_lib;'])
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #          diagnostics = it.project.getMessagesByPath(filename)
-
-        #          _logger.info("Records found:")
-        #          for diagnostic in diagnostics:
-        #              _logger.info(diagnostic)
-
-        #          it.assertIn(
-        #              PathNotInProjectFile(p.abspath(filename)),
-        #              diagnostics)
-
-        #          # The builder should find other issues as well...
-        #          it.assertTrue(len(diagnostics) > 1,
-        #                        "It was expected that the builder added some "
-        #                        "message here indicating an error")
-
-        #          it.assertMsgQueueIsEmpty(it.project)
-
-        #      @it.should("rebuild sources when needed within the same library")
-        #      def test010():
-        #          if not it.PROJECT_FILE:
-        #              _logger.info("Requires a valid project file")
-        #              return
-
-        #          filenames = (
-        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'))
-
-        #          # Count how many messages each source has
-        #          source_msgs = {}
-
-        #          for filename in filenames:
-        #              _logger.info("Getting messages for '%s'", filename)
-        #              source_msgs[filename] = \
-        #                  it.project.getMessagesByPath(filename)
-
-        #          _logger.info("Changing very_common_pkg to force rebuilding "
-        #                       "synchronizer and another one I don't recall "
-        #                       "right now")
-        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-        #                                   'very_common_pkg.vhd')
-
-        #          code = open(very_common_pkg, 'r').read().split('\n')
-
-        #          writeListToFile(very_common_pkg,
-        #                          code[:22] + \
-        #                          ["    constant TESTING : integer := 4;"] + \
-        #                          code[22:])
-
-        #          try:
-        #              # The number of messages on all sources should not change
-        #              it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
-
-        #              for filename in filenames:
-        #                  if source_msgs[filename]:
-        #                      _logger.info(
-        #                          "Source %s had the following messages:\n%s",
-        #                          filename, "\n".join([str(x) for x in
-        #                                               source_msgs[filename]]))
-        #                  else:
-        #                      _logger.info("Source %s has no previous messages",
-        #                                   filename)
-
-        #                  it.assertEqual(source_msgs[filename],
-        #                                 it.project.getMessagesByPath(filename))
-        #          finally:
-        #              _logger.info("Restoring previous content")
-        #              writeListToFile(very_common_pkg, code)
-
-        #      @it.should("rebuild sources when changing a package on different libraries")
-        #      def test011():
-        #          #  if not it.BUILDER_NAME:
-        #          #      _logger.info("Test requires a builder")
-        #          #      return
-
-        #          filenames = (
-        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
-
-        #          # Count how many messages each source has
-        #          source_msgs = {}
-
-        #          for filename in filenames:
-        #              _logger.info("Getting messages for '%s'", filename)
-        #              source_msgs[filename] = \
-        #                  it.project.getMessagesByPath(filename)
-        #              it.assertNotIn(
-        #                  DiagType.ERROR, [x.severity for x in source_msgs[filename]])
-
-        #          _logger.info("Changing very_common_pkg to force rebuilding "
-        #                       "synchronizer and another one I don't recall "
-        #                       "right now")
-        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-        #                                   'very_common_pkg.vhd')
-
-        #          code = open(very_common_pkg, 'r').read().split('\n')
-
-        #          writeListToFile(very_common_pkg,
-        #                          code[:22] + \
-        #                          ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-        #                          code[22:])
-
-        #          try:
-        #              # The number of messages on all sources should not change
-        #              it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
-
-        #              for filename in filenames:
-
-        #                  if source_msgs[filename]:
-        #                      _logger.info(
-        #                          "Source %s had the following messages:\n%s",
-        #                          filename, "\n".join([str(x) for x in
-        #                                               source_msgs[filename]]))
-        #                  else:
-        #                      _logger.info("Source %s has no previous messages",
-        #                                   filename)
-
-        #                  it.assertEqual(source_msgs[filename],
-        #                                  it.project.getMessagesByPath(filename))
-        #          finally:
-        #              _logger.info("Restoring previous content")
-        #              writeListToFile(very_common_pkg, code)
-
-        #      @it.should("rebuild sources when changing an entity on different libraries")
-        #      def test012():
-        #          #  if not it.BUILDER_NAME:
-        #          #      _logger.info("Test requires a builder")
-        #          #      return
-
-        #          filenames = (
-        #              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-        #              p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
-        #          # Count how many messages each source has
-        #          source_msgs = {}
-
-        #          for filename in filenames:
-        #              _logger.info("Getting messages for '%s'", filename)
-        #              source_msgs[filename] = \
-        #                  it.project.getMessagesByPath(filename)
-        #              it.assertNotIn(
-        #                  DiagType.ERROR, [x.severity for x in source_msgs[filename]])
-
-        #          _logger.info("Changing very_common_pkg to force rebuilding "
-        #                       "synchronizer and another one I don't recall "
-        #                       "right now")
-        #          very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
-        #                                   'very_common_pkg.vhd')
-
-        #          code = open(very_common_pkg, 'r').read().split('\n')
-
-        #          writeListToFile(very_common_pkg,
-        #                          code[:22] + \
-        #                          ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
-        #                          code[22:])
-
-        #          try:
-        #              # The number of messages on all sources should not change
-        #              it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
-
-        #              for filename in filenames:
-
-        #                  if source_msgs[filename]:
-        #                      _logger.info(
-        #                          "Source %s had the following messages:\n%s",
-        #                          filename, "\n".join([str(x) for x in
-        #                                               source_msgs[filename]]))
-        #                  else:
-        #                      _logger.info("Source %s has no previous messages",
-        #                                   filename)
-
-        #                  it.assertEqual(source_msgs[filename],
-        #                                  it.project.getMessagesByPath(filename))
-        #          finally:
-        #              _logger.info("Restoring previous content")
-        #              writeListToFile(very_common_pkg, code)
+            content = "\n".join(["library work;",
+                                 "use work.all;",
+                                 "entity some_entity is end;"])
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+            diagnostics = it.project.getMessagesWithText(filename, content)
+
+            _logger.debug("Records received:")
+            for diagnostic in diagnostics:
+                _logger.debug("- %s", diagnostic)
+
+            # Check that all diagnostics point to the original filename and
+            # remove them from the diagnostics so it's easier to compare
+            # the remaining fields
+            for diagnostic in diagnostics:
+                it.assertSameFile(filename, diagnostic.filename)
+
+            expected = [
+                LibraryShouldBeOmited(library='work',
+                                      filename=p.abspath(filename),
+                                      column_number=9,
+                                      line_number=1),
+                PathNotInProjectFile(p.abspath(filename)),]
+
+            try:
+                it.assertCountEqual(expected, diagnostics)
+            except:
+                _logger.warning("Expected:")
+                for exp in expected:
+                    _logger.warning(exp)
+
+                raise
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+
+        @it.should("get updated messages")
+        def test006():
+            filename = p.join(TEST_PROJECT, 'another_library',
+                              'foo.vhd')
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+            code = open(filename, 'r').read().split('\n')
+
+            code[28] = '-- ' + code[28]
+
+            writeListToFile(filename, code)
+
+            diagnostics = it.project.getMessagesByPath(filename)
+
+            try:
+                it.assertNotIn(
+                    ObjectIsNeverUsed(object_type='constant',
+                                      object_name='ADDR_WIDTH',
+                                      line_number=29,
+                                      column_number=14),
+                    diagnostics)
+            finally:
+                # Remove the comment we added
+                code[28] = code[28][3:]
+                writeListToFile(filename, code)
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+        @it.should("get messages by path of a different source")
+        def test007():
+            filename = p.join(TEST_PROJECT, 'basic_library',
+                              'clock_divider.vhd')
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+            diagnostics = []
+            for diagnostic in it.project.getMessagesByPath(filename):
+                it.assertSameFile(filename, diagnostic.filename)
+                diagnostics += [diagnostic]
+
+            it.assertEqual(
+                diagnostics,
+                [ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=27, column_number=12,
+                    object_type='signal', object_name='clk_enable_unused')])
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+        @it.should("get messages from a source outside the project file")
+        def test009():
+            filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
+            writeListToFile(filename, ['library some_lib;'])
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+            diagnostics = it.project.getMessagesByPath(filename)
+
+            _logger.info("Records found:")
+            for diagnostic in diagnostics:
+                _logger.info(diagnostic)
+
+            it.assertIn(
+                PathNotInProjectFile(p.abspath(filename)),
+                diagnostics)
+
+            # The builder should find other issues as well...
+            it.assertTrue(len(diagnostics) > 1,
+                          "It was expected that the builder added some "
+                          "message here indicating an error")
+
+            it.assertMsgQueueIsEmpty(it.project)
+
+        @it.should("rebuild sources when needed within the same library")
+        def test010():
+            filenames = (
+                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+                p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'))
+
+            # Count how many messages each source has
+            source_msgs = {}
+
+            for filename in filenames:
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
+
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
+                                     'very_common_pkg.vhd')
+
+            code = open(very_common_pkg, 'r').read().split('\n')
+
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant TESTING : integer := 4;"] + \
+                            code[22:])
+
+            try:
+                # The number of messages on all sources should not change
+                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
+
+                for filename in filenames:
+                    if source_msgs[filename]:
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
+                    it.assertEqual(source_msgs[filename],
+                                   it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
+
+        @it.should("rebuild sources when changing a package on different libraries")
+        def test011():
+            filenames = (
+                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+                p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
+
+            # Count how many messages each source has
+            source_msgs = {}
+
+            for filename in filenames:
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
+                it.assertNotIn(
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
+
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
+                                     'very_common_pkg.vhd')
+
+            code = open(very_common_pkg, 'r').read().split('\n')
+
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                            code[22:])
+
+            try:
+                # The number of messages on all sources should not change
+                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
+
+                for filename in filenames:
+
+                    if source_msgs[filename]:
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
+                    it.assertEqual(source_msgs[filename],
+                                   it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
+
+        @it.should("rebuild sources when changing an entity on different libraries")
+        def test012():
+            filenames = (
+                p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+                p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
+            # Count how many messages each source has
+            source_msgs = {}
+
+            for filename in filenames:
+                _logger.info("Getting messages for '%s'", filename)
+                source_msgs[filename] = \
+                    it.project.getMessagesByPath(filename)
+                it.assertNotIn(
+                    DiagType.ERROR, [x.severity for x in source_msgs[filename]])
+
+            _logger.info("Changing very_common_pkg to force rebuilding "
+                         "synchronizer and another one I don't recall "
+                         "right now")
+            very_common_pkg = p.join(TEST_PROJECT, 'basic_library',
+                                     'very_common_pkg.vhd')
+
+            code = open(very_common_pkg, 'r').read().split('\n')
+
+            writeListToFile(very_common_pkg,
+                            code[:22] + \
+                            ["    constant ANOTHER_TEST_NOW : integer := 1;"] + \
+                            code[22:])
+
+            try:
+                # The number of messages on all sources should not change
+                it.assertEqual(it.project.getMessagesByPath(very_common_pkg), [])
+
+                for filename in filenames:
+
+                    if source_msgs[filename]:
+                        _logger.info(
+                            "Source %s had the following messages:\n%s",
+                            filename, "\n".join([str(x) for x in
+                                                 source_msgs[filename]]))
+                    else:
+                        _logger.info("Source %s has no previous messages",
+                                     filename)
+
+                    it.assertEqual(source_msgs[filename],
+                                   it.project.getMessagesByPath(filename))
+            finally:
+                _logger.info("Restoring previous content")
+                writeListToFile(very_common_pkg, code)
 
 it.createTests(globals())
