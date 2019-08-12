@@ -398,6 +398,6 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(diagnostics, [])
+                it.assertCountEqual(diagnostics, [])
 
 it.createTests(globals())

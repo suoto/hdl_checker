@@ -32,7 +32,8 @@ import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import (CheckerDiagnostic, DiagType, ObjectIsNeverUsed,
                                StaticCheckerDiag)
-from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
+from hdlcc.tests.utils import (assertCountEqual, disableVunit, getTestTempPath,
+                               setupTestSuport)
 from hdlcc.utils import removeIfExists
 
 try:  # Python 3.x
@@ -51,8 +52,8 @@ HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 with such.A("hdlcc bottle app") as it:
     # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        it.assertCountEqual = assertCountEqual(it)
 
     @it.has_setup
     def setup():
@@ -76,7 +77,7 @@ with such.A("hdlcc bottle app") as it:
     @disableVunit
     def test():
         reply = it.app.post_json('/get_diagnose_info')
-        it.assertItemsEqual(
+        it.assertCountEqual(
             reply.json['info'],
             [u'hdlcc version: %s' % hdlcc.__version__,
              u'Server PID: %d' % os.getpid(),
@@ -91,7 +92,7 @@ with such.A("hdlcc bottle app") as it:
 
         _logger.info("Reply is %s", reply.json['info'])
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             reply.json['info'],
             [u'hdlcc version: %s' % hdlcc.__version__,
              u'Server PID: %d' % os.getpid(),
@@ -111,7 +112,7 @@ with such.A("hdlcc bottle app") as it:
                 '/get_diagnose_info',
                 {'project_file' : it.project_file})
 
-            it.assertItemsEqual(
+            it.assertCountEqual(
                 reply.json['info'],
                 [u'hdlcc version: %s' % hdlcc.__version__,
                  u'Server PID: %d' % os.getpid(),
@@ -125,7 +126,7 @@ with such.A("hdlcc bottle app") as it:
             {'project_file' : 'foo_bar.prj'})
 
         _logger.info("Reply is %s", reply.json['info'])
-        it.assertItemsEqual(
+        it.assertCountEqual(
             reply.json['info'],
             [u'hdlcc version: %s' % hdlcc.__version__,
              u'Server PID: %d' % os.getpid(),
@@ -227,7 +228,7 @@ with such.A("hdlcc bottle app") as it:
 
         messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             messages,
             [ObjectIsNeverUsed(filename=filename, line_number=27,
                                column_number=12, object_type='signal',
@@ -252,7 +253,7 @@ with such.A("hdlcc bottle app") as it:
 
         _logger.info("Dependencies: %s", ', '.join(dependencies))
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             ["ieee.std_logic_1164",
              "ieee.numeric_std",
              "basic_library.clock_divider"],
@@ -271,7 +272,7 @@ with such.A("hdlcc bottle app") as it:
 
         _logger.info("Sequence: %s", sequence)
 
-        it.assertItemsEqual(
+        it.assertCountEqual(
             [p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
              p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
              p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')],
