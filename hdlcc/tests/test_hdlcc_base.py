@@ -37,7 +37,7 @@ from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
 from hdlcc.hdlcc_base import CACHE_NAME
-from hdlcc.parsers import DependencySpec
+from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertCountEqual,
                                assertSameFile, getTestTempPath,
@@ -555,13 +555,34 @@ with such.A("hdlcc project") as it:
             it.assertTrue(isinstance(it.project.builder, MockBuilder),
                           "Builder should be {} but got {} instead".format(MockBuilder, it.project.builder))
 
+        @it.should('get a list of sources')
+        def test():
+            it.assertCountEqual(
+                it.project.getSources(),
+                [VerilogParser(filename=p.join(TEST_PROJECT, 'verilog', 'parity.sv'),
+                               library='verilog'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
+                            library='basic_library'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
+                            library='basic_library'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
+                            library='basic_library'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
+                            library='basic_library'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'package_with_functions.vhd'),
+                            library='basic_library'),
+                 VhdlParser(filename=p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
+                            library='another_library'),
+                 VerilogParser(filename=p.join(TEST_PROJECT, 'verilog', 'parity.v'),
+                               library='verilog')])
+
         @it.has_teardown
         def teardown():
             it.config_parser_patch.stop()
             it.mock_builder_patch.stop()
 
         @it.should("get messages by path")
-        def test005a():
+        def test():
             filename = p.join(TEST_PROJECT, 'another_library',
                               'foo.vhd')
 
@@ -579,7 +600,7 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")
-        def test005b():
+        def test():
             filename = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
             original_content = open(filename, 'r').read().split('\n')
@@ -623,7 +644,7 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text for file outside the project file")
-        def test005c():
+        def test():
             filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ["entity some_entity is end;", ])
 
@@ -665,7 +686,7 @@ with such.A("hdlcc project") as it:
 
 
         @it.should("get updated messages")
-        def test006():
+        def test():
             filename = p.join(TEST_PROJECT, 'another_library',
                               'foo.vhd')
 
@@ -694,7 +715,7 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages by path of a different source")
-        def test007():
+        def test():
             filename = p.join(TEST_PROJECT, 'basic_library',
                               'clock_divider.vhd')
 
@@ -715,7 +736,7 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages from a source outside the project file")
-        def test009():
+        def test():
             filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
             writeListToFile(filename, ['library some_lib;'])
 
@@ -739,7 +760,7 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("rebuild sources when needed within the same library")
-        def test010():
+        def test():
             filenames = (
                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'))
@@ -786,7 +807,7 @@ with such.A("hdlcc project") as it:
                 writeListToFile(very_common_pkg, code)
 
         @it.should("rebuild sources when changing a package on different libraries")
-        def test011():
+        def test():
             filenames = (
                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
@@ -836,7 +857,7 @@ with such.A("hdlcc project") as it:
                 writeListToFile(very_common_pkg, code)
 
         @it.should("rebuild sources when changing an entity on different libraries")
-        def test012():
+        def test():
             filenames = (
                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'))
