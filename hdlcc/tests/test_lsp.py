@@ -54,7 +54,7 @@ pyls._utils.debounce = _debounce
 
 import hdlcc.lsp as lsp  # isort:skip
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
-from hdlcc.tests.utils import getTestTempPath, setupTestSuport  # isort:skip
+from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport # isort:skip
 from hdlcc.utils import onWindows  # isort:skip
 
 _logger = logging.getLogger(__name__)
@@ -126,6 +126,8 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
             'some error', defines.MessageType.Error)
 
 with such.A("LSP server") as it:
+    if six.PY2:
+        it.assertCountEqual = assertCountEqual(it)
 
     def _initializeServer(server, params=None):
         it.assertEqual(
@@ -215,7 +217,7 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
+                it.assertCountEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
                       'range': {'start': {'line': 28, 'character': 11},
@@ -265,7 +267,7 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(diagnostics, [])
+                it.assertCountEqual(diagnostics, [])
 
     with it.having('a non existing project file'):
 
@@ -310,7 +312,7 @@ with such.A("LSP server") as it:
                     error = '[Errno 2] No such file or directory: '
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
+                it.assertCountEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
                       'range': {'start': {'line': 28, 'character': 11},
@@ -355,7 +357,7 @@ with such.A("LSP server") as it:
                 _logger.info("diagnostics: %s", diagnostics)
 
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
+                it.assertCountEqual(
                     diagnostics,
                     [{'source': 'HDL Code Checker/static',
                       'range': {'start': {'line': 26, 'character': 11},

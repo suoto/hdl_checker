@@ -124,6 +124,7 @@ def _parseArguments():
 
 def _getNoseCommandLineArgs(args):
     argv = []
+
     if args.verbose:
         argv += ['--verbose', '--verbose', ] # wtf?
     if args.debugger:
@@ -131,17 +132,11 @@ def _getNoseCommandLineArgs(args):
     if args.fail_fast:
         argv += ['--fail-fast']
 
-    if args.log_level:
-        argv += ['--log-level', args.log_level]
-
     return argv
 
 def runTestsForEnv(args):
     nose_base_args = _getNoseCommandLineArgs(args)
     nose_args = list(nose_base_args)
-
-    nose_args = ['--log-capture', ]
-
 
     if args.tests:
         nose_args += args.tests
@@ -177,7 +172,6 @@ def main():
     logging.getLogger('vunit').setLevel(logging.ERROR)
     logging.getLogger('requests').setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
-    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     log_format = '%(levelname)-7s | %(asctime)s | ' + \
         '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
     file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
