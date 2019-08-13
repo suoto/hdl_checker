@@ -29,8 +29,8 @@ import unittest2
 from hdlcc.builders import AVAILABLE_BUILDERS, GHDL, XVHDL, Fallback, MSim
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.exceptions import SanityCheckError
-from hdlcc.parsers import VhdlParser
-from hdlcc.tests.utils import (assertSameFile, getTestTempPath,
+from hdlcc.parsers import DependencySpec, VhdlParser
+from hdlcc.tests.utils import (SourceMock, assertSameFile, getTestTempPath,
                                parametrizeClassWithBuilders, setupTestSuport)
 
 _logger = logging.getLogger(__name__)
@@ -43,6 +43,9 @@ BUILDER_CLASS_MAP = {
     'xvhdl': XVHDL,
     'ghdl': GHDL,
     'fallback': Fallback}
+
+class _SourceMock(SourceMock):
+    base_path = TEST_TEMP_PATH
 
 @parametrizeClassWithBuilders
 class TestBuilder(unittest2.TestCase):
@@ -344,12 +347,23 @@ class TestBuilder(unittest2.TestCase):
 
         self.assertEqual(rebuilds, [])
 
-    def test_msim_recompile_msg(self):
+    def test_msim_recompile_msg_0(self):
         if self.builder_name != "msim":
             raise unittest2.SkipTest("ModelSim only test")
 
         line = ("** Error: (vcom-13) Recompile foo_lib.bar_component because "
                 "foo_lib.foo_lib_pkg has changed.")
+
+        self.assertEqual(
+            [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
+            self.builder._searchForRebuilds(line))
+
+    def test_msim_recompile_msg_1(self):
+        if self.builder_name != "msim":
+            raise unittest2.SkipTest("ModelSim only test")
+
+        line = ("** Error: (vcom-13) Recompile foo_lib.bar_component because "
+                "foo_lib.foo_lib_pkg, base_library.very_common_package have changed.")
 
         self.assertEqual(
             [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
@@ -364,6 +378,27 @@ class TestBuilder(unittest2.TestCase):
         self.assertEqual(
             [{'unit_type': 'package', 'unit_name': 'leon3'}],
             self.builder._searchForRebuilds(line))
+
+    # Rebuild formats are:
+    # - {unit_type: '', 'unit_name': }
+    # - {library_name: '', 'unit_name': }
+    # - {rebuild_path: ''}
+    @parameterized.parameterized.expand([
+        ({'unit_type': 'package', 'unit_name': 'very_common_pkg'}, ),
+        ({'library_name': 'work', 'unit_name': 'foo'}, ),
+        ({'rebuild_path': ''}, ),
+        ])
+    def test_get_rebuilds(self, rebuild_info):
+        _logger.info("Rebuild info is %s", rebuild_info)
+        with mock.patch.object(self.builder, '_searchForRebuilds', return_value=[rebuild_info, ]):
+            source = _SourceMock(
+                library='some_lib',
+                design_units=[{'name' : 'target',
+                               'type' : 'entity'}],
+                dependencies=[
+                    DependencySpec(library='work', name='very_common_pkg')])
+
+            self.assertEqual(self.builder._getRebuilds(source, ''), [rebuild_info, ])
 
 class TestSanityError(unittest2.TestCase):
 
