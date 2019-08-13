@@ -46,24 +46,6 @@ BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
-TEST_ENVS = {}
-
-TEST_ENVS['ghdl'] = {'BUILDER_NAME' : 'ghdl'}
-
-if _CI or not p.exists(p.expanduser('~/.local/bin/ghdl')):
-    TEST_ENVS['ghdl']['BUILDER_PATH'] = p.expanduser('~/builders/ghdl/bin/')
-else:
-    TEST_ENVS['ghdl']['BUILDER_PATH'] = p.expanduser('~/.local/bin/ghdl')
-
-TEST_ENVS['msim'] = {
-    'BUILDER_NAME' : 'msim',
-    'BUILDER_PATH' : p.expanduser('~/builders/msim/modelsim_ase/linux/')}
-
-TEST_ENVS['xvhdl'] = {
-    'BUILDER_NAME' : 'xvhdl',
-    'BUILDER_PATH' : p.expanduser('~/builders/xvhdl/bin/')}
-
-
 def _shell(cmd):
     _logger.info("$ %s", cmd)
     for line in os.popen(cmd).read().split('\n'):
@@ -78,46 +60,28 @@ def _clear():
 
 def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
-    from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
-    rainbow_stream_handler = RainbowLoggingHandler(stream)
+    if hasattr(stream, 'isatty') and stream.isatty():
+        from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
+        rainbow_stream_handler = RainbowLoggingHandler(stream)
 
-    logging.root.addHandler(rainbow_stream_handler)
-    logging.root.setLevel(level)
+        logging.root.addHandler(rainbow_stream_handler)
+        logging.root.setLevel(level)
+    else:
+        handler = logging.StreamHandler(stream)
+        handler.formatter = logging.Formatter(
+            '%(levelname)-7s | %(asctime)s | ' +
+            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
+            '|\t%(message)s', datefmt='%H:%M:%S')
 
-def _uploadAppveyorArtifact(path):
-    "Uploads 'path' to Appveyor artifacts"
-    assert _APPVEYOR, "Appveyor artifacts can only be uploaded to Appveyor"
-    cmd = "appveyor PushArtifact \"%s\"" % path
-    print(cmd)
-    _logger.info(cmd)
-    for line in os.popen(cmd).read().splitlines():
-        print(line)
-        _logger.info(line)
+        logging.root.addHandler(handler)
+        logging.root.setLevel(level)
 
 def _parseArguments():
-    "Argument parser for standalone hdlcc"
-
     parser = argparse.ArgumentParser()
 
     # Options
     parser.add_argument('tests', action='append', nargs='*',
                         help="Test names or files to be run")
-
-    parser.add_argument('--msim', action='store_true',
-                        help="Runs tests with ModelSim environment")
-
-    parser.add_argument('--ghdl', action='store_true',
-                        help="Runs tests with GHDL environment")
-
-    parser.add_argument('--xvhdl', action='store_true',
-                        help="Runs tests with XHDL environment")
-
-    parser.add_argument('--fallback', action='store_true',
-                        help="Runs tests for the fallback builder")
-
-    parser.add_argument('--standalone', action='store_true',
-                        help="Runs tests for standalone hdlcc")
-
     parser.add_argument('--fail-fast', '-F', action='store_true')
 
     parser.add_argument('--debugger', '-D', action='store_true')
@@ -140,13 +104,6 @@ def _parseArguments():
     args = parser.parse_args()
     args.log_level = str(args.log_level).upper()
 
-    # Set the default behaviour: run all tests
-    env_list = [getattr(args, x) for x in ('msim', 'ghdl', 'xvhdl', 'fallback',
-                                           'standalone')]
-    if True not in env_list:
-        _ = [setattr(args, x, True) for x in ('msim', 'ghdl', 'xvhdl', 'fallback',
-                                              'standalone')]
-    test_list = []
     if args.tests:
         test_list = [source for sublist in args.tests for source in sublist]
 
@@ -166,56 +123,37 @@ def _parseArguments():
     return args
 
 def _getNoseCommandLineArgs(args):
-    argv = [sys.argv[0]]
+    argv = []
+
     if args.verbose:
-        argv += ['--verbose']
+        argv += ['--verbose', '--verbose', ] # wtf?
     if args.debugger:
         argv += ['--debugger']
     if args.fail_fast:
         argv += ['--fail-fast']
-
-    if args.log_level:
-        argv += ['--log-level', args.log_level]
+    if not args.log_to_stdout:
+        argv += ['--log-capture', ]
 
     return argv
 
-def _getDefaultTestByEnv(env):
-    if env in ('msim', 'ghdl', 'xvhdl'):
-        return ('hdlcc.tests.test_builders',
-                'hdlcc.tests.test_hdlcc_base',
-                'hdlcc.tests.test_persistence',
-                'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_standalone')
-    if env == 'standalone':
-        return ('hdlcc.tests.test_config_parser',
-                'hdlcc.tests.test_static_check')
-    if env == 'fallback':
-        return ('hdlcc.tests.test_lsp',
-                'hdlcc.tests.test_server',
-                'hdlcc.tests.test_builders',
-                'hdlcc.tests.test_vhdl_parser',
-                'hdlcc.tests.test_verilog_parser',
-                'hdlcc.tests.test_hdlcc_base',
-                'hdlcc.tests.test_server_handlers',
-                'hdlcc.tests.test_standalone',
-                'hdlcc.tests.test_misc')
-    assert False
-
-def runTestsForEnv(env, args):
+def runTestsForEnv(args):
     nose_base_args = _getNoseCommandLineArgs(args)
     nose_args = list(nose_base_args)
 
     if args.tests:
         nose_args += args.tests
-    else:
-        nose_args += _getDefaultTestByEnv(env)
 
     test_env = os.environ.copy()
 
-    if env in TEST_ENVS:
-        test_env.update(TEST_ENVS[env])
-
     test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
+
+    home = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'home')
+    os.makedirs(home)
+
+    if not _ON_WINDOWS:
+        test_env.update({'HOME' : home})
+    else:
+        test_env.update({'LOCALAPPDATA' : home})
 
     _logger.info("nose2 args: %s", nose_args)
 
@@ -236,36 +174,18 @@ def main():
     logging.getLogger('vunit').setLevel(logging.ERROR)
     logging.getLogger('requests').setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
-    #  log_format = "[%(asctime)s] %(levelname)-8s || %(name)-30s || %(message)s"
     log_format = '%(levelname)-7s | %(asctime)s | ' + \
         '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
     file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
     logging.root.addHandler(file_handler)
     logging.root.setLevel(args.log_level)
 
-    print("Environment info:")
-    print(" - CI:       %s" % _CI)
-    print(" - APPVEYOR: %s" % _APPVEYOR)
-    print(" - TRAVIS:   %s" % _TRAVIS)
-    print(" - LOG:      %s" % args.log_file)
+    print(" - Log file: " + args.log_file)
 
     cov = coverage.Coverage(config_file='.coveragerc')
     cov.start()
 
-    passed = True
-    for env in ('ghdl', 'msim', 'xvhdl', 'fallback', 'standalone'):
-        if getattr(args, env):
-            _logger.info("Running env '%s'", env)
-
-            if not runTestsForEnv(env, args):
-                if passed:
-                    _logger.warning("Some tests failed while running '%s'", env)
-                passed = False
-
-            if not passed and args.fail_fast:
-                break
-        else:
-            _logger.info("Skipping env '%s'", env)
+    passed = runTestsForEnv(args)
 
     cov.stop()
     cov.save()

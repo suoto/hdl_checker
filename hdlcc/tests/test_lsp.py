@@ -25,27 +25,41 @@
 import logging
 import os
 import os.path as p
-import sys
-import threading
-from threading import Timer
 import time
+from threading import Event, Timer
 
 import mock
+import parameterized
+import six
 import unittest2
 from nose2.tools import such
-
-import pyls.lsp as defines
+import pyls
+from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace
 from pyls_jsonrpc.streams import JsonRpcStreamReader
 
-import hdlcc.lsp as lsp
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.utils import onWindows
+
+# Debouncing will hurt testing since it won't actually call the debounced
+# function if we call it too quickly.
+def _debounce(interval_s, keyed_by=None):
+    def wrapper(func):
+        def debounced(*args, **kwargs):
+            result = func(*args, **kwargs)
+            _logger.info("%s(%s, %s) returned %s", func.__name__, args, kwargs, result)
+            return result
+        return debounced
+    return wrapper
+
+# Mock debounce before it's applied
+pyls._utils.debounce = _debounce
+
+import hdlcc.lsp as lsp  # isort:skip
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
+from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport # isort:skip
+from hdlcc.utils import onWindows  # isort:skip
 
 _logger = logging.getLogger(__name__)
-
-# pylint: disable=bad-whitespace
 
 JSONRPC_VERSION = '2.0'
 LSP_MSG_TEMPLATE = {'jsonrpc': JSONRPC_VERSION,
@@ -56,46 +70,43 @@ LSP_MSG_EMPTY_RESPONSE = {'jsonrpc': JSONRPC_VERSION, 'id': 1, 'result': None}
 
 MOCK_WAIT_TIMEOUT = 5
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
-VIM_HDL_EXAMPLES = p.abspath(p.join(TEST_SUPPORT_PATH, "vim-hdl-examples"))
-
-_ON_WINDOWS = sys.platform == "win32"
+TEST_TEMP_PATH = getTestTempPath(__name__)
+TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
 if onWindows():
-    VIM_HDL_EXAMPLES = VIM_HDL_EXAMPLES.lower()
+    TEST_PROJECT = TEST_PROJECT.lower()
 
 class TestCheckerDiagToLspDict(unittest2.TestCase):
 
-    def test_converting_to_lsp(self):
-        for diag_type, severity in (
-                (DiagType.INFO,           defines.DiagnosticSeverity.Hint),
-                (DiagType.STYLE_INFO,     defines.DiagnosticSeverity.Hint),
-                (DiagType.STYLE_WARNING,  defines.DiagnosticSeverity.Information),
-                (DiagType.STYLE_ERROR,    defines.DiagnosticSeverity.Information),
-                (DiagType.WARNING,        defines.DiagnosticSeverity.Warning),
-                (DiagType.ERROR,          defines.DiagnosticSeverity.Error),
-                (DiagType.NONE,           defines.DiagnosticSeverity.Error)):
+    @parameterized.parameterized.expand([
+        (DiagType.INFO, defines.DiagnosticSeverity.Hint),
+        (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Hint),
+        (DiagType.STYLE_WARNING, defines.DiagnosticSeverity.Information),
+        (DiagType.STYLE_ERROR, defines.DiagnosticSeverity.Information),
+        (DiagType.WARNING, defines.DiagnosticSeverity.Warning),
+        (DiagType.ERROR, defines.DiagnosticSeverity.Error),
+        (DiagType.NONE, defines.DiagnosticSeverity.Error)])
+    def test_converting_to_lsp(self, diag_type, severity):
+        _logger.info("Running %s and %s", diag_type, severity)
 
-            _logger.info("Running %s and %s", diag_type, severity)
+        diag = CheckerDiagnostic(
+            checker='hdlcc test', text='some diag', filename='filename',
+            line_number=1, column_number=1, error_code='error code',
+            severity=diag_type)
 
-            diag = CheckerDiagnostic(
-                checker='hdlcc test', text='some diag', filename='filename',
-                line_number=1, column_number=1, error_code='error code',
-                severity=diag_type)
-
-            self.assertEqual(
-                lsp.checkerDiagToLspDict(diag),
-                {'source': 'hdlcc test',
-                 'range': {
-                     'start': {
-                         'line': 0,
-                         'character': 0, },
-                     'end': {
-                         'line': 0,
-                         'character': 0, }},
-                 'message': 'some diag',
-                 'severity': severity,
-                 'code': 'error code'})
+        self.assertEqual(
+            lsp.checkerDiagToLspDict(diag),
+            {'source': 'hdlcc test',
+             'range': {
+                 'start': {
+                     'line': 0,
+                     'character': 0, },
+                 'end': {
+                     'line': 0,
+                     'character': 0, }},
+             'message': 'some diag',
+             'severity': severity,
+             'code': 'error code'})
 
     def test_workspace_notify(self):
         workspace = mock.MagicMock(spec=Workspace)
@@ -117,6 +128,8 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
             'some error', defines.MessageType.Error)
 
 with such.A("LSP server") as it:
+    if six.PY2:
+        it.assertCountEqual = assertCountEqual(it)
 
     def _initializeServer(server, params=None):
         it.assertEqual(
@@ -124,9 +137,31 @@ with such.A("LSP server") as it:
             {"capabilities": {"textDocumentSync": 1}})
 
         it.assertEqual(server.m_initialized(), None)
+    def startLspServer():
+        _logger.debug("Creating server")
+        tx_r, tx_w = os.pipe()
+        it.tx = JsonRpcStreamReader(os.fdopen(tx_r, 'rb'))
+
+        it.rx = mock.MagicMock()
+        it.rx.closed = False
+
+        it.server = lsp.HdlccLanguageServer(it.rx, os.fdopen(tx_w, 'wb'))
+
+    def stopLspServer():
+        _logger.debug("Shutting down server")
+        msg = LSP_MSG_TEMPLATE.copy()
+        msg.update({'method': 'exit'})
+        it.server._endpoint.consume(msg)
+
+        # Close the pipe from the server to stdout and empty any pending
+        # messages
+        it.tx.close()
+        it.tx.listen(_logger.fatal)
+
+        del it.server
 
     def _waitOnMockCall(meth):
-        event = threading.Event()
+        event = Event()
 
         timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
         timer.start()
@@ -145,127 +180,166 @@ with such.A("LSP server") as it:
 
         return result
 
+    def checkLintFileOnOpen(source):
+        return checkLintFileOnMethod(source, 'm_text_document__did_open')
+
+    def checkLintFileOnSave(source):
+        return checkLintFileOnMethod(source, 'm_text_document__did_save')
+
+    def checkLintFileOnMethod(source, method):
+        with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+            _logger.info("Sending %s request", method)
+            getattr(it.server, method)(
+                textDocument={'uri': uris.from_fs_path(source),
+                              'text': None})
+
+            call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+            doc_uri, diagnostics = call[1]
+            _logger.info("doc_uri: %s", doc_uri)
+            _logger.info("diagnostics: %s", diagnostics)
+
+            it.assertEqual(doc_uri, uris.from_fs_path(source))
+            return diagnostics
 
     @it.has_setup
     def setup():
-        _logger.debug("Sever")
-        tx_r, tx_w = os.pipe()
-        it.tx = JsonRpcStreamReader(os.fdopen(tx_r, 'rb'))
-
-        it.rx = mock.MagicMock()
-        it.rx.closed = False
-
-        it.server = lsp.HdlccLanguageServer(it.rx, os.fdopen(tx_w, 'wb'))
-
-    @it.has_teardown
-    def teardown():
-        _logger.debug("Shutting down server")
-        msg = LSP_MSG_TEMPLATE.copy()
-        msg.update({'method': 'exit'})
-        it.server._endpoint.consume(msg)
-
-        # Close the pipe from the server to stdout and empty any pending
-        # messages
-        it.tx.close()
-        it.tx.listen(_logger.fatal)
-
-        del it.server
-        import shutil
-        try:
-            shutil.rmtree(p.join(VIM_HDL_EXAMPLES, '.hdlcc'))
-        except OSError:
-            pass
+        setupTestSuport(TEST_TEMP_PATH)
 
     with it.having('no project file'):
 
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
+
         @it.should('respond capabilities upon initialization')
         def test():
             _initializeServer(
                 it.server,
-                params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
-                    'initializationOptions': {
-                        'project_file': None}})
+                params={'rootUri': uris.from_fs_path(TEST_PROJECT)})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
+            it.assertCountEqual(
+                checkLintFileOnOpen(source),
+                [{'source': 'HDL Code Checker/static',
+                  'range': {'start': {'line': 28, 'character': 11},
+                            'end': {'line': 28, 'character': 11}},
+                  'message': "Signal 'neat_signal' is never used",
+                  'severity': defines.DiagnosticSeverity.Information}])
 
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
-
-                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-                doc_uri, diagnostics = call[1]
-                _logger.info("doc_uri: %s", doc_uri)
-                _logger.info("diagnostics: %s", diagnostics)
-
-                it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
 
 
         @it.should('not lint file outside workspace')
-        @mock.patch.object(Workspace, 'publish_diagnostics',
-                           mock.MagicMock(spec=Workspace.publish_diagnostics))
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'basic_library',
-                            'clock_divider.vhd')
-
-            it.server.lint(doc_uri=uris.from_fs_path(source),
-                           is_saved=True)
-
-            it.server.workspace.publish_diagnostics.assert_not_called()
+            source = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
+            with it.assertRaises(AssertionError):
+                checkLintFileOnSave(source)
 
     with it.having('an existing and valid project file'):
+
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
 
         @it.should('respond capabilities upon initialization')
         def test():
             _initializeServer(
                 it.server,
                 params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                    'rootUri': uris.from_fs_path(TEST_PROJECT),
                     'initializationOptions': {
                         'project_file': 'vimhdl.prj'}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
+            it.assertCountEqual(checkLintFileOnOpen(source), [])
 
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
+        @it.should('clean up if the project file has been modified')
+        def test():
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-                doc_uri, diagnostics = call[1]
-                _logger.info("doc_uri: %s", doc_uri)
-                _logger.info("diagnostics: %s", diagnostics)
+            og_timestamp = p.getmtime(it.server._checker.project_file)
 
-                it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
+            content = open(it.server._checker.project_file).read()
+            open(it.server._checker.project_file, 'a').write('\n# foo')
+            curr_ts = p.getmtime(it.server._checker.project_file)
+
+            _logger.info("Original timestamp: %s, current timestamp: %s",
+                         og_timestamp, curr_ts)
+
+            it.assertNotEqual(og_timestamp, curr_ts,
+                              "Timestamps are still equal??")
+
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                with mock.patch.object(it.server._checker, 'clean') as clean:
+
+                    _logger.info("Sending m_text_document__did_save request")
+                    it.server.m_text_document__did_save(
+                        textDocument={'uri': uris.from_fs_path(source),
+                                      'text': None})
+
+                    call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                    doc_uri, diagnostics = call[1]
+                    _logger.info("doc_uri: %s", doc_uri)
+                    _logger.info("diagnostics: %s", diagnostics)
+
+                    clean.assert_called_once()
+
+            # Restore the original content (which will change the timestamp)
+            # and request a message so that parsing occurs here
+            open(it.server._checker.project_file, 'w').write(content)
+            it.assertEqual(content, open(it.server._checker.project_file).read())
+
+            it.server.m_text_document__did_save(
+                textDocument={'uri': uris.from_fs_path(source),
+                              'text': None})
+
+        @it.should('rebuild if the cache file has been removed')
+        def test():
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
+            os.remove(it.server._checker._getCacheFilename())
+
+            def getBuilder():
+                return 'msim'
+
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                with mock.patch.object(it.server._checker, 'clean') as clean:
+                    with mock.patch.object(it.server._checker.config_parser,
+                                           'getBuilder', getBuilder):
+
+                        _logger.info("Sending m_text_document__did_save request")
+                        it.server.m_text_document__did_save(
+                            textDocument={'uri': uris.from_fs_path(source),
+                                          'text': None})
+
+                        call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                        doc_uri, diagnostics = call[1]
+                        _logger.info("doc_uri: %s", doc_uri)
+                        _logger.info("diagnostics: %s", diagnostics)
+
+                        clean.assert_called()
 
     with it.having('a non existing project file'):
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
 
         @it.should('respond capabilities upon initialization')
         def test():
@@ -275,51 +349,51 @@ with such.A("LSP server") as it:
             _initializeServer(
                 it.server,
                 params={
-                    'rootUri': uris.from_fs_path(VIM_HDL_EXAMPLES),
+                    'rootUri': uris.from_fs_path(TEST_PROJECT),
                     'initializationOptions': {
                         'project_file': it.project_file}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
+            diagnostics = checkLintFileOnOpen(source)
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
-
-                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-                doc_uri, diagnostics = call[1]
-                _logger.info("doc_uri: %s", doc_uri)
-                _logger.info("diagnostics: %s", diagnostics)
-
-                if _ON_WINDOWS:
-                    error = '[WinError 2] The system cannot find the file specified'
+            if onWindows():
+                if six.PY3:
+                    error = '[WinError 2] The system cannot find the file specified: '
                 else:
-                    error = '[Errno 2] No such file or directory'
+                    # Got to get rid of these stupid string modifiers
+                    # really or at least make testing independent of them
+                    error = '[Error 2] The system cannot find the file specified: u'
+            else:
+                error = '[Errno 2] No such file or directory: '
 
-                it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information},
-                     {'source': 'HDL Code Checker',
-                      'range': {'start': {'line': 0, 'character': 0},
-                                'end': {'line': 0, 'character': 0}},
-                      'message': "Exception while creating server: '{}: {}'"
-                                 .format(error,
-                                         repr(p.join(VIM_HDL_EXAMPLES,
-                                                     it.project_file))),
-                      'severity': defines.DiagnosticSeverity.Error}])
+            it.assertCountEqual(
+                diagnostics,
+                [{'source': 'HDL Code Checker/static',
+                  'range': {'start': {'line': 28, 'character': 11},
+                            'end': {'line': 28, 'character': 11}},
+                  'message': "Signal 'neat_signal' is never used",
+                  'severity': defines.DiagnosticSeverity.Information},
+                 {'source': 'HDL Code Checker',
+                  'range': {'start': {'line': 0, 'character': 0},
+                            'end': {'line': 0, 'character': 0}},
+                  'message': "Exception while creating server: '{}{}'"
+                             .format(error,
+                                     repr(p.join(TEST_PROJECT,
+                                                 it.project_file))),
+                  'severity': defines.DiagnosticSeverity.Error}])
 
-    with it.having('no root URI or project file set'):
+    with it.having('neither root URI nor project file set'):
+
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
+
 
         @it.should('respond capabilities upon initialization')
         def test():
@@ -331,32 +405,28 @@ with such.A("LSP server") as it:
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
+            it.assertCountEqual(
+                checkLintFileOnOpen(source),
+                [{'source': 'HDL Code Checker/static',
+                  'range': {'start': {'line': 26, 'character': 11},
+                            'end': {'line': 26, 'character': 11}},
+                  'message': "Signal 'clk_enable_unused' is never used",
+                  'severity': defines.DiagnosticSeverity.Information}
+                ])
 
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
-
-                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-                doc_uri, diagnostics = call[1]
-                _logger.info("doc_uri: %s", doc_uri)
-                _logger.info("diagnostics: %s", diagnostics)
-
-                it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
 
     with it.having('no root URI but project file set'):
+
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
+
 
         @it.should('respond capabilities upon initialization')
         def test():
@@ -366,33 +436,12 @@ with such.A("LSP server") as it:
                 it.server,
                 params={
                     'initializationOptions': {
-                        'project_file': p.join(VIM_HDL_EXAMPLES, 'vimhdl.prj')}})
+                        'project_file': p.join(TEST_PROJECT, 'vimhdl.prj')}})
 
         @it.should('lint file when opening it')
         def test():
-            source = p.join(VIM_HDL_EXAMPLES, 'another_library', 'foo.vhd')
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
-
-                call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-                doc_uri, diagnostics = call[1]
-                _logger.info("doc_uri: %s", doc_uri)
-                _logger.info("diagnostics: %s", diagnostics)
-
-                it.assertEqual(doc_uri, uris.from_fs_path(source))
-                it.assertItemsEqual(
-                    diagnostics,
-                    [{'source': 'HDL Code Checker/static',
-                      'range': {'start': {'line': 42, 'character': 11},
-                                'end': {'line': 42, 'character': 11}},
-                      'message': "Signal 'neat_signal' is never used",
-                      'severity': defines.DiagnosticSeverity.Information}])
+            it.assertCountEqual(checkLintFileOnOpen(source), [])
 
 it.createTests(globals())

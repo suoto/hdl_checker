@@ -26,16 +26,15 @@ from nose2.tools import such
 
 from hdlcc.parsers import VerilogParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import writeListToFile
+from hdlcc.tests.utils import assertCountEqual, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
 _FILENAME = 'source.v'
 
 with such.A('Verilog source file object') as it:
-    # Workaround for Python 2.x and 3.x differences
-    if six.PY3:
-        it.assertItemsEqual = it.assertCountEqual
+    if six.PY2:
+        it.assertCountEqual = assertCountEqual(it)
 
     with it.having('a module code'):
         @it.has_setup
@@ -67,7 +66,7 @@ module clock_divider
         def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
-            it.assertItemsEqual([{'type' : 'entity', 'name' : 'clock_divider'}],
+            it.assertCountEqual([{'type' : 'entity', 'name' : 'clock_divider'}],
                                 design_units)
 
         @it.should('return no dependencies')
@@ -112,7 +111,7 @@ endpackage
         def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
-            it.assertItemsEqual([{'type' : 'package', 'name' : 'msgPkg'}],
+            it.assertCountEqual([{'type' : 'package', 'name' : 'msgPkg'}],
                                 design_units)
 
         @it.should('return only its own library')

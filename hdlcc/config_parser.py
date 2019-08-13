@@ -20,11 +20,12 @@ import logging
 import os.path as p
 import re
 from glob import glob
-from threading import Lock
+from threading import RLock
 
 import hdlcc.exceptions
-from hdlcc.builders import AVAILABLE_BUILDERS, getBuilderByName
-from hdlcc.parsers import VerilogParser, VhdlParser, getSourceFileObjects
+from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
+from hdlcc.parsers import getSourceFileObjects
+from hdlcc.utils import getFileType
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -67,10 +68,10 @@ _VUNIT_FLAGS = {
     'ghdl' : {
         '93'   : ['--std=93c'],
         '2002' : ['--std=02'],
-        '2008' : ['--std=08']}
+        '2008' : ['--std=08']},
     }
 
-class ConfigParser(object):
+class ConfigParser(object):  # pylint: disable=useless-object-inheritance
     """
     Configuration info provider
     """
@@ -110,7 +111,7 @@ class ConfigParser(object):
 
         self._sources = {}
         self._timestamp = 0
-        self._parse_lock = Lock()
+        self._parse_lock = RLock()
 
     def __eq__(self, other): # pragma: no cover
         if not isinstance(other, type(self)):
@@ -172,18 +173,13 @@ class ConfigParser(object):
         # Communication library and array utility library are only
         # available on VHDL 2008
         if vunit_project.vhdl_standard == '2008':
-            for func in (vunit_project.add_com,
-                         vunit_project.add_array_util):
-                try:
-                    func()
-                except: # pragma: no cover pylint:disable=bare-except
-                    self._logger.exception("Error running '%s'", str(func))
-                    raise
+            vunit_project.add_com()
+            vunit_project.add_array_util()
 
         # Get extra flags for building VUnit sources
-        if self.getBuilder() in _VUNIT_FLAGS:
+        try:
             vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
-        else:
+        except KeyError:
             vunit_flags = []
 
         _source_file_args = []
@@ -217,6 +213,8 @@ class ConfigParser(object):
         """
         Gets a dict that describes the current state of this object
         """
+        self._parseIfNeeded()
+
         state = {}
         state['filename'] = self.filename
         state['_timestamp'] = self._timestamp
@@ -243,7 +241,7 @@ class ConfigParser(object):
         sources = state.pop('_sources')
         obj.filename = state.pop('filename', None)
         obj._timestamp = state.pop('_timestamp')
-        obj._parse_lock = Lock()
+        obj._parse_lock = RLock()
 
         obj._parms = state['_parms']
         obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
@@ -270,12 +268,19 @@ class ConfigParser(object):
         """
         self._timestamp = p.getmtime(self.filename)
 
+    def isParsing(self):
+        "Checks if parsing is ongoing in another thread"
+        locked = not self._parse_lock.acquire(False)
+        if not locked:
+            self._parse_lock.release()
+        return locked
+
     def _parseIfNeeded(self):
         """
-        Parses the configuration file
+        Locks accesses to parsed attributes and parses the configuration file
         """
-        if self._shouldParse():
-            with self._parse_lock:
+        with self._parse_lock:
+            if self._shouldParse():
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
@@ -331,23 +336,15 @@ class ConfigParser(object):
         self._logger.debug("Searching for builder among %s",
                            AVAILABLE_BUILDERS)
         for builder_class in AVAILABLE_BUILDERS:
-            if builder_class.builder_name == 'fallback':
+            if builder_class is Fallback:
                 continue
             if builder_class.isAvailable():
-                break
-            else:
-                self._logger.debug("'%s' failed", builder_class.builder_name)
-                continue
+                self._logger.info("Builder '%s' has worked",
+                                  builder_class.builder_name)
+                self._parms['builder'] = builder_class.builder_name
+                return
 
-        if builder_class is not None:
-            self._logger.info("Builder '%s' has worked",
-                              builder_class.builder_name)
-            self._parms['builder'] = builder_class.builder_name
-        else: # pragma: no cover
-            # Fallback is tested in the list above, so we shouldn't
-            # reach this
-            self._logger.info("Couldn't find any builder, using fallback")
-            self._parms['builder'] = 'fallback'
+        self._parms['builder'] = Fallback.builder_name
 
     # TODO: Add a test for this
     def _setDefaultBuildFlagsIfNeeded(self):
@@ -398,12 +395,13 @@ class ConfigParser(object):
         source_path_list = []
         source_build_list = []
 
-        for match in [x.groupdict() for x in _configFileScan(line)]:
+        for match in _configFileScan(line):
+            match = match.groupdict()
             self._logger.debug("match: '%s'", match)
             if match['parameter'] is not None:
                 self._handleParsedParameter(match['parameter'],
                                             match['parm_lang'], match['value'])
-            elif match['path']:
+            else:
                 for source_path in self._getSourcePaths(match['path']):
                     source_path_list += [source_path]
                     # Try to get the build info for this source. If we get nothing
@@ -480,45 +478,6 @@ class ConfigParser(object):
         self._parseIfNeeded()
         return self._parms['builder']
 
-    @staticmethod
-    def simpleParse(filename):
-        """
-        """
-        target_dir = None
-        builder_name = None
-        for _line in open(filename, mode='rb').readlines():
-            line = _replaceCfgComments("", _line.decode(errors='ignore'))
-            for match in re.finditer(
-                    r"^\s*target_dir\s*=\s*(?P<target_dir>.+)\s*$"
-                    r"|"
-                    r"^\s*builder\s*=\s*(?P<builder>.+)\s*$",
-                    line):
-                match_dict = match.groupdict()
-                if match_dict['target_dir'] is not None:
-                    target_dir = match_dict['target_dir']
-                if match_dict['builder'] is not None:
-                    builder_name = match_dict['builder']
-
-        if target_dir:
-            target_dir = p.abspath(p.join(p.dirname(filename), target_dir))
-        else:
-            target_dir = '.hdlcc'
-
-        if not p.isabs(target_dir):
-            target_dir = p.join(p.dirname(filename), target_dir)
-
-        ConfigParser._logger.info("Simple parse found target_dir = %s and "
-                                  "builder = %s", repr(target_dir),
-                                  repr(builder_name))
-        return target_dir, builder_name
-
-    def getTargetDir(self):
-        """
-        Returns the target folder that should be used by the builder
-        """
-        self._parseIfNeeded()
-        return self._parms['target_dir']
-
     def getBuildFlags(self, path, batch_mode):
         """
         Return a list of flags configured to build a source in batch or
@@ -527,7 +486,8 @@ class ConfigParser(object):
         self._parseIfNeeded()
         if self.filename is None:
             return []
-        lang = self.getSourceByPath(path).filetype
+        lang = getFileType(path)
+
         flags = list(self._parms['global_build_flags'][lang])
 
         if batch_mode:
@@ -570,6 +530,8 @@ class ConfigParser(object):
         unit. Case sensitive mode should be used when tracking
         dependencies on Verilog files. VHDL should use VHDL
         """
+        self._parseIfNeeded()
+
         # Default to lower case if we're not handling case sensitive. VHDL
         # source files are all converted to lower case when parsed, so the
         # units they define are in lower case already

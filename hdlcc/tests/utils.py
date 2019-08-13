@@ -28,9 +28,12 @@ from multiprocessing import Queue
 
 import mock
 import six
+from parameterized import parameterized_class
 
 import hdlcc
-from hdlcc.utils import getFileType, onWindows, removeDuplicates, samefile
+from hdlcc.builders.base_builder import BaseBuilder
+from hdlcc.utils import (getCachePath, getFileType, onWindows,
+                         removeDuplicates, samefile)
 
 _logger = logging.getLogger(__name__)
 
@@ -39,39 +42,50 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
 
-    def _handleUiInfo(self, msg):
-        self._msg_queue.put(('info', msg))
-        self._ui_handler.info(msg)
+    def _handleUiInfo(self, message):
+        self._msg_queue.put(('info', message))
+        self._ui_handler.info('[UI INFO]: %s', message)
 
-    def _handleUiWarning(self, msg):
-        self._msg_queue.put(('warning', msg))
-        self._ui_handler.warning(msg)
+    def _handleUiWarning(self, message):
+        self._msg_queue.put(('warning', message))
+        self._ui_handler.info('[UI WARNING]: %s', message)
 
-    def _handleUiError(self, msg):
-        self._msg_queue.put(('error', msg))
-        self._ui_handler.error(msg)
+    def _handleUiError(self, message):
+        self._msg_queue.put(('error', message))
+        self._ui_handler.info('[UI ERROR]: %s', message)
+
+    def getUiMessages(self):
+        while not self._msg_queue.empty():
+            yield self._msg_queue.get()
 
 class SourceMock(object):
+    _logger = logging.getLogger('SourceMock')
+    base_path = ''
     def __init__(self, library, design_units, dependencies=None, filename=None):
         if filename is not None:
-            self.filename = filename
+            self._filename = p.join(self.base_path, filename)
         else:
-            self.filename = library + '_' + design_units[0]['name'] + '.vhd'
+            self._filename = p.join(self.base_path,
+                                    library + '_' + design_units[0]['name'] + '.vhd')
 
         self.filetype = getFileType(self.filename)
         self.abspath = p.abspath(self.filename)
         self.flags = []
 
         self.library = library
-        self._design_units = design_units
-        if dependencies is not None:
-            self._dependencies = dependencies
-        else:
-            self._dependencies = []
+        self._design_units = list(design_units or [])
+        self._dependencies = list(dependencies or [])
 
         self._createMockFile()
+    @property
+    def filename(self):
+        return self._filename
+
+    def getLibraries(self):
+        return [x.library for x in self._dependencies]
 
     def _createMockFile(self):
+        self._logger.debug("Creating mock file: %s", self.filename)
         with open(self.filename, 'w') as fd:
             libs = removeDuplicates(
                 [x.library for x in self._dependencies])
@@ -83,14 +97,17 @@ class SourceMock(object):
                 fd.write("use {0}.{1};\n".format(dependency.library,
                                                  dependency.name))
 
+            fd.write('\n')
             for design_unit in self._design_units:
-                fd.write("{0} is {1} end {0} {1};\n".
+                fd.write("{0} {1} is\n\nend {0} {1};\n".
                          format(design_unit['type'],
                                 design_unit['name']))
 
-    def __del__(self):
-        if p.exists(self.filename):
-            os.remove(self.filename)
+    def __repr__(self):
+        return ("{}(library='{}', design_units={}, dependencies={}, "
+                "filename={}".format(self.__class__.__name__, self.library,
+                                     self._design_units, self._dependencies,
+                                     self.filename))
 
     def getmtime(self):
         return p.getmtime(self.filename)
@@ -104,8 +121,12 @@ class SourceMock(object):
     def getDependencies(self):
         return self._dependencies
 
-class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abstract-method
-    _logger = logging.getLogger('MSimMock')
+    def getRawSourceContent(self):
+        return open(self.filename).read()
+
+
+class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
+    _logger = logging.getLogger('MockBuilder')
     builder_name = 'msim_mock'
     file_types = ('vhdl', )
     def __init__(self, target_folder):
@@ -113,7 +134,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
-        super(MSimMock, self).__init__(target_folder)
+        super(MockBuilder, self).__init__(target_folder)
 
     def _makeRecords(self, _): # pragma: no cover
         return []
@@ -129,6 +150,8 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
         return True
 
     def _buildSource(self, path, library, flags=None):  # pylint: disable=unused-argument
+        self._logger.debug("Building path=%s, library=%s, flags=%s",
+                           path, library, flags)
         return [], []
 
     def _createLibrary(self, library):  # pylint: disable=unused-argument
@@ -138,7 +161,7 @@ class MSimMock(hdlcc.builders.base_builder.BaseBuilder):  # pylint: disable=abst
         return []
 
 
-class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
+class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
     builder_name = 'FailingBuilder'
     def _checkEnvironment(self):
@@ -146,43 +169,16 @@ class FailingBuilder(MSimMock):  # pylint: disable=abstract-method
             self.builder_name, "Fake error")
 
 
-def disableVunit(func):
-    return mock.patch('hdlcc.config_parser.foundVunit', lambda: False)(func)
+disableVunit = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
 
 
-def deleteFileOrDir(path):
-    if p.isdir(path):
-        shutil.rmtree(path)
-    else:
-        os.remove(path)
-
-
-def handlePathPlease(*args):
+def sanitizePath(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
     """
     return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
 
 
-def getDefaultCachePath(project_file): # pragma: no cover
-    """
-    Gets the default path of hdlcc cache.
-    Intended for testing only.
-    """
-    return p.join(p.abspath(p.dirname(project_file)), '.hdlcc')
-
-
-def cleanProjectCache(project_file): # pragma: no cover
-    """
-    Removes the default hdlcc cache folder.
-    Intended for testing only.
-    """
-    if project_file is None:
-        _logger.debug("Can't clean None")
-    else:
-        cache_folder = getDefaultCachePath(project_file)
-        if p.exists(cache_folder):
-            shutil.rmtree(cache_folder)
 
 
 def assertCountEqual(it):  # pylint: disable=invalid-name
@@ -211,7 +207,7 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
             # Add user message at the top
             error_details = [msg, ] + error_details
             error_details += ['', "Lists {} and {} differ".format(first, second)]
-            it.fail('\n'.join(error_details))
+            it.fail('\n'.join([str(x) for x in error_details]))
 
     return wrapper
 
@@ -247,3 +243,59 @@ def writeListToFile(filename, _list): # pragma: no cover
             break
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
+if not onWindows():
+    TEST_ENVS = {
+        'ghdl': os.environ['GHDL_PATH'],
+        'msim': os.environ['MODELSIM_PATH'],
+        'xvhdl': os.environ['XSIM_PATH'],
+        'fallback': None}
+else:
+    TEST_ENVS = {'fallback': None}
+
+
+def parametrizeClassWithBuilders(cls):
+    cls.assertSameFile = assertSameFile(cls)
+
+    keys = ['builder_name', 'builder_path']
+    values = []
+    for name, path in TEST_ENVS.items():
+        values += [(name, path)]
+
+    return parameterized_class(keys, values)(cls)
+
+def removeCacheData():
+    cache_path = getCachePath()
+    if p.exists(cache_path):
+        shutil.rmtree(cache_path)
+        _logger.info("Removed %s", cache_path)
+
+def getTestTempPath(name):
+    name = name.replace('.', '_')
+    path = p.abspath(p.join(os.environ['TOX_ENV_DIR'], 'tmp', name))
+    if not p.exists(path):
+        os.makedirs(path)
+    return path
+
+def setupTestSuport(path):
+    """Copy contents of .ci/test_support_path/ to the given path"""
+    _logger.info("Setting up test support at %s", path)
+
+    test_support_path = os.environ['CI_TEST_SUPPORT_PATH']
+
+    paths_to_copy = os.listdir(test_support_path)
+
+    # Create the parent directory
+    if not p.exists(p.dirname(path)):
+        _logger.info("Creating %s", p.dirname(path))
+        os.makedirs(p.dirname(path))
+
+    for path_to_copy in paths_to_copy:
+        src = p.join(test_support_path, path_to_copy)
+        dest = p.join(path, path_to_copy)
+
+        if p.exists(dest):
+            _logger.info("Destination path %s already exists, removing it", dest)
+            shutil.rmtree(dest)
+
+        _logger.info("Copying %s to %s", src, dest)
+        shutil.copytree(src, dest)

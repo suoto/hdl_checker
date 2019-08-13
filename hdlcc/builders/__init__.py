@@ -57,4 +57,3 @@ def getWorkingBuilders():
 __all__ = ['MSim', 'XVHDL', 'GHDL', 'Fallback']
 
 AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback
-

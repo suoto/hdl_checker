@@ -94,14 +94,34 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         return obj
 
     def __repr__(self):
-        return "BaseSourceFile('%s', library='%s', flags=%s)" % \
-                (self.abspath, self.library, self.flags)
+        return ("{}(library='{}', design_units={}, dependencies={}, "
+                "filename={})".format(self.__class__.__name__, self.library,
+                                      self._design_units, self._dependencies,
+                                      self.filename))
+
+    @property
+    def __eq_key__(self):
+        return self.library, self.filename, self._content
+
+    def __hash__(self):
+        return hash((self.filename, self.library))
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, BaseSourceFile):
+            return self.__eq_key__ == other.__eq_key__
+        return NotImplemented
+
+    def __ne__(self, other):
+        """Overrides the default implementation (unnecessary in Python 3)"""
+        result = self.__eq__(other)
+        if result is not NotImplemented:
+            return not result
+        return NotImplemented
+
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
-
-    def __hash__(self):
-        return hash(repr(self))
 
     def _changed(self):
         """

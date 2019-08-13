@@ -28,24 +28,26 @@ from multiprocessing import Process, Queue
 from threading import Thread
 
 import mock
+import requests
+import six
 from nose2.tools import such
 from pyls import uris
-from pyls.python_ls import start_io_lang_server
-
-import requests
+from pyls.python_ls import PythonLanguageServer, start_io_lang_server
 
 import hdlcc
 import hdlcc.lsp
-from hdlcc.tests.utils import disableVunit
+from hdlcc.tests.utils import (disableVunit, getTestTempPath, removeCacheData,
+                               setupTestSuport)
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 such.unittest.TestCase.maxDiff = None
 
 _logger = logging.getLogger(__name__)
 
+TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_LOG_PATH = p.join(os.environ['TOX_ENV_DIR'], 'log')
-TEST_TMP_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
 SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
+
 HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
 
 JSONRPC_VERSION = '2.0'
@@ -90,9 +92,11 @@ class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-f
         self.server_thread.daemon = True
         self.server_thread.start()
 
-        self.client = hdlcc.lsp.HdlccLanguageServer(os.fdopen(scr, 'rb'),
-                                                    os.fdopen(csw, 'wb'),
-                                                    start_io_lang_server)
+        # Object being tested is the server thread. Avoid both objects
+        # competing for the same cache by using the raw Python language server
+        self.client = PythonLanguageServer(os.fdopen(scr, 'rb'),
+                                           os.fdopen(csw, 'wb'),
+                                           start_io_lang_server)
 
         self.client_thread = Thread(target=_startClient, args=[self.client])
         self.client_thread.daemon = True
@@ -237,7 +241,7 @@ with such.A("hdlcc server") as it:
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
                 'initialize',
-                {'rootPath': uris.from_fs_path(TEST_TMP_PATH),
+                {'rootPath': uris.from_fs_path(TEST_TEMP_PATH),
                  'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)
@@ -248,7 +252,7 @@ with such.A("hdlcc server") as it:
         def test():
 
             def start_io_lang_server(*_):
-                assert False
+                assert False, 'Expected fail to trigger the test'
 
             args = type('args', (object, ),
                         {'lsp': True,
@@ -268,6 +272,12 @@ with such.A("hdlcc server") as it:
                     with it.assertRaises(AssertionError):
                         hdlcc.server.run(args)
 
+            assertion_msg = "\'Expected fail to trigger the test\'"
+
+            # Don't know why Python 2 adds an extra comma to the msg
+            if six.PY2:
+                assertion_msg += ","
+
             # Build up the expected response
             body = json.dumps({
                 "method": "window/showMessage",
@@ -275,8 +285,8 @@ with such.A("hdlcc server") as it:
                 "params": {
                     "message":
                         "Unable to start HDLCC LSP server: "
-                        "\'AssertionError()\'! Check " + p.abspath(args.stderr) +
-                        " for more info",
+                        "\'AssertionError(" + assertion_msg + ")\'! "
+                        "Check " + p.abspath(args.stderr) + " for more info",
                     "type": 1}})
 
             response = ("Content-Length: {}\r\n"
@@ -323,11 +333,7 @@ with such.A("hdlcc server") as it:
                 "Starting server. Our PID is {}, no parent PID to attach to. "
                 "Version string for hdlcc is '{}'".format(
                     server.pid, hdlcc.__version__),
-                "Starting HdlccLanguageServer IO language server",
-                "No configuration file given, using fallback",
-                "Using Fallback builder",
-                "Selected builder is 'fallback'",
-                ""]
+                "Starting HdlccLanguageServer IO language server",]
 
             _logger.info("Log content: %s", log_content)
 
@@ -335,7 +341,7 @@ with such.A("hdlcc server") as it:
                 log_content = log_content[1:]
                 expected = expected[1:]
 
-            it.assertEqual(log_content, expected)
+            it.assertEqual(log_content[:len(expected)], expected)
 
             os.remove(log_file)
 

@@ -69,7 +69,7 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
         filename = None if self.filename is None else self.filename
         error_code = None if self.error_code is None else self.error_code
 
-        return ('{}(checker="{}", filename="{}", line_number="{}", '
+        return ('{}(checker="{}", filename="{}", line_number={}, '
                 'column_number={}, error_code={}, severity="{}", text="{}")'
                 .format(self.__class__.__name__, self.checker, filename,
                         self.line_number, self.column_number, error_code,

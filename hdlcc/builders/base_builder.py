@@ -20,7 +20,6 @@ import os
 import os.path as p
 import abc
 import logging
-import subprocess as subp
 from threading import Lock
 
 from hdlcc.exceptions import SanityCheckError
@@ -40,12 +39,12 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         'global_build_flags' : {}} # type: dict
 
     _external_libraries = {
-        'vhdl' : [],
-        'verilog' : []}  # type: dict
+        'vhdl' : set(),
+        'verilog' : set()}  # type: dict
 
     _include_paths = {
-        'vhdl' : [],
-        'verilog' : []}  # type: dict
+        'vhdl' : set(),
+        'verilog' : set()}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
@@ -54,16 +53,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         directly
         """
         assert lang in cls._external_libraries, "Uknown language '%s'" & lang
-        if library_name not in cls._external_libraries[lang]:
-            cls._external_libraries[lang].append(library_name)
+        cls._external_libraries[lang].add(library_name)
 
     @classmethod
     def addIncludePath(cls, lang, path):
         """
         Adds an include path to be used by the builder where applicable
         """
-        if path not in cls._include_paths[lang]:
-            cls._include_paths[lang].append(path)
+        cls._include_paths[lang].add(path)
 
     @abc.abstractproperty
     def builder_name(self):
@@ -91,7 +88,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         if self.builder_name != 'fallback':
             if not p.exists(self._target_folder):
                 self._logger.info("Target folder '%s' was created", self._target_folder)
-                os.mkdir(self._target_folder)
+                os.makedirs(self._target_folder)
             else:
                 self._logger.info("%s already exists", self._target_folder)
 
@@ -227,32 +224,6 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         Return a list with the libraries this compiler currently knows
         """
-
-    def _subprocessRunner(self, cmd_with_args, shell=False, env=None,
-                          cwd=None):
-        """
-        Runs a shell command and handles stdout catching
-        """
-        if env is not None: # pragma: no cover
-            subp_env = env
-        else:
-            subp_env = os.environ
-
-        self._logger.debug(" ".join(cmd_with_args))
-
-        exc = None
-        try:
-            stdout = list(
-                subp.check_output(cmd_with_args, stderr=subp.STDOUT,
-                                  shell=shell, env=subp_env, cwd=cwd).splitlines())
-        except subp.CalledProcessError as exc:
-            stdout = list(exc.output.splitlines())
-            self._logger.debug(
-                "Command '%s' failed with error code %d.\nStdout:\n%s",
-                cmd_with_args, exc.returncode, '\n'.join([x.decode() for x in
-                                                          stdout]))
-
-        return [x.decode() for x in stdout]
 
     @abc.abstractmethod
     def _checkEnvironment(self):

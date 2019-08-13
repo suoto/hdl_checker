@@ -18,11 +18,12 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import logging
+import os.path as p
 import re
 import subprocess as subp
-import os.path as p
-import logging
-from nose2.tools import such
+import parameterized
+import unittest2
 
 _logger = logging.getLogger(__name__)
 
@@ -44,40 +45,31 @@ _HEADER = re.compile(
     r"(?:--|#) You should have received a copy of the GNU General Public License\n"
     r"(?:--|#) along with HDL Code Checker\.  If not, see <http://www\.gnu\.org/licenses/>\.\n")
 
-with such.A("hdlcc sources") as it:
-    @it.should("contain the correct file header")
-    def test():
 
-        def _fileFilter(path):
-            # Exclude versioneer files
-            if p.basename(path) in ('_version.py', 'versioneer.py'):
-                return False
-            return path.split('.')[-1] in ('py', 'sh', 'ps1')
+def _getFiles():
+    for filename in subp.check_output(
+            ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
+        yield p.abspath(filename).decode()
 
-        files = list(filter(_fileFilter, getFiles()))
+def _getRelevantFiles():
+    def _fileFilter(path):
+        # Exclude versioneer files
+        if p.basename(path) in ('_version.py', 'versioneer.py'):
+            return False
+        if p.join('.ci', 'test_support') in path:
+            return False
+        return path.split('.')[-1] in ('py', 'sh', 'ps1')
 
-        it.assertNotEquals(files, [], "Couldn't find any files!")
-        _logger.info("Files found: %s", ", ".join(files))
-        bad_files = []
-        for filename in files:
-            if checkFile(filename):
-                _logger.debug("%s: Ok", filename)
-            else:
-                _logger.error("%s: problems found", filename)
-                bad_files += [filename]
+    return filter(_fileFilter, _getFiles())
 
-        it.assertEquals(bad_files, [],
-                        "Some files have problems: %s" % ", ".join(bad_files))
+def checkFile(filename):
+    lines = open(filename, mode='rb').read().decode(errors='replace')
 
-    def getFiles():
-        for filename in subp.check_output(
-                ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
-            yield p.abspath(filename).decode()
+    match = _HEADER.search(lines)
+    return match is not None
 
-    def checkFile(filename):
-        lines = open(filename, mode='rb').read().decode(errors='replace')
-
-        match = _HEADER.search(lines)
-        return match is not None
-
-it.createTests(globals())
+class TestFileHeaders(unittest2.TestCase):
+    @parameterized.parameterized.expand([
+        (x, ) for x in _getRelevantFiles()])
+    def test_has_license(self, path):
+        self.assertTrue(checkFile(path))

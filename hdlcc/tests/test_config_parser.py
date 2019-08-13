@@ -33,15 +33,16 @@ import hdlcc
 import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import (assertCountEqual, handlePathPlease,
+from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
+                               sanitizePath, setupTestSuport,
                                writeListToFile)
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = getTestTempPath(__name__)
+TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
-TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(
-    p.dirname(__file__), '..', '..', '.ci', 'test_support', 'test_config_parser')
+TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, 'test_config_parser')
 
 such.unittest.TestCase.maxDiff = None
 
@@ -51,6 +52,10 @@ with such.A('config parser object') as it:
         # Can't use assertCountEqual for lists of unhashable types.
         # Workaround for https://bugs.python.org/issue10242
         it.assertCountEqual = assertCountEqual(it)
+
+    @it.has_setup
+    def setup():
+        setupTestSuport(TEST_TEMP_PATH)
 
     @it.has_teardown
     def teardown():
@@ -69,13 +74,13 @@ with such.A('config parser object') as it:
                                          'project_unknown_parm.prj'))
             parser.getSources()
 
-    @it.should("assign a default value for target dir equal to the builder value")
-    def test():
-        parser = ConfigParser(
-            p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_no_target.prj'))
-        it.assertEquals(
-            parser.getTargetDir(),
-            p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.hdlcc')))
+    #  @it.should("assign a default value for target dir equal to the builder value")
+    #  def test():
+    #      parser = ConfigParser(
+    #          p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_no_target.prj'))
+    #      it.assertEquals(
+    #          parser.getTargetDir(),
+    #          p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.hdlcc')))
 
     with it.having("a standard project file"):
         @it.has_setup
@@ -103,13 +108,6 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(it.parser.getBuilder(), 'msim')
 
-        @it.should("extract target dir")
-        def test():
-            it.assertTrue(p.isabs(it.parser.getTargetDir()))
-            it.assertEqual(
-                it.parser.getTargetDir(),
-                p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.build')))
-
         @it.should("extract build flags for single build")
         def test():
             it.assertCountEqual(
@@ -129,6 +127,14 @@ with such.A('config parser object') as it:
                                                'sample_testbench.vhd'),
                                         batch_mode=False),
                 set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
+
+        @it.should("extract common flags for files outisde the project file")
+        def test():
+            it.assertCountEqual(
+                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
+                                               'non_existing_file.vhd'),
+                                        batch_mode=False),
+                set(['-s0', '-s1', '-g0', '-g1', ]))
 
         @it.should("extract build flags for batch builds")
         def test():
@@ -202,12 +208,6 @@ with such.A('config parser object') as it:
                                                'bar.sv'),
                                         batch_mode=False),
                 ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
-
-        @it.should("Match the result of ConfigParser.simpleParse")
-        def test():
-            target_dir, builder_name = ConfigParser.simpleParse(it.parser.filename)
-            it.assertEqual(it.parser.getTargetDir(), target_dir)
-            it.assertEqual(it.parser.getBuilder(), builder_name)
 
         @it.should("restore from cached state")
         def test():
@@ -293,29 +293,22 @@ with such.A('config parser object') as it:
         def test():
             it.assertEqual(it.parser.getBuilder(), 'fallback')
 
-        @it.should("return .fallback as target directory")
-        def test():
-            it.assertEqual(it.parser.getTargetDir(), '.fallback')
-
         @it.should("return empty single build flags for any path")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=False), [])
 
         @it.should("return empty batch build flags for any path")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertEqual(it.parser.getBuildFlags(path, batch_mode=True), [])
 
         @it.should("say every path is on the project file")
-        @params(TEST_SUPPORT_PATH + '/vim-hdl-examples/basic_library/clock_divider.vhd',
+        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
                 'hello')
         def test(case, path):
-            _logger.info("Running %s", case)
             it.assertTrue(it.parser.hasSource(path))
 
     with it.having("not installed VUnit"):
@@ -417,17 +410,16 @@ with such.A('config parser object') as it:
             return result
 
         @it.has_setup
-        #  @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
         def setup():
             it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
                                      lambda: False)
             it.no_vunit.start()
 
-            it.project_filename = 'test.prj'
-            it.lib_path = p.join(TEST_SUPPORT_PATH, 'vim-hdl-examples')
+            it.project_filename = p.join(TEST_TEMP_PATH, 'test.prj')
+            it.lib_path = p.join(TEST_PROJECT)
             it.sources = [
-                ('work', p.join('another_library', 'foo.vhd')),
-                ('work', p.join('basic_library', 'clock_divider.vhd'))]
+                ('work', p.join(TEST_TEMP_PATH, 'another_library', 'foo.vhd')),
+                ('work', p.join(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'))]
 
             writeListToFile(
                 it.project_filename,
@@ -451,8 +443,8 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_pre.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
 
             _logger.info("Adding the extra source...")
 
@@ -466,9 +458,9 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
             # Check the files originally found weren't re-created
             for path, source in sources_pre.items():
@@ -478,27 +470,27 @@ with such.A('config parser object') as it:
         def test_02():
             sources_pre = getSourcesFrom(
                 it.sources +
-                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
+                [('work', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
 
             sources_post = getSourcesFrom(
                 it.sources +
-                [('foo_lib', p.join('basic_library', 'very_common_pkg.vhd'))])
+                [('foo_lib', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
-            added_path = handlePathPlease('basic_library', 'very_common_pkg.vhd')
+            added_path = sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')
 
             added_source = sources_post[added_path]
 
             # Check that the sources that have been previously added are
             # the same
             for path in [
-                    handlePathPlease('another_library', 'foo.vhd'),
-                    handlePathPlease('basic_library', 'clock_divider.vhd')]:
+                    sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                    sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')]:
                 it.assertEqual(sources_pre[path], sources_post[path])
 
             _logger.warning("added path: %s", added_path)
@@ -520,16 +512,16 @@ with such.A('config parser object') as it:
 
             it.assertCountEqual(
                 sources_pre.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd'),
-                 handlePathPlease('basic_library', 'very_common_pkg.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
 
             sources_post = getSourcesFrom()
 
             it.assertCountEqual(
                 sources_post.keys(),
-                [handlePathPlease('another_library', 'foo.vhd'),
-                 handlePathPlease('basic_library', 'clock_divider.vhd')])
+                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
+                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
 
     with it.having("no builder configured on the project file"):
         @it.has_setup
@@ -548,8 +540,8 @@ with such.A('config parser object') as it:
             _logger.info("%s: Testing builder %s", case, builder)
             commands = []
 
-            def _subprocessMocker(self, cmd_with_args, shell=False, env=None):
-                commands.append(cmd_with_args)
+            def _subprocessMocker(*args, **kwargs):
+                commands.append((args, kwargs))
                 return []
 
             @staticmethod
@@ -559,8 +551,7 @@ with such.A('config parser object') as it:
             patches = [
                 mock.patch('hdlcc.builders.%s.checkEnvironment' % builder,
                            lambda self: setattr(self, '_version', '<foo>')),
-                mock.patch('hdlcc.builders.%s._subprocessRunner' % builder,
-                           _subprocessMocker),
+                mock.patch('hdlcc.utils.runShellCommand', _subprocessMocker),
                 mock.patch('hdlcc.builders.%s.isAvailable' % builder,
                            isAvailable)]
 
@@ -584,4 +575,3 @@ with such.A('config parser object') as it:
             it.assertEquals(parser.getBuilder(), 'fallback')
 
 it.createTests(globals())
-

@@ -19,8 +19,11 @@
 import os
 import os.path as p
 import re
+import shutil
+import tempfile
 
 from hdlcc.diagnostics import BuilderDiag, DiagType
+from hdlcc.utils import runShellCommand
 
 from .base_builder import BaseBuilder
 
@@ -97,8 +100,8 @@ class XVHDL(BaseBuilder):
         "(Not used by XVHDL)"
 
     def _checkEnvironment(self):
-        stdout = self._subprocessRunner(['xvhdl', '--nolog', '--version'],
-                                        cwd=self._target_folder)
+        stdout = runShellCommand(['xvhdl', '--nolog', '--version'],
+                                 cwd=self._target_folder)
         self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)",
                                    stdout[0])[0]
         self._logger.info("xvhdl version string: '%s'. "
@@ -107,7 +110,14 @@ class XVHDL(BaseBuilder):
 
     @staticmethod
     def isAvailable():
-        return not os.system('xvhdl --nolog --version')
+        try:
+            temp_dir = tempfile.mkdtemp()
+            runShellCommand(['xvhdl', '--nolog', '--version'], cwd=temp_dir)
+            return True
+        except OSError:
+            return False
+        finally:
+            shutil.rmtree(temp_dir)
 
     def getBuiltinLibraries(self):
         # FIXME: Built-in libraries should not be statically defined
@@ -122,7 +132,7 @@ class XVHDL(BaseBuilder):
         assert library != 'ieee'
 
         if not p.exists(self._target_folder):
-            os.mkdir(self._target_folder)
+            os.makedirs(self._target_folder)
             self._added_libraries = set()
 
         if library in self._added_libraries:
@@ -144,7 +154,7 @@ class XVHDL(BaseBuilder):
                '--work', library]
         cmd += flags
         cmd += [path]
-        return self._subprocessRunner(cmd, cwd=self._target_folder)
+        return runShellCommand(cmd, cwd=self._target_folder)
 
     def _searchForRebuilds(self, line):
         rebuilds = []

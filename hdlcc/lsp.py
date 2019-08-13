@@ -18,10 +18,10 @@
 
 # pylint: disable=useless-object-inheritance
 
-import sys
 import functools
 import logging
 import os.path as p
+import sys
 
 import pyls.lsp as defines
 from pyls._utils import debounce
@@ -39,10 +39,6 @@ _logger = logging.getLogger(__name__)
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 DEFAULT_PROJECT_FILENAME = 'vimhdl.prj'
 PY2 = sys.version_info[0] == 2
-
-if PY2:
-    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
-
 
 def _logCalls(func):  # pragma: no cover
     "Decorator to Log calls to func"
@@ -124,13 +120,10 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         return True
 
     def _shouldRecreateTargetDir(self):
-        if self._config is None:
+        if p.exists(self._getCacheFilename()):
             return False
 
-        if p.exists(self._config.getTargetDir()):
-            return False
-
-        return self._config.getBuilder() != 'fallback'
+        return self.config_parser.getBuilder() != 'fallback'
 
     def _setupEnvIfNeeded(self):
         # On LSP, user can't force a fresh rebuild, we'll force a full clean if
@@ -149,15 +142,18 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
     def _handleUiInfo(self, message):
         self._logger.debug("UI info: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Info)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Info)
 
     def _handleUiWarning(self, message):
         self._logger.debug("UI warning: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Warning)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Warning)
 
     def _handleUiError(self, message):
         self._logger.debug("UI error: %s", message)
-        self._workspace.show_message(message, defines.MessageType.Error)
+        if self._workspace:
+            self._workspace.show_message(message, defines.MessageType.Error)
 
 class HdlccLanguageServer(PythonLanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
@@ -188,7 +184,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         """
         result = super(HdlccLanguageServer, self).m_initialize(
             processId=processId, rootUri=rootUri, rootPath=rootPath,
-            initializationOptions=initializationOptions, **_kwargs)
+            initializationOptions={})
 
         self._onProjectFileUpdate(initializationOptions or {})
 
@@ -208,7 +204,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         try:
             self._checker = HdlCodeCheckerServer(self.workspace, path)
-        except (FileNotFoundError, OSError) as exc:
+        except (IOError, OSError) as exc:
             _logger.info("Failed to create checker, reverting to fallback")
             self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)
@@ -221,14 +217,14 @@ class HdlccLanguageServer(PythonLanguageServer):
         the root URI as provided by the workspace
         """
         path = (options or {}).get('project_file', DEFAULT_PROJECT_FILENAME)
+
+        # Path has been explicitly set to none
         if 'project_file' in options and path is None:
-            # Path has been explicitly set to none
             return None
 
         # Project file will be related to the root path
-        root_path = self.workspace.root_path
-        if root_path:
-            path = p.join(root_path, path)
+        if self.workspace:
+            path = p.join(self.workspace.root_path or '', path)
         return path
 
     @debounce(LINT_DEBOUNCE_S, keyed_by='doc_uri')
@@ -271,25 +267,25 @@ class HdlccLanguageServer(PythonLanguageServer):
     def m_workspace__did_change_configuration(self, settings=None):
         self._onProjectFileUpdate(settings or {})
 
-    @_logCalls
-    def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
-        changed_monitored_files = set()
-        config_changed = False
-        for change in (changes or []):
-            if change['uri'].endswith(MONITORED_FILES):
-                changed_monitored_files.add(change['uri'])
-            elif change['uri'].endswith(CONFIG_FILES):
-                config_changed = True
+    #  @_logCalls
+    #  def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
+    #      changed_monitored_files = set()
+    #      config_changed = False
+    #      for change in (changes or []):
+    #          if change['uri'].endswith(MONITORED_FILES):
+    #              changed_monitored_files.add(change['uri'])
+    #          elif change['uri'].endswith(CONFIG_FILES):
+    #              config_changed = True
 
-        if config_changed:
-            self.config.settings.cache_clear()
-            self._checker.clean()
-        elif not changed_monitored_files:
-            # Only externally changed python files and lint configs may result
-            # in changed diagnostics.
-            return
+    #      if config_changed:
+    #          self.config.settings.cache_clear()
+    #          self._checker.clean()
+    #      elif not changed_monitored_files:
+    #          # Only externally changed python files and lint configs may result
+    #          # in changed diagnostics.
+    #          return
 
-        for doc_uri in self.workspace.documents:
-            # Changes in doc_uri are already handled by m_text_document__did_save
-            if doc_uri not in changed_monitored_files:
-                self.lint(doc_uri, is_saved=False)
+    #      for doc_uri in self.workspace.documents:
+    #          # Changes in doc_uri are already handled by m_text_document__did_save
+    #          if doc_uri not in changed_monitored_files:
+    #              self.lint(doc_uri, is_saved=False)

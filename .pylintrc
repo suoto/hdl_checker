@@ -5,12 +5,7 @@
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-init-hook=sys.path.insert(0, 'dependencies/python-language-server/'); \
-          sys.path.insert(0, 'dependencies/bottle/');                 \
-          sys.path.insert(0, 'dependencies/pluggy/src/');             \
-          sys.path.insert(0, 'dependencies/python-jsonrpc-server/');  \
-          sys.path.insert(0, 'dependencies/requests/');               \
-          sys.path.insert(0, 'dependencies/waitress/');
+# init-hook=
 
 # Profiled execution.
 profile=no

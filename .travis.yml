@@ -17,45 +17,17 @@ language: python
 
 services:
   - docker
-
 stages:
-- test
-- deploy
+  - test
+  - deploy
 
 jobs:
   include:
-    # XVHDL is the slowest of all, start them first
-    - name: Python 2.7 - xvhdl
-      python: '2.7'
-      env: BUILDER=xvhdl
-      script: tox -e py27-xvhdl-linux
+    - name: Python 2.7
+      script: ./run_tests.sh -e py27-linux
+    - name: Python 3.7
+      script: ./run_tests.sh -e py37-linux
 
-    - name: Python 3.7 - xvhdl
-      python: '3.7'
-      dist: xenial
-      env: BUILDER=xvhdl
-      script: tox -e py37-xvhdl-linux
-
-
-    # Python 2.7 land
-    - name: Python 2.7 - msim
-      script: ./run_tests.sh -e py27-msim-linux
-
-    - name: Python 2.7 - standalone and fallback
-      script: ./run_tests.sh -e py27-fallback-linux -e py27-standalone-linux
-
-    - name: Python 2.7 - ghdl
-      script: ./run_tests.sh -e py27-ghdl-linux
-
-    # Python 3.7 land
-    - name: Python 3.7 - msim
-      script: ./run_tests.sh -e py37-msim-linux
-
-    - name: Python 3.7 - standalone and fallback
-      script: ./run_tests.sh -e py37-fallback-linux -e py37-standalone-linux
-
-    - name: Python 3.7 - ghdl
-      script: ./run_tests.sh -e py37-ghdl-linux
 
     - stage: deploy
       before_install: skip
@@ -71,17 +43,9 @@ jobs:
           secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
 
 before_install:
-- if [ "${BUILDER}" != "xvhdl" ] ; then docker pull suoto/hdlcc:latest; fi
-- sudo apt-get update -qq;
-- sudo apt-get install -qq libtcl8.5
-
-before_script:
-- pip install tox
-- if [ "${BUILDER}" == "xvhdl" ] ; then "./.ci/scripts/setup_xvhdl.sh"; fi
+  - docker pull suoto/hdlcc:latest
 
 after_success:
-- if [ "${BUILDER}" == "xvhdl" ] ; then pip install coverage coveralls; coverage xml; coverage report; COVERALLS_PARALLEL=true coveralls; fi
-- bash <(curl -s https://codecov.io/bash)
-
+  - bash <(curl -s https://codecov.io/bash)
 cache:
   pip: true

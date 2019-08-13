@@ -26,7 +26,7 @@ from multiprocessing import Queue
 import bottle
 
 import hdlcc
-from hdlcc.builders import getWorkingBuilders
+from hdlcc.builders import getWorkingBuilders, Fallback
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import terminateProcess
@@ -67,13 +67,17 @@ def _getServerByProjectFile(project_file):
     """
     if isinstance(project_file, str) and project_file.lower() == 'none':
         project_file = None
-    try:
-        return _hdlcc_objects[project_file]
-    except KeyError:
-        _logger.debug("Created new project server for '%s'", project_file)
-        project = HdlCodeCheckerServer(project_file)
-        _hdlcc_objects[project_file] = project
-        return project
+
+    if project_file not in servers:
+        try:
+            project = HdlCodeCheckerServer(project_file)
+            _logger.debug("Created new project server for '%s'", project_file)
+        except (IOError, OSError) as exc:
+            _logger.info("Failed to create checker, reverting to fallback")
+            project = HdlCodeCheckerServer(None)
+
+        servers[project_file] = project
+    return servers[project_file]
 
 
 def _exceptionWrapper(func):
@@ -112,10 +116,13 @@ def _getProjectDiags(project_file):
     """
     diags = []
     server = _getServerByProjectFile(project_file)
-    if server.builder is not None:
-        diags += ["Builder: %s" % server.builder.builder_name]
-    else:
+
+    if server.config_parser.isParsing():
         diags += ["Builder: <unknown> (config file parsing is underway)"]
+    elif isinstance(server.builder, Fallback):
+        diags += ["Builder: none"]
+    else:
+        diags += ["Builder: %s" % server.builder.builder_name]
 
     return diags
 
@@ -131,8 +138,7 @@ def getDiagnoseInfo():
     response = ["hdlcc version: %s" % hdlcc.__version__,
                 "Server PID: %d" % os.getpid()]
 
-    if project_file is not None and p.exists(project_file):
-        response += _getProjectDiags(project_file)
+    response += _getProjectDiags(project_file)
 
     _logger.info("Diagnose info collected:")
     for diag in response:
@@ -176,20 +182,6 @@ def onBufferVisit():
 
     server = _getServerByProjectFile(project_file)
     server.onBufferVisit(path)
-
-    return {}
-
-
-@app.post('/on_buffer_leave')
-@_exceptionWrapper
-def onBufferLeave():
-    "Hook for doing actions related to leaving a buffer"
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
-    _logger.debug("Left buffer ('%s') '%s'", project_file, path)
-
-    server = _getServerByProjectFile(project_file)
-    server.onBufferLeave(path)
 
     return {}
 
@@ -249,13 +241,12 @@ def rebuildProject():
     """
     Rebuilds the current project
     """
-
     _logger.info("Rebuilding project")
     project_file = bottle.request.forms.get('project_file')
     server = _getServerByProjectFile(project_file)
     server.clean()
     _logger.debug("Removing and recreating server object")
-    del _hdlcc_objects[project_file]
+    del servers[project_file]
     _getServerByProjectFile(project_file)
 
 
@@ -311,5 +302,5 @@ def getBuildSequence():
 
 
 #  We'll store a dict to store differents hdlcc objects
-_hdlcc_objects = {}  # pylint: disable=invalid-name
+servers = {}  # pylint: disable=invalid-name
 setupSignalHandlers()

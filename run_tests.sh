@@ -30,6 +30,5 @@ docker run                                                      \
   --env USER_ID="$(id -u)"                                      \
   --env GROUP_ID="$(id -g)"                                     \
   --env TOX_ARGS="$TOX_ARGS"                                    \
-  --env TOX_ARGS="$TOX_ARGS"                                    \
   --env USERNAME="$USER"                                        \
-  suoto/hdlcc:latest
+  suoto/hdlcc:latest /bin/bash -c '.ci/scripts/docker_entry_point.sh'

@@ -23,34 +23,59 @@ import os.path as p
 import shutil
 
 import mock
-from nose2.tools import such
-from nose2.tools.params import params
+import parameterized
+import unittest2
 
-from hdlcc.builders import getBuilderByName
+from hdlcc.builders import AVAILABLE_BUILDERS, GHDL, XVHDL, Fallback, MSim
 from hdlcc.diagnostics import BuilderDiag, DiagType
-from hdlcc.parsers import VhdlParser
-from hdlcc.tests.utils import assertSameFile
+from hdlcc.exceptions import SanityCheckError
+from hdlcc.parsers import DependencySpec, VhdlParser
+from hdlcc.tests.utils import (SourceMock, assertSameFile, getTestTempPath,
+                               parametrizeClassWithBuilders, setupTestSuport)
 
 _logger = logging.getLogger(__name__)
 
-TEST_SUPPORT_PATH = p.join(os.environ['TOX_ENV_DIR'], 'tmp')
+TEST_TEMP_PATH = getTestTempPath(__name__)
+SOURCES_PATH = p.join(TEST_TEMP_PATH, 'test_builders')
 
-with such.A("builder object") as it:
+BUILDER_CLASS_MAP = {
+    'msim': MSim,
+    'xvhdl': XVHDL,
+    'ghdl': GHDL,
+    'fallback': Fallback}
 
-    it.assertSameFile = assertSameFile(it)
+class _SourceMock(SourceMock):
+    base_path = TEST_TEMP_PATH
 
-    @it.has_setup
-    def setup():
-        it.BUILDER_NAME = os.environ.get('BUILDER_NAME', None)
-        it.BUILDER_PATH = os.environ.get('BUILDER_PATH', None)
-        # TODO: tox.ini should put those on the environment so we can run tests
-        # in parallel
-        it.SOURCES_PATH = p.join(p.dirname(__file__), '..', '..', '.ci',
-                                 'test_support', 'test_builders')
+@parametrizeClassWithBuilders
+class TestBuilder(unittest2.TestCase):
+    # Create defaults so that pylint doesn't complain about non existing
+    # members
+    builder_name = None
+    builder_path = None
 
-    @it.has_teardown
-    def teardown():
-        if it.BUILDER_NAME == 'xvhdl':
+    @classmethod
+    def setUpClass(cls):
+        setupTestSuport(TEST_TEMP_PATH)
+        # Add builder path to the env
+        cls.original_env = os.environ.copy()
+
+        # Add the builder path to the environment so we can call it
+        if cls.builder_path:
+            _logger.info("Adding '%s' to the system path", cls.builder_path)
+            cls.patch = mock.patch.dict(
+                'os.environ',
+                {'PATH' : os.pathsep.join([cls.builder_path, os.environ['PATH']])})
+            cls.patch.start()
+
+        builder_class = BUILDER_CLASS_MAP[cls.builder_name]
+        cls.builder = builder_class(p.join(TEST_TEMP_PATH,
+                                           '_%s' % cls.builder_name))
+        cls.builder_class = builder_class
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.builder_name == 'xvhdl':
             try:
                 os.remove('.xvhdl.init')
             except OSError:
@@ -60,322 +85,330 @@ with such.A("builder object") as it:
             except OSError:
                 pass
 
-    with it.having('its binary executable'):
-        @it.has_setup
-        def setup():
-            it.original_env = os.environ.copy()
+        if cls.builder_path:
+            cls.patch.stop()
+        if p.exists('._%s' % cls.builder_name):
+            shutil.rmtree('._%s' % cls.builder_name)
 
-            # Add the builder path to the environment so we can call it
-            if it.BUILDER_PATH:
-                it.patch = mock.patch.dict(
-                    'os.environ',
-                    {'PATH' : os.pathsep.join([it.BUILDER_PATH, os.environ['PATH']])})
-                it.patch.start()
+    def test_environment_check(self):
+        self.builder.checkEnvironment()
 
-            cls = getBuilderByName(it.BUILDER_NAME)
-            it.builder = cls(p.join(TEST_SUPPORT_PATH,
-                                    '._%s' % it.BUILDER_NAME))
-            it.cls = cls
+    def test_builder_reports_its_available(self):
+        self.assertTrue(self.builder_class.isAvailable())
 
-        @it.has_teardown
-        def teardown():
-            if it.BUILDER_PATH:
-                it.patch.stop()
-            if p.exists('._%s' % it.BUILDER_NAME):
-                shutil.rmtree('._%s' % it.BUILDER_NAME)
+    def test_create_library_multiple_times(self):
+        self.builder._createLibrary('random_lib')
+        self.builder._createLibrary('random_lib')
 
-        @it.should('pass environment check')
-        def test():
-            it.builder.checkEnvironment()
+    def test_builder_does_nothing_when_creating_builtin_libraries(self):
+        self.builder._createLibrary('ieee')
 
-        @it.should('should be available')
-        def test():
-            it.assertTrue(it.cls.isAvailable())
+    def test_finds_builtin_libraries(self):
+        expected = []
 
-        @it.should('not fail when creating the same library multiple times')
-        def test():
-            it.builder._createLibrary('random_lib')
-            it.builder._createLibrary('random_lib')
+        if self.builder_name != 'fallback':
+            expected += ['ieee', 'std']
 
-        @it.should('do nothing when trying to create builtin libraries')
-        def test():
-            it.builder._createLibrary('ieee')
+        if self.builder_name == "msim":
+            expected += ['modelsim_lib']
 
-        @it.should("find GHDL builtin libraries")
-        def test():
-            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
-                _logger.info("Test requires a builder")
-                return
-            expected = ['ieee', 'std']
+        for lib in expected:
+            self.assertIn(lib, self.builder.getBuiltinLibraries())
 
-            if it.BUILDER_NAME == "msim":
-                expected += ['modelsim_lib']
+    @parameterized.parameterized.expand([
+        ('/some/file/with/abs/path.vhd', ),
+        ('some/file/with/relative/path.vhd', ),
+        ('some_file_on_same_level.vhd', ),
+        (r'C:\some\file\on\windows.vhd', )])
+    def test_parse_msim_result(self, path):
+        if self.builder_name != "msim":
+            raise unittest2.SkipTest("ModelSim only test")
 
-            for lib in expected:
-                it.assertIn(lib, it.builder.getBuiltinLibraries())
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Error: %s(21): near \"EOF\": (vcom-1576) "
+                "expecting \';\'." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="near \"EOF\": expecting \';\'.",
+                filename=path,
+                line_number=21,
+                error_code='vcom-1576',
+                severity=DiagType.ERROR)])
 
-        @it.should("parse MSim lines correctly")
-        @params('/some/file/with/abs/path.vhd',
-                'some/file/with/relative/path.vhd',
-                'some_file_on_same_level.vhd',
-                r'C:\some\file\on\windows.vhd')
-        def test(case, path):
-            if it.BUILDER_NAME != "msim":
-                _logger.info("MSim only test")
-                return
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Warning: %s(23): (vcom-1320) Type of expression "
+                "\"(OTHERS => '0')\" is ambiguous; using element type "
+                "STD_LOGIC_VECTOR, not aggregate type register_type." % path)),
 
-            _logger.info("Running '%s'", case)
-            it.assertEqual(
-                list(it.builder._makeRecords(
-                    "** Error: %s(21): near \"EOF\": (vcom-1576) "
-                    "expecting \';\'." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="near \"EOF\": expecting \';\'.",
-                    filename=path,
-                    line_number=21,
-                    error_code='vcom-1576',
-                    severity=DiagType.ERROR)])
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Type of expression \"(OTHERS => '0')\" is "
+                     "ambiguous; using element type STD_LOGIC_VECTOR, not "
+                     "aggregate type register_type.",
+                filename=path,
+                line_number=23,
+                error_code='vcom-1320',
+                severity=DiagType.WARNING)])
 
-            it.assertEqual(
-                list(it.builder._makeRecords(
-                    "** Warning: %s(23): (vcom-1320) Type of expression "
-                    "\"(OTHERS => '0')\" is ambiguous; using element type "
-                    "STD_LOGIC_VECTOR, not aggregate type register_type." % path)),
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Warning: %s(39): (vcom-1514) Range choice direction "
+                "(downto) does not determine aggregate index range "
+                "direction (to)." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Range choice direction (downto) does not determine "
+                     "aggregate index range direction (to).",
+                filename=path,
+                line_number=39,
+                error_code='vcom-1514',
+                severity=DiagType.WARNING)])
 
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Type of expression \"(OTHERS => '0')\" is "
-                         "ambiguous; using element type STD_LOGIC_VECTOR, not "
-                         "aggregate type register_type.",
-                    filename=path,
-                    line_number=23,
-                    error_code='vcom-1320',
-                    severity=DiagType.WARNING)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Error: (vcom-11) Could not find work.regfile_pkg.")),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Could not find work.regfile_pkg.",
+                error_code='vcom-11',
+                severity=DiagType.ERROR)])
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Warning: %s(39): (vcom-1514) Range choice direction "
-                    "(downto) does not determine aggregate index range "
-                    "direction (to)." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Range choice direction (downto) does not determine "
-                         "aggregate index range direction (to).",
-                    filename=path,
-                    line_number=39,
-                    error_code='vcom-1514',
-                    severity=DiagType.WARNING)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Error (suppressible): %s(7): (vcom-1195) Cannot find "
+                "expanded name \"work.regfile_pkg\"." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Cannot find expanded name \"work.regfile_pkg\".",
+                filename=path,
+                line_number=7,
+                error_code='vcom-1195',
+                severity=DiagType.ERROR)])
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Error: (vcom-11) Could not find work.regfile_pkg.")),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Could not find work.regfile_pkg.",
-                    error_code='vcom-11',
-                    severity=DiagType.ERROR)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Error: %s(7): Unknown expanded name." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Unknown expanded name.",
+                line_number='7',
+                filename=path,
+                severity=DiagType.ERROR)])
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Error (suppressible): %s(7): (vcom-1195) Cannot find "
-                    "expanded name \"work.regfile_pkg\"." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Cannot find expanded name \"work.regfile_pkg\".",
-                    filename=path,
-                    line_number=7,
-                    error_code='vcom-1195',
-                    severity=DiagType.ERROR)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Warning: [14] %s(103): (vcom-1272) Length of expected "
+                "is 4; length of actual is 8." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Length of expected is 4; length of actual is 8.",
+                line_number='103',
+                error_code='vcom-1272',
+                filename=path,
+                severity=DiagType.WARNING)])
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Error: %s(7): Unknown expanded name." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Unknown expanded name.",
-                    line_number='7',
-                    filename=path,
-                    severity=DiagType.ERROR)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "** Warning: [14] %s(31): (vcom-1246) Range -1 downto 0 "
+                "is null." % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="Range -1 downto 0 is null.",
+                line_number='31',
+                error_code='vcom-1246',
+                filename=path,
+                severity=DiagType.WARNING)])
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Warning: [14] %s(103): (vcom-1272) Length of expected "
-                    "is 4; length of actual is 8." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Length of expected is 4; length of actual is 8.",
-                    line_number='103',
-                    error_code='vcom-1272',
-                    filename=path,
-                    severity=DiagType.WARNING)])
+    @parameterized.parameterized.expand([
+        ('/some/file/with/abs/path.vhd', ),
+        ('some/file/with/relative/path.vhd', ),
+        ('some_file_on_same_level.vhd', ),
+        (r'C:\some\file\on\windows.vhd', )])
+    def test_parse_ghdl_result(self, path):
+        if self.builder_name != "ghdl":
+            raise unittest2.SkipTest("GHDL only test")
 
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "** Warning: [14] %s(31): (vcom-1246) Range -1 downto 0 "
-                    "is null." % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="Range -1 downto 0 is null.",
-                    line_number='31',
-                    error_code='vcom-1246',
-                    filename=path,
-                    severity=DiagType.WARNING)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                "%s:11:35: extra ';' at end of interface list" % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                filename=path,
+                line_number=11,
+                column_number=35,
+                severity=DiagType.ERROR,
+                text="extra ';' at end of interface list")])
 
-        @it.should("parse GHDL builder lines correctly")
-        @params('/some/file/with/abs/path.vhd',
-                'some/file/with/relative/path.vhd',
-                'some_file_on_same_level.vhd',
-                r'C:\some\file\on\windows.vhd')
-        def test(case, path):
-            if it.BUILDER_NAME != "ghdl":
-                _logger.info("GHDL only test")
-                return
-            _logger.info("Running %s", case)
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    "%s:11:35: extra ';' at end of interface list" % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    filename=path,
-                    line_number=11,
-                    column_number=35,
-                    severity=DiagType.ERROR,
-                    text="extra ';' at end of interface list")])
+    @parameterized.parameterized.expand([
+        ('/some/file/with/abs/path.vhd',),
+        ('some/file/with/relative/path.vhd',),
+        ('some_file_on_same_level.vhd',)])
+    def test_parse_xvhdl_result(self, path):
+        if self.builder_name != "XVHDL":
+            raise unittest2.SkipTest("XVHDL only test")
 
-        @it.should("parse XVHDL builder lines correctly")
-        @params('/some/file/with/abs/path.vhd',
-                'some/file/with/relative/path.vhd',
-                'some_file_on_same_level.vhd')
-                #  r'C:\some\file\on\windows.vhd')
-        def test(case, path):
-            if it.BUILDER_NAME != "XVHDL":
-                _logger.info("XVHDL only test")
-                return
-            _logger.info("Running %s", case)
-            it.assertEquals(
-                list(it.builder._makeRecords(
-                    'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path)),
-                [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text="syntax error near )",
-                    filename=path,
-                    line_number=12,
-                    error_code='VRFC 10-1412',
-                    severity=DiagType.ERROR)])
+        self.assertEqual(
+            list(self.builder._makeRecords(
+                'ERROR: [VRFC 10-1412] syntax error near ) [%s:12]' % path)),
+            [BuilderDiag(
+                builder_name=self.builder_name,
+                text="syntax error near )",
+                filename=path,
+                line_number=12,
+                error_code='VRFC 10-1412',
+                severity=DiagType.ERROR)])
 
-        @it.should('compile a VHDL source without errors')
-        def test():
-            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.vhd'))
-            records, rebuilds = it.builder.build(source)
-            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
-                           'This source should not generate errors.')
-            it.assertEqual(rebuilds, [])
+    def test_vhdl_compilation(self):
+        if 'vhdl' not in self.builder_class.file_types:
+            raise unittest2.SkipTest("Builder {} doesn't support VHDL"
+                                     .format(self.builder_name))
 
-        @it.should('compile a Verilog source without errors')
-        def test():
-            if it.BUILDER_NAME != "msim":
-                _logger.info("MSim only test")
-                return
-            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.v'))
-            records, rebuilds = it.builder.build(source)
-            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
-                           'This source should not generate errors.')
-            it.assertEqual(rebuilds, [])
+        source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.vhd'))
+        records, rebuilds = self.builder.build(source)
+        self.assertNotIn(DiagType.ERROR, [x.severity for x in records],
+                         'This source should not generate errors.')
+        self.assertEqual(rebuilds, [])
 
-        @it.should('compile a SystemVerilog source without errors')
-        def test():
-            if it.BUILDER_NAME != "msim":
-                _logger.info("MSim only test")
-                return
-            source = VhdlParser(p.join(it.SOURCES_PATH, 'no_messages.sv'))
-            records, rebuilds = it.builder.build(source)
-            it.assertNotIn(DiagType.ERROR, [x.severity for x in records],
-                           'This source should not generate errors.')
-            it.assertEqual(rebuilds, [])
+    def test_verilog_compilation(self):
+        if 'verilog' not in self.builder_class.file_types:
+            raise unittest2.SkipTest("Builder {} doesn't support Verilog"
+                                     .format(self.builder_name))
 
+        source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.v'))
+        records, rebuilds = self.builder.build(source)
+        self.assertNotIn(DiagType.ERROR, [x.severity for x in records],
+                         'This source should not generate errors.')
+        self.assertEqual(rebuilds, [])
 
-        @it.should('catch a known error on a VHDL source')
-        def test():
-            if it.BUILDER_NAME not in ('msim', 'ghdl', 'xvhdl'):
-                _logger.info("Test requires a builder")
-                return
+    def test_systemverilog_compilation(self):
+        if 'systemverilog' not in self.builder_class.file_types:
+            raise unittest2.SkipTest("Builder {} doesn't support SystemVerilog"
+                                     .format(self.builder_name))
 
-            source = VhdlParser(p.join(it.SOURCES_PATH,
-                                       'source_with_error.vhd'))
-            records, rebuilds = it.builder.build(source, forced=True)
+        source = VhdlParser(p.join(SOURCES_PATH, 'no_messages.sv'))
+        records, rebuilds = self.builder.build(source)
+        self.assertNotIn(DiagType.ERROR, [x.severity for x in records],
+                         'This source should not generate errors.')
+        self.assertEqual(rebuilds, [])
 
-            for record in records:
-                _logger.info(record)
+    def test_catch_a_known_error(self):
+        source = VhdlParser(p.join(SOURCES_PATH,
+                                   'source_with_error.vhd'))
+        records, rebuilds = self.builder.build(source, forced=True)
 
-            if it.BUILDER_NAME == 'msim':
-                expected = [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text='Unknown identifier "some_lib".',
+        for record in records:
+            _logger.info(record)
+
+        if self.builder_name == 'msim':
+            expected = [BuilderDiag(
+                builder_name=self.builder_name,
+                text='Unknown identifier "some_lib".',
+                line_number=4,
+                error_code='vcom-1136',
+                severity=DiagType.ERROR)]
+        elif self.builder_name == 'ghdl':
+            expected = [BuilderDiag(
+                builder_name=self.builder_name,
+                text='no declaration for "some_lib"',
+                line_number=4,
+                column_number=5,
+                severity=DiagType.ERROR)]
+        elif self.builder_name == 'xvhdl':
+            expected = [
+                BuilderDiag(
+                    builder_name=self.builder_name,
+                    text='some_lib is not declared',
                     line_number=4,
-                    error_code='vcom-1136',
-                    severity=DiagType.ERROR)]
-            elif it.BUILDER_NAME == 'ghdl':
-                expected = [BuilderDiag(
-                    builder_name=it.BUILDER_NAME,
-                    text='no declaration for "some_lib"',
-                    line_number=4,
-                    column_number=5,
-                    severity=DiagType.ERROR)]
-            elif it.BUILDER_NAME == 'xvhdl':
-                expected = [
-                    BuilderDiag(
-                        builder_name=it.BUILDER_NAME,
-                        text='some_lib is not declared',
-                        line_number=4,
-                        error_code='VRFC 10-91',
-                        severity=DiagType.ERROR),
+                    error_code='VRFC 10-91',
+                    severity=DiagType.ERROR),
 
-                    BuilderDiag(
-                        builder_name=it.BUILDER_NAME,
-                        text="'some_lib' is not declared",
-                        line_number='4',
-                        error_code='VRFC 10-2989',
-                        severity=DiagType.ERROR)]
+                BuilderDiag(
+                    builder_name=self.builder_name,
+                    text="'some_lib' is not declared",
+                    line_number='4',
+                    error_code='VRFC 10-2989',
+                    severity=DiagType.ERROR)]
 
-            it.assertEqual(len(records), 1)
+        if self.builder_name != 'fallback':
+            self.assertEqual(len(records), 1)
             record = records.pop()
-            it.assertSameFile(record.filename, source.filename)
+            assertSameFile(self)(record.filename, source.filename)
 
             # By this time the path to the file is the same, so we'll force the
             # expected record's filename to use the __eq__ operator
             for expected_diag in expected:
                 expected_diag.filename = source.filename
 
-            it.assertIn(record, expected)
+            self.assertIn(record, expected)
+        else:
+            self.assertEqual(records, set())
 
-            it.assertEqual(rebuilds, [])
+        self.assertEqual(rebuilds, [])
 
-        @it.should("catch MSim rebuilds by messages")
-        @params(
-            "** Error: (vcom-13) Recompile foo_lib.bar_component because "
-            "foo_lib.foo_lib_pkg has changed.",)
-        def test(case, line):
-            if it.BUILDER_NAME != 'msim':
-                _logger.info("ModelSim test only")
-                return
-            _logger.info("Running %s", case)
+    def test_msim_recompile_msg_0(self):
+        if self.builder_name != "msim":
+            raise unittest2.SkipTest("ModelSim only test")
 
-            it.assertEquals(
-                [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
-                it.builder._searchForRebuilds(line))
+        line = ("** Error: (vcom-13) Recompile foo_lib.bar_component because "
+                "foo_lib.foo_lib_pkg has changed.")
 
-        @it.should("catch GHDL rebuilds by messages")
-        @params(
-            "somefile.vhd:12:13: package \"leon3\" is obsoleted by package \"amba\"")
-        def test(case, line):
-            if it.BUILDER_NAME != 'ghdl':
-                _logger.info("GHDL test only")
-                return
-            _logger.info("Running %s", case)
+        self.assertEqual(
+            [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
+            self.builder._searchForRebuilds(line))
 
-            it.assertEquals(
-                [{'unit_type': 'package', 'unit_name': 'leon3'}],
-                it.builder._searchForRebuilds(line))
+    def test_msim_recompile_msg_1(self):
+        if self.builder_name != "msim":
+            raise unittest2.SkipTest("ModelSim only test")
 
-it.createTests(globals())
+        line = ("** Error: (vcom-13) Recompile foo_lib.bar_component because "
+                "foo_lib.foo_lib_pkg, base_library.very_common_package have changed.")
+
+        self.assertEqual(
+            [{'library_name': 'foo_lib', 'unit_name': 'bar_component'}],
+            self.builder._searchForRebuilds(line))
+
+    def test_ghdl_recompile_msg(self):
+        if self.builder_name != "ghdl":
+            raise unittest2.SkipTest("GHDL only test")
+
+        line = "somefile.vhd:12:13: package \"leon3\" is obsoleted by package \"amba\""
+
+        self.assertEqual(
+            [{'unit_type': 'package', 'unit_name': 'leon3'}],
+            self.builder._searchForRebuilds(line))
+
+    # Rebuild formats are:
+    # - {unit_type: '', 'unit_name': }
+    # - {library_name: '', 'unit_name': }
+    # - {rebuild_path: ''}
+    @parameterized.parameterized.expand([
+        ({'unit_type': 'package', 'unit_name': 'very_common_pkg'}, ),
+        ({'library_name': 'work', 'unit_name': 'foo'}, ),
+        ({'rebuild_path': ''}, ),
+        ])
+    def test_get_rebuilds(self, rebuild_info):
+        _logger.info("Rebuild info is %s", rebuild_info)
+        with mock.patch.object(self.builder, '_searchForRebuilds', return_value=[rebuild_info, ]):
+            source = _SourceMock(
+                library='some_lib',
+                design_units=[{'name' : 'target',
+                               'type' : 'entity'}],
+                dependencies=[
+                    DependencySpec(library='work', name='very_common_pkg')])
+
+            self.assertEqual(self.builder._getRebuilds(source, ''), [rebuild_info, ])
+
+class TestSanityError(unittest2.TestCase):
+
+    @parameterized.parameterized.expand(
+        [(x, ) for x in AVAILABLE_BUILDERS])
+    def test_raises_sanity_error(self, builder_class):
+        if builder_class is Fallback:
+            raise self.skipTest("Fallback won't raise any exception")
+
+        _logger.info("Testing builder %s", builder_class.builder_name)
+
+        with self.assertRaises(SanityCheckError):
+            _ = builder_class(p.join(TEST_TEMP_PATH, '_%s' % builder_class.builder_name))

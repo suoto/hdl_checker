@@ -35,6 +35,7 @@ CLASS_MAP = {
     'GHDL': hdlcc.builders.GHDL,
     'MSim': hdlcc.builders.MSim,
     'XVHDL': hdlcc.builders.XVHDL,
+    'Fallback': hdlcc.builders.Fallback,
 }
 
 class StateEncoder(json.JSONEncoder):
