@@ -269,6 +269,58 @@ with such.A("LSP server") as it:
                 it.assertEqual(doc_uri, uris.from_fs_path(source))
                 it.assertCountEqual(diagnostics, [])
 
+        @it.should('clean up if the project file has been modified')
+        def test():
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
+            og_timestamp = p.getmtime(it.server._checker.project_file)
+
+            content = open(it.server._checker.project_file).read()
+            open(it.server._checker.project_file, 'a').write('\n# foo')
+            curr_ts = p.getmtime(it.server._checker.project_file)
+
+            _logger.info("Original timestamp: %s, current timestamp: %s",
+                         og_timestamp, curr_ts)
+
+            it.assertNotEqual(og_timestamp, curr_ts,
+                              "Timestamps are still equal??")
+
+            with mock.patch.object(it.server._checker, 'clean') as clean:
+
+                it.server.m_text_document__did_open(
+                    textDocument={'uri': uris.from_fs_path(source),
+                                  'text': None})
+
+                clean.assert_called_once()
+
+            # Restore the original content (which will change the timestamp)
+            # and request a message so that parsing occurs here
+            open(it.server._checker.project_file, 'w').write(content)
+            it.assertEqual(content, open(it.server._checker.project_file).read())
+
+            it.server.m_text_document__did_open(
+                textDocument={'uri': uris.from_fs_path(source),
+                              'text': None})
+
+        @it.should('rebuild if the cache file has been removed')
+        def test():
+            source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
+            os.remove(it.server._checker._getCacheFilename())
+
+            def getBuilder():
+                return 'msim'
+
+            with mock.patch.object(it.server._checker, 'clean') as clean:
+                with mock.patch.object(it.server._checker.config_parser,
+                        'getBuilder', getBuilder):
+
+                    it.server.m_text_document__did_open(
+                        textDocument={'uri': uris.from_fs_path(source),
+                                      'text': None})
+
+                    clean.assert_called()
+
     with it.having('a non existing project file'):
 
         @it.should('respond capabilities upon initialization')
@@ -328,7 +380,7 @@ with such.A("LSP server") as it:
                                                      it.project_file))),
                       'severity': defines.DiagnosticSeverity.Error}])
 
-    with it.having('no root URI or project file set'):
+    with it.having('neither root URI nor project file set'):
 
         @it.should('respond capabilities upon initialization')
         def test():
