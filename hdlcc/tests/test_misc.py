@@ -22,7 +22,6 @@ import logging
 import os.path as p
 import re
 import subprocess as subp
-
 import parameterized
 import unittest2
 

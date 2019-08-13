@@ -61,7 +61,6 @@ class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
 class SourceMock(object):
     _logger = logging.getLogger('SourceMock')
     base_path = ''
-
     def __init__(self, library, design_units, dependencies=None, filename=None):
         if filename is not None:
             self._filename = p.join(self.base_path, filename)
@@ -78,7 +77,6 @@ class SourceMock(object):
         self._dependencies = list(dependencies or [])
 
         self._createMockFile()
-
     @property
     def filename(self):
         return self._filename
@@ -100,16 +98,10 @@ class SourceMock(object):
                                                  dependency.name))
 
             fd.write('\n')
-
             for design_unit in self._design_units:
                 fd.write("{0} {1} is\n\nend {0} {1};\n".
                          format(design_unit['type'],
                                 design_unit['name']))
-
-    #  def __del__(self):
-    #      if p.exists(self.filename):
-    #          self._logger.debug("Deleting %s", self.filename)
-    #          os.remove(self.filename)
 
     def __repr__(self):
         return ("{}(library='{}', design_units={}, dependencies={}, "
@@ -137,14 +129,12 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger('MockBuilder')
     builder_name = 'msim_mock'
     file_types = ('vhdl', )
-
     def __init__(self, target_folder):
         self._target_folder = target_folder
         if not p.exists(self._target_folder):
             os.mkdir(self._target_folder)
 
         super(MockBuilder, self).__init__(target_folder)
-
 
     def _makeRecords(self, _): # pragma: no cover
         return []
@@ -187,6 +177,8 @@ def sanitizePath(*args):
     Join args with pathsep, gets the absolute path and normalizes
     """
     return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
+
+
 
 
 def assertCountEqual(it):  # pylint: disable=invalid-name
@@ -251,8 +243,6 @@ def writeListToFile(filename, _list): # pragma: no cover
             break
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
-
-
 if not onWindows():
     TEST_ENVS = {
         'ghdl': os.environ['GHDL_PATH'],

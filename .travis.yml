@@ -17,7 +17,6 @@ language: python
 
 services:
   - docker
-
 stages:
   - test
   - deploy
@@ -28,6 +27,7 @@ jobs:
       script: ./run_tests.sh -e py27-linux
     - name: Python 3.7
       script: ./run_tests.sh -e py37-linux
+
 
     - stage: deploy
       before_install: skip
@@ -47,6 +47,5 @@ before_install:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
-
 cache:
   pip: true
