@@ -137,6 +137,7 @@ with such.A("LSP server") as it:
         it.assertEqual(server.m_initialized(), None)
 
     def _waitOnMockCall(meth):
+        _logger.info("Waiting for publish_diagnostics to be called")
         event = Event()
 
         timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
@@ -202,11 +203,8 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                _logger.info("Sending m_text_document__did_open request")
                 it.server.m_text_document__did_open(
                     textDocument={'uri': uris.from_fs_path(source),
                                   'text': None})
@@ -252,11 +250,8 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                _logger.info("Sending m_text_document__did_open request")
                 it.server.m_text_document__did_open(
                     textDocument={'uri': uris.from_fs_path(source),
                                   'text': None})
@@ -285,13 +280,20 @@ with such.A("LSP server") as it:
             it.assertNotEqual(og_timestamp, curr_ts,
                               "Timestamps are still equal??")
 
-            with mock.patch.object(it.server._checker, 'clean') as clean:
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                with mock.patch.object(it.server._checker, 'clean') as clean:
 
-                it.server.m_text_document__did_open(
-                    textDocument={'uri': uris.from_fs_path(source),
-                                  'text': None})
+                    _logger.info("Sending m_text_document__did_open request")
+                    it.server.m_text_document__did_open(
+                        textDocument={'uri': uris.from_fs_path(source),
+                                      'text': None})
 
-                clean.assert_called_once()
+                    call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                    doc_uri, diagnostics = call[1]
+                    _logger.info("doc_uri: %s", doc_uri)
+                    _logger.info("diagnostics: %s", diagnostics)
+
+                    clean.assert_called_once()
 
             # Restore the original content (which will change the timestamp)
             # and request a message so that parsing occurs here
@@ -311,15 +313,22 @@ with such.A("LSP server") as it:
             def getBuilder():
                 return 'msim'
 
-            with mock.patch.object(it.server._checker, 'clean') as clean:
-                with mock.patch.object(it.server._checker.config_parser,
-                        'getBuilder', getBuilder):
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                with mock.patch.object(it.server._checker, 'clean') as clean:
+                    with mock.patch.object(it.server._checker.config_parser,
+                                           'getBuilder', getBuilder):
 
-                    it.server.m_text_document__did_open(
-                        textDocument={'uri': uris.from_fs_path(source),
-                                      'text': None})
+                        _logger.info("Sending m_text_document__did_open request")
+                        it.server.m_text_document__did_open(
+                            textDocument={'uri': uris.from_fs_path(source),
+                                          'text': None})
 
-                    clean.assert_called()
+                        call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
+                        doc_uri, diagnostics = call[1]
+                        _logger.info("doc_uri: %s", doc_uri)
+                        _logger.info("diagnostics: %s", diagnostics)
+
+                        clean.assert_called()
 
     with it.having('a non existing project file'):
 
@@ -339,11 +348,8 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                _logger.info("Sending m_text_document__did_open request")
                 it.server.m_text_document__did_open(
                     textDocument={'uri': uris.from_fs_path(source),
                                   'text': None})
@@ -394,11 +400,8 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                _logger.info("Sending m_text_document__did_open request")
                 it.server.m_text_document__did_open(
                     textDocument={'uri': uris.from_fs_path(source),
                                   'text': None})
@@ -435,11 +438,8 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
-            meth = mock.MagicMock()
-            with mock.patch.object(it.server.workspace,
-                                   'publish_diagnostics',
-                                   meth):
-
+            with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
+                _logger.info("Sending m_text_document__did_open request")
                 it.server.m_text_document__did_open(
                     textDocument={'uri': uris.from_fs_path(source),
                                   'text': None})
