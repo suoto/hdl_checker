@@ -17,14 +17,13 @@ and provides some (limited) static checks.
 
 * [Installation](#installation)
 * [Usage](#usage)
-  * [Configuration File](#configuration-file)
+  * [Third-party tools](#third-party-tools)
+  * [Configuration file](#configuration-file)
   * [LSP server](#lsp-server)
   * [HTTP server](#http-server)
 * [Testing](#testing)
-* [Supported environments](#supported-environments)
-  * [Supported systems](#supported-systems)
-  * [Editor support](#editor-support)
-  * [Supported third-party compilers](#supported-third-party-compilers)
+* [Supported systems](#supported-systems)
+* [Editor support](#editor-support)
 * [Style checking](#style-checking)
 * [Issues](#issues)
 * [License](#license)
@@ -70,10 +69,20 @@ optional arguments:
   --version, -V         Prints hdlcc version and exit
 ```
 
+### Third-party tools
+
+HDL Code Checker supports
+
+* [Mentor ModelSim][Mentor_msim]
+* [ModelSim Intel FPGA Edition][Intel_msim]
+* [GHDL][GHDL]
+* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx
+  Vivado][Xilinx_Vivado])
+
 ### Configuration file
 
-`hdlcc` requires a configuration file listing libraries, source files, build flags,
-etc.
+HDL Code Checker requires a configuration file listing libraries, source files,
+build flags, etc.
 
 Basic syntax is
 
@@ -81,7 +90,6 @@ Basic syntax is
 # This is a comment
 
 [ builder = (msim|ghdl|xvhdl) ] # This is being deprecated
-[ target_dir = PATH_TO_HDLCC_TEMPORARY_WORKING_DIR ] # This is being deprecated
 
 [ global_build_flags[ (vhdl|verilog|systemverilog) ] = <language specific flags> ]
 
@@ -92,9 +100,10 @@ Basic syntax is
 An example project file could be:
 
 ```bash
-# Specifying builder and target path
+# Specifying builder
+# HDL Code Checker will try to use ModelSim, GHDL and XVHDL in this order, so
+# only add this if you want to force to a particular one
 builder = msim
-target_dir = .msim
 
 global_build_flags[vhdl] = -rangecheck
 global_build_flags[verilog] = -lint
@@ -107,6 +116,9 @@ vhdl          my_library foo_tb.vhd                            -2008
 verilog       my_library verilog/a_verilog_file.v              -pedanticerrors
 # Absolute paths are handled as such
 systemverilog my_library /home/user/some_systemverilog_file.sv -pedanticerrors
+# Wildcards are supported
+vhdl          my_library library/*.vhd
+vhdl          my_library library/*/*.vhd
 ```
 
 Setting specific flags can be done per language or per file:
@@ -117,8 +129,8 @@ global_build_flags[verilog] = <flags passed to the compiler when building Verilo
 global_build_flags[systemverilog] = <flags passed to the compiler when building SystemVerilog files>
 ```
 
-When unset, `hdlcc` sets the following default values depending on the compiler
-being used:
+When unset, HDL Code Checker sets the following default values depending on the
+compiler being used:
 
 * ModelSim
 
@@ -148,25 +160,35 @@ hdlcc --lsp
 On a Linux system, log file will be at `/tmp/hdlcc_log_pid<PID_NUMBER>.log` and
 `/tmp/hdlcc_stderr_pid<PID_NUMBER>.log`.
 
-
 ### HTTP server
 
 HDL Code Checker can be used in HTTP server mode also:
 
 ```bash
-$ hdlcc
+hdlcc
 ```
 
 *Please note that this mode **does not use LSP to communicate**. Request/response
 API is not yet available, but a reference implementation can be found in
 [vim-hdl][vim-hdl]*
 
+## Testing
+
+HDL Code Checker uses a [docker][docker] container to run tests. If you wish to
+run them, clone this repository and on the root folder run
+
+```bash
+./run_tests.sh
+```
+
+The container used for testing is [suoto/hdlcc][hdlcc_container]
+
 ## Supported systems
 
-| System  | CI      | CI status                                                                                                                                                         |
-| :--:    | :--:    | :--:                                                                                                                                                              |
-| Linux   | Yes     | [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)                                                         |
-| Windows | Partial | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master) |
+| System  | CI   | CI status                                                                                                                                                         |
+| :--:    | :--: | :--:                                                                                                                                                              |
+| Linux   | Yes  | [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)                                                         |
+| Windows | Yes  | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master) |
 
 ## Editor support
 
@@ -179,7 +201,7 @@ API is not yet available, but a reference implementation can be found in
 Style checks are independent of a third-party compiler. Checking includes:
 
 * Unused signals, constants, generics, shared variables, libraries, types and
- attributes
+  attributes
 * Comment tags (`FIXME`, `TODO`, `XXX`)
 
 Notice that currently the unused reports has caveats, namely declarations with
@@ -212,18 +234,21 @@ This software is licensed under the [GPL v3 license][gpl].
 Mentor Graphics®, ModelSim® and their respective logos are trademarks or registered
 trademarks of Mentor Graphics, Inc.
 
-Altera® and its logo is a trademark or registered trademark of Altera Corporation.
+Intel® and its logo is a trademark or registered trademark of Intel Corporation.
 
 Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
 
-`hdlcc`'s author has no connection or affiliation to any of the trademarks mentioned
-or used by this software.
+HDL Code Checker's author has no connection or affiliation to any of the
+trademarks mentioned or used by this software.
 
-[Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
-[Altera_msim]: https://www.altera.com/downloads/download-center.html
-[Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
+[docker]: https://www.docker.com/
+[GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
+[hdlcc_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdlcc
+[Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
 [issue_tracker]: https://github.com/suoto/hdlcc/issues
-[async_fifo_tb]: https://github.com/suoto/hdl_lib/blob/master/memory/testbench/async_fifo_tb.vhd
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
+[Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
 [vim-hdl]: https://github.com/suoto/vim-hdl/
+[Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
+[Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html

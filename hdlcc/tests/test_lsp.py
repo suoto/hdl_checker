@@ -137,7 +137,6 @@ with such.A("LSP server") as it:
             {"capabilities": {"textDocumentSync": 1}})
 
         it.assertEqual(server.m_initialized(), None)
-
     def startLspServer():
         _logger.debug("Creating server")
         tx_r, tx_w = os.pipe()
@@ -161,11 +160,7 @@ with such.A("LSP server") as it:
 
         del it.server
 
-
     def _waitOnMockCall(meth):
-        _logger.info("Waiting for publish_diagnostics to be called")
-        workspace = it.server.workspace
-
         event = Event()
 
         timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
@@ -181,10 +176,7 @@ with such.A("LSP server") as it:
             time.sleep(0.1)
 
         if event.isSet():
-            _logger.error("Timeout waiting for %s", meth)
-            _logger.error("Workspace: %s", workspace)
-            _logger.error("Documents: %s", workspace.documents)
-            assert False, "Timeout waiting for {}".format(meth)
+            it.fail("Timeout waiting for %s" % meth)
 
         return result
 
@@ -259,7 +251,6 @@ with such.A("LSP server") as it:
         def teardown():
             stopLspServer()
 
-
         @it.should('respond capabilities upon initialization')
         def test():
             _initializeServer(
@@ -272,6 +263,7 @@ with such.A("LSP server") as it:
         @it.should('lint file when opening it')
         def test():
             source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
             it.assertCountEqual(checkLintFileOnOpen(source), [])
 
         @it.should('clean up if the project file has been modified')
@@ -341,7 +333,6 @@ with such.A("LSP server") as it:
                         clean.assert_called()
 
     with it.having('a non existing project file'):
-
         @it.has_setup
         def setup():
             startLspServer()
@@ -349,7 +340,6 @@ with such.A("LSP server") as it:
         @it.has_teardown
         def teardown():
             stopLspServer()
-
 
         @it.should('respond capabilities upon initialization')
         def test():
@@ -451,6 +441,7 @@ with such.A("LSP server") as it:
         @it.should('lint file when opening it')
         def test():
             source = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+
             it.assertCountEqual(checkLintFileOnOpen(source), [])
 
 it.createTests(globals())
