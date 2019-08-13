@@ -131,6 +131,8 @@ def _getNoseCommandLineArgs(args):
         argv += ['--debugger']
     if args.fail_fast:
         argv += ['--fail-fast']
+    if not args.log_to_stdout:
+        argv += ['--log-capture', ]
 
     return argv
 
