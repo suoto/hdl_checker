@@ -267,25 +267,25 @@ class HdlccLanguageServer(PythonLanguageServer):
     def m_workspace__did_change_configuration(self, settings=None):
         self._onProjectFileUpdate(settings or {})
 
-    @_logCalls
-    def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
-        changed_monitored_files = set()
-        config_changed = False
-        for change in (changes or []):
-            if change['uri'].endswith(MONITORED_FILES):
-                changed_monitored_files.add(change['uri'])
-            elif change['uri'].endswith(CONFIG_FILES):
-                config_changed = True
+    #  @_logCalls
+    #  def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
+    #      changed_monitored_files = set()
+    #      config_changed = False
+    #      for change in (changes or []):
+    #          if change['uri'].endswith(MONITORED_FILES):
+    #              changed_monitored_files.add(change['uri'])
+    #          elif change['uri'].endswith(CONFIG_FILES):
+    #              config_changed = True
 
-        if config_changed:
-            self.config.settings.cache_clear()
-            self._checker.clean()
-        elif not changed_monitored_files:
-            # Only externally changed python files and lint configs may result
-            # in changed diagnostics.
-            return
+    #      if config_changed:
+    #          self.config.settings.cache_clear()
+    #          self._checker.clean()
+    #      elif not changed_monitored_files:
+    #          # Only externally changed python files and lint configs may result
+    #          # in changed diagnostics.
+    #          return
 
-        for doc_uri in self.workspace.documents:
-            # Changes in doc_uri are already handled by m_text_document__did_save
-            if doc_uri not in changed_monitored_files:
-                self.lint(doc_uri, is_saved=False)
+    #      for doc_uri in self.workspace.documents:
+    #          # Changes in doc_uri are already handled by m_text_document__did_save
+    #          if doc_uri not in changed_monitored_files:
+    #              self.lint(doc_uri, is_saved=False)
