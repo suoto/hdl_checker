@@ -1,6 +1,6 @@
 # HDL Code Checker
 
-[![PyPI version](https://badge.fury.io/py/hdlcc.svg)](https://badge.fury.io/py/hdlcc)
+[![PyPI version](https://img.shields.io/pypi/v/hdlcc.svg)](https://pypi.org/project/hdlcc/)
 [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
 [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master)
 [![codecov](https://codecov.io/gh/suoto/hdlcc/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdlcc)
