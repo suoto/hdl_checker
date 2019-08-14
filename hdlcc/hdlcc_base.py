@@ -23,14 +23,17 @@ import os
 import os.path as p
 import traceback
 from multiprocessing.pool import ThreadPool
+from typing import (Any, AnyStr, Dict, Generator, List, Optional, Set, Tuple,
+                    Union)
 
 import hdlcc.builders
 import hdlcc.exceptions
 from hdlcc.builders import Fallback
 from hdlcc.config_parser import ConfigParser
-from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
-                               PathNotInProjectFile)
+from hdlcc.diagnostics import (CheckerDiagnostic, DependencyNotUnique,
+                               DiagType, PathNotInProjectFile)
 from hdlcc.parsers import VerilogParser, VhdlParser
+from hdlcc.parsers.dependency_spec import DependencySpec
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
 from hdlcc.utils import (getCachePath, getFileType, removeDirIfExists,
@@ -39,6 +42,10 @@ from hdlcc.utils import (getCachePath, getFileType, removeDirIfExists,
 CACHE_NAME = 'cache.json'
 
 _logger = logging.getLogger('build messages')
+
+Path = str
+OptionalPath = Optional[AnyStr]
+SourceFile = Union[VhdlParser, VerilogParser]
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -51,11 +58,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, project_file=None):
+    def __init__(self, project_file=None): # type: (OptionalPath) -> None
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
-        self._build_sequence_cache = {}
-        self._outstanding_diags = set()
+        self._build_sequence_cache = {} # type: Dict[str, Any]
+        self._outstanding_diags = set() # type: Set[CheckerDiagnostic]
 
         self.project_file = project_file
 
@@ -181,54 +188,57 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.builder = state['builder']
 
     @abc.abstractmethod
-    def _handleUiInfo(self, message):
+    def _handleUiInfo(self, message): # type: (AnyStr) -> None
         """
         Method that should be overriden to handle info messages from
         HDL Code Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiWarning(self, message):
+    def _handleUiWarning(self, message): # type: (AnyStr) -> None
         """
         Method that should be overriden to handle warning messages
         from HDL Code Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiError(self, message):
+    def _handleUiError(self, message): # type: (AnyStr) -> None
         """
         Method that should be overriden to handle errors messages
         from HDL Code Checker to the user
         """
 
     def getSourceByPath(self, path):
+        # type: (Path) -> Tuple[SourceFile, List[CheckerDiagnostic]]
         """
         Get the source object, flags and any additional info to be displayed
         """
-        source = None
-        remarks = []
-
         try:
-            source = self.config_parser.getSourceByPath(path)
+            return self.config_parser.getSourceByPath(path), []
         except KeyError:
             pass
+
+        remarks = [] # type: List[CheckerDiagnostic]
 
         # If the source file was not found on the configuration file, add this
         # as a remark.
         # Also, create a source parser object with some library so the user can
         # at least have some info on the source
-        if source is None:
-            if not isinstance(self.builder, Fallback):
-                remarks += [PathNotInProjectFile(p.abspath(path)), ]
+        if not isinstance(self.builder, Fallback):
+            remarks = [PathNotInProjectFile(p.abspath(path)), ]
 
-            self._logger.info("Path %s not found in the project file",
-                              p.abspath(path))
-            cls = VhdlParser if getFileType(path) == 'vhdl' else VerilogParser
-            source = cls(path, library='undefined')
+        self._logger.info("Path %s not found in the project file",
+                          p.abspath(path))
+
+        if getFileType(path) == 'vhdl':
+            source = VhdlParser(path, library='undefined') # type: SourceFile
+        else:
+            source = VerilogParser(path, library='undefined')
 
         return source, remarks
 
     def _resolveRelativeNames(self, source):
+        # type: (SourceFile) -> Generator[DependencySpec, None, None]
         """
         Translate raw dependency list parsed from a given source to the
         project name space
@@ -252,6 +262,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 (x.severity, x.line_number or 0, x.error_code or ''))
 
     def updateBuildSequenceCache(self, source):
+        # type: (SourceFile) -> List[SourceFile]
         """
         Wrapper to _resolveBuildSequence passing the initial build sequence
         list empty and caching the result
@@ -311,11 +322,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
 
     def getBuildSequence(self, source):
-        build_sequence = []
+        # type: (SourceFile) -> List[SourceFile]
+        build_sequence = [] # type: List[SourceFile]
         self._resolveBuildSequence(source, build_sequence)
         return build_sequence
 
     def _resolveBuildSequence(self, source, build_sequence, reference=None):
+        # type: (SourceFile, List[SourceFile], Optional[DependencySpec]) -> None
         """
         Recursively finds out the dependencies of the given source file
         """

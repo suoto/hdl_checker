@@ -21,11 +21,11 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Any, AnyStr, Dict, List, Optional, Set, Tuple, Generator
+from typing import Any, AnyStr, Dict, Generator, List, Optional, Set, Union
 
 import hdlcc.exceptions
 from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
-from hdlcc.parsers import BaseSourceFile, getSourceFileObjects
+from hdlcc.parsers import getSourceFileObjects, VerilogParser, VhdlParser
 from hdlcc.utils import getFileType
 
 # pylint: disable=invalid-name
@@ -45,6 +45,7 @@ BuildInfo = Dict[str, Any]
 BuildFlags = List[str]
 UnitName = str
 LibraryName = str
+SourceFile = Union[VhdlParser, VerilogParser]
 
 def _extractSet(entry): # type: (str) -> List[str]
     """
@@ -119,7 +120,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
             self._logger.info("No configuration file given, using fallback")
 
-        self._sources = {} # type: Dict[Path, BaseSourceFile]
+        self._sources = {} # type: Dict[Path, SourceFile]
         self._timestamp = 0.0
         self._parse_lock = RLock()
 
@@ -519,14 +520,14 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         return flags + self._sources[p.abspath(path)].flags
 
-    def getSources(self): # type: () -> List[BaseSourceFile]
+    def getSources(self): # type: () -> List[SourceFile]
         """
         Returns a list of VhdlParser/VerilogParser objects parsed
         """
         self._parseIfNeeded()
         return list(self._sources.values())
 
-    def getSourceByPath(self, path): # type: (Path) -> BaseSourceFile
+    def getSourceByPath(self, path): # type: (Path) -> SourceFile
         """
         Returns a source object given its path
         """
@@ -544,7 +545,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
     def findSourcesByDesignUnit(self, unit, library='work',
                                 case_sensitive=False):
-        # type: (UnitName, LibraryName, bool) -> List[BaseSourceFile]
+        # type: (UnitName, LibraryName, bool) -> List[SourceFile]
         """
         Return the source (or sources) that define the given design
         unit. Case sensitive mode should be used when tracking
@@ -558,7 +559,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         library_name = library if case_sensitive else library.lower()
         unit_name = unit if case_sensitive else unit.lower()
 
-        sources = [] # type: List[BaseSourceFile]
+        sources = [] # type: List[SourceFile]
 
         for source in self._sources.values():
             source_library = source.library
@@ -577,7 +578,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         return sources
 
     def discoverSourceDependencies(self, unit, library, case_sensitive):
-        # type: (UnitName, LibraryName, bool) -> List[BaseSourceFile]
+        # type: (UnitName, LibraryName, bool) -> List[SourceFile]
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same
