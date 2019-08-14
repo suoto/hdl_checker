@@ -37,4 +37,5 @@ su -l "$USERNAME" -c "    \
   tox ${TOX_ARGS[*]}   && \
   coverage combine     && \
   coverage xml         && \
+  coverage report      && \
   coverage html"

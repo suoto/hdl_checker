@@ -101,7 +101,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                     self._logger.debug("Builtin libraries: %s",
                                        ', '.join(self._builtin_libraries))
                 else: # pragma: no cover
-                    self._logger.info("No builtin libraries found")
+                    self._logger.debug("No builtin libraries found")
         except NotImplementedError:
             pass
 

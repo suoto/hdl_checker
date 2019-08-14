@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"""Serialization specifics"""
+"Serialization specifics"
 
 import json
 import logging
@@ -45,6 +45,8 @@ class StateEncoder(json.JSONEncoder):
     def default(self, o):  # pylint: disable=method-hidden
         if hasattr(o, '__jsonEncode__'):
             dct = o.__jsonEncode__()
+            # Set a __class__ entry into the dict so we can use it to get from
+            # CLASS_MAP when recreating the object
             prev = dct.get('__class__', None)
             if prev is not None and o.__class__.__name__ != prev:
                 _logger.warning("Class has been set to %s, overwriting it "

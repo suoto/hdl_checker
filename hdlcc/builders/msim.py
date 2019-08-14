@@ -108,7 +108,7 @@ class MSim(BaseBuilder):
         for match in self._stdout_message_scanner(line):
             info = match.groupdict()
 
-            self._logger.info("Parsed dict: %s", repr(info))
+            self._logger.debug("Parsed dict: %s", repr(info))
 
             text = re.sub(r"\s*\((vcom|vlog)-\d+\)\s*", " ",
                           info['error_message']).strip()
@@ -266,7 +266,7 @@ class MSim(BaseBuilder):
         if not p.exists(self._target_folder):  # pragma: no cover
             os.makedirs(self._target_folder)
 
-        self._logger.info("modelsim.ini not found at '%s', creating",
+        self._logger.debug("Creating modelsim.ini at '%s'",
                           p.abspath(_modelsim_ini))
 
         modelsim_env = os.environ.get('MODELSIM')
