@@ -63,6 +63,7 @@ setuptools.setup(
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
                                      'python-language-server>=0.26.1,<=0.27.0',
+                                     'typing',
                                      'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {
