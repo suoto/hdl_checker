@@ -30,14 +30,15 @@ import mock
 import six
 from parameterized import parameterized_class
 
-import hdlcc
+from hdlcc import exceptions
 from hdlcc.builders.base_builder import BaseBuilder
+from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import (getCachePath, getFileType, onWindows,
                          removeDuplicates, samefile)
 
 _logger = logging.getLogger(__name__)
 
-class StandaloneProjectBuilder(hdlcc.HdlCodeCheckerBase):
+class StandaloneProjectBuilder(HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
     _msg_queue = Queue()
     _ui_handler = logging.getLogger('UI')
@@ -165,7 +166,7 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
     builder_name = 'FailingBuilder'
     def _checkEnvironment(self):
-        raise hdlcc.exceptions.SanityCheckError(
+        raise exceptions.SanityCheckError(
             self.builder_name, "Fake error")
 
 

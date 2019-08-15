@@ -20,13 +20,15 @@ import logging
 import os.path as p
 import re
 from glob import glob
+from tempfile import mkdtemp
 from threading import RLock
-from typing import Any, AnyStr, Dict, Generator, List, Optional, Set, Union
+from typing import Any, Dict, Generator, List, Set
 
-import hdlcc.exceptions
+from hdlcc import exceptions
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
-from hdlcc.parsers import getSourceFileObjects, VerilogParser, VhdlParser
-from hdlcc.utils import getFileType
+from hdlcc.parsers import BaseSourceFile, getSourceFileObjects
+from hdlcc.utils import getFileType, removeDirIfExists
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -38,14 +40,6 @@ _configFileScan = re.compile("|".join([
         r"(?P<path>[^\s]+)\s*(?P<flags>.*)\s*",
     ]), flags=re.I).finditer
 # pylint: enable=invalid-name
-
-Path = str
-OptionalPath = Optional[AnyStr]
-BuildInfo = Dict[str, Any]
-BuildFlags = List[str]
-UnitName = str
-LibraryName = str
-SourceFile = Union[VhdlParser, VerilogParser]
 
 def _extractSet(entry): # type: (str) -> List[str]
     """
@@ -80,20 +74,26 @@ _VUNIT_FLAGS = {
         '2008' : ['--std=08']},
     }
 
+BuildFlagsMap = Dict[str, List[str]]
+
 class ConfigParser(object):  # pylint: disable=useless-object-inheritance
     """
     Configuration info provider
     """
+    __hash__ = None # type: ignore
 
     _list_parms = ('batch_build_flags', 'single_build_flags',
                    'global_build_flags',)
 
-    _single_value_parms = ('builder', 'target_dir')
+    _single_value_parms = ('builder', )
+    _deprecated_parameters = ('target_dir', )
 
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
-    def __init__(self, filename=None): # type: (OptionalPath) -> None
-        self._parms = {
+    def __init__(self, filename=None): # type: (t.OptionalPath) -> None
+        self._parms = {'builder' : 'fallback'}
+
+        self._flags = {
             'batch_build_flags' : {
                 'vhdl'          : [],
                 'verilog'       : [],
@@ -105,7 +105,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             'global_build_flags' : {
                 'vhdl'          : [],
                 'verilog'       : [],
-                'systemverilog' : [], }} # type: Dict[str, Any]
+                'systemverilog' : [], }} # type: Dict[str, BuildFlagsMap]
 
         self.filename = filename
 
@@ -114,13 +114,9 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             self._logger.debug("Creating config parser for filename '%s'",
                                self.filename)
         else:
-            self.filename = None
-            self._parms['builder'] = 'fallback'
-            self._parms['target_dir'] = '.fallback'
-
             self._logger.info("No configuration file given, using fallback")
 
-        self._sources = {} # type: Dict[Path, SourceFile]
+        self._sources = {} # type: Dict[t.Path, t.SourceFile]
         self._timestamp = 0.0
         self._parse_lock = RLock()
 
@@ -128,7 +124,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         if not isinstance(other, type(self)):
             return False
 
-        for attr in ('_parms', '_list_parms', '_single_value_parms',
+        for attr in ('_parms', '_flags', '_list_parms', '_single_value_parms',
                      '_sources', 'filename'):
             if not hasattr(other, attr):
                 return False
@@ -152,7 +148,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         self._logger.info("VUnit installation found")
 
-        builder_class = getBuilderByName(self.getBuilder())
+        builder_class = getBuilderByName(self.getBuilderName())
 
         if 'systemverilog' in builder_class.file_types:
             from vunit.verilog import VUnit    # type: ignore pylint: disable=import-error
@@ -162,21 +158,25 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             builder_class.addIncludePath(
                 'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
                                   'include'))
-            self._importVunitFiles(VUnit)
+        else:
+            from vunit import VUnit  # pylint: disable=import-error
 
-        from vunit import VUnit  # pylint: disable=import-error
-        self._importVunitFiles(VUnit)
+        output_path = mkdtemp()
+        try:
+            self._importVunitFiles(VUnit, output_path)
+        finally:
+            removeDirIfExists(output_path)
 
-    def _importVunitFiles(self, vunit_module):
+    def _importVunitFiles(self, vunit_module, output_path): # type: (Any, t.Path) -> None
         """
-        Imports VUnit sources from a VUnit module
+        Runs VUnit entry point to determine which files it has and adds them to
+        the project
         """
 
         # I'm not sure how this would work because VUnit specifies a
         # single VHDL revision for a whole project, so there can be
         # incompatibilities as this is really used
-        vunit_project = vunit_module.from_argv(
-            ['--output-path', p.join(self._parms['target_dir'], 'vunit')])
+        vunit_project = vunit_module.from_argv(['--output-path', output_path])
 
         # OSVVM is always avilable
         vunit_project.add_osvvm()
@@ -189,7 +189,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         # Get extra flags for building VUnit sources
         try:
-            vunit_flags = _VUNIT_FLAGS[self.getBuilder()][vunit_project.vhdl_standard]
+            vunit_flags = _VUNIT_FLAGS[self.getBuilderName()][vunit_project.vhdl_standard]
         except KeyError:
             vunit_flags = []
 
@@ -213,6 +213,10 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         for parameter, value in self._parms.items():
             _repr += ["    - %s = %s" % (str(parameter), str(value))]
 
+        _repr += ["- Flags"]
+        for parameter, value in self._flags.items():
+            _repr += ["    - %s = %s" % (str(parameter), str(value))]
+
         if self._sources:
             _repr += ["- Sources"]
             for source, attrs in self._sources.items():
@@ -220,7 +224,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         return "\n".join(_repr)
 
-    def __jsonEncode__(self): # type: () -> Dict
+    def __jsonEncode__(self): # type: () -> t.ObjectState
         """
         Gets a dict that describes the current state of this object
         """
@@ -231,24 +235,27 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             '_timestamp': self._timestamp,
             '_sources': self._sources.copy(),
             '_parms': {
+                'builder': self._parms['builder'],
+            },
+            '_flags': {
                 'batch_build_flags' : {
-                    'vhdl'          : list(self._parms['batch_build_flags']['vhdl']),
-                    'verilog'       : list(self._parms['batch_build_flags']['verilog']),
-                    'systemverilog' : list(self._parms['batch_build_flags']['systemverilog'])},
+                    'vhdl'          : list(self._flags['batch_build_flags']['vhdl']),
+                    'verilog'       : list(self._flags['batch_build_flags']['verilog']),
+                    'systemverilog' : list(self._flags['batch_build_flags']['systemverilog'])},
                 'single_build_flags' : {
-                    'vhdl'          : list(self._parms['single_build_flags']['vhdl']),
-                    'verilog'       : list(self._parms['single_build_flags']['verilog']),
-                    'systemverilog' : list(self._parms['single_build_flags']['systemverilog'])},
+                    'vhdl'          : list(self._flags['single_build_flags']['vhdl']),
+                    'verilog'       : list(self._flags['single_build_flags']['verilog']),
+                    'systemverilog' : list(self._flags['single_build_flags']['systemverilog'])},
                 'global_build_flags' : {
-                    'vhdl'          : list(self._parms['global_build_flags']['vhdl']),
-                    'verilog'       : list(self._parms['global_build_flags']['verilog']),
-                    'systemverilog' : list(self._parms['global_build_flags']['systemverilog'])
+                    'vhdl'          : list(self._flags['global_build_flags']['vhdl']),
+                    'verilog'       : list(self._flags['global_build_flags']['verilog']),
+                    'systemverilog' : list(self._flags['global_build_flags']['systemverilog'])
                 }
             }
         }
 
     @classmethod
-    def __jsonDecode__(cls, state): # type: (Dict) -> None
+    def __jsonDecode__(cls, state): # type: (t.ObjectState) -> None
         """
         Returns an object of cls based on a given state
         """
@@ -260,11 +267,12 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         obj._timestamp = state.pop('_timestamp')
         obj._parse_lock = RLock()
 
-        obj._parms = state['_parms']
-        obj._parms['batch_build_flags'] = state['_parms']['batch_build_flags']
-        obj._parms['single_build_flags'] = state['_parms']['single_build_flags']
-        obj._parms['global_build_flags'] = state['_parms']['global_build_flags']
+        obj._flags = state['_flags']
+        obj._flags['batch_build_flags'] = state['_flags']['batch_build_flags']
+        obj._flags['single_build_flags'] = state['_flags']['single_build_flags']
+        obj._flags['global_build_flags'] = state['_flags']['global_build_flags']
 
+        obj._parms = state['_parms']
         obj._sources = sources
 
         # pylint: enable=protected-access
@@ -302,48 +310,32 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
-    def _doParseConfigFile(self):
+    def _doParseConfigFile(self): # type: () -> None
         """
         Parse the configuration file without any previous checking
         """
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        just_parsed_paths = []
-        build_info_list = []
-        for _line in open(self.filename, mode='rb').readlines():
-            line = _replaceCfgComments("", _line.decode(errors='ignore'))
-            line_source_list, line_build_list = self._parseLine(line)
-            just_parsed_paths += line_source_list
-            build_info_list += line_build_list
+        parsed_info = [] # type: List[t.BuildInfo]
+        if self.filename is not None:
+            for _line in open(self.filename, mode='rb').readlines():
+                line = _replaceCfgComments("", _line.decode(errors='ignore'))
+                parsed_info += list(self._parseLine(line))
+
+        self._cleanUpSourcesList([x['filename'] for x in parsed_info if self._shouldAddSource(x)])
 
         # At this point we have a list of sources parsed from the config
         # file and the info we need to build each one.
-        self._logger.info("Adding %d sources", len(build_info_list))
-        for source in getSourceFileObjects(build_info_list):
+        self._logger.info("Adding %d sources", len(parsed_info))
+        for source in getSourceFileObjects(parsed_info):
             self._sources[source.filename] = source
 
-        self._cleanUpSourcesList(just_parsed_paths)
-
         # If no builder was configured, try to discover one that works
-        if 'builder' not in self._parms.keys():
+        if self._parms['builder'] == 'fallback':
             self._discoverBuilder()
 
         # Set default flags if the user hasn't specified any
         self._setDefaultBuildFlagsIfNeeded()
-
-        # If after parsing we haven't found the configured target
-        # dir, we'll use '.hdlcc' as default
-        if 'target_dir' not in self._parms.keys():
-            self._parms['target_dir'] = ".hdlcc"
-
-        # If the configured target folder is not absolute, we assume it
-        # should be relative to the folder where the configuration file
-        # resides
-        if not p.isabs(self._parms['target_dir']):
-            self._parms['target_dir'] = p.join(p.dirname(self.filename),
-                                               self._parms['target_dir'])
-
-        self._parms['target_dir'] = p.abspath(self._parms['target_dir'])
 
     def _discoverBuilder(self):
         """
@@ -369,33 +361,33 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         """
         Tries to get a default set of flags if none were specified
         """
-        if self.getBuilder() == 'fallback':
+        if self.getBuilderName() == 'fallback':
             return
 
-        builder_class = getBuilderByName(self.getBuilder())
+        builder_class = getBuilderByName(self.getBuilderName())
 
         # If the global/batch/single flags list is not set, overwrite
         # with the values given by the builder class
         for context in builder_class.default_flags:
             for lang in builder_class.default_flags[context]:
-                if not self._parms[context][lang]:
+                if not self._flags[context][lang]:
                     self._logger.debug(
                         "Flag '%s' for '%s' wasn't set, using the default "
                         "value from '%s' class: '%s'", context, lang,
                         builder_class.builder_name,
                         builder_class.default_flags[context][lang])
-                    self._parms[context][lang] = builder_class.default_flags[context][lang]
+                    self._flags[context][lang] = builder_class.default_flags[context][lang]
                 else:
                     self._logger.debug(
                         "Flag '%s' for '%s' was already set with value '%s'",
-                        context, lang, self._parms[context][lang])
+                        context, lang, self._flags[context][lang])
 
-    def _cleanUpSourcesList(self, sources): # type: (List[Path]) -> None
+    def _cleanUpSourcesList(self, sources): # type: (List[t.Path]) -> None
         """
         Removes sources we had found earlier and leave only the ones
         whose path are found in the 'sources' argument
         """
-        files_to_remove = set() # type: Set[Path]
+        files_to_remove = set() # type: Set[t.Path]
         for path in self._sources:
             if path not in sources:
                 self._logger.warning("Removing '%s' because it has been removed "
@@ -405,7 +397,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         for rm_path in files_to_remove:
             del self._sources[rm_path]
 
-    def _parseLine(self, line): # type: (str) -> Generator[BuildInfo, None, None]
+    def _parseLine(self, line): # type: (str) -> Generator[t.BuildInfo, None, None]
         """
         Parses a line a calls the appropriate extraction methods
         """
@@ -420,17 +412,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
                     yield {'filename' : source_path,
                            'library' : groupdict['library'],
-                           'flags' : groupdict['flags']}
-
-        #              source_path_list += [source_path]
-        #              # Try to get the build info for this source. If we get nothing
-        #              # we just skip it
-        #              build_info = self._handleParsedSource(
-        #                  groupdict['library'], source_path, groupdict['flags'])
-        #              if build_info:
-        #                  build_info_list.append(build_info)
-
-        #  return source_path_list, build_info_list
+                           'flags' : _extractSet(groupdict['flags'])}
 
     def _handleParsedParameter(self, parameter, lang, value): # type: (str, str, str) -> None
         """
@@ -438,18 +420,20 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         """
         self._logger.debug("Found parameter '%s' for '%s' with value '%s'",
                            parameter, lang, value)
-        if parameter in self._single_value_parms:
+        if parameter in self._deprecated_parameters:
+            self._logger.debug("Ignoring deprecated parameter '%s'", parameter)
+        elif parameter in self._single_value_parms:
             self._logger.debug("Handling parameter '%s' as a single value",
                                parameter)
             self._parms[parameter] = value
         elif parameter in self._list_parms:
             self._logger.debug("Handling parameter '%s' as a list of values",
                                parameter)
-            self._parms[parameter][lang] = _extractSet(value)
+            self._flags[parameter][lang] = _extractSet(value)
         else:
-            raise hdlcc.exceptions.UnknownParameterError(parameter)
+            raise exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePaths(self, path): # type: (Path) -> List[Path]
+    def _getSourcePaths(self, path): # type: (t.Path) -> List[t.Path]
         """
         Normalizes and handles absolute/relative paths
         """
@@ -462,25 +446,17 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         return glob(source_path) or [source_path]
 
-    def _handleParsedSource(self, library, path, flags): # type: (str, Path, str) -> BuildInfo
-        """
-        Handles a parsed line that adds a source
-        """
-        flags_set = _extractSet(flags)
-
-        # If the source should be built, return the build info for it
-        if self._shouldAddSource(path, library, flags_set):
-            return {'filename' : path, 'library' : library, 'flags' : flags_set}
-        return {}
-
-    def _shouldAddSource(self, source_path, library, flags): # type: (str, Path, BuildFlags) -> bool
+    def _shouldAddSource(self, build_info): # type: (t.BuildInfo) -> bool
         """
         Checks if the source with the given parameters should be
         created/updated
         """
+        source_path = build_info['filename']
+        library = build_info['library']
+        flags = build_info['flags']
         # If the path can't be found, just add it
-        if source_path not in self._sources:
-            return  True
+        if build_info['filename'] not in self._sources:
+            return True
 
         source = self._sources[source_path]
 
@@ -489,16 +465,17 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         # the object
         if source.library != library or source.flags != flags:
             return True
+
         return False
 
-    def getBuilder(self):
+    def getBuilderName(self): # type: () -> str
         """
         Returns the builder name
         """
         self._parseIfNeeded()
         return self._parms['builder']
 
-    def getBuildFlags(self, path, batch_mode): # type: (Path, bool) -> List[str]
+    def getBuildFlags(self, path, batch_mode): # type: (t.Path, bool) -> List[str]
         """
         Return a list of flags configured to build a source in batch or
         single mode
@@ -508,33 +485,35 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             return []
         lang = getFileType(path)
 
-        flags = list(self._parms['global_build_flags'][lang])
+        flags = list(self._flags['global_build_flags'][lang])
 
         if batch_mode:
-            flags += self._parms['batch_build_flags'][lang]
+            flags += self._flags['batch_build_flags'][lang]
         else:
-            flags += self._parms['single_build_flags'][lang]
+            flags += self._flags['single_build_flags'][lang]
 
         if not self.hasSource(path):
+            self._logger.debug("Path %s not found, won't add source specific "
+                               "flags", path)
             return flags
 
         return flags + self._sources[p.abspath(path)].flags
 
-    def getSources(self): # type: () -> List[SourceFile]
+    def getSources(self): # type: () -> List[BaseSourceFile]
         """
         Returns a list of VhdlParser/VerilogParser objects parsed
         """
         self._parseIfNeeded()
         return list(self._sources.values())
 
-    def getSourceByPath(self, path): # type: (Path) -> SourceFile
+    def getSourceByPath(self, path): # type: (t.Path) -> BaseSourceFile
         """
         Returns a source object given its path
         """
         self._parseIfNeeded()
         return self._sources[p.abspath(path)]
 
-    def hasSource(self, path): # type: (Path) -> bool
+    def hasSource(self, path): # type: (t.Path) -> bool
         """
         Checks if a given path exists in the configuration file
         """
@@ -545,7 +524,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
     def findSourcesByDesignUnit(self, unit, library='work',
                                 case_sensitive=False):
-        # type: (UnitName, LibraryName, bool) -> List[SourceFile]
+        # type: (t.UnitName, t.LibraryName, bool) -> List[BaseSourceFile]
         """
         Return the source (or sources) that define the given design
         unit. Case sensitive mode should be used when tracking
@@ -559,7 +538,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         library_name = library if case_sensitive else library.lower()
         unit_name = unit if case_sensitive else unit.lower()
 
-        sources = [] # type: List[SourceFile]
+        sources = [] # type: List[BaseSourceFile]
 
         for source in self._sources.values():
             source_library = source.library
@@ -578,7 +557,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         return sources
 
     def discoverSourceDependencies(self, unit, library, case_sensitive):
-        # type: (UnitName, LibraryName, bool) -> List[SourceFile]
+        # type: (t.UnitName, t.LibraryName, bool) -> List[BaseSourceFile]
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same

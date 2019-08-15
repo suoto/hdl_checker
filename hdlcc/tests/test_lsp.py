@@ -54,7 +54,7 @@ def _debounce(interval_s, keyed_by=None):
 # Mock debounce before it's applied
 pyls._utils.debounce = _debounce
 
-import hdlcc.lsp as lsp  # isort:skip
+from hdlcc import lsp # isort:skip
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
 from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport # isort:skip
 from hdlcc.utils import onWindows  # isort:skip
@@ -312,13 +312,13 @@ with such.A("LSP server") as it:
 
             os.remove(it.server._checker._getCacheFilename())
 
-            def getBuilder():
+            def getBuilderName():
                 return 'msim'
 
             with mock.patch.object(it.server.workspace, 'publish_diagnostics'):
                 with mock.patch.object(it.server._checker, 'clean') as clean:
                     with mock.patch.object(it.server._checker.config_parser,
-                                           'getBuilder', getBuilder):
+                                           'getBuilderName', getBuilderName):
 
                         _logger.info("Sending m_text_document__did_save request")
                         it.server.m_text_document__did_save(

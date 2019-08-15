@@ -26,8 +26,8 @@ from multiprocessing.pool import ThreadPool
 from typing import (Any, AnyStr, Dict, Generator, List, Optional, Set, Tuple,
                     Union)
 
-import hdlcc.builders
-import hdlcc.exceptions
+from hdlcc import builders, exceptions
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import Fallback
 from hdlcc.config_parser import ConfigParser
 from hdlcc.diagnostics import (CheckerDiagnostic, DependencyNotUnique,
@@ -66,7 +66,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self.project_file = project_file
 
-        self.config_parser = ConfigParser(self.project_file)
+        self.config_parser = ConfigParser(self.project_file) # type: ConfigParser
         self.builder = Fallback(self._getCacheDirectory())
 
         self._recoverCacheIfPossible()
@@ -137,8 +137,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             # If still using Fallback builder, check if the config has a
             # different one
             if isinstance(self.builder, Fallback):
-                builder_name = self.config_parser.getBuilder()
-                builder_class = hdlcc.builders.getBuilderByName(builder_name)
+                builder_name = self.config_parser.getBuilderName()
+                builder_class = builders.getBuilderByName(builder_name)
                 if builder_class is Fallback:
                     return
 
@@ -152,7 +152,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
                 self._logger.info("Selected builder is '%s'",
                                   self.builder.builder_name)
-        except hdlcc.exceptions.SanityCheckError as exc:
+        except exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = Fallback(self._getCacheDirectory())
 
@@ -181,7 +181,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self.config_parser = state['config_parser']
 
-        builder_name = self.config_parser.getBuilder()
+        builder_name = self.config_parser.getBuilderName()
         self._logger.debug("Recovered builder is '%s'", builder_name)
         #  builder_class = hdlcc.builders.getBuilderByName(builder_name)
         #  self.builder = builder_class.recoverFromState(state['builder'])

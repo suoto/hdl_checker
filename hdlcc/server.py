@@ -27,8 +27,8 @@ from threading import Timer
 
 from pyls.python_ls import start_io_lang_server
 
-import hdlcc
-import hdlcc.lsp
+from hdlcc import __version__ as version
+from hdlcc import lsp
 from hdlcc import handlers
 from hdlcc.utils import (getTemporaryFilename, isProcessRunning, setupLogging,
                          terminateProcess)
@@ -79,7 +79,7 @@ def parseArguments():
     args = parser.parse_args()
 
     if args.version:
-        print(hdlcc.__version__)
+        print(version)
         sys.exit(0)
 
     if args.lsp:
@@ -200,12 +200,12 @@ def startServer(args):
         os.getpid(),
         "no parent PID to attach to" if args.attach_to_pid is None else \
         "our parent is %s" % args.attach_to_pid,
-        hdlcc.__version__)
+        version)
 
     if args.lsp:
         stdin, stdout = _binaryStdio()
         start_io_lang_server(stdin, stdout, True,
-                             hdlcc.lsp.HdlccLanguageServer)
+                             lsp.HdlccLanguageServer)
     else:
         if args.attach_to_pid is not None:
             _attachPids(args.attach_to_pid, os.getpid())

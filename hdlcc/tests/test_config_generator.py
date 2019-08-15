@@ -31,7 +31,6 @@ import unittest2
 from nose2.tools import such
 from webtest import TestApp
 
-import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.builders import AVAILABLE_BUILDERS, GHDL, XVHDL, Fallback, MSim
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
@@ -203,4 +202,4 @@ class TestConfigGenerator(unittest2.TestCase):
                                        'some_source.vhd')]
 
         self.assertEqual(content[:len(intro)], intro)
-        self.assertEquals(content[len(intro):], files)
+        self.assertEqual(content[len(intro):], files)

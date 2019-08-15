@@ -34,7 +34,6 @@ from nose2.tools import such
 from pyls import uris
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server
 
-import hdlcc
 import hdlcc.lsp
 from hdlcc.tests.utils import (disableVunit, getTestTempPath, removeCacheData,
                                setupTestSuport)

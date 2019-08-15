@@ -19,23 +19,23 @@
 import json
 import logging
 
-import hdlcc
+from hdlcc import builders, config_parser, parsers
 
 _logger = logging.getLogger(__name__)
 
 # Maps class names added by the decoder to the actual class on Python side to
 # recreate an object
 CLASS_MAP = {
-    'ConfigParser': hdlcc.config_parser.ConfigParser,
+    'ConfigParser': config_parser.ConfigParser,
 
-    'DependencySpec': hdlcc.parsers.DependencySpec,
-    'VerilogParser': hdlcc.parsers.VerilogParser,
-    'VhdlParser': hdlcc.parsers.VhdlParser,
+    'DependencySpec': parsers.DependencySpec,
+    'VerilogParser': parsers.VerilogParser,
+    'VhdlParser': parsers.VhdlParser,
 
-    'GHDL': hdlcc.builders.GHDL,
-    'MSim': hdlcc.builders.MSim,
-    'XVHDL': hdlcc.builders.XVHDL,
-    'Fallback': hdlcc.builders.Fallback,
+    'GHDL': builders.GHDL,
+    'MSim': builders.MSim,
+    'XVHDL': builders.XVHDL,
+    'Fallback': builders.Fallback,
 }
 
 class StateEncoder(json.JSONEncoder):

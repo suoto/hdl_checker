@@ -123,7 +123,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         if p.exists(self._getCacheFilename()):
             return False
 
-        return self.config_parser.getBuilder() != 'fallback'
+        return self.config_parser.getBuilderName() != 'fallback'
 
     def _setupEnvIfNeeded(self):
         # On LSP, user can't force a fresh rebuild, we'll force a full clean if
