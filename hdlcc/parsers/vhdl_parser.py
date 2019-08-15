@@ -33,7 +33,7 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     ]), flags=re.M)
 
 _LIBRARY_SCANNER = re.compile(
-    r"\blibrary\s+(?P<library_name>[^;]+)", flags=re.M)
+    r"^\s*\blibrary\s+(?P<library_name>[a-z]\w*)\s*;", flags=re.M | re.I)
 
 _ADDITIONAL_DEPS_SCANNER = re.compile(
     r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.M)
