@@ -1,12 +1,12 @@
-batch_build_flags[vhdl] = -b0 -b1
-single_build_flags[vhdl] = -s0 -s1
-global_build_flags[vhdl] = -g0 -g1
+batch_build_flags[vhdl] = -build_flag0 -build-flag-1
+single_build_flags[vhdl] = -single_build_flag_0 -singlebuildflag
+global_build_flags[vhdl] = -global -global-build-flag
 
 builder = msim
 target_dir = .build
 
-vhdl work sample_file.vhd -f0
-vhdl work sample_package.vhd -f1
+vhdl work sample_file.vhd -sample_file_flag
+vhdl work sample_package.vhd -sample_package_flag
 vhdl work sample_testbench.vhd -build-using some way
 
 verilog work foo.v -some-flag some value

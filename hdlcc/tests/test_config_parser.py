@@ -91,7 +91,7 @@ with such.A('config parser object') as it:
 
             project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                       'standard_project_file.prj')
-            it.parser = ConfigParser(project_filename)
+            it.parser = ConfigParser(project_filename) # type: ConfigParser
 
             # Create empty files listed in the project file to avoid
             # crashing the config parser
@@ -110,23 +110,33 @@ with such.A('config parser object') as it:
 
         @it.should("extract build flags for single build")
         def test():
+            _logger.info("Sources:")
+            for source in it.parser.getSources():
+                _logger.info(" - %s", source)
+
             it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_file.vhd'),
                                         batch_mode=False),
-                set(['-s0', '-s1', '-g0', '-g1', '-f0']))
+                set(['-single_build_flag_0', '-singlebuildflag',
+                     '-global', '-global-build-flag',
+                     '-sample_file_flag']))
 
             it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_package.vhd'),
                                         batch_mode=False),
-                set(['-s0', '-s1', '-g0', '-g1', '-f1']))
+                set(['-single_build_flag_0', '-singlebuildflag',
+                     '-global', '-global-build-flag',
+                     '-sample_package_flag']))
 
             it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_testbench.vhd'),
                                         batch_mode=False),
-                set(['-s0', '-s1', '-g0', '-g1', '-build-using', 'some', 'way']))
+                set(['-single_build_flag_0', '-singlebuildflag',
+                     '-global', '-global-build-flag',
+                     '-build-using', 'some', 'way']))
 
         @it.should("extract common flags for files outisde the project file")
         def test():
@@ -134,7 +144,7 @@ with such.A('config parser object') as it:
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'non_existing_file.vhd'),
                                         batch_mode=False),
-                set(['-s0', '-s1', '-g0', '-g1', ]))
+                set(['-single_build_flag_0', '-singlebuildflag', '-global', '-global-build-flag', ]))
 
         @it.should("extract build flags for batch builds")
         def test():
@@ -142,13 +152,13 @@ with such.A('config parser object') as it:
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_file.vhd'),
                                         batch_mode=True),
-                set(['-b0', '-b1', '-g0', '-g1', '-f0']))
+                set(['-build_flag0', '-build-flag-1', '-global', '-global-build-flag', '-sample_file_flag']))
 
             it.assertCountEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_package.vhd'),
                                         batch_mode=True),
-                set(['-b0', '-b1', '-g0', '-g1', '-f1']))
+                set(['-build_flag0', '-build-flag-1', '-global', '-global-build-flag', '-sample_package_flag']))
 
         @it.should("include VHDL and Verilog sources")
         def test():
@@ -175,12 +185,12 @@ with such.A('config parser object') as it:
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_testbench.vhd'),
                                         batch_mode=True),
-                ['-g0', '-g1', '-b0', '-b1', '-build-using', 'some', 'way', ])
+                ['-global', '-global-build-flag', '-build_flag0', '-build-flag-1', '-build-using', 'some', 'way', ])
             it.assertEqual(
                 it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                                'sample_testbench.vhd'),
                                         batch_mode=False),
-                ['-g0', '-g1', '-s0', '-s1', '-build-using', 'some', 'way', ])
+                ['-global', '-global-build-flag', '-single_build_flag_0', '-singlebuildflag', '-build-using', 'some', 'way', ])
 
         @it.should("return build flags for a Verilog file")
         def test():

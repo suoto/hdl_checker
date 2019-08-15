@@ -230,6 +230,8 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             '_timestamp': self._timestamp,
             '_sources': self._sources.copy(),
             '_parms': {
+                'builder': self._parms['builder'],
+                'target_dir': self._parms['target_dir'],
                 'batch_build_flags' : {
                     'vhdl'          : list(self._parms['batch_build_flags']['vhdl']),
                     'verilog'       : list(self._parms['batch_build_flags']['verilog']),
@@ -301,27 +303,27 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
                 self._doParseConfigFile()
                 self._addVunitIfFound()
 
-    def _doParseConfigFile(self):
+    def _doParseConfigFile(self): # type: () -> None
         """
         Parse the configuration file without any previous checking
         """
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        just_parsed_paths = []
-        build_info_list = []
-        for _line in open(self.filename, mode='rb').readlines():
-            line = _replaceCfgComments("", _line.decode(errors='ignore'))
-            line_source_list, line_build_list = self._parseLine(line)
-            just_parsed_paths += line_source_list
-            build_info_list += line_build_list
+        #  just_parsed_paths = []
+        #  build_info_list = []
+        parsed_info = [] # type: List[BuildInfo]
+        if self.filename is not None:
+            for _line in open(self.filename, mode='rb').readlines():
+                line = _replaceCfgComments("", _line.decode(errors='ignore'))
+                parsed_info += list(self._parseLine(line))
+
+        self._cleanUpSourcesList([x['filename'] for x in parsed_info if self._shouldAddSource(x)])
 
         # At this point we have a list of sources parsed from the config
         # file and the info we need to build each one.
-        self._logger.info("Adding %d sources", len(build_info_list))
-        for source in getSourceFileObjects(build_info_list):
+        self._logger.info("Adding %d sources", len(parsed_info))
+        for source in getSourceFileObjects(parsed_info):
             self._sources[source.filename] = source
-
-        self._cleanUpSourcesList(just_parsed_paths)
 
         # If no builder was configured, try to discover one that works
         if 'builder' not in self._parms.keys():
@@ -419,7 +421,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
                     yield {'filename' : source_path,
                            'library' : groupdict['library'],
-                           'flags' : groupdict['flags']}
+                           'flags' : _extractSet(groupdict['flags'])}
 
         #              source_path_list += [source_path]
         #              # Try to get the build info for this source. If we get nothing
@@ -461,34 +463,33 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
         return glob(source_path) or [source_path]
 
-    def _handleParsedSource(self, library, path, flags): # type: (str, Path, str) -> BuildInfo
-        """
-        Handles a parsed line that adds a source
-        """
-        flags_set = _extractSet(flags)
-
-        # If the source should be built, return the build info for it
-        if self._shouldAddSource(path, library, flags_set):
-            return {'filename' : path, 'library' : library, 'flags' : flags_set}
-        return {}
-
-    def _shouldAddSource(self, source_path, library, flags): # type: (str, Path, BuildFlags) -> bool
+    def _shouldAddSource(self, build_info): # type: (BuildInfo) -> bool
         """
         Checks if the source with the given parameters should be
         created/updated
         """
+        msg = ['Analyzing {}...'.format(build_info), ]
+        should_add = False
+
+        source_path = build_info['filename']
+        library = build_info['library']
+        flags = build_info['flags']
         # If the path can't be found, just add it
-        if source_path not in self._sources:
-            return  True
+        if build_info['filename'] not in self._sources:
+            should_add = True
+        else:
+            source = self._sources[source_path]
 
-        source = self._sources[source_path]
+            # If the path already exists, check that other parameters are
+            # the same. Should there be any difference, we'll need to update
+            # the object
+            if source.library != library or source.flags != flags:
+                should_add = True
 
-        # If the path already exists, check that other parameters are
-        # the same. Should there be any difference, we'll need to update
-        # the object
-        if source.library != library or source.flags != flags:
-            return True
-        return False
+        msg.append("adding!" if should_add else "not adding!")
+        self._logger.info(' '.join(msg))
+
+        return should_add
 
     def getBuilder(self):
         """
@@ -515,6 +516,8 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             flags += self._parms['single_build_flags'][lang]
 
         if not self.hasSource(path):
+            self._logger.debug("Path %s not found, won't add source specific "
+                               "flags", path)
             return flags
 
         return flags + self._sources[p.abspath(path)].flags
