@@ -19,7 +19,10 @@
 import abc
 import logging
 import os.path as p
+from typing import Dict, Optional, Set, Tuple
 
+from hdlcc import types as t
+from hdlcc.builders import AnyValidBuilder
 from hdlcc.utils import getFileType
 
 _SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
@@ -30,6 +33,9 @@ _DEFAULT_LIBRARY_NAME = {
         'verilog': 'lib',
         'systemverilog': 'lib'}
 
+Flags = str
+SourceSpec = Tuple[t.Path, Flags, t.LibraryName]
+
 class BaseGenerator:
     """
     Base class implementing creation of config file semi automatically
@@ -37,20 +43,19 @@ class BaseGenerator:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, builders):
+    def __init__(self): # type: () -> None
         """
-        Arguments:
-            - builders: list of builder names that the server has reported as
-                        working
         """
-        self._builders = builders
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._sources = set()
-        self._include_paths = {'verilog': set(),
-                               'systemverilog': set()}
+        self._sources = set() # type: Set[SourceSpec]
+        self._include_paths = {
+            'verilog': set(),
+            'systemverilog': set()
+        } # type: Dict[str, Set[t.Path]]
 
 
-    def _addSource(self, path, flags, library=None):
+    def _addSource(self, path, flags=None, library=None):
+        # type: (t.Path, Optional[Flags], Optional[str]) -> None
         """
         Add a source to project. 'flags' and 'library' are only used for
         regular sources and not for header files (files ending in .vh or .svh)
@@ -63,34 +68,23 @@ class BaseGenerator:
             if file_type in ('verilog', 'systemverilog'):
                 self._include_paths[file_type].add(p.dirname(path))
         else:
-            self._sources.add((path, ' '.join([str(x) for x in flags]),
-                               library))
+            self._sources.add((path,
+                               ' '.join([str(x) for x in flags or []]),
+                               library or '<undefined>'))
 
     @abc.abstractmethod
-    def _populate(self):
+    def _populate(self): # type: () -> None
         """
         Method that will be called for generating the project file contets and
         should be implemented by child classes
         """
 
-    @abc.abstractmethod
-    def _getPreferredBuilder(self):
+    def _getPreferredBuilder(self): # type: () -> AnyValidBuilder
         """
         Method should be overridden by child classes to express the preferred
         builder
         """
-
-    def _formatIncludePaths(self, paths):
-        """
-        Format a list of paths to be used as flags by the builder. (Still needs
-        a bit of thought, ideally only the builder know how to do this)
-        """
-        builder = self._getPreferredBuilder()
-
-        if builder == 'msim':
-            return ' '.join(['+incdir+%s' % path for path in paths])
-
-        return ''
+        return NotImplemented
 
     def generate(self):
         """
@@ -100,20 +94,18 @@ class BaseGenerator:
 
         self._populate()
 
-        contents = ['# Files found: %s' % len(self._sources),
-                    '# Available builders: %s' % ', '.join(self._builders)]
+        contents = ['# Files found: %s' % len(self._sources),]
 
         builder = self._getPreferredBuilder()
-        if builder in self._builders:
+        if builder is not NotImplemented:
             contents += ['builder = %s' % builder]
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
         for lang in sorted(self._include_paths.keys()):
             paths = sorted(self._include_paths[lang])
-            include_paths = self._formatIncludePaths(paths)
-            if include_paths:
-                contents += ['global_build_flags[%s] = %s' % (lang, include_paths)]
+            if paths:
+                contents += ['include_paths[%s] = %s' % (lang, ' '.join(paths))]
 
         if self._include_paths:
             contents += ['']

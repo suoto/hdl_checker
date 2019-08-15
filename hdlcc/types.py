@@ -17,7 +17,7 @@
 "Common type definitions for type hinting"
 from __future__ import absolute_import
 
-from typing import Any, AnyStr, Dict, Generator, List, Optional, Set, Union
+from typing import Any, AnyStr, Dict, List, Optional, Union
 
 from hdlcc import parsers
 

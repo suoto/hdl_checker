@@ -17,6 +17,7 @@
 "Base class that implements the base builder flow"
 
 import logging
+from typing import Union
 
 from .fallback import Fallback
 from .ghdl import GHDL
@@ -57,3 +58,5 @@ def getWorkingBuilders():
 __all__ = ['MSim', 'XVHDL', 'GHDL', 'Fallback']
 
 AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback
+AnyBuilder = Union[MSim, XVHDL, GHDL, Fallback]
+AnyValidBuilder = Union[MSim, XVHDL, GHDL, ]

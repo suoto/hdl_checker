@@ -18,63 +18,39 @@
 
 import os
 import os.path as p
+from typing import Generator, List
 
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.utils import UnknownTypeExtension, getFileType, isFileReadable
+
 from .base_generator import BaseGenerator
 
 _SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
 _HEADER_EXTENSIONS = 'vh', 'svh'
 
-_DEFAULT_LIBRARY_NAME = {
-        'vhdl': 'lib',
-        'verilog': 'lib',
-        'systemverilog': 'lib'}
 
 class SimpleFinder(BaseGenerator):
     """
     Implementation of BaseGenerator that searches for paths on a given
     set of paths recursively
     """
-    def __init__(self, builders, paths):
-        super(SimpleFinder, self).__init__(builders)
+    def __init__(self, paths): # type: (List[t.Path]) -> None
+        super(SimpleFinder, self).__init__()
         self._logger.debug("Search paths: %s", [p.abspath(x) for x in  paths])
         self._paths = paths
         self._valid_extensions = tuple(list(_SOURCE_EXTENSIONS) +
                                        list(_HEADER_EXTENSIONS))
 
-    def _getPreferredBuilder(self):
-        if 'msim' in self._builders:
-            return 'msim'
-        if 'ghdl' in self._builders:
-            return 'ghdl'
-        return 'xvhdl'
-
-    def _getCompilerFlags(self, path):
-        """
-        Returns file specific compiler flags
-        """
-        if self._getPreferredBuilder() != 'msim':
-            return []
-
-        flags = []
-        # Testbenches are usually more relaxed, so set VHDL 2008
-        if (p.basename(path).split('.')[0].endswith('_tb') or
-                p.basename(path).startswith('tb_')):
-            flags += ['-2008']
-
-        return flags
-
-    def _getLibrary(self, path):  # pylint: disable=no-self-use
+    def _getLibrary(self, path):  # type: (t.Path) -> str
         """
         Returns the library name given the path. On this implementation this
         returns a default name; child classes can override this to provide
         specific names (say the library name is embedded on the path itself or
         on the file's contents)
         """
-        extension = getFileType(path)
-        return _DEFAULT_LIBRARY_NAME[extension]
+        return NotImplemented
 
-    def _findSources(self):
+    def _findSources(self): # type: () -> Generator[t.Path, None, None]
         """
         Iterates over the paths and searches for relevant files by extension.
         """
@@ -97,7 +73,8 @@ class SimpleFinder(BaseGenerator):
                     if isFileReadable(path):
                         yield path
 
-    def _populate(self):
+    def _populate(self): # type: (...) -> None
         for path in self._findSources():
-            self._addSource(path, flags=self._getCompilerFlags(path),
-                            library=self._getLibrary(path))
+            library = self._getLibrary(path)
+            self._addSource(path,
+                            library='work' if library is NotImplemented else library)

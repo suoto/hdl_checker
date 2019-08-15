@@ -26,22 +26,17 @@ import os
 import os.path as p
 import shutil
 
-import six
 import unittest2
-from nose2.tools import such
 from webtest import TestApp
 
 import hdlcc.handlers as handlers
-from hdlcc.builders import AVAILABLE_BUILDERS, GHDL, XVHDL, Fallback, MSim
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
-from hdlcc.tests.utils import (MockBuilder, disableVunit, getTestTempPath,
-                               parametrizeClassWithBuilders, setupTestSuport)
-from hdlcc.utils import getCachePath, removeDirIfExists
+from hdlcc.builders import GHDL, XVHDL, Fallback, MSim
+from hdlcc.tests.utils import getTestTempPath, setupTestSuport
 
 try:  # Python 3.x
-    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+    import unittest.mock as mock
 except ImportError:  # Python 2.x
-    import mock
+    import mock  # type: ignore
 
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
@@ -59,42 +54,17 @@ BUILDER_CLASS_MAP = {
     'fallback': Fallback}
 
 
-@parametrizeClassWithBuilders
 class TestConfigGenerator(unittest2.TestCase):
-    # Create defaults so that pylint doesn't complain about non existing
-    # members
-    builder_name = None
-    builder_path = None
 
     @classmethod
     def setUpClass(cls):
         setupTestSuport(TEST_TEMP_PATH)
-        # Add builder path to the env
-        cls.original_env = os.environ.copy()
-
-        # Add the builder path to the environment so we can call it
-        if cls.builder_path:
-            _logger.info("Adding '%s' to the system path", cls.builder_path)
-            cls.patch = mock.patch.dict(
-                'os.environ',
-                {'PATH' : os.pathsep.join([cls.builder_path, os.environ['PATH']])})
-            cls.patch.start()
-
-        builder_class = BUILDER_CLASS_MAP[cls.builder_name]
-        cls.builder = builder_class(p.join(TEST_TEMP_PATH,
-                                           '_%s' % cls.builder_name))
-        cls.builder_class = builder_class
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.builder_path:
-            cls.patch.stop()
 
     def setUp(self):
         self.app = TestApp(handlers.app)
 
         # Needs to agree with vroom test file
-        self.dummy_test_path = p.join(TEST_TEMP_PATH, self.builder_name, 'dummy_test_path')
+        self.dummy_test_path = p.join(TEST_TEMP_PATH, 'dummy_test_path')
 
         self.assertFalse(
             p.exists(self.dummy_test_path),
@@ -136,7 +106,6 @@ class TestConfigGenerator(unittest2.TestCase):
     def test_run_simple_config_gen(self):
         data = {
             'generator' : 'SimpleFinder',
-            'args'      : json.dumps(tuple()),
             'kwargs'    : json.dumps({'paths': [self.dummy_test_path, ]})
         }
 
@@ -144,62 +113,34 @@ class TestConfigGenerator(unittest2.TestCase):
 
         content = reply.json['content'].split('\n')
 
-        _logger.info("Content:")
-        for line in content:
-            _logger.info(repr(line))
+        intro = [
+            '# Files found: 5',
 
-        if self.builder_name in ('msim', ):
-            intro = [
-                '# Files found: 5',
-                '# Available builders: %s' % self.builder_name,
-                'builder = %s' % self.builder_name,
+            'include_paths[systemverilog] = ' + p.join(self.dummy_test_path,
+                                                       'sv_includes'),
 
-                'global_build_flags[systemverilog] = +incdir+%s' % \
-                    p.join(self.dummy_test_path, 'sv_includes'),
+            'include_paths[verilog] = %s %s' % \
+                (p.join(self.dummy_test_path, 'path_a'),
+                 p.join(self.dummy_test_path, 'v_includes')),
+            '']
 
-                'global_build_flags[verilog] = +incdir+%s +incdir+%s' % \
-                    (p.join(self.dummy_test_path, 'path_a'),
-                     p.join(self.dummy_test_path, 'v_includes')),
-                '']
 
-            files = [
-                'vhdl lib %s' % p.join(self.dummy_test_path, 'path_a',
-                                       'some_source.vhd'),
-                'vhdl lib %s -2008' % p.join(self.dummy_test_path, 'path_a',
-                                             'source_tb.vhd'),
-                'systemverilog lib %s' % p.join(self.dummy_test_path,
-                                                'path_b',
-                                                'a_systemverilog_source.sv'),
-                'verilog lib %s' % p.join(self.dummy_test_path, 'path_b',
-                                          'a_verilog_source.v'),
-                'vhdl lib %s' % p.join(self.dummy_test_path, 'path_b',
-                                       'some_source.vhd')]
+        files = [
+            'vhdl work %s' % p.join(self.dummy_test_path, 'path_a',
+                                    'some_source.vhd'),
+            'vhdl work %s' % p.join(self.dummy_test_path, 'path_a',
+                                    'source_tb.vhd'),
+            'systemverilog work %s' % p.join(self.dummy_test_path,
+                                             'path_b',
+                                             'a_systemverilog_source.sv'),
+            'verilog work %s' % p.join(self.dummy_test_path, 'path_b',
+                                       'a_verilog_source.v'),
+            'vhdl work %s' % p.join(self.dummy_test_path, 'path_b',
+                                    'some_source.vhd')]
 
-        else:
-            if self.builder_name in ('ghdl', 'xvhdl'):
-                # Default start of the contents when a builder was found
-                intro = ['# Files found: 5',
-                         '# Available builders: %s' % self.builder_name,
-                         'builder = %s' % self.builder_name,
-                         '']
-            else:
-                # Fallback contents
-                intro = ['# Files found: 5',
-                         '# Available builders: ',
-                         '']
-
-            files = [
-                'vhdl lib %s' % p.join(self.dummy_test_path, 'path_a',
-                                       'some_source.vhd'),
-                'vhdl lib %s' % p.join(self.dummy_test_path, 'path_a',
-                                       'source_tb.vhd'),
-                'systemverilog lib %s' % p.join(self.dummy_test_path,
-                                                'path_b',
-                                                'a_systemverilog_source.sv'),
-                'verilog lib %s' % p.join(self.dummy_test_path, 'path_b',
-                                          'a_verilog_source.v'),
-                'vhdl lib %s' % p.join(self.dummy_test_path, 'path_b',
-                                       'some_source.vhd')]
+        _logger.info("Resulting file:")
+        for i, line in enumerate(content):
+            _logger.info("%2d | %s", i + 1, line)
 
         self.assertEqual(content[:len(intro)], intro)
         self.assertEqual(content[len(intro):], files)

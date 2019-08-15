@@ -27,7 +27,7 @@ import bottle
 
 from hdlcc import __version__ as version
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import Fallback, getWorkingBuilders
+from hdlcc.builders import Fallback
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import terminateProcess
@@ -73,7 +73,7 @@ def _getServerByProjectFile(project_file):
         try:
             project = HdlCodeCheckerServer(project_file)
             _logger.debug("Created new project server for '%s'", project_file)
-        except (IOError, OSError) as exc:
+        except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")
             project = HdlCodeCheckerServer(None)
 
@@ -158,15 +158,19 @@ def runConfigGenerator():
         - 'args', 'kwargs': arguments to be passed to the generator constructor
     """
     name = bottle.request.forms.get('generator', None)
-    args = json.loads(bottle.request.forms.get('args'))
-    kwargs = json.loads(bottle.request.forms.get('kwargs'))
+    req_args = bottle.request.forms.get('args', None)
+    args = []
+    if req_args is not None:
+        args = json.loads(req_args)
+
+    req_kwargs = bottle.request.forms.get('kwargs', None)
+    kwargs = []
+    if req_kwargs is not None:
+        kwargs = json.loads(req_kwargs)
 
     _logger.info("Running config generator %s(%s, %s)",
                  repr(name), repr(args), repr(kwargs))
 
-    kwargs['builders'] = list(getWorkingBuilders())
-
-    _logger.debug("Running config generator: %s(%s, %s)", name, args, kwargs)
     generator = getGeneratorByName(name)(*args, **kwargs)
     content = generator.generate()
 
