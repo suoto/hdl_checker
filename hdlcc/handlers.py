@@ -19,14 +19,15 @@
 import json
 import logging
 import os
-import os.path as p
 import signal
 from multiprocessing import Queue
+from typing import Dict
 
 import bottle
 
-import hdlcc
-from hdlcc.builders import getWorkingBuilders, Fallback
+from hdlcc import __version__ as version
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.builders import Fallback, getWorkingBuilders
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import terminateProcess
@@ -135,7 +136,7 @@ def getDiagnoseInfo():
     """
     _logger.info("Collecting diagnose info")
     project_file = bottle.request.forms.get('project_file')
-    response = ["hdlcc version: %s" % hdlcc.__version__,
+    response = ["hdlcc version: %s" % version,
                 "Server PID: %d" % os.getpid()]
 
     response += _getProjectDiags(project_file)
@@ -302,5 +303,5 @@ def getBuildSequence():
 
 
 #  We'll store a dict to store differents hdlcc objects
-servers = {}  # pylint: disable=invalid-name
+servers = {}  # type: Dict[t.Path, HdlCodeCheckerServer] # pylint: disable=invalid-name
 setupSignalHandlers()

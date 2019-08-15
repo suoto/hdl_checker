@@ -61,7 +61,7 @@ def patchClassMap(**kwargs):
     return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)
 
 class ConfigParserMock(hdlcc.config_parser.ConfigParser):
-    def getBuilder(self):
+    def getBuilderName(self):
         return 'MockBuilder'
 
 such.unittest.TestCase.maxDiff = None

@@ -21,21 +21,19 @@ import json
 import logging
 import os
 import os.path as p
+import pprint
 import shutil
 import sys
 
+import hdlcc
 import mock
 import six
-from nose2.tools import such
-from nose2.tools.params import params
-
-import hdlcc
-import hdlcc.tests.utils
 from hdlcc.config_parser import ConfigParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
-                               sanitizePath, setupTestSuport,
-                               writeListToFile)
+from hdlcc.tests.utils import (assertCountEqual, getTestTempPath, sanitizePath,
+                               setupTestSuport, writeListToFile)
+from nose2.tools import such
+from nose2.tools.params import params
 
 _logger = logging.getLogger(__name__)
 
@@ -106,7 +104,7 @@ with such.A('config parser object') as it:
 
         @it.should("extract builder")
         def test():
-            it.assertEqual(it.parser.getBuilder(), 'msim')
+            it.assertEqual(it.parser.getBuilderName(), 'msim')
 
         @it.should("extract build flags for single build")
         def test():
@@ -222,13 +220,14 @@ with such.A('config parser object') as it:
         @it.should("restore from cached state")
         def test():
             state = json.dumps(it.parser, cls=StateEncoder)
-            #  state = it.parser.getState()
-            #  restored = ConfigParser.recoverFromState(state)
             restored = json.loads(state, object_hook=jsonObjectHook)
 
+            _logger.info("Primary state:\n\n%s\n\n", pprint.pformat(it.parser))
+
+            _logger.info("Restored state:\n\n%s\n\n", pprint.pformat(restored))
+
             it.assertEqual(it.parser._parms, restored._parms)
-            it.assertEqual(it.parser._list_parms, restored._list_parms)
-            it.assertEqual(it.parser._single_value_parms, restored._single_value_parms)
+            it.assertEqual(it.parser._flags, restored._flags)
             it.assertCountEqual(it.parser._sources, restored._sources)
             it.assertEqual(it.parser.filename, restored.filename)
 
@@ -301,7 +300,7 @@ with such.A('config parser object') as it:
 
         @it.should("return fallback as selected builder")
         def test():
-            it.assertEqual(it.parser.getBuilder(), 'fallback')
+            it.assertEqual(it.parser.getBuilderName(), 'fallback')
 
         @it.should("return empty single build flags for any path")
         @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
@@ -573,7 +572,7 @@ with such.A('config parser object') as it:
                                              'project_wo_builder_wo_target_dir.prj'))
                 for cmd in commands:
                     _logger.warning('> %s', str(cmd))
-                it.assertEquals(parser.getBuilder(), builder.lower())
+                it.assertEquals(parser.getBuilderName(), builder.lower())
             finally:
                 for patch in patches:
                     patch.stop()
@@ -582,6 +581,6 @@ with such.A('config parser object') as it:
         def test():
             parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
                                          'project_wo_builder_wo_target_dir.prj'))
-            it.assertEquals(parser.getBuilder(), 'fallback')
+            it.assertEquals(parser.getBuilderName(), 'fallback')
 
 it.createTests(globals())
