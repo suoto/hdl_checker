@@ -17,11 +17,13 @@
 "Common type definitions for type hinting"
 from __future__ import absolute_import
 
-from typing import Any, AnyStr, Dict, List, Optional, Union
+from enum import Enum
+from typing import Any, AnyStr, Dict, List, NewType, Optional, Union
 
 from hdlcc import parsers
+from hdlcc.builders import GHDL, XVHDL, Fallback, MSim
 
-Path = str
+Path = NewType('Path', str)
 OptionalPath = Optional[AnyStr]
 BuildInfo = Dict[str, Any]
 BuildFlags = List[str]
@@ -29,3 +31,17 @@ UnitName = str
 LibraryName = str
 SourceFile = Union[parsers.VhdlParser, parsers.VerilogParser]
 ObjectState = Dict
+DesignUnit = Dict[str, str]
+AnyValidBuilder = Union[MSim, XVHDL, GHDL, ]
+AnyBuilder = Union[AnyValidBuilder, Fallback]
+
+class BuilderName(Enum):
+    msim = MSim.builder_name
+    xvhdl = XVHDL.builder_name
+    ghdl = GHDL.builder_name
+    fallback = Fallback.builder_name
+
+class FileType(Enum):
+    vhd = ('vhd', 'vhdl')
+    verilog = ('v', 'vh')
+    systemverilog = ('sv', 'svh')

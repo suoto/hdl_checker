@@ -22,7 +22,6 @@ import os.path as p
 from typing import Dict, Optional, Set, Tuple
 
 from hdlcc import types as t
-from hdlcc.builders import AnyValidBuilder
 from hdlcc.utils import getFileType
 
 _SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
@@ -79,7 +78,7 @@ class BaseGenerator:
         should be implemented by child classes
         """
 
-    def _getPreferredBuilder(self): # type: () -> AnyValidBuilder
+    def _getPreferredBuilder(self): # type: () -> t.AnyValidBuilder
         """
         Method should be overridden by child classes to express the preferred
         builder

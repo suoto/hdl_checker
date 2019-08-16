@@ -20,15 +20,13 @@ import logging
 import os.path as p
 import re
 from glob import glob
-from tempfile import mkdtemp
 from threading import RLock
-from typing import Any, Dict, Generator, List, Set
+from typing import Any, Dict, Generator, KeysView, List, Set
 
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
-from hdlcc.parsers import BaseSourceFile, getSourceFileObjects
-from hdlcc.utils import getFileType, removeDirIfExists
+from hdlcc.parsers import getSourceFileObjects
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -51,28 +49,6 @@ def _extractSet(entry): # type: (str) -> List[str]
         return []
 
     return [value for value in _splitAtWhitespaces(entry)]
-
-def foundVunit(): # type: () -> bool
-    """
-    Checks if our env has VUnit installed
-    """
-    try:
-        import vunit  # type: ignore pylint: disable=unused-import
-        return True
-    except ImportError: # pragma: no cover
-        pass
-    return False
-
-_VUNIT_FLAGS = {
-    'msim' : {
-        '93'   : ['-93'],
-        '2002' : ['-2002'],
-        '2008' : ['-2008']},
-    'ghdl' : {
-        '93'   : ['--std=93c'],
-        '2002' : ['--std=02'],
-        '2008' : ['--std=08']},
-    }
 
 BuildFlagsMap = Dict[str, List[str]]
 
@@ -135,76 +111,6 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
 
     def __ne__(self, other): # pragma: no cover
         return not self.__eq__(other)
-
-    def _addVunitIfFound(self):
-        """
-        Tries to import files to support VUnit right out of the box
-        """
-        if not foundVunit() or self._parms['builder'] == 'fallback':
-            return
-
-        import vunit  # pylint: disable=import-error
-        logging.getLogger('vunit').setLevel(logging.WARNING)
-
-        self._logger.info("VUnit installation found")
-
-        builder_class = getBuilderByName(self.getBuilderName())
-
-        if 'systemverilog' in builder_class.file_types:
-            from vunit.verilog import VUnit    # type: ignore pylint: disable=import-error
-            self._logger.debug("Builder supports Verilog, "
-                               "using vunit.verilog.VUnit")
-            builder_class.addExternalLibrary('verilog', 'vunit_lib')
-            builder_class.addIncludePath(
-                'verilog', p.join(p.dirname(vunit.__file__), 'verilog',
-                                  'include'))
-        else:
-            from vunit import VUnit  # pylint: disable=import-error
-
-        output_path = mkdtemp()
-        try:
-            self._importVunitFiles(VUnit, output_path)
-        finally:
-            removeDirIfExists(output_path)
-
-    def _importVunitFiles(self, vunit_module, output_path): # type: (Any, t.Path) -> None
-        """
-        Runs VUnit entry point to determine which files it has and adds them to
-        the project
-        """
-
-        # I'm not sure how this would work because VUnit specifies a
-        # single VHDL revision for a whole project, so there can be
-        # incompatibilities as this is really used
-        vunit_project = vunit_module.from_argv(['--output-path', output_path])
-
-        # OSVVM is always avilable
-        vunit_project.add_osvvm()
-
-        # Communication library and array utility library are only
-        # available on VHDL 2008
-        if vunit_project.vhdl_standard == '2008':
-            vunit_project.add_com()
-            vunit_project.add_array_util()
-
-        # Get extra flags for building VUnit sources
-        try:
-            vunit_flags = _VUNIT_FLAGS[self.getBuilderName()][vunit_project.vhdl_standard]
-        except KeyError:
-            vunit_flags = []
-
-        _source_file_args = []
-        for vunit_source_obj in vunit_project.get_compile_order():
-            path = p.abspath(vunit_source_obj.name)
-            library = vunit_source_obj.library.name
-
-            _source_file_args.append(
-                {'filename' : path,
-                 'library' : library,
-                 'flags' : vunit_flags if path.endswith('.vhd') else []})
-
-        for source in getSourceFileObjects(_source_file_args):
-            self._sources[source.filename] = source
 
     def __repr__(self):
         _repr = ["ConfigParser('%s'):" % self.filename]
@@ -308,7 +214,6 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         with self._parse_lock:
             if self._shouldParse():
                 self._doParseConfigFile()
-                self._addVunitIfFound()
 
     def _doParseConfigFile(self): # type: () -> None
         """
@@ -444,7 +349,7 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
             fname_base_dir = p.dirname(p.abspath(self.filename))
             source_path = p.join(fname_base_dir, source_path)
 
-        return glob(source_path) or [source_path]
+        return [t.Path(x) for x in glob(source_path)] or [t.Path(source_path)]
 
     def _shouldAddSource(self, build_info): # type: (t.BuildInfo) -> bool
         """
@@ -475,92 +380,19 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         self._parseIfNeeded()
         return self._parms['builder']
 
-    def getBuildFlags(self, path, batch_mode): # type: (t.Path, bool) -> List[str]
-        """
-        Return a list of flags configured to build a source in batch or
-        single mode
-        """
-        self._parseIfNeeded()
-        if self.filename is None:
-            return []
-        lang = getFileType(path)
+    def getPaths(self): # type: () -> KeysView[t.Path]
+        return self._sources.keys()
 
-        flags = list(self._flags['global_build_flags'][lang])
-
-        if batch_mode:
-            flags += self._flags['batch_build_flags'][lang]
-        else:
-            flags += self._flags['single_build_flags'][lang]
-
-        if not self.hasSource(path):
-            self._logger.debug("Path %s not found, won't add source specific "
-                               "flags", path)
-            return flags
-
-        return flags + self._sources[p.abspath(path)].flags
-
-    def getSources(self): # type: () -> List[BaseSourceFile]
+    def getSources(self): # type: () -> List[t.SourceFile]
         """
         Returns a list of VhdlParser/VerilogParser objects parsed
         """
         self._parseIfNeeded()
         return list(self._sources.values())
 
-    def getSourceByPath(self, path): # type: (t.Path) -> BaseSourceFile
+    def getSourceByPath(self, path): # type: (t.Path) -> t.SourceFile
         """
         Returns a source object given its path
         """
         self._parseIfNeeded()
-        return self._sources[p.abspath(path)]
-
-    def hasSource(self, path): # type: (t.Path) -> bool
-        """
-        Checks if a given path exists in the configuration file
-        """
-        self._parseIfNeeded()
-        if self.filename is None:
-            return True
-        return p.abspath(path) in self._sources.keys()
-
-    def findSourcesByDesignUnit(self, unit, library='work',
-                                case_sensitive=False):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[BaseSourceFile]
-        """
-        Return the source (or sources) that define the given design
-        unit. Case sensitive mode should be used when tracking
-        dependencies on Verilog files. VHDL should use VHDL
-        """
-        self._parseIfNeeded()
-
-        # Default to lower case if we're not handling case sensitive. VHDL
-        # source files are all converted to lower case when parsed, so the
-        # units they define are in lower case already
-        library_name = library if case_sensitive else library.lower()
-        unit_name = unit if case_sensitive else unit.lower()
-
-        sources = [] # type: List[BaseSourceFile]
-
-        for source in self._sources.values():
-            source_library = source.library
-            design_unit_names = map(lambda x: x['name'],
-                                    source.getDesignUnits())
-            if not case_sensitive:
-                source_library = source_library.lower()
-                design_unit_names = map(lambda x: x.lower(), design_unit_names)
-
-            if source_library == library_name and unit_name in design_unit_names:
-                sources += [source]
-
-        if not sources:
-            self._logger.warning("No source file defining '%s.%s'",
-                                 library, unit)
-        return sources
-
-    def discoverSourceDependencies(self, unit, library, case_sensitive):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[BaseSourceFile]
-        """
-        Searches for sources that implement the given design unit. If
-        more than one file implements an entity or package with the same
-        name, there is no guarantee that the right one is selected
-        """
-        return self.findSourcesByDesignUnit(unit, library, case_sensitive)
+        return self._sources[t.Path(p.abspath(path))]
