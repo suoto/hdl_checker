@@ -16,14 +16,16 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base class that implements the base builder flow"
 
-import os
-import os.path as p
 import abc
 import logging
+import os
+import os.path as p
+import re
 from threading import Lock
 
-from hdlcc.exceptions import SanityCheckError
 from hdlcc.diagnostics import DiagType
+from hdlcc.exceptions import SanityCheckError
+
 
 class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """

@@ -18,9 +18,11 @@
 
 import logging
 import re
+from typing import Set
 
-from hdlcc.parsers.base_parser import BaseSourceFile
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers import DependencySpec
+from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
 
@@ -125,11 +127,11 @@ class VhdlParser(BaseSourceFile):
         libs.append(self.library)
         return libs
 
-    def _getDesignUnits(self):
+    def _getDesignUnits(self): # type: () -> Set[t.DesignUnit]
         """
         Parses the source file to find design units and dependencies
         """
-        design_units = []
+        design_units = set() # type: Set[t.DesignUnit]
 
         for match, line_number in self._iterDesignUnitMatches():
             unit = None
@@ -145,7 +147,7 @@ class VhdlParser(BaseSourceFile):
 
             if unit:
                 unit['line_number'] = line_number
-                design_units.append(unit)
+                design_units.add(unit)
 
         return design_units
 

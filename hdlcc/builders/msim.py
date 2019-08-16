@@ -239,6 +239,7 @@ class MSim(BaseBuilder):
 
         if not self._iniFileExists() and library in self._added_libraries:
             return
+
         self._added_libraries.add(library)
         try:
             if p.exists(p.join(self._target_folder, library)):

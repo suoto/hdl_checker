@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "HDL Code Checker project builder class"
 
+# pylint: disable=missing-docstring
+
 import abc
 import json
 import logging
