@@ -119,26 +119,30 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         self._project_mtime = p.getmtime(self.project_file)
         return True
 
-    def _shouldRecreateTargetDir(self):
-        if p.exists(self._getCacheFilename()):
-            return False
+    #  def _shouldRecreateTargetDir(self):
+    #      if p.exists(self._getCacheFilename()):
+    #          return False
 
-        return self.config_parser.getBuilderName() != 'fallback'
+    #      return self.config_parser.getBuilderName() != 'fallback'
 
-    def _setupEnvIfNeeded(self):
-        # On LSP, user can't force a fresh rebuild, we'll force a full clean if
-        # - Project file is valid and has been modified
-        # - Target directory doesn't exist (and NOT using fallback builder)
-        should_parse = self._shouldParseProjectFile()
+    #  def _setupEnvIfNeeded(self):
+    #      # On LSP, user can't force a fresh rebuild, we'll force a full clean if
+    #      # - Project file is valid and has been modified
+    #      # - Target directory doesn't exist (and NOT using fallback builder)
+    #      #  if self.isSetupRunning() or self.config_parser.isParsing():
+    #      #      _logger.info("Setup already running, jsut chill")
+    #      #      return
 
-        if should_parse or self._shouldRecreateTargetDir():
-            if should_parse:
-                self._handleUiInfo("Project file has changed, rebuilding project")
-            else:
-                self._handleUiInfo("Output dir not found, rebuilding project")
-            self.clean()
+    #      should_parse = self._shouldParseProjectFile()
 
-        super(HdlCodeCheckerServer, self)._setupEnvIfNeeded()
+    #      if should_parse or self._shouldRecreateTargetDir():
+    #          if should_parse:
+    #              self._handleUiInfo("Project file has changed, rebuilding project")
+    #          else:
+    #              self._handleUiInfo("Output dir not found, rebuilding project")
+    #          self.clean()
+
+    #      super(HdlCodeCheckerServer, self)._setupEnvIfNeeded()
 
     def _handleUiInfo(self, message):
         self._logger.debug("UI info: %s", message)
@@ -208,8 +212,6 @@ class HdlccLanguageServer(PythonLanguageServer):
             _logger.info("Failed to create checker, reverting to fallback")
             self._global_diags.add(FailedToCreateProject(exc))
             self._checker = HdlCodeCheckerServer(self.workspace, None)
-
-        self._checker.clean()
 
     def _getProjectFilePath(self, options=None):
         """
