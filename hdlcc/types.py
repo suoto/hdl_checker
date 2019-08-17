@@ -18,15 +18,14 @@
 from __future__ import absolute_import
 
 from enum import Enum
-from typing import Any, AnyStr, Dict, List, NewType, Optional, Union
+from typing import Any, AnyStr, Dict, List, NewType, Optional, Tuple, Union
 
 from hdlcc import parsers
 from hdlcc.builders import GHDL, XVHDL, Fallback, MSim
 
 Path = NewType('Path', str)
-OptionalPath = Optional[AnyStr]
 BuildInfo = Dict[str, Any]
-BuildFlags = List[str]
+BuildFlags = Tuple[str, ...]
 UnitName = str
 LibraryName = str
 SourceFile = Union[parsers.VhdlParser, parsers.VerilogParser]
@@ -36,6 +35,15 @@ AnyValidBuilder = Union[MSim, XVHDL, GHDL, ]
 AnyBuilder = Union[AnyValidBuilder, Fallback]
 
 class BuilderName(Enum):
+    @staticmethod
+    def fromString(name):
+        """
+        Returns the enum type from a string. The conversion is case
+        insensitive
+        """
+        name = str(name).lower()
+        return getattr(BuilderName, str(name).lower())
+
     msim = MSim.builder_name
     xvhdl = XVHDL.builder_name
     ghdl = GHDL.builder_name

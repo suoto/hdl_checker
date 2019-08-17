@@ -21,12 +21,10 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Any, Dict, Generator, KeysView, List, Set
+from typing import Dict, Iterator, Optional, Set
 
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import AVAILABLE_BUILDERS, Fallback, getBuilderByName
-from hdlcc.parsers import getSourceFileObjects
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -39,166 +37,111 @@ _configFileScan = re.compile("|".join([
     ]), flags=re.I).finditer
 # pylint: enable=invalid-name
 
-def _extractSet(entry): # type: (str) -> List[str]
+BuildFlagsMap = Dict[str, t.BuildFlags]
+
+def _extractSet(entry): # type: (str) -> t.BuildFlags
     """
     Extract a list by splitting a string at whitespaces, removing
     empty values caused by leading/trailing/multiple whitespaces
     """
-    entry = str(entry).strip()
-    if not entry:
-        return []
+    string = str(entry).strip()
+    # Return an empty list if the string is empty
+    if not string:
+        return ()
+    return tuple(_splitAtWhitespaces(string))
 
-    return [value for value in _splitAtWhitespaces(entry)]
+class ParsedElement:
+    """Holder class to specify the interface with config parsers"""
+    def __init__(self, path, library=None, flags=None):
+        # type: (t.Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
+        self._path = p.normpath(p.abspath(path))
+        self._library = library
+        self._flags = tuple(flags or [])
 
-BuildFlagsMap = Dict[str, List[str]]
+    @property
+    def path(self):
+        "Returns the absolute and normalized path"
+        return self._path
 
-class ConfigParser(object):  # pylint: disable=useless-object-inheritance
+    @property
+    def library(self): # type: () -> Optional[t.LibraryName]
+        "Returns parsed library name (may be None)"
+        return self._library
+
+    @property
+    def flags(self): # type: () -> t.BuildFlags
+        "Parsed flags or an empty list if no flags were found"
+        return self._flags
+
+    @property
+    def __hash_key__(self):
+        return (self.path, self.library, self.flags)
+
+    def __hash__(self):
+        return hash(self.__hash_key__)
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, ParsedElement):
+            return self.__hash_key__ == other.__hash_key__
+        return NotImplemented  # pragma: no cover
+
+    def __ne__(self, other):  # pragma: no cover
+        """Overrides the default implementation (unnecessary in Python 3)"""
+        result = self.__eq__(other)
+        if result is not NotImplemented:
+            return not result
+        return NotImplemented
+
+    def __repr__(self):
+        return '{}(path="{}", library="{}", flags={})'.format(
+            self.__class__.__name__, self.path, self.library, self.flags)
+
+
+class ConfigParser:
     """
     Configuration info provider
     """
-    __hash__ = None # type: ignore
-
-    _list_parms = ('batch_build_flags', 'single_build_flags',
-                   'global_build_flags',)
+    _list_parms = ('single_build_flags', 'global_build_flags',)
 
     _single_value_parms = ('builder', )
     _deprecated_parameters = ('target_dir', )
 
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
-    def __init__(self, filename=None): # type: (t.OptionalPath) -> None
-        self._parms = {'builder' : 'fallback'}
+    def __init__(self, filename): # type: (t.Path) -> None
+        self._logger.debug("Creating config parser for filename '%s'", filename)
+
+        self._parms = {'builder' : t.BuilderName.fallback}
 
         self._flags = {
-            'batch_build_flags' : {
-                'vhdl'          : [],
-                'verilog'       : [],
-                'systemverilog' : [], },
             'single_build_flags' : {
-                'vhdl'          : [],
-                'verilog'       : [],
-                'systemverilog' : [], },
+                'vhdl'          : (),
+                'verilog'       : (),
+                'systemverilog' : (), },
             'global_build_flags' : {
-                'vhdl'          : [],
-                'verilog'       : [],
-                'systemverilog' : [], }} # type: Dict[str, BuildFlagsMap]
+                'vhdl'          : (),
+                'verilog'       : (),
+                'systemverilog' : (), }} # type: Dict[str, BuildFlagsMap]
 
-        self.filename = filename
+        self._sources = set() # type: Set[ParsedElement]
 
-        if filename is not None:
-            self.filename = p.abspath(filename)
-            self._logger.debug("Creating config parser for filename '%s'",
-                               self.filename)
-        else:
-            self._logger.info("No configuration file given, using fallback")
+        self.filename = t.Path(p.abspath(filename))
 
-        self._sources = {} # type: Dict[t.Path, t.SourceFile]
         self._timestamp = 0.0
         self._parse_lock = RLock()
-
-    def __eq__(self, other): # pragma: no cover
-        if not isinstance(other, type(self)):
-            return False
-
-        for attr in ('_parms', '_flags', '_list_parms', '_single_value_parms',
-                     '_sources', 'filename'):
-            if not hasattr(other, attr):
-                return False
-            if getattr(self, attr) != getattr(other, attr):
-                return False
-
-        return True
-
-    def __ne__(self, other): # pragma: no cover
-        return not self.__eq__(other)
-
-    def __repr__(self):
-        _repr = ["ConfigParser('%s'):" % self.filename]
-
-        _repr += ["- Parameters"]
-        for parameter, value in self._parms.items():
-            _repr += ["    - %s = %s" % (str(parameter), str(value))]
-
-        _repr += ["- Flags"]
-        for parameter, value in self._flags.items():
-            _repr += ["    - %s = %s" % (str(parameter), str(value))]
-
-        if self._sources:
-            _repr += ["- Sources"]
-            for source, attrs in self._sources.items():
-                _repr += ["    - %s = %s" % (str(source), str(attrs))]
-
-        return "\n".join(_repr)
-
-    def __jsonEncode__(self): # type: () -> t.ObjectState
-        """
-        Gets a dict that describes the current state of this object
-        """
-        self._parseIfNeeded()
-
-        return {
-            'filename': self.filename,
-            '_timestamp': self._timestamp,
-            '_sources': self._sources.copy(),
-            '_parms': {
-                'builder': self._parms['builder'],
-            },
-            '_flags': {
-                'batch_build_flags' : {
-                    'vhdl'          : list(self._flags['batch_build_flags']['vhdl']),
-                    'verilog'       : list(self._flags['batch_build_flags']['verilog']),
-                    'systemverilog' : list(self._flags['batch_build_flags']['systemverilog'])},
-                'single_build_flags' : {
-                    'vhdl'          : list(self._flags['single_build_flags']['vhdl']),
-                    'verilog'       : list(self._flags['single_build_flags']['verilog']),
-                    'systemverilog' : list(self._flags['single_build_flags']['systemverilog'])},
-                'global_build_flags' : {
-                    'vhdl'          : list(self._flags['global_build_flags']['vhdl']),
-                    'verilog'       : list(self._flags['global_build_flags']['verilog']),
-                    'systemverilog' : list(self._flags['global_build_flags']['systemverilog'])
-                }
-            }
-        }
-
-    @classmethod
-    def __jsonDecode__(cls, state): # type: (t.ObjectState) -> None
-        """
-        Returns an object of cls based on a given state
-        """
-        obj = super(ConfigParser, cls).__new__(cls)
-
-        # pylint: disable=protected-access
-        sources = state.pop('_sources')
-        obj.filename = state.pop('filename', None)
-        obj._timestamp = state.pop('_timestamp')
-        obj._parse_lock = RLock()
-
-        obj._flags = state['_flags']
-        obj._flags['batch_build_flags'] = state['_flags']['batch_build_flags']
-        obj._flags['single_build_flags'] = state['_flags']['single_build_flags']
-        obj._flags['global_build_flags'] = state['_flags']['global_build_flags']
-
-        obj._parms = state['_parms']
-        obj._sources = sources
-
-        # pylint: enable=protected-access
-
-        return obj
 
     def _shouldParse(self): # type: () -> bool
         """
         Checks if we should parse the configuration file
         """
-        if self.filename is None:
-            return False
         return p.getmtime(self.filename) > self._timestamp
 
     def _updateTimestamp(self):
         """
         Updates our timestamp with the configuration file
         """
-        if self.filename is not None:
-            self._timestamp = p.getmtime(self.filename)
+        self._timestamp = p.getmtime(self.filename)
 
     def isParsing(self): # type: () -> bool
         "Checks if parsing is ongoing in another thread"
@@ -213,96 +156,20 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         """
         with self._parse_lock:
             if self._shouldParse():
-                self._doParseConfigFile()
+                self._parse()
 
-    def _doParseConfigFile(self): # type: () -> None
+    def _parse(self): # type: () -> None
         """
         Parse the configuration file without any previous checking
         """
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        parsed_info = [] # type: List[t.BuildInfo]
-        if self.filename is not None:
-            for _line in open(self.filename, mode='rb').readlines():
-                line = _replaceCfgComments("", _line.decode(errors='ignore'))
-                parsed_info += list(self._parseLine(line))
+        self._sources = set()
+        for _line in open(self.filename, mode='rb').readlines():
+            line = _replaceCfgComments("", _line.decode(errors='ignore'))
+            self._parseLine(line)
 
-        self._cleanUpSourcesList([x['filename'] for x in parsed_info if self._shouldAddSource(x)])
-
-        # At this point we have a list of sources parsed from the config
-        # file and the info we need to build each one.
-        self._logger.info("Adding %d sources", len(parsed_info))
-        for source in getSourceFileObjects(parsed_info):
-            self._sources[source.filename] = source
-
-        # If no builder was configured, try to discover one that works
-        if self._parms['builder'] == 'fallback':
-            self._discoverBuilder()
-
-        # Set default flags if the user hasn't specified any
-        self._setDefaultBuildFlagsIfNeeded()
-
-    def _discoverBuilder(self):
-        """
-        If no builder was specified, try to find one that works using
-        a dummy target dir
-        """
-        builder_class = None
-        self._logger.debug("Searching for builder among %s",
-                           AVAILABLE_BUILDERS)
-        for builder_class in AVAILABLE_BUILDERS:
-            if builder_class is Fallback:
-                continue
-            if builder_class.isAvailable():
-                self._logger.info("Builder '%s' has worked",
-                                  builder_class.builder_name)
-                self._parms['builder'] = builder_class.builder_name
-                return
-
-        self._parms['builder'] = Fallback.builder_name
-
-    # TODO: Add a test for this
-    def _setDefaultBuildFlagsIfNeeded(self):
-        """
-        Tries to get a default set of flags if none were specified
-        """
-        if self.getBuilderName() == 'fallback':
-            return
-
-        builder_class = getBuilderByName(self.getBuilderName())
-
-        # If the global/batch/single flags list is not set, overwrite
-        # with the values given by the builder class
-        for context in builder_class.default_flags:
-            for lang in builder_class.default_flags[context]:
-                if not self._flags[context][lang]:
-                    self._logger.debug(
-                        "Flag '%s' for '%s' wasn't set, using the default "
-                        "value from '%s' class: '%s'", context, lang,
-                        builder_class.builder_name,
-                        builder_class.default_flags[context][lang])
-                    self._flags[context][lang] = builder_class.default_flags[context][lang]
-                else:
-                    self._logger.debug(
-                        "Flag '%s' for '%s' was already set with value '%s'",
-                        context, lang, self._flags[context][lang])
-
-    def _cleanUpSourcesList(self, sources): # type: (List[t.Path]) -> None
-        """
-        Removes sources we had found earlier and leave only the ones
-        whose path are found in the 'sources' argument
-        """
-        files_to_remove = set() # type: Set[t.Path]
-        for path in self._sources:
-            if path not in sources:
-                self._logger.warning("Removing '%s' because it has been removed "
-                                     "from the config file", path)
-                files_to_remove.add(path)
-
-        for rm_path in files_to_remove:
-            del self._sources[rm_path]
-
-    def _parseLine(self, line): # type: (str) -> Generator[t.BuildInfo, None, None]
+    def _parseLine(self, line): # type: (str) -> None
         """
         Parses a line a calls the appropriate extraction methods
         """
@@ -314,10 +181,10 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
                                             groupdict['parm_lang'], groupdict['value'])
             else:
                 for source_path in self._getSourcePaths(groupdict['path']):
-
-                    yield {'filename' : source_path,
-                           'library' : groupdict['library'],
-                           'flags' : _extractSet(groupdict['flags'])}
+                    self._sources.add(
+                        ParsedElement(path=source_path,
+                                      library=groupdict['library'],
+                                      flags=_extractSet(groupdict['flags'])))
 
     def _handleParsedParameter(self, parameter, lang, value): # type: (str, str, str) -> None
         """
@@ -328,71 +195,37 @@ class ConfigParser(object):  # pylint: disable=useless-object-inheritance
         if parameter in self._deprecated_parameters:
             self._logger.debug("Ignoring deprecated parameter '%s'", parameter)
         elif parameter in self._single_value_parms:
-            self._logger.debug("Handling parameter '%s' as a single value",
-                               parameter)
-            self._parms[parameter] = value
+            self._logger.debug("Handling '%s' as a single value", parameter)
+            self._parms[parameter] = t.BuilderName.fromString(value)
         elif parameter in self._list_parms:
-            self._logger.debug("Handling parameter '%s' as a list of values",
-                               parameter)
+            self._logger.debug("Handling '%s' as a list of values", parameter)
             self._flags[parameter][lang] = _extractSet(value)
         else:
             raise exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePaths(self, path): # type: (t.Path) -> List[t.Path]
+    def _getSourcePaths(self, path): # type: (t.Path) -> Iterator[t.Path]
         """
         Normalizes and handles absolute/relative paths
         """
         source_path = p.normpath(p.expanduser(path))
         # If the path to the source file was not absolute, we assume
         # it was relative to the config file base path
-        if not p.isabs(source_path) and self.filename is not None:
+        if not p.isabs(source_path):
             fname_base_dir = p.dirname(p.abspath(self.filename))
             source_path = p.join(fname_base_dir, source_path)
 
-        return [t.Path(x) for x in glob(source_path)] or [t.Path(source_path)]
+        # Convert paths found to t.Path
+        return map(t.Path, glob(source_path) or [source_path, ])
 
-    def _shouldAddSource(self, build_info): # type: (t.BuildInfo) -> bool
+    def parse(self):
         """
-        Checks if the source with the given parameters should be
-        created/updated
-        """
-        source_path = build_info['filename']
-        library = build_info['library']
-        flags = build_info['flags']
-        # If the path can't be found, just add it
-        if build_info['filename'] not in self._sources:
-            return True
-
-        source = self._sources[source_path]
-
-        # If the path already exists, check that other parameters are
-        # the same. Should there be any difference, we'll need to update
-        # the object
-        if source.library != library or source.flags != flags:
-            return True
-
-        return False
-
-    def getBuilderName(self): # type: () -> str
-        """
-        Returns the builder name
+        Parses the file if it hasn't been parsed before or if the config file
+        has been changed
         """
         self._parseIfNeeded()
-        return self._parms['builder']
+        data = self._flags.copy()
+        data.update({
+            'builder_name': self._parms['builder'],
+            'sources': set(self._sources)})
 
-    def getPaths(self): # type: () -> KeysView[t.Path]
-        return self._sources.keys()
-
-    def getSources(self): # type: () -> List[t.SourceFile]
-        """
-        Returns a list of VhdlParser/VerilogParser objects parsed
-        """
-        self._parseIfNeeded()
-        return list(self._sources.values())
-
-    def getSourceByPath(self, path): # type: (t.Path) -> t.SourceFile
-        """
-        Returns a source object given its path
-        """
-        self._parseIfNeeded()
-        return self._sources[t.Path(p.abspath(path))]
+        return data

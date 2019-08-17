@@ -15,34 +15,37 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=invalid-name
+# pylint: disable=missing-docstring
 
-import json
 import logging
-import os
 import os.path as p
 import pprint
-import shutil
-import sys
+import tempfile
+from contextlib import contextmanager
+from typing import Iterator, List
+
+import six
+from nose2.tools import such  # type: ignore
 
 import hdlcc
-import mock
-import six
-from hdlcc.config_parser import ConfigParser
-from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import (assertCountEqual, getTestTempPath, sanitizePath,
-                               setupTestSuport, writeListToFile)
-from nose2.tools import such
-from nose2.tools.params import params
+from hdlcc import types as t
+from hdlcc.config_parser import ConfigParser, ParsedElement
+from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
+                               setupTestSuport)
 
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
-TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, 'test_config_parser')
-
-such.unittest.TestCase.maxDiff = None
+@contextmanager
+def fileWithContent(content): # type: (List[bytes]) -> Iterator[str]
+    with tempfile.NamedTemporaryFile(delete=False) as fd:
+        print("Writing to %s (%s)" % (fd, fd.name))
+        fd.write(content)
+        fd.flush()
+        yield fd.name
 
 with such.A('config parser object') as it:
 
@@ -55,532 +58,89 @@ with such.A('config parser object') as it:
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
 
-    @it.has_teardown
-    def teardown():
-        for temp_path in ('.build', '.hdlcc'):
-            temp_path = p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                         temp_path))
-            if p.exists(temp_path):
-                shutil.rmtree(temp_path)
+    #  @it.has_teardown
+    #  def teardown():
+    #      for temp_path in ('.build', '.hdlcc'):
+    #          temp_path = p.abspath(p.join(CONFIG_PARSER_SUPPORT_PATH,
+    #                                       temp_path))
+    #          if p.exists(temp_path):
+    #              shutil.rmtree(temp_path)
 
 
     @it.should("raise UnknownParameterError exception when an unknown "
                "parameter is found")
-    def test():
+    def test_raises_exception():
         with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
-            parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                         'project_unknown_parm.prj'))
-            parser.getSources()
+            with fileWithContent(b'foo = bar') as name:
+                parser = ConfigParser(name)
+                parser.parse()
 
-    #  @it.should("assign a default value for target dir equal to the builder value")
-    #  def test():
-    #      parser = ConfigParser(
-    #          p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'project_no_target.prj'))
-    #      it.assertEquals(
-    #          parser.getTargetDir(),
-    #          p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, '.hdlcc')))
+    @it.should("parse a regular file")
+    def test_parsing_regular_file():
+        contents = b"""
+single_build_flags[vhdl] = -single_build_flag_0 -singlebuildflag
+global_build_flags[vhdl] = -global -global-build-flag
 
-    with it.having("a standard project file"):
-        @it.has_setup
-        def setup():
-            it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
-                                     lambda: False)
-            it.no_vunit.start()
+builder = msim
+target_dir = .build
 
-            project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                      'standard_project_file.prj')
-            it.parser = ConfigParser(project_filename) # type: ConfigParser
+vhdl work sample_file.vhd -sample_file_flag
+vhdl work sample_package.vhdl -sample_package_flag
+vhdl work sample_testbench.VHD -build-using some way
 
-            # Create empty files listed in the project file to avoid
-            # crashing the config parser
-            open(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'), 'a')
-            open(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'), 'a')
+vhdl lib /some/abs/path.VHDL
 
-        @it.has_teardown
-        def teardown():
-            os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'))
-            os.remove(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))
-            it.no_vunit.stop()
+verilog work foo.v -some-flag some value
 
-        @it.should("extract builder")
-        def test():
-            it.assertEqual(it.parser.getBuilderName(), 'msim')
+systemverilog work bar.sv some sv flag
+"""
 
-        @it.should("extract build flags for single build")
-        def test():
-            _logger.info("Sources:")
-            for source in it.parser.getSources():
-                _logger.info(" - %s", source)
+        with fileWithContent(contents) as name:
+            parser = ConfigParser(name)
+            config = parser.parse()
 
-            it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_file.vhd'),
-                                        batch_mode=False),
-                set(['-single_build_flag_0', '-singlebuildflag',
-                     '-global', '-global-build-flag',
-                     '-sample_file_flag']))
+            _logger.info("Parsed config:\n%s", pprint.pformat(config))
+            sources = config.pop('sources')
 
-            it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_package.vhd'),
-                                        batch_mode=False),
-                set(['-single_build_flag_0', '-singlebuildflag',
-                     '-global', '-global-build-flag',
-                     '-sample_package_flag']))
+            it.assertDictEqual(
+                config,
+                {'builder_name': t.BuilderName.msim,
+                 'global_build_flags': {'systemverilog': (),
+                                        'verilog': (),
+                                        'vhdl': ('-global', '-global-build-flag')},
+                 'single_build_flags': {'systemverilog': (),
+                                        'verilog': (),
+                                        'vhdl': ('-single_build_flag_0', '-singlebuildflag')},
+                 })
+
+            class _ParsedElement(ParsedElement):
+                base_path = p.abspath(p.dirname(name))
+
+                def __init__(self, path, library=None, flags=None):
+                    if not p.isabs(path):
+                        path = p.join(_ParsedElement.base_path, path)
+
+                    super(_ParsedElement, self).__init__(
+                        path=path, library=library, flags=flags)
 
             it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_testbench.vhd'),
-                                        batch_mode=False),
-                set(['-single_build_flag_0', '-singlebuildflag',
-                     '-global', '-global-build-flag',
-                     '-build-using', 'some', 'way']))
-
-        @it.should("extract common flags for files outisde the project file")
-        def test():
-            it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'non_existing_file.vhd'),
-                                        batch_mode=False),
-                set(['-single_build_flag_0', '-singlebuildflag', '-global', '-global-build-flag', ]))
-
-        @it.should("extract build flags for batch builds")
-        def test():
-            it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_file.vhd'),
-                                        batch_mode=True),
-                set(['-build_flag0', '-build-flag-1', '-global', '-global-build-flag', '-sample_file_flag']))
-
-            it.assertCountEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_package.vhd'),
-                                        batch_mode=True),
-                set(['-build_flag0', '-build-flag-1', '-global', '-global-build-flag', '-sample_package_flag']))
-
-        @it.should("include VHDL and Verilog sources")
-        def test():
-            it.assertCountEqual(
-                [p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd')),
-                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_package.vhd')),
-                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_testbench.vhd')),
-                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v')),
-                 p.abspath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'))],
-                [x.filename for x in it.parser.getSources()])
-
-        @it.should("tell correctly if a path is on the project file")
-        @params((p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'sample_file.vhd'), True),
-                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo.v'), True),
-                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'bar.sv'), True),
-                (p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'hello_world.vhd'), False))
-        def test(case, path, result):
-            _logger.info("Running %s", case)
-            it.assertEqual(it.parser.hasSource(path), result)
-
-        @it.should("return build flags for a VHDL file")
-        def test():
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_testbench.vhd'),
-                                        batch_mode=True),
-                ['-global', '-global-build-flag', '-build_flag0', '-build-flag-1', '-build-using', 'some', 'way', ])
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'sample_testbench.vhd'),
-                                        batch_mode=False),
-                ['-global', '-global-build-flag', '-single_build_flag_0', '-singlebuildflag', '-build-using', 'some', 'way', ])
-
-        @it.should("return build flags for a Verilog file")
-        def test():
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'foo.v'),
-                                        batch_mode=True),
-                ['-permissive', '-some-flag', 'some', 'value', ])
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'foo.v'),
-                                        batch_mode=False),
-                ['-lint', '-hazards', '-pedanticerrors', '-some-flag',
-                 'some', 'value'])
-
-        @it.should("return build flags for a System Verilog file")
-        def test():
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'bar.sv'),
-                                        batch_mode=True),
-                ['-permissive', 'some', 'sv', 'flag'])
-            it.assertEqual(
-                it.parser.getBuildFlags(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                               'bar.sv'),
-                                        batch_mode=False),
-                ['-lint', '-hazards', '-pedanticerrors', 'some', 'sv', 'flag'])
-
-        @it.should("restore from cached state")
-        def test():
-            state = json.dumps(it.parser, cls=StateEncoder)
-            restored = json.loads(state, object_hook=jsonObjectHook)
-
-            _logger.info("Primary state:\n\n%s\n\n", pprint.pformat(it.parser))
-
-            _logger.info("Restored state:\n\n%s\n\n", pprint.pformat(restored))
-
-            it.assertEqual(it.parser._parms, restored._parms)
-            it.assertEqual(it.parser._flags, restored._flags)
-            it.assertCountEqual(it.parser._sources, restored._sources)
-            it.assertEqual(it.parser.filename, restored.filename)
-
-            # Raw dictionary provided by state should be the same the a dict
-            # dumped from a restored version of it since they both represent
-            # the same set of info
-            it.assertDictEqual(json.loads(state),
-                               json.loads(json.dumps(restored, cls=StateEncoder)))
-
-        @it.should("find the correct source defining a design unit")
-        def test():
-            it.assertEquals(
-                [], it.parser.findSourcesByDesignUnit('some_unit', 'some_lib'))
-
-            sources = it.parser.findSourcesByDesignUnit('sample_package')
-            for source in sources:
-                it.assertTrue(
-                    p.exists(source.filename),
-                    "Couldn't find source with path '%s'" % source.filename)
-
-        @it.should("find the correct source defining a design unit when case "
-                   "doesn't match")
-        def test():
-            lower_insensitive = it.parser.findSourcesByDesignUnit(
-                'sample_package', case_sensitive=False)
-            lower_sensitive = it.parser.findSourcesByDesignUnit(
-                'sample_package', case_sensitive=True)
-
-            upper_insensitive = it.parser.findSourcesByDesignUnit(
-                'SAMPLE_PACKAGE', case_sensitive=False)
-            upper_sensitive = it.parser.findSourcesByDesignUnit(
-                'SAMPLE_PACKAGE', case_sensitive=True)
-
-            it.assertNotEqual(lower_insensitive, [])
-            it.assertNotEqual(lower_sensitive, [])
-            it.assertCountEqual(lower_insensitive, lower_sensitive)
-
-            it.assertNotEqual(upper_insensitive, [])
-            it.assertEquals(upper_sensitive, [])
-
-            it.assertCountEqual(lower_insensitive, upper_insensitive)
-
-            for source in lower_insensitive:
-                it.assertTrue(
-                    p.exists(source.filename),
-                    "Couldn't find source with path '%s'" % source.filename)
-
-        @it.should("consider non absolute paths are relative to the "
-                   "configuration file path")
-        def test():
-            file_path = p.normpath(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH, 'foo',
-                                          'bar.vhd'))
-
-            # Consider non absolute paths are relative to the configuration
-            # file path
-            it.assertEquals([file_path, ],
-                            it.parser._getSourcePaths(p.join('foo', 'bar.vhd')))
-
-            # Absolute paths should refer to the current path
-            it.assertEquals(
-                [p.abspath(p.join('foo', 'bar.vhd')), ],
-                it.parser._getSourcePaths(p.abspath(p.join('foo', 'bar.vhd'))))
-
-    with it.having("no project file"):
-        @it.should("create the object without error")
-        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
-        def test():
-            it.parser = ConfigParser()
-            it.assertIsNotNone(it.parser)
-
-        @it.should("return fallback as selected builder")
-        def test():
-            it.assertEqual(it.parser.getBuilderName(), 'fallback')
-
-        @it.should("return empty single build flags for any path")
-        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                'hello')
-        def test(case, path):
-            it.assertEqual(it.parser.getBuildFlags(path, batch_mode=False), [])
-
-        @it.should("return empty batch build flags for any path")
-        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                'hello')
-        def test(case, path):
-            it.assertEqual(it.parser.getBuildFlags(path, batch_mode=True), [])
-
-        @it.should("say every path is on the project file")
-        @params(p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                'hello')
-        def test(case, path):
-            it.assertTrue(it.parser.hasSource(path))
-
-    with it.having("not installed VUnit"):
-        @it.should("not add VUnit files to the source list")
-        @mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
-        def test():
-            # We'll add no project file, so the only sources that should
-            # be fond are VUnit's files
-            project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                      'builder_only_project.prj')
-            parser = ConfigParser(project_filename)
-            sources = parser.getSources()
-
-            it.assertEquals(
-                sources, [], "We shouldn't find any source but found %s" %
-                ", ".join([x.filename for x in sources]))
-
-    with it.having("VUnit installed"):
-        @it.has_setup
-        def setup():
-            try:
-                import vunit # pylint: disable=unused-variable
-            except ImportError:
-                it.fail("Couldn't import vunit")
-
-        @it.should("add only VUnit VHDL files to the source list if the "
-                   'builder only supports VHDL')
-        def test():
-            # We'll add no project file, so the only sources that should
-            # be fond are VUnit's files
-            it.assertIn('vunit', sys.modules)
-            project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                      'builder_only_project.prj')
-            with mock.patch('hdlcc.builders.MSim.file_types',
-                            new_callable=mock.PropertyMock,
-                            return_value=('vhdl', )):
-                parser = ConfigParser(project_filename)
-                sources = parser.getSources()
-
-            vunit_files = 0
-            for source in sources:
-                if 'vunit' in source.filename.lower():
-                    vunit_files += 1
-
-            it.assertEqual(len(sources), vunit_files,
-                           "We should only find VUnit files")
-
-            # Check that we find no verilog or systemverilog files
-            for filetype in ('verilog', 'systemverilog'):
-                it.assertNotIn(filetype, [x.filetype for x in sources],
-                               "We should only find VUnit VHDL files")
-
-        @it.should("add VUnit VHDL and SystemVerilog files to the source "
-                   "list if the builder supports them")
-        def test():
-            # We'll add no project file, so the only sources that should
-            # be fond are VUnit's files
-            it.assertIn('vunit', sys.modules)
-            project_filename = p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                      'builder_only_project.prj')
-            with mock.patch('hdlcc.builders.MSim.file_types',
-                            new_callable=mock.PropertyMock,
-                            return_value=('vhdl', 'systemverilog')):
-                parser = ConfigParser(project_filename)
-            sources = parser.getSources()
-
-            _logger.info("Sources found:")
-            for source in sources:
-                _logger.info("- %s", source)
-
-            vunit_files = 0
-            for source in sources:
-                if 'vunit' in source.filename.lower():
-                    vunit_files += 1
-
-            it.assertEqual(len(sources), vunit_files,
-                           "We should only find VUnit files")
-
-            for filetype in ('vhdl', 'systemverilog'):
-                it.assertIn(filetype, [x.filetype for x in sources],
-                            "We should find %s files" % filetype)
-
-    with it.having("a project file constantly updated"):
-
-        def getSourcesFrom(sources=None):
-            prj_content = []
-            if sources is None:
-                sources = list(it.sources)
-
-            for lib, path in sources:
-                prj_content += ["vhdl %s %s" % (lib, path)]
-
-            writeListToFile(it.project_filename, prj_content)
-
-            result = {}
-            for source in it.parser.getSources():
-                result[source.filename] = source
-
-            return result
-
-        @it.has_setup
-        def setup():
-            it.no_vunit = mock.patch('hdlcc.config_parser.foundVunit',
-                                     lambda: False)
-            it.no_vunit.start()
-
-            it.project_filename = p.join(TEST_TEMP_PATH, 'test.prj')
-            it.lib_path = p.join(TEST_PROJECT)
-            it.sources = [
-                ('work', p.join(TEST_TEMP_PATH, 'another_library', 'foo.vhd')),
-                ('work', p.join(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'))]
-
-            writeListToFile(
-                it.project_filename,
-                ["vhdl %s %s" % (lib, path) for lib, path in it.sources])
-
-            it.parser = ConfigParser(it.project_filename)
-
-        @it.has_teardown
-        def teardown():
-            os.remove(it.project_filename)
-            it.no_vunit.stop()
-
-        @it.should("Find only the sources given then the extra source")
-        def test_01():
-            _logger.info("Getting sources before adding the extra source")
-            sources_pre = getSourcesFrom()
-
-            _logger.info("Paths found:")
-            for source in sources_pre:
-                _logger.info(" - %s", source)
-
-            it.assertCountEqual(
-                sources_pre.keys(),
-                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
-
-            _logger.info("Adding the extra source...")
-
-            sources_post = getSourcesFrom(
-                it.sources +
-                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
-
-            _logger.info("Paths found:")
-            for source in sources_post:
-                _logger.info(" - %s", source)
-
-            it.assertCountEqual(
-                sources_post.keys(),
-                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
-
-            # Check the files originally found weren't re-created
-            for path, source in sources_pre.items():
-                it.assertEqual(source, sources_post[path])
-
-        @it.should("Update the source library if changed")
-        def test_02():
-            sources_pre = getSourcesFrom(
-                it.sources +
-                [('work', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
-
-            sources_post = getSourcesFrom(
-                it.sources +
-                [('foo_lib', p.join(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd'))])
-
-            it.assertCountEqual(
-                sources_post.keys(),
-                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
-
-            added_path = sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')
-
-            added_source = sources_post[added_path]
-
-            # Check that the sources that have been previously added are
-            # the same
-            for path in [
-                    sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                    sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')]:
-                it.assertEqual(sources_pre[path], sources_post[path])
-
-            _logger.warning("added path: %s", added_path)
-            _logger.warning("sources pre:\n%s", "\n".join(sources_pre.keys()))
-            _logger.warning("sources post:\n%s", "\n".join(sources_post.keys()))
-            # Check that the source we changed library has changed
-            it.assertNotEqual(sources_pre[added_path], sources_post[added_path])
-            it.assertEqual(added_source.library, 'foo_lib')
-
-            # Also, check that there is no extra source left behind
-            it.assertEqual(len(sources_pre), len(sources_post))
-
-        @it.should("Remove sources from config object if they were removed "
-                   "from the project file")
-        def test_03():
-            sources_pre = getSourcesFrom(
-                it.sources +
-                [('work', p.join('basic_library', 'very_common_pkg.vhd'))])
-
-            it.assertCountEqual(
-                sources_pre.keys(),
-                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'very_common_pkg.vhd')])
-
-            sources_post = getSourcesFrom()
-
-            it.assertCountEqual(
-                sources_post.keys(),
-                [sanitizePath(TEST_TEMP_PATH, 'another_library', 'foo.vhd'),
-                 sanitizePath(TEST_TEMP_PATH, 'basic_library', 'clock_divider.vhd')])
-
-    with it.having("no builder configured on the project file"):
-        @it.has_setup
-        def setup():
-            it.patcher = mock.patch('hdlcc.config_parser.foundVunit',
-                                    lambda: False)
-            it.patcher.start()
-
-        @it.has_teardown
-        def teardown():
-            it.patcher.stop()
-
-        @it.should("find a builder should it pass the environment check")
-        @params('MSim', 'GHDL', 'XVHDL')
-        def test(case, builder):
-            _logger.info("%s: Testing builder %s", case, builder)
-            commands = []
-
-            def _subprocessMocker(*args, **kwargs):
-                commands.append((args, kwargs))
-                return []
-
-            @staticmethod
-            def isAvailable():
-                return True
-
-            patches = [
-                mock.patch('hdlcc.builders.%s.checkEnvironment' % builder,
-                           lambda self: setattr(self, '_version', '<foo>')),
-                mock.patch('hdlcc.utils.runShellCommand', _subprocessMocker),
-                mock.patch('hdlcc.builders.%s.isAvailable' % builder,
-                           isAvailable)]
-
-            for patch in patches:
-                patch.start()
-
-            try:
-                parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                             'project_wo_builder_wo_target_dir.prj'))
-                for cmd in commands:
-                    _logger.warning('> %s', str(cmd))
-                it.assertEquals(parser.getBuilderName(), builder.lower())
-            finally:
-                for patch in patches:
-                    patch.stop()
-
-        @it.should("use fallback if no builder pass")
-        def test():
-            parser = ConfigParser(p.join(TEST_CONFIG_PARSER_SUPPORT_PATH,
-                                         'project_wo_builder_wo_target_dir.prj'))
-            it.assertEquals(parser.getBuilderName(), 'fallback')
+                sources,
+                [_ParsedElement(path="sample_file.vhd",
+                                library="work",
+                                flags=('-sample_file_flag',)),
+                 _ParsedElement(path="sample_package.vhdl",
+                                library="work",
+                                flags=('-sample_package_flag',)),
+                 _ParsedElement(path="sample_testbench.VHD",
+                                library="work",
+                                flags=('-build-using', 'some', 'way')),
+                 _ParsedElement(path="/some/abs/path.VHDL",
+                                library="lib", flags=()),
+                 _ParsedElement(path="foo.v",
+                                library="work",
+                                flags=('-some-flag', 'some', 'value')),
+                 _ParsedElement(path="bar.sv",
+                                library="work",
+                                flags=('some', 'sv', 'flag'))])
 
 it.createTests(globals())
