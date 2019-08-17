@@ -87,22 +87,34 @@ class SourceMock(object):
 
     def _createMockFile(self):
         self._logger.debug("Creating mock file: %s", self.filename)
+        libs = removeDuplicates(
+            [x.library for x in self._dependencies])
+
+        lines = []
+
+        for lib in libs:
+            lines.append("library {0};".format(lib))
+
+        for dependency in self._dependencies:
+            lines.append("use {0}.{1};".format(dependency.library,
+                                               dependency.name))
+
+        lines.append('')
+
+        for design_unit in self._design_units:
+            type_ = design_unit['type']
+            name = design_unit['name']
+
+            lines.append("{0} {1} is".format(type_, name))
+            lines.append('')
+            lines.append("end {0} {1};".format(type_, name))
+            lines.append('')
+
+        for i, line in enumerate(lines):
+            self._logger.debug("%2d | %s", i + 1, line)
+
         with open(self.filename, 'w') as fd:
-            libs = removeDuplicates(
-                [x.library for x in self._dependencies])
-
-            for lib in libs:
-                fd.write("library {0};\n".format(lib))
-
-            for dependency in self._dependencies:
-                fd.write("use {0}.{1};\n".format(dependency.library,
-                                                 dependency.name))
-
-            fd.write('\n')
-            for design_unit in self._design_units:
-                fd.write("{0} {1} is\n\nend {0} {1};\n".
-                         format(design_unit['type'],
-                                design_unit['name']))
+            fd.write('\n'.join(lines))
 
     def __repr__(self):
         return ("{}(library='{}', design_units={}, dependencies={}, "

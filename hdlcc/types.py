@@ -24,7 +24,6 @@ BuildFlags = Tuple[str, ...]
 UnitName = str
 LibraryName = str
 ObjectState = Dict
-DesignUnit = Dict[str, str]
 
 class FileType(Enum):
     vhd = ('vhd', 'vhdl')

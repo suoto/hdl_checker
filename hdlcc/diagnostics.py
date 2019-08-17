@@ -18,7 +18,7 @@
 
 import os.path as p
 
-from hdlcc.utils import samefile, toBytes
+from hdlcc.utils import HashableByKey, samefile
 
 # pylint: disable=useless-object-inheritance
 
@@ -37,7 +37,8 @@ class DiagType(object):  # pylint: disable=too-few-public-methods
     STYLE_WARNING = 'Warning (style)'
     STYLE_ERROR = 'Error (style)'
 
-class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
+
+class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-attributes
     """
     Base container for diagnostics
     """
@@ -75,14 +76,9 @@ class CheckerDiagnostic(object):  # pylint: disable=too-many-instance-attributes
                         self.line_number, self.column_number, error_code,
                         self.severity, self.text))
 
-    def _hash_data(self):
-        return b'|'.join([toBytes(x) for x in
-                          (self.checker, self.column_number, self.error_code,
-                           self.filename, self.line_number, self.severity,
-                           self.text)])
-
-    def __hash__(self):
-        return hash(self._hash_data())
+    def __hash_key__(self):
+        return (self.checker, self.column_number, self.error_code,
+                self.filename, self.line_number, self.severity, self.text)
 
     def __eq__(self, other):
         if hash(self) != hash(other):

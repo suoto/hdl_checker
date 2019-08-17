@@ -16,49 +16,52 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import Optional
+from typing import FrozenSet, Optional, Set, Tuple
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.parsed_element import LocationList, ParsedElement
+from hdlcc.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-class DependencySpec(ParsedElement):
-    def __init__(self, path, library, name, locations=None):
-        # type: (t.Path, t.LibraryName, str, Optional[LocationList]) -> None
-        self._library = str(library)
-        self._name = str(name)
-        super(DependencySpec, self).__init__(path, locations)
+Location = Tuple[t.Path, Optional[int], Optional[int]]
+LocationList = FrozenSet[Location]
+
+class ParsedElement(HashableByKey):
+
+    def __init__(self, path, locations=None):
+        # type: (t.Path, Optional[LocationList]) -> None
+        self._path = path
+        set_of_locations = set()  # type: Set[Location]
+        for filename, line_number, column_number in locations or []:
+            set_of_locations.add((
+                t.Path(filename),
+                None if line_number is None else line_number,
+                None if column_number is None else column_number))
+
+        self._locations = frozenset(set_of_locations)
 
     @property
-    def name(self):
-        return self._name
+    def path(self):
+        return self._path
 
     @property
-    def library(self):
-        return self._library
-
-    @property
-    def __hash_key__(self):
-        return self.library, self.name, self.locations
+    def locations(self):
+        return self._locations
 
     def __jsonEncode__(self):
-        state = super(DependencySpec, self).__jsonEncode__()
-        state['library'] = state['library']
-        state['name'] = state['name']
-        return state
+        return {'path': self.path,
+                'location': self.locations}
 
     @classmethod
     def __jsonDecode__(cls, state):
         """Returns an object of cls based on a given state"""
         # pylint: disable=protected-access
         _logger.info("Recovering from %s", state)
-        obj = super(DependencySpec, cls).__new__(cls)
-        obj._library = state['library']
-        obj._name = state['name']
+        obj = super(ParsedElement, cls).__new__(cls)
+        obj._path = state['path']
+        obj._locations = {tuple(x) for x in state['locations']}
         return obj
 
-    def __repr__(self):
-        return '{}.{}(library={}, name={}, locations={})'.format(
-            __name__, self.__class__.__name__, repr(self.library),
-            repr(self.name), repr(self.locations))
+    @property
+    def __hash_key__(self):
+        return (self.path, self.locations)

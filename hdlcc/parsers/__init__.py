@@ -21,7 +21,7 @@
 import logging
 import os.path as p
 from multiprocessing.pool import ThreadPool as Pool
-from typing import Dict, Iterator, Optional, Set, Union
+from typing import Dict, Iterator, Optional, Set, Type, Union
 
 from hdlcc import types as t  # pylint: disable=unused-import
 
@@ -51,6 +51,21 @@ def _isVerilog(path): # pragma: no cover
     if path.lower().endswith('.sv'):
         return True
     return False
+
+def getSourceParserFromPath(path): # type: (t.Path) -> SourceFile
+    """
+    Returns either a VhdlParser or VerilogParser based on the path's file
+    extension
+    """
+    ext = path.split('.')[-1].lower()
+    if ext in t.FileType.vhd.value:
+        cls = VhdlParser # type: Type[Union[VhdlParser, VerilogParser]]
+    if ext in t.FileType.verilog.value:
+        cls = VerilogParser
+    if ext in t.FileType.systemverilog.value:
+        cls = VerilogParser
+
+    return cls(path)
 
 def getSourceFileObjects(kwargs_list, workers=None):
     """

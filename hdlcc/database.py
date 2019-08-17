@@ -19,16 +19,18 @@
 # pylint: disable=useless-object-inheritance
 
 import logging
-import os
 import os.path as p
+import pprint
 from tempfile import mkdtemp
 from threading import RLock
-from typing import Any, Dict, Generator, List, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, List, Set, Tuple
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import BuilderName, getBuilderByName
-from hdlcc.parsers import DependencySpec, getSourceFileObjects, ConfigParser
+from hdlcc.design_unit import DesignUnit
+from hdlcc.parsers import (ConfigParser, DependencySpec, SourceFile,
+                           getSourceFileObjects, getSourceParserFromPath)
 from hdlcc.utils import removeDirIfExists
 
 _logger = logging.getLogger(__name__)
@@ -63,36 +65,61 @@ class Database(object):
         self._lock = RLock()
 
         self._builder_name = BuilderName.fallback
-        self._paths = set() # type: Set[t.Path]
+        self._paths = {} # type: Dict[t.Path, int]
         self._libraries = {} # type: Dict[t.Path, t.LibraryName]
         self._flags = {} # type: Dict[t.Path, t.BuildFlags]
-        self._design_units = {} # type: Dict[t.Path, Set[t.DesignUnit]]
+        self._design_units = {} # type: Dict[t.Path, Set[DesignUnit]]
         self._dependencies = {} # type: Dict[t.Path, Set[DependencySpec]]
-        self._sources = {} # type: Dict[t.Path, t.SourceFile]
+        self._sources = {} # type: Dict[t.Path, SourceFile]
 
         self._addVunitIfFound()
 
-    def getBuilderName(self): # type: (...) -> BuilderName
+    @property
+    def builder_name(self): # type: (...) -> BuilderName
         return self._builder_name
+
+    def _clean(self):
+        self._paths = {}
+        self._libraries = {}
+        self._flags = {}
+        self._design_units = {}
+        self._dependencies = {}
+        self._sources = {}
+        #  self._design_units[path] = set(source.getDesignUnits())
+        #  self._dependencies[path] = set(source.getDependencies())
+
+        # Re-add VUnit files back again
+        self._addVunitIfFound()
 
     def accept(self, parser):  # type: (ConfigParser) -> None
         # Clear up previous definitions
-        self._paths = set()
-        self._libraries = {}
-        self._flags = {}
+        self._clean()
 
         config = parser.parse()
+        _logger.debug("Updating from\n%s", pprint.pformat(config))
 
-        for path in parser.getPaths():
-            _logger.debug("Adding %s", path)
-            self._paths.add(path)
-            source = parser.getSourceByPath(path)
-            self._sources[path] = source
+        self._builder_name = config.get('builder_name', self._builder_name)
+
+        for source in config.get('sources', []):
+            _logger.debug('Adding %s', source)
+            path = source.path
+            # Default when updating is set the modification time to zero
+            # because we're cleaning up the parsed info too
+            self._paths[path] = 0
             self._libraries[path] = source.library
-            self._flags[path] = list(source.flags)
+            self._flags[path] = source.flags
 
-            self._design_units[path] = set(source.getDesignUnits())
-            self._dependencies[path] = set(source.getDependencies())
+
+        #  for path in parser.getPaths():
+        #      _logger.debug("Adding %s", path)
+        #      self._paths.add(path)
+        #      source = parser.getSourceByPath(path)
+        #      self._sources[path] = source
+        #      self._libraries[path] = source.library
+        #      self._flags[path] = list(source.flags)
+
+        #      self._design_units[path] = set(source.getDesignUnits())
+        #      self._dependencies[path] = set(source.getDependencies())
 
         self._addVunitIfFound()
 
@@ -110,30 +137,42 @@ class Database(object):
 
         return state
 
-    def getSourceByPath(self, path):
-        return self._sources[path]
+    def getFlags(self, path): # type: (t.Path) -> t.BuildFlags
+        """
+        Return a list of flags for the given path or an empty tuple if the path
+        is not found in the database.
+        """
+        return self._flags.get(path, ())
 
-    def _cleanup(self):
+    @property
+    def paths(self): # type: () -> Iterable[t.Path]
+        "Returns a list of paths currently in the database"
+        return self._paths.keys()
+
+    def getLibrary(self, path):
+        return self._libraries.get(path, None)
+
+    def _parsePathIfNeeded(self, path):
+        # Sources will get parsed on demand
+        if p.getmtime(path) <= self._paths.get(path, 0):
+            return
+
+        _logger.debug("Parsing '%s'", path)
+        source = getSourceParserFromPath(path)
+        self._design_units[path] = set(source.getDesignUnits())
+        self._dependencies[path] = set(source.getDependencies())
+
+    def getDesignUnits(self, path):
+        self._parsePathIfNeeded(path)
+        return self._design_units.get(path, set())
+
+    def getKnownDesignUnits(self):
         pass
 
-    def getBuildFlags(self, path): # type: (t.Path) -> t.BuildFlags
-        """
-        Return a list of flags for the given path. This does not check if the
-        path exists on the table or not
-        """
-        return self._flags[path]
-
-    def getPaths(self): # type: () -> Set[t.Path]
-        "Returns a list of paths currently in the database"
-        return set(self._paths)
-
-    def hasPath(self, path): # type: (t.Path) -> bool
-        "Checks if a given path exists in the database"
-        return path in self._paths
 
     def findSourcesByDesignUnit(self, unit, library='work',
                                 case_sensitive=False):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[t.SourceFile]
+        # type: (t.UnitName, t.LibraryName, bool) -> List[SourceFile]
         """
         Return the source (or sources) that define the given design
         unit. Case sensitive mode should be used when tracking
@@ -146,7 +185,7 @@ class Database(object):
         library_name = library if case_sensitive else library.lower()
         unit_name = unit if case_sensitive else unit.lower()
 
-        sources = [] # type: List[t.SourceFile]
+        sources = [] # type: List[SourceFile]
 
         for source in self._sources.values():
             source_library = source.library
@@ -166,7 +205,7 @@ class Database(object):
         return sources
 
     def discoverSourceDependencies(self, unit, library, case_sensitive):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[Tuple[t.SourceFile, t.LibraryName]]
+        # type: (t.UnitName, t.LibraryName, bool) -> List[Tuple[SourceFile, t.LibraryName]]
         """
         Searches for sources that implement the given design unit. If
         more than one file implements an entity or package with the same
@@ -179,7 +218,7 @@ class Database(object):
         library_name = library if case_sensitive else library.lower()
         unit_name = unit if case_sensitive else unit.lower()
 
-        sources = [] # type: List[Tuple[t.SourceFile, t.LibraryName]]
+        sources = [] # type: List[Tuple[SourceFile, t.LibraryName]]
 
         for source in self._sources.values():
             source_library = source.library
@@ -210,7 +249,7 @@ class Database(object):
 
         _logger.info("VUnit installation found")
 
-        builder_class = getBuilderByName(self.getBuilderName())
+        builder_class = getBuilderByName(self.builder_name)
 
         if 'systemverilog' in builder_class.file_types:
             from vunit.verilog import VUnit    # type: ignore pylint: disable=import-error
@@ -221,7 +260,6 @@ class Database(object):
                                   'include'))
         else:
             from vunit import VUnit  # pylint: disable=import-error
-
 
         output_path = t.Path(mkdtemp()) # type: t.Path
         try:
@@ -252,7 +290,7 @@ class Database(object):
 
         # Get extra flags for building VUnit sources
         try:
-            vunit_flags = _VUNIT_FLAGS[self.getBuilderName()][vunit_project.vhdl_standard]
+            vunit_flags = _VUNIT_FLAGS[self.builder_name][vunit_project.vhdl_standard]
         except KeyError:
             vunit_flags = []
 

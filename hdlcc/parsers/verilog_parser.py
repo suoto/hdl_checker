@@ -16,8 +16,11 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "VHDL source file parser"
 
-import re
 import logging
+import re
+from typing import Generator
+
+from hdlcc.design_unit import DesignUnit, DesignUnitType
 from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
@@ -48,29 +51,26 @@ class VerilogParser(BaseSourceFile):
         Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines
         """
+        content = self.getSourceContent()
         for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
-            yield match.groupdict()
+            start = match.start()
+            yield match.groupdict(), content[:start].count('\n')
 
     def _getDependencies(self):
         return []
 
-    def _getDesignUnits(self):
-        design_units = []
-
-        for match in self._iterDesignUnitMatches():
+    def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
+        for match, line_number in self._iterDesignUnitMatches():
             if match.get('module_name', None):
-                design_units += [{
-                    'name' : match['module_name'],
-                    'type' : 'entity'}]
+                yield DesignUnit(path=self.filename,
+                                 name=match['module_name'],
+                                 type_=DesignUnitType.entity,
+                                 locations=((self.filename, line_number, None),))
             elif match.get('package_name', None):
-                design_units += [{
-                    'name' : match['package_name'],
-                    'type' : 'package'}]
-            else:  # pragma: no cover
-                assert False
-
-        return design_units
+                yield DesignUnit(path=self.filename,
+                                 name=match['package_name'],
+                                 type_=DesignUnitType.package,
+                                 locations=((self.filename, line_number, None),))
 
     def _getLibraries(self):
         return [self.library, ]
-

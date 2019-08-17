@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base source file parser"
 
+# pylint:disable=useless-object-inheritance
+
 import abc
 import logging
 import os.path as p
@@ -23,12 +25,14 @@ import re
 import time
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
+from typing import Set
 
-from hdlcc.utils import getFileType, removeDuplicates, toBytes
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
 
 _logger = logging.getLogger(__name__)
 
-class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,useless-object-inheritance
+class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attributes
     """
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
@@ -100,25 +104,8 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
                                       self.filename))
 
     @property
-    def __eq_key__(self):
-        return self.library, self.filename, self._content
-
-    def __hash__(self):
-        return hash((self.filename, self.library))
-
-    def __eq__(self, other):
-        """Overrides the default implementation"""
-        if isinstance(other, BaseSourceFile):
-            return self.__eq_key__ == other.__eq_key__
-        return NotImplemented
-
-    def __ne__(self, other):
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-        if result is not NotImplemented:
-            return not result
-        return NotImplemented
-
+    def __hash_key__(self):
+        return (self.library, self.filename, self._content)
 
     def __str__(self):
         return "[%s] %s" % (self.library, self.filename)
@@ -221,12 +208,12 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
 
         return self._cache['raw_content']
 
-    def getDesignUnits(self):
+    def getDesignUnits(self): # type: () -> Set[t.DesignUnit]
         """
         Cached version of the _getDesignUnits method
         """
         if not p.exists(self.filename):
-            return []
+            return set()
         self._clearCachesIfChanged()
         if self._design_units is None:
             self._design_units = self._getDesignUnits()
@@ -269,14 +256,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             self._cache[key] = self._getMatchingLibrary(
                 unit_type, unit_name)
         return self._cache[key]
-
-    def getDesignUnitsDotted(self):
-        """
-        Returns the design units using the <library>.<design_unit>
-        representation
-        """
-        return {"%s.%s" % (self.library, x['name']) \
-                    for x in self.getDesignUnits()}
 
     @abc.abstractmethod
     def _getSourceContent(self):

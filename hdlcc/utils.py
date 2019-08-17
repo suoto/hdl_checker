@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
+import abc
 import logging
 import os
 import os.path as p
@@ -325,3 +326,30 @@ def removeDirIfExists(dirname):
         shutil.rmtree(dirname)
     except OSError:
         pass
+
+
+class HashableByKey(object):
+    """
+    Implements hash and comparison operators properly across Python 2 and 3
+    """
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractproperty
+    def __hash_key__(self):
+        """ Implement this attribute to use it for hashing and comparing"""
+
+    def __hash__(self):
+        return hash(self.__hash_key__)
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, self.__class__):
+            return self.__hash_key__ == other.__hash_key__
+        return NotImplemented  # pragma: no cover
+
+    def __ne__(self, other):  # pragma: no cover
+        """Overrides the default implementation (unnecessary in Python 3)"""
+        result = self.__eq__(other)
+        if result is not NotImplemented:
+            return not result
+        return NotImplemented

@@ -28,6 +28,7 @@ from typing import Dict, Iterator, Optional, Set
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import BuilderName
+from hdlcc.utils import HashableByKey
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -53,7 +54,7 @@ def _extractSet(entry): # type: (str) -> t.BuildFlags
         return ()
     return tuple(_splitAtWhitespaces(string))
 
-class ProjectSourceSpec(object):
+class ProjectSourceSpec(HashableByKey):
     """Holder class to specify the interface with config parsers"""
     def __init__(self, path, library=None, flags=None):
         # type: (t.Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
@@ -79,22 +80,6 @@ class ProjectSourceSpec(object):
     @property
     def __hash_key__(self):
         return (self.path, self.library, self.flags)
-
-    def __hash__(self):
-        return hash(self.__hash_key__)
-
-    def __eq__(self, other):
-        """Overrides the default implementation"""
-        if isinstance(other, ProjectSourceSpec):
-            return self.__hash_key__ == other.__hash_key__
-        return NotImplemented  # pragma: no cover
-
-    def __ne__(self, other):  # pragma: no cover
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-        if result is not NotImplemented:
-            return not result
-        return NotImplemented
 
     def __repr__(self):
         return '{}(path="{}", library="{}", flags={})'.format(

@@ -18,9 +18,10 @@
 
 import logging
 import re
-from typing import Set
+from typing import Generator, Dict, Union, Set
 
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.design_unit import DesignUnit, DesignUnitType
 from hdlcc.parsers import DependencySpec
 from hdlcc.parsers.base_parser import BaseSourceFile
 
@@ -67,12 +68,12 @@ class VhdlParser(BaseSourceFile):
             start = match.start()
             yield match.groupdict(), content[:start].count('\n')
 
-    def _getDependencies(self):
+    def _getDependencies(self): # type: () -> Generator[DependencySpec, None, None]
         libs = self.getLibraries() + ['work']
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
-        dependencies = {}
+        dependencies = {} # type: Dict[int, Dict[str, Union[str, Set]]]
 
         text = self.getSourceContent()
         for match in lib_deps_regex.finditer(text):
@@ -84,32 +85,38 @@ class VhdlParser(BaseSourceFile):
             key = hash((library, unit))
 
             if key not in dependencies:
-                dependencies[key] = DependencySpec(library=library, name=unit)
+                dependencies[key] = {'library': library,
+                                     'name': unit,
+                                     'locations': set()}
 
             dependency = dependencies[key]
+
             line_number = text[:match.end()].count('\n')
             column_number = len(text[:match.start()].split('\n')[-1])
 
-            dependency.addLocation(filename=self.filename,
-                                   line_number=line_number + 1,
-                                   column_number=column_number + 1)
+            dependency['locations'].add((self.filename, line_number + 1, column_number + 1))
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             package_body_name = match.groupdict()['package_body_name']
             key = hash((self.library, package_body_name))
 
             if key not in dependencies:
-                dependencies[key] = DependencySpec(library=self.library,
-                                                   name=package_body_name)
+                dependencies[key] = {'library': library,
+                                     'name': unit,
+                                     'locations': set()}
 
             dependency = dependencies[key]
             line_number = text[:match.end()].count('\n')
             column_number = len(text[:match.start()].split('\n')[-1])
-            dependency.addLocation(filename=self.filename,
-                                   line_number=line_number + 1,
-                                   column_number=column_number + 1)
+            dependency['locations'].add((self.filename, line_number + 1, column_number + 1))
 
-        return list(dependencies.values())
+
+        # Done parsing, won't add any more locations, so generate the specs
+        for dep in dependencies.values():
+            yield DependencySpec(path=self.filename,
+                                 name=dep['name'],
+                                 library=dep['library'],
+                                 locations=set(dep['locations']))
 
     def _getLibraries(self):
         """
@@ -127,26 +134,24 @@ class VhdlParser(BaseSourceFile):
         libs.append(self.library)
         return libs
 
-    def _getDesignUnits(self): # type: () -> Set[t.DesignUnit]
+    def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
         """
         Parses the source file to find design units and dependencies
         """
-        design_units = set() # type: Set[t.DesignUnit]
-
         for match, line_number in self._iterDesignUnitMatches():
-            unit = None
             if match['package_name'] is not None:
-                unit = {'name' : str(match['package_name']),
-                        'type' : 'package'}
+                yield DesignUnit(path=self.filename,
+                                 name=match['package_name'],
+                                 type_=DesignUnitType.package,
+                                 locations=((self.filename, line_number, None),))
+
             elif match['entity_name'] is not None:
-                unit = {'name' : str(match['entity_name']),
-                        'type' : 'entity'}
+                yield DesignUnit(path=self.filename,
+                                 name=match['entity_name'],
+                                 type_=DesignUnitType.entity,
+                                 locations=((self.filename, line_number, None),))
             elif match['context_name'] is not None:
-                unit = {'name' : str(match['context_name']),
-                        'type' : 'context'}
-
-            if unit:
-                unit['line_number'] = line_number
-                design_units.add(unit)
-
-        return design_units
+                yield DesignUnit(path=self.filename,
+                                 name=match['context'],
+                                 type_=DesignUnitType.context,
+                                 locations=((self.filename, line_number, None),))

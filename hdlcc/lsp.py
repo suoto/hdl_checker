@@ -23,10 +23,10 @@ import logging
 import os.path as p
 import sys
 
-import pyls.lsp as defines
-from pyls._utils import debounce
-from pyls.python_ls import PythonLanguageServer
-from pyls.uris import to_fs_path
+import pyls.lsp as defines # type: ignore
+from pyls._utils import debounce # type: ignore
+from pyls.python_ls import PythonLanguageServer # type: ignore
+from pyls.uris import to_fs_path # type: ignore
 
 from hdlcc.diagnostics import DiagType, FailedToCreateProject
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
