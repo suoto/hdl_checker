@@ -53,7 +53,7 @@ def _extractSet(entry): # type: (str) -> t.BuildFlags
         return ()
     return tuple(_splitAtWhitespaces(string))
 
-class ParsedElement(object):
+class ProjectSourceSpec(object):
     """Holder class to specify the interface with config parsers"""
     def __init__(self, path, library=None, flags=None):
         # type: (t.Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
@@ -85,7 +85,7 @@ class ParsedElement(object):
 
     def __eq__(self, other):
         """Overrides the default implementation"""
-        if isinstance(other, ParsedElement):
+        if isinstance(other, ProjectSourceSpec):
             return self.__hash_key__ == other.__hash_key__
         return NotImplemented  # pragma: no cover
 
@@ -99,7 +99,6 @@ class ParsedElement(object):
     def __repr__(self):
         return '{}(path="{}", library="{}", flags={})'.format(
             self.__class__.__name__, self.path, self.library, self.flags)
-
 
 class ConfigParser(object):
     """
@@ -127,7 +126,7 @@ class ConfigParser(object):
                 'verilog'       : (),
                 'systemverilog' : (), }} # type: Dict[str, BuildFlagsMap]
 
-        self._sources = set() # type: Set[ParsedElement]
+        self._sources = set() # type: Set[ProjectSourceSpec]
 
         self.filename = t.Path(p.abspath(filename))
 
@@ -185,9 +184,9 @@ class ConfigParser(object):
             else:
                 for source_path in self._getSourcePaths(groupdict['path']):
                     self._sources.add(
-                        ParsedElement(path=source_path,
-                                      library=groupdict['library'],
-                                      flags=_extractSet(groupdict['flags'])))
+                        ProjectSourceSpec(path=source_path,
+                                          library=groupdict['library'],
+                                          flags=_extractSet(groupdict['flags'])))
 
     def _handleParsedParameter(self, parameter, lang, value): # type: (str, str, str) -> None
         """

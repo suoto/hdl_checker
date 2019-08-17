@@ -16,14 +16,20 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Top of the hdlcc.parsers submodule"
 
-import logging
-from multiprocessing.pool import ThreadPool as Pool
-from typing import Union
+# pylint: disable=useless-object-inheritance
 
-from hdlcc.parsers.base_parser import BaseSourceFile
-from hdlcc.parsers.dependency_spec import DependencySpec
-from hdlcc.parsers.verilog_parser import VerilogParser
-from hdlcc.parsers.vhdl_parser import VhdlParser
+import logging
+import os.path as p
+from multiprocessing.pool import ThreadPool as Pool
+from typing import Dict, Iterator, Optional, Set, Union
+
+from hdlcc import types as t  # pylint: disable=unused-import
+
+from .base_parser import BaseSourceFile
+from .config_parser import ConfigParser, ProjectSourceSpec
+from .dependency_spec import DependencySpec
+from .verilog_parser import VerilogParser
+from .vhdl_parser import VhdlParser
 
 _logger = logging.getLogger(__name__)
 

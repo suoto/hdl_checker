@@ -30,8 +30,8 @@ import six
 from nose2.tools import such  # type: ignore
 
 from hdlcc.builders import BuilderName
-from hdlcc.config_parser import ConfigParser, ParsedElement
 from hdlcc.exceptions import UnknownParameterError
+from hdlcc.parsers import ConfigParser, ProjectSourceSpec
 from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
                                setupTestSuport)
 
@@ -123,34 +123,34 @@ systemverilog work bar.sv some sv flag
                                         'vhdl': ('-single_build_flag_0', '-singlebuildflag')},
                  })
 
-            class _ParsedElement(ParsedElement):
+            class _ProjectSourceSpec(ProjectSourceSpec):
                 base_path = p.abspath(p.dirname(it.path))
 
                 def __init__(self, path, library=None, flags=None):
                     if not p.isabs(path):
-                        path = p.join(_ParsedElement.base_path, path)
+                        path = p.join(_ProjectSourceSpec.base_path, path)
 
-                    super(_ParsedElement, self).__init__(
+                    super(_ProjectSourceSpec, self).__init__(
                         path=path, library=library, flags=flags)
 
             it.assertCountEqual(
                 sources,
-                [_ParsedElement(path="sample_file.vhd",
-                                library="work",
-                                flags=('-sample_file_flag',)),
-                 _ParsedElement(path="sample_package.vhdl",
-                                library="work",
-                                flags=('-sample_package_flag',)),
-                 _ParsedElement(path="sample_testbench.VHD",
-                                library="work",
-                                flags=('-build-using', 'some', 'way')),
-                 _ParsedElement(path="/some/abs/path.VHDL",
-                                library="lib", flags=()),
-                 _ParsedElement(path="foo.v",
-                                library="work",
-                                flags=('-some-flag', 'some', 'value')),
-                 _ParsedElement(path="bar.sv",
-                                library="work",
-                                flags=('some', 'sv', 'flag'))])
+                [_ProjectSourceSpec(path="sample_file.vhd",
+                                    library="work",
+                                    flags=('-sample_file_flag',)),
+                 _ProjectSourceSpec(path="sample_package.vhdl",
+                                    library="work",
+                                    flags=('-sample_package_flag',)),
+                 _ProjectSourceSpec(path="sample_testbench.VHD",
+                                    library="work",
+                                    flags=('-build-using', 'some', 'way')),
+                 _ProjectSourceSpec(path="/some/abs/path.VHDL",
+                                    library="lib", flags=()),
+                 _ProjectSourceSpec(path="foo.v",
+                                    library="work",
+                                    flags=('-some-flag', 'some', 'value')),
+                 _ProjectSourceSpec(path="bar.sv",
+                                    library="work",
+                                    flags=('some', 'sv', 'flag'))])
 
 it.createTests(globals())

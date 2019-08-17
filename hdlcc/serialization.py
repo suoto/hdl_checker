@@ -19,15 +19,13 @@
 import json
 import logging
 
-from hdlcc import builders, config_parser, parsers
+from hdlcc import builders, parsers
 
 _logger = logging.getLogger(__name__)
 
 # Maps class names added by the decoder to the actual class on Python side to
 # recreate an object
 CLASS_MAP = {
-    'ConfigParser': config_parser.ConfigParser,
-
     'DependencySpec': parsers.DependencySpec,
     'VerilogParser': parsers.VerilogParser,
     'VhdlParser': parsers.VhdlParser,

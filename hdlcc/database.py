@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Project wide database"
 
+# pylint: disable=useless-object-inheritance
+
 import logging
 import os
 import os.path as p
@@ -25,19 +27,18 @@ from typing import Any, Dict, Generator, List, Set, Tuple
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import getBuilderByName
-from hdlcc.config_parser import ConfigParser
-from hdlcc.parsers import DependencySpec, getSourceFileObjects
+from hdlcc.builders import BuilderName, getBuilderByName
+from hdlcc.parsers import DependencySpec, getSourceFileObjects, ConfigParser
 from hdlcc.utils import removeDirIfExists
 
 _logger = logging.getLogger(__name__)
 
 _VUNIT_FLAGS = {
-    t.BuilderName.msim : {
+    BuilderName.msim : {
         '93'   : ['-93'],
         '2002' : ['-2002'],
         '2008' : ['-2008']},
-    t.BuilderName.ghdl : {
+    BuilderName.ghdl : {
         '93'   : ['--std=93c'],
         '2002' : ['--std=02'],
         '2008' : ['--std=08']},
@@ -55,13 +56,13 @@ def foundVunit(): # type: () -> bool
     return False
 
 
-class Database(object):  # pylint: disable=useless-object-inheritance
+class Database(object):
     __hash__ = None # type: ignore
 
     def __init__(self): # type: () -> None
         self._lock = RLock()
 
-        self._builder_name = t.BuilderName.fallback
+        self._builder_name = BuilderName.fallback
         self._paths = set() # type: Set[t.Path]
         self._libraries = {} # type: Dict[t.Path, t.LibraryName]
         self._flags = {} # type: Dict[t.Path, t.BuildFlags]
@@ -71,16 +72,16 @@ class Database(object):  # pylint: disable=useless-object-inheritance
 
         self._addVunitIfFound()
 
-    def getBuilderName(self): # type: (...) -> t.BuilderName
+    def getBuilderName(self): # type: (...) -> BuilderName
         return self._builder_name
 
     def accept(self, parser):  # type: (ConfigParser) -> None
-        parser = ConfigParser()
-
         # Clear up previous definitions
         self._paths = set()
         self._libraries = {}
         self._flags = {}
+
+        config = parser.parse()
 
         for path in parser.getPaths():
             _logger.debug("Adding %s", path)
@@ -201,7 +202,7 @@ class Database(object):  # pylint: disable=useless-object-inheritance
         """
         Tries to import files to support VUnit right out of the box
         """
-        if not foundVunit() or self._builder_name == t.BuilderName.fallback:
+        if not foundVunit() or self._builder_name == BuilderName.fallback:
             return
 
         import vunit  # pylint: disable=import-error
@@ -267,4 +268,3 @@ class Database(object):  # pylint: disable=useless-object-inheritance
 
         for source in getSourceFileObjects(_source_file_args):
             self._sources[source.filename] = source
-
