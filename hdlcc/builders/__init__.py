@@ -17,6 +17,7 @@
 "Base class that implements the base builder flow"
 
 import logging
+from enum import Enum
 from typing import Union
 
 from .fallback import Fallback
@@ -25,6 +26,24 @@ from .msim import MSim
 from .xvhdl import XVHDL
 
 _logger = logging.getLogger(__name__)
+
+AnyValidBuilder = Union[MSim, XVHDL, GHDL, ]
+AnyBuilder = Union[AnyValidBuilder, Fallback]
+
+class BuilderName(Enum):
+    @staticmethod
+    def fromString(name):
+        """
+        Returns the enum type from a string. The conversion is case
+        insensitive
+        """
+        name = str(name).lower()
+        return getattr(BuilderName, str(name).lower())
+
+    msim = MSim.builder_name
+    xvhdl = XVHDL.builder_name
+    ghdl = GHDL.builder_name
+    fallback = Fallback.builder_name
 
 def getBuilderByName(name):
     "Returns the builder class given a string name"

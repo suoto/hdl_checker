@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=function-redefined
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
 
@@ -28,9 +29,9 @@ from typing import Iterator, List
 import six
 from nose2.tools import such  # type: ignore
 
-import hdlcc
-from hdlcc import types as t
+from hdlcc.builders import BuilderName
 from hdlcc.config_parser import ConfigParser, ParsedElement
+from hdlcc.exceptions import UnknownParameterError
 from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
                                setupTestSuport)
 
@@ -70,14 +71,18 @@ with such.A('config parser object') as it:
     @it.should("raise UnknownParameterError exception when an unknown "
                "parameter is found")
     def test_raises_exception():
-        with it.assertRaises(hdlcc.exceptions.UnknownParameterError):
+        with it.assertRaises(UnknownParameterError):
             with fileWithContent(b'foo = bar') as name:
                 parser = ConfigParser(name)
                 parser.parse()
 
-    @it.should("parse a regular file")
-    def test_parsing_regular_file():
-        contents = b"""
+    with it.having('a regular file'):
+
+        @it.has_setup
+        def setup():
+            it.path = tempfile.mktemp()
+
+            contents = b"""
 single_build_flags[vhdl] = -single_build_flag_0 -singlebuildflag
 global_build_flags[vhdl] = -global -global-build-flag
 
@@ -95,8 +100,13 @@ verilog work foo.v -some-flag some value
 systemverilog work bar.sv some sv flag
 """
 
-        with fileWithContent(contents) as name:
-            parser = ConfigParser(name)
+            with open(it.path, 'wb') as fd:
+                fd.write(contents)
+                fd.flush()
+
+        @it.should("find the correct info")
+        def test_parsing_regular_file():
+            parser = ConfigParser(it.path)
             config = parser.parse()
 
             _logger.info("Parsed config:\n%s", pprint.pformat(config))
@@ -104,7 +114,7 @@ systemverilog work bar.sv some sv flag
 
             it.assertDictEqual(
                 config,
-                {'builder_name': t.BuilderName.msim,
+                {'builder_name': BuilderName.msim,
                  'global_build_flags': {'systemverilog': (),
                                         'verilog': (),
                                         'vhdl': ('-global', '-global-build-flag')},
@@ -114,7 +124,7 @@ systemverilog work bar.sv some sv flag
                  })
 
             class _ParsedElement(ParsedElement):
-                base_path = p.abspath(p.dirname(name))
+                base_path = p.abspath(p.dirname(it.path))
 
                 def __init__(self, path, library=None, flags=None):
                     if not p.isabs(path):

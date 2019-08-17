@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Configuration file parser"
 
+# pylint: disable=useless-object-inheritance
+
 import logging
 import os.path as p
 import re
@@ -25,6 +27,7 @@ from typing import Dict, Iterator, Optional, Set
 
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.builders import BuilderName
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -50,7 +53,7 @@ def _extractSet(entry): # type: (str) -> t.BuildFlags
         return ()
     return tuple(_splitAtWhitespaces(string))
 
-class ParsedElement:
+class ParsedElement(object):
     """Holder class to specify the interface with config parsers"""
     def __init__(self, path, library=None, flags=None):
         # type: (t.Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
@@ -98,7 +101,7 @@ class ParsedElement:
             self.__class__.__name__, self.path, self.library, self.flags)
 
 
-class ConfigParser:
+class ConfigParser(object):
     """
     Configuration info provider
     """
@@ -112,7 +115,7 @@ class ConfigParser:
     def __init__(self, filename): # type: (t.Path) -> None
         self._logger.debug("Creating config parser for filename '%s'", filename)
 
-        self._parms = {'builder' : t.BuilderName.fallback}
+        self._parms = {'builder' : BuilderName.fallback}
 
         self._flags = {
             'single_build_flags' : {
@@ -196,7 +199,7 @@ class ConfigParser:
             self._logger.debug("Ignoring deprecated parameter '%s'", parameter)
         elif parameter in self._single_value_parms:
             self._logger.debug("Handling '%s' as a single value", parameter)
-            self._parms[parameter] = t.BuilderName.fromString(value)
+            self._parms[parameter] = BuilderName.fromString(value)
         elif parameter in self._list_parms:
             self._logger.debug("Handling '%s' as a list of values", parameter)
             self._flags[parameter][lang] = _extractSet(value)

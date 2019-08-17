@@ -17,8 +17,8 @@
 "Top of the hdlcc.parsers submodule"
 
 import logging
-#  from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool as Pool
+from typing import Union
 
 from hdlcc.parsers.base_parser import BaseSourceFile
 from hdlcc.parsers.dependency_spec import DependencySpec
@@ -26,6 +26,8 @@ from hdlcc.parsers.verilog_parser import VerilogParser
 from hdlcc.parsers.vhdl_parser import VhdlParser
 
 _logger = logging.getLogger(__name__)
+
+SourceFile = Union[VhdlParser, VerilogParser]
 
 def _isVhdl(path): # pragma: no cover
     "Uses the file extension to check if the given path is a VHDL file"

@@ -150,14 +150,3 @@ class VhdlParser(BaseSourceFile):
                 design_units.add(unit)
 
         return design_units
-
-def main():
-    import sys
-    for arg in sys.argv[1:]:
-        print(arg)
-        #  print(VhdlParser(arg).getDesignUnits())
-        for d in VhdlParser(arg).getDependencies():
-            print(d)
-
-if __name__ == '__main__':
-    main()
