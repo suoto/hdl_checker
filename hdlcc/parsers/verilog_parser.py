@@ -20,7 +20,9 @@ import logging
 import re
 from typing import Generator
 
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.design_unit import DesignUnit, DesignUnitType
+from hdlcc.parsed_element import LocationList
 from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
@@ -61,16 +63,17 @@ class VerilogParser(BaseSourceFile):
 
     def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
         for match, line_number in self._iterDesignUnitMatches():
+            locations = frozenset({(line_number, None), }) # type: LocationList
             if match.get('module_name', None):
                 yield DesignUnit(path=self.filename,
                                  name=match['module_name'],
                                  type_=DesignUnitType.entity,
-                                 locations=((self.filename, line_number, None),))
+                                 locations=locations)
             elif match.get('package_name', None):
                 yield DesignUnit(path=self.filename,
                                  name=match['package_name'],
                                  type_=DesignUnitType.package,
-                                 locations=((self.filename, line_number, None),))
+                                 locations=locations)
 
     def _getLibraries(self):
         return [self.library, ]
