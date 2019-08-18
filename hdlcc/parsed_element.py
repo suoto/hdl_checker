@@ -23,34 +23,27 @@ from hdlcc.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-Location = Tuple[t.Path, Optional[int], Optional[int]]
+Location = Tuple[Optional[int], Optional[int]]
 LocationList = FrozenSet[Location]
 
 class ParsedElement(HashableByKey):
 
-    def __init__(self, path, locations=None):
-        # type: (t.Path, Optional[LocationList]) -> None
-        self._path = path
+    def __init__(self, locations=None):
+        # type: (Optional[LocationList]) -> None
         set_of_locations = set()  # type: Set[Location]
-        for filename, line_number, column_number in locations or []:
+        for line_number, column_number in locations or []:
             set_of_locations.add((
-                t.Path(filename),
-                None if line_number is None else line_number,
-                None if column_number is None else column_number))
+                None if line_number is None else int(line_number),
+                None if column_number is None else int(column_number)))
 
         self._locations = frozenset(set_of_locations)
-
-    @property
-    def path(self):
-        return self._path
 
     @property
     def locations(self):
         return self._locations
 
     def __jsonEncode__(self):
-        return {'path': self.path,
-                'location': self.locations}
+        return {'location': self.locations}
 
     @classmethod
     def __jsonDecode__(cls, state):
@@ -58,10 +51,9 @@ class ParsedElement(HashableByKey):
         # pylint: disable=protected-access
         _logger.info("Recovering from %s", state)
         obj = super(ParsedElement, cls).__new__(cls)
-        obj._path = state['path']
         obj._locations = {tuple(x) for x in state['locations']}
         return obj
 
     @property
     def __hash_key__(self):
-        return (self.path, self.locations)
+        return (self.locations, )

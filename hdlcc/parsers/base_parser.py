@@ -28,6 +28,7 @@ from tempfile import NamedTemporaryFile
 from typing import Set
 
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.design_unit import DesignUnit
 from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
 
 _logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._cache['raw_content']
 
-    def getDesignUnits(self): # type: () -> Set[t.DesignUnit]
+    def getDesignUnits(self): # type: () -> Set[DesignUnit]
         """
         Cached version of the _getDesignUnits method
         """

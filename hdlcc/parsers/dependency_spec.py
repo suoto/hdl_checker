@@ -24,11 +24,16 @@ from hdlcc.parsed_element import LocationList, ParsedElement
 _logger = logging.getLogger(__name__)
 
 class DependencySpec(ParsedElement):
-    def __init__(self, path, library, name, locations=None):
-        # type: (t.Path, t.LibraryName, str, Optional[LocationList]) -> None
+    def __init__(self, path, name, library, locations=None):
+        # type: (t.Path, str, t.LibraryName, Optional[LocationList]) -> None
+        self._path = path
         self._library = str(library)
         self._name = str(name)
-        super(DependencySpec, self).__init__(path, locations)
+        super(DependencySpec, self).__init__(locations)
+
+    @property
+    def path(self):
+        return self._path
 
     @property
     def name(self):
@@ -40,7 +45,8 @@ class DependencySpec(ParsedElement):
 
     @property
     def __hash_key__(self):
-        return self.library, self.name, self.locations
+        return (self.path, self.library, self.name,
+                super(DependencySpec, self).__hash_key__)
 
     def __jsonEncode__(self):
         state = super(DependencySpec, self).__jsonEncode__()

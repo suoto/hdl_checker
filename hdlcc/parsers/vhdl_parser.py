@@ -18,11 +18,12 @@
 
 import logging
 import re
-from typing import Generator, Dict, Union, Set
+from typing import Generator, Dict, Union, Set, Tuple, Any
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.design_unit import DesignUnit, DesignUnitType
 from hdlcc.parsers import DependencySpec
+from hdlcc.parsed_element import LocationList
 from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
@@ -36,11 +37,12 @@ _DESIGN_UNIT_SCANNER = re.compile('|'.join([
     ]), flags=re.M)
 
 _LIBRARY_SCANNER = re.compile(
-    r"^\s*\blibrary\s+(?P<library_name>[a-z]\w*)\s*;", flags=re.M | re.I)
+    r"library\s+([a-z]\w*(?:\s*,\s*[a-z]\w*){0,})\s*;", flags=re.M | re.I)
 
 _ADDITIONAL_DEPS_SCANNER = re.compile(
     r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.M)
 
+IncompleteDependency = Dict[str, Union[str, Set[Any]]]
 
 class VhdlParser(BaseSourceFile):
     """
@@ -69,11 +71,11 @@ class VhdlParser(BaseSourceFile):
             yield match.groupdict(), content[:start].count('\n')
 
     def _getDependencies(self): # type: () -> Generator[DependencySpec, None, None]
-        libs = self.getLibraries() + ['work']
+        libs = set(self.getLibraries() + ['work'])
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
-        dependencies = {} # type: Dict[int, Dict[str, Union[str, Set]]]
+        dependencies = {} # type: Dict[int, IncompleteDependency]
 
         text = self.getSourceContent()
         for match in lib_deps_regex.finditer(text):
@@ -82,33 +84,34 @@ class VhdlParser(BaseSourceFile):
             if library == 'work':
                 library = self.library
 
+            line_number = text[:match.end()].count('\n')
+            column_number = len(text[:match.start()].split('\n')[-1])
+
             key = hash((library, unit))
 
             if key not in dependencies:
                 dependencies[key] = {'library': library,
                                      'name': unit,
-                                     'locations': set()}
+                                     'locations': set()
+                                     }
 
             dependency = dependencies[key]
-
-            line_number = text[:match.end()].count('\n')
-            column_number = len(text[:match.start()].split('\n')[-1])
-
-            dependency['locations'].add((self.filename, line_number + 1, column_number + 1))
+            dependency['locations'].add((line_number + 1, column_number + 1))
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             package_body_name = match.groupdict()['package_body_name']
+            line_number = text[:match.end()].count('\n')
+            column_number = len(text[:match.start()].split('\n')[-1])
+
             key = hash((self.library, package_body_name))
 
             if key not in dependencies:
                 dependencies[key] = {'library': library,
-                                     'name': unit,
+                                     'name': package_body_name,
                                      'locations': set()}
 
             dependency = dependencies[key]
-            line_number = text[:match.end()].count('\n')
-            column_number = len(text[:match.start()].split('\n')[-1])
-            dependency['locations'].add((self.filename, line_number + 1, column_number + 1))
+            dependency['locations'].add((line_number + 1, column_number + 1))
 
 
         # Done parsing, won't add any more locations, so generate the specs
@@ -122,16 +125,16 @@ class VhdlParser(BaseSourceFile):
         """
         Parses the source file to find design units and dependencies
         """
-        libs = ['work']
+        libs = set()
 
         for match in _LIBRARY_SCANNER.finditer(self.getSourceContent()):
-            match = match.groupdict()
-            if match['library_name'] is not None:
-                for lib in re.split(r"\s*,\s*", match['library_name']):
-                    libs.append(lib.strip())
+            for group in match.groups():
+                libs = libs.union(set(map(str.strip, group.split(','))))
 
-        libs.remove('work')
-        libs.append(self.library)
+        # Replace references of 'work' for the actual library name
+        if 'work' in libs:
+            libs = libs - {'work'}
+            libs.add(self.library)
         return libs
 
     def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
@@ -139,19 +142,20 @@ class VhdlParser(BaseSourceFile):
         Parses the source file to find design units and dependencies
         """
         for match, line_number in self._iterDesignUnitMatches():
+            locations = frozenset({(line_number, None), }) # type: LocationList
             if match['package_name'] is not None:
                 yield DesignUnit(path=self.filename,
                                  name=match['package_name'],
                                  type_=DesignUnitType.package,
-                                 locations=((self.filename, line_number, None),))
+                                 locations=locations)
 
             elif match['entity_name'] is not None:
                 yield DesignUnit(path=self.filename,
                                  name=match['entity_name'],
                                  type_=DesignUnitType.entity,
-                                 locations=((self.filename, line_number, None),))
+                                 locations=locations)
             elif match['context_name'] is not None:
                 yield DesignUnit(path=self.filename,
                                  name=match['context'],
                                  type_=DesignUnitType.context,
-                                 locations=((self.filename, line_number, None),))
+                                 locations=locations)

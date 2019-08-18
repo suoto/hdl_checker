@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=function-redefined
+# pylint: disable=missing-docstring
+# pylint: disable=protected-access
 
 import json
 import logging
@@ -23,10 +25,10 @@ import os
 import os.path as p
 
 import six
-from nose2.tools import such
-from nose2.tools.params import params
+from nose2.tools import such  # type: ignore
+from nose2.tools.params import params  # type: ignore
 
-import hdlcc
+from hdlcc.design_unit import DesignUnit, DesignUnitType
 from hdlcc.parsers import DependencySpec, VhdlParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, assertSameFile, writeListToFile
@@ -63,8 +65,10 @@ with such.A('VHDL source file object') as it:
                 " use  work.cherry_pick.one;",
                 "use work.cherry_pick.two;",
                 "",
+                "-- library foo;",
                 "library lib1,lib2;",
                 "library lib3, lib4;",
+                "library lib5; library lib6;",
                 "",
                 "entity clock_divider is",
                 "    generic (",
@@ -90,55 +94,58 @@ with such.A('VHDL source file object') as it:
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
-        @it.should('parse a file without errors')
+        @it.should('parse a file without errors')  # type: ignore
         def test():
             it.source = VhdlParser(_FILENAME, library='mylibrary')
 
-        @it.should('return its entities')
+        @it.should('return its entities')  # type: ignore
         def test():
             design_units = list(it.source.getDesignUnits())
             _logger.info("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
-            it.assertCountEqual([{'type' : 'entity',
-                                  'name' : 'clock_divider',
-                                  'line_number': 12}],
-                                design_units)
+            it.assertCountEqual(
+                design_units,
+                [DesignUnit(path=it.source.filename,
+                            type_=DesignUnitType.entity,
+                            name='clock_divider',
+                            locations={(14, None), })])
 
-        @it.should('parse its libraries')
+        @it.should('parse its libraries')  # type: ignore
         def test():
             libraries = it.source.getLibraries()
             _logger.info("Libraries found: %s",
                          ", ".join([repr(x) for x in libraries]))
 
-            it.assertCountEqual(
-                ['mylibrary', 'work', 'ieee', 'lib1', 'lib2', 'lib3', 'lib4'],
-                libraries)
+            it.assertCountEqual(libraries,
+                                ['mylibrary', 'ieee', 'lib1', 'lib2',
+                                 'lib3', 'lib4', 'lib5', 'lib6'])
 
-        @it.should('return its dependencies')
+        @it.should('return its dependencies')  # type: ignore
         def test():
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(library='ieee', name='std_logic_1164',
-                                locations=[(_FILENAME, 2, 5),]),
-                 DependencySpec(library='ieee', name='std_logic_arith',
-                                locations=[(_FILENAME, 3, 6),]),
-                 DependencySpec(library='mylibrary', name='package_with_constants',
-                                locations=[(_FILENAME, 6, 6),]),
-                 DependencySpec(library='mylibrary', name='cherry_pick',
-                                locations=[(_FILENAME, 7, 7),
-                                           (_FILENAME, 8, 5),]),
+                [DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_1164', locations=[(2, 5),]),
+                 DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_arith', locations=[(3, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary', name='package_with_constants',
+                                locations=[(6, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='cherry_pick',
+                                locations=[(7, 7),
+                                           (8, 5),]),
                  ])
 
 
-        @it.should('return source modification time')
+        @it.should('return source modification time')  # type: ignore
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-        @it.should('find the matching library of a package')
+        @it.should('find the matching library of a package')  # type: ignore
         @params(
             ('package', 'std_logic_1164', 'ieee'),
             ('package', 'package_with_constants', 'mylibrary'))
-        def test(case, unit_type, unit_name, result):
+        def test_find_library(case, unit_type, unit_name, result):
             _logger.info("Running test %s", case)
             _logger.info("Unit: '%s' is a '%s'. Expected result is '%s'",
                          unit_name, unit_type, result)
@@ -147,7 +154,7 @@ with such.A('VHDL source file object') as it:
                 result,
                 it.source.getMatchingLibrary(unit_type, unit_name))
 
-        @it.should('return updated dependencies')
+        @it.should('return updated dependencies')  # type: ignore
         def test():
             code = list(it._code)
 
@@ -157,20 +164,20 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(library='ieee', name='std_logic_1164',
-                                locations=[(_FILENAME, 4, 5),]),
-                 DependencySpec(library='ieee', name='std_logic_arith',
-                                locations=[(_FILENAME, 5, 6),]),
-                 DependencySpec(library='mylibrary', name='package_with_constants',
-                                locations=[(_FILENAME, 8, 6),]),
-                 DependencySpec(library='some_library', name='some_package',
-                                locations=[(_FILENAME, 2, 9),]),
-                 DependencySpec(library='mylibrary', name='cherry_pick',
-                                locations=[(_FILENAME, 9, 7),
-                                           (_FILENAME, 10, 5),]),
+                [DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_1164', locations=[(4, 5),]),
+                 DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_arith', locations=[(5, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='package_with_constants', locations=[(8, 6),]),
+                 DependencySpec(path=_FILENAME, library='some_library',
+                                name='some_package', locations=[(2, 9),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='cherry_pick', locations=[(9, 7),
+                                                               (10, 5),]),
                  ])
 
-        @it.should('handle implicit libraries')
+        @it.should('handle implicit libraries')  # type: ignore
         def test():
             code = list(it._code)
             code.insert(0, '    use work.another_package;')
@@ -178,20 +185,20 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(library='ieee', name='std_logic_1164',
-                                locations=[(_FILENAME, 3, 5),]),
-                 DependencySpec(library='ieee', name='std_logic_arith',
-                                locations=[(_FILENAME, 4, 6),]),
-                 DependencySpec(library='mylibrary', name='package_with_constants',
-                                locations=[(_FILENAME, 7, 6),]),
-                 DependencySpec(library='mylibrary', name='another_package',
-                                locations=[(_FILENAME, 1, 9),]),
-                 DependencySpec(library='mylibrary', name='cherry_pick',
-                                locations=[(_FILENAME, 8, 7),
-                                           (_FILENAME, 9, 5),]),
+                [DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_1164', locations=[(3, 5),]),
+                 DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_arith', locations=[(4, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='package_with_constants', locations=[(7, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='another_package', locations=[(1, 9),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='cherry_pick', locations=[(8, 7),
+                                                               (9, 5),]),
                  ],)
 
-        @it.should('handle libraries without packages')
+        @it.should('handle libraries without packages')  # type: ignore
         def test():
             code = list(it._code)
             code.insert(0, 'library remove_me;')
@@ -199,19 +206,19 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(library='ieee', name='std_logic_1164',
-                                locations=[(_FILENAME, 3, 5),]),
-                 DependencySpec(library='ieee', name='std_logic_arith',
-                                locations=[(_FILENAME, 4, 6),]),
-                 DependencySpec(library='mylibrary', name='package_with_constants',
-                                locations=[(_FILENAME, 7, 6),]),
-                 DependencySpec(library='mylibrary', name='cherry_pick',
-                                locations=[(_FILENAME, 8, 7),
-                                           (_FILENAME, 9, 5),]),
+                [DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_1164', locations=[(3, 5),]),
+                 DependencySpec(path=_FILENAME, library='ieee',
+                                name='std_logic_arith', locations=[(4, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='package_with_constants', locations=[(7, 6),]),
+                 DependencySpec(path=_FILENAME, library='mylibrary',
+                                name='cherry_pick', locations=[(8, 7),
+                                                               (9, 5),]),
                  ])
 
 
-        @it.should('report as equal after recovering from cache via json')
+        @it.should('report as equal after recovering from cache via json')  # type: ignore
         def test():
             state = json.dumps(it.source, cls=StateEncoder)
             _logger.info("State before: %s", state)
@@ -233,6 +240,8 @@ with such.A('VHDL source file object') as it:
                 "",
                 "    constant SOME_INTEGER_CONSTANT : integer := 10;",
                 "    constant SOME_STRING_CONSTANT  : string := \"Hello\";",
+
+                "    constant ANOTHER_CONSTANT : string := work.foo.bar;",
                 "",
                 "    constant SOME_STRING : string := " \
                 "basic_library.very_common_pkg.VIM_HDL_VERSION;",
@@ -251,34 +260,37 @@ with such.A('VHDL source file object') as it:
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
-        @it.should('parse a file without errors')
+        @it.should('parse a file without errors')  # type: ignore
         def test():
             it.source = VhdlParser(_FILENAME)
 
-        @it.should('return the names of the packages found')
+        @it.should('return the names of the packages found')  # type: ignore
         def test():
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
-                [{'type' : 'package',
-                  'name' : 'package_with_constants',
-                  'line_number': 7}])
+                [DesignUnit(path=it.source.filename,
+                            type_=DesignUnitType.package,
+                            name='package_with_constants',
+                            locations={(7, None), })])
 
-        @it.should('return its dependencies')
-        def test():
+        @it.should('return its dependencies') # type: ignore
+        def test(): # type: () -> None
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(library='ieee', name='std_logic_1164',
-                                locations={(it.source.filename, 2, 5)}),
-                 DependencySpec(library='ieee', name='std_logic_arith',
-                                locations={(it.source.filename, 3, 5)}),
-                 DependencySpec(library='ieee', name='std_logic_unsigned',
-                                locations={(it.source.filename, 4, 5)}),
-                 DependencySpec(library='basic_library', name='very_common_pkg',
-                                locations={(it.source.filename, 13, 38)}),
-                 DependencySpec(library='work', name='package_with_constants',
-                                locations={(it.source.filename, 16, 1)})])
+                [DependencySpec(path=it.source.filename, library='ieee',
+                                name='std_logic_1164', locations={(2, 5)}),
+                 DependencySpec(path=it.source.filename, library='ieee',
+                                name='std_logic_arith', locations={(3, 5)}),
+                 DependencySpec(path=it.source.filename, library='ieee',
+                                name='std_logic_unsigned', locations={(4, 5)}),
+                 DependencySpec(path=it.source.filename, library='work',
+                                name='foo', locations={(12, 43)}),
+                 DependencySpec(path=it.source.filename, library='basic_library',
+                                name='very_common_pkg', locations={(14, 38)}),
+                 DependencySpec(path=it.source.filename, library='basic_library',
+                                name='package_with_constants', locations={(17, 1)})])
 
-        @it.should('return source modification time')
+        @it.should('return source modification time')  # type: ignore
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 

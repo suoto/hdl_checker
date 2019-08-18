@@ -17,28 +17,39 @@
 
 import logging
 from enum import Enum
+from typing import Optional
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.parsed_element import ParsedElement
+from hdlcc.parsed_element import LocationList, ParsedElement
 
 _logger = logging.getLogger(__name__)
 
 class DesignUnitType(Enum):
+    "Specifies tracked design unit types"
     package = 'package'
-    entity = 'entity '
-    context = 'context '
+    entity = 'entity'
+    context = 'context'
 
 class DesignUnit(ParsedElement):
+    """
+    Specifies a design unit (uses mostly VHDL nomenclature)
+    """
 
     def __init__(self, path, type_, name, locations=None):
+        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        self._path = path
         self._type = type_
         self._name = name
-        super(DesignUnit, self).__init__(path, locations)
+        super(DesignUnit, self).__init__(locations)
 
     def __repr__(self):
         return '{}(path="{}", name="{}", type="{}", locations="{}"'.format(
             self.__class__.__name__, self.path, self.name, self.type_,
             self.locations)
+
+    @property
+    def path(self):
+        return self._path
 
     @property
     def type_(self):
@@ -50,4 +61,4 @@ class DesignUnit(ParsedElement):
 
     @property
     def __hash_key__(self):
-        return (self.type_, self.name, super(DesignUnit, self).__hash_key__)
+        return (self.path, self.type_, self.name, super(DesignUnit, self).__hash_key__)

@@ -242,7 +242,7 @@ def writeListToFile(filename, _list): # pragma: no cover
     time.sleep(0.01)
 
     for i, line in enumerate(_list):
-        _logger.debug('%2d | %s', i, line)
+        _logger.debug('%2d | %s', i + 1, line)
 
     if onWindows():
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
