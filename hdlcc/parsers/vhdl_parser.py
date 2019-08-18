@@ -101,27 +101,22 @@ class VhdlParser(BaseSourceFile):
             dependency = dependencies[key]
             dependency['locations'].add((line_number + 1, column_number + 1)) # type: ignore
 
-        for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
-            package_body_name = match.groupdict()['package_body_name']
-            line_number = text[:match.end()].count('\n')
-            column_number = len(text[:match.start()].split('\n')[-1])
-
-            key = hash((self.library, package_body_name))
-
-            if key not in dependencies:
-                dependencies[key] = {'library': library,
-                                     'name': package_body_name,
-                                     'locations': set()}
-
-            dependency = dependencies[key]
-            dependency['locations'].add((line_number + 1, column_number + 1)) # type: ignore
-
         # Done parsing, won't add any more locations, so generate the specs
         for dep in dependencies.values():
             yield DependencySpec(path=self.filename, # type: ignore
                                  name=dep['name'],
                                  library=dep['library'],
                                  locations=set(dep['locations']))
+
+        for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
+            package_body_name = match.groupdict()['package_body_name']
+            line_number = text[:match.end()].count('\n')
+            column_number = len(text[:match.start()].split('\n')[-1])
+
+            yield DependencySpec(path=self.filename, # type: ignore
+                                 name=package_body_name,
+                                 library=library,
+                                 locations={(line_number + 1, column_number + 1),})
 
     def _getLibraries(self):
         """

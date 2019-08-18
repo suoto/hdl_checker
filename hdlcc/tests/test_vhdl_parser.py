@@ -250,6 +250,10 @@ with such.A('VHDL source file object') as it:
                 "package body package_with_constants is",
                 "",
                 "end package body;",
+                "",
+                "package body package_body_only is",
+                "",
+                "end package body package_body_only;",
             ]
 
             writeListToFile(_FILENAME, it._code)
@@ -288,7 +292,10 @@ with such.A('VHDL source file object') as it:
                  DependencySpec(path=it.source.filename, library='basic_library',
                                 name='very_common_pkg', locations={(14, 38)}),
                  DependencySpec(path=it.source.filename, library='basic_library',
-                                name='package_with_constants', locations={(17, 1)})])
+                                name='package_with_constants', locations={(17, 1)}),
+                 DependencySpec(path=it.source.filename, library='basic_library',
+                                name='package_body_only', locations={(21, 1)}),
+                 ])
 
         @it.should('return source modification time')  # type: ignore
         def test():
