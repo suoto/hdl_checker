@@ -18,12 +18,12 @@
 
 import logging
 import re
-from typing import Generator, Dict, Union, Set, Tuple, Any
+from typing import Any, Dict, Generator, Set, Union
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.design_unit import DesignUnit, DesignUnitType
-from hdlcc.parsers import DependencySpec
 from hdlcc.parsed_element import LocationList
+from hdlcc.parsers import DependencySpec
 from hdlcc.parsers.base_parser import BaseSourceFile
 
 _logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ class VhdlParser(BaseSourceFile):
         converts to lowercase
         """
         content = open(self.filename, mode='rb').read().decode(errors='ignore')
+
         return self._comment.sub('', content).lower()
 
     def _iterDesignUnitMatches(self):
@@ -66,6 +67,7 @@ class VhdlParser(BaseSourceFile):
         source's lines
         """
         content = self.getSourceContent()
+
         for match in _DESIGN_UNIT_SCANNER.finditer(content):
             start = match.start()
             yield match.groupdict(), content[:start].count('\n')
@@ -75,9 +77,10 @@ class VhdlParser(BaseSourceFile):
         lib_deps_regex = re.compile(r'|'.join([ \
                 r"%s\.\w+" % x for x in libs]), flags=re.I)
 
-        dependencies = {} # type: Dict[int, IncompleteDependency]
+        dependencies = {} # type: ignore
 
         text = self.getSourceContent()
+
         for match in lib_deps_regex.finditer(text):
             library, unit = match.group().split('.')[:2]
 
@@ -96,7 +99,7 @@ class VhdlParser(BaseSourceFile):
                                      }
 
             dependency = dependencies[key]
-            dependency['locations'].add((line_number + 1, column_number + 1))
+            dependency['locations'].add((line_number + 1, column_number + 1)) # type: ignore
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
             package_body_name = match.groupdict()['package_body_name']
@@ -111,12 +114,11 @@ class VhdlParser(BaseSourceFile):
                                      'locations': set()}
 
             dependency = dependencies[key]
-            dependency['locations'].add((line_number + 1, column_number + 1))
-
+            dependency['locations'].add((line_number + 1, column_number + 1)) # type: ignore
 
         # Done parsing, won't add any more locations, so generate the specs
         for dep in dependencies.values():
-            yield DependencySpec(path=self.filename,
+            yield DependencySpec(path=self.filename, # type: ignore
                                  name=dep['name'],
                                  library=dep['library'],
                                  locations=set(dep['locations']))
@@ -129,20 +131,23 @@ class VhdlParser(BaseSourceFile):
 
         for match in _LIBRARY_SCANNER.finditer(self.getSourceContent()):
             for group in match.groups():
-                libs = libs.union(set(map(str.strip, group.split(','))))
+                libs = libs.union(set(map(str.strip, str(group).split(','))))
 
         # Replace references of 'work' for the actual library name
         if 'work' in libs:
             libs = libs - {'work'}
             libs.add(self.library)
+
         return libs
 
     def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
         """
         Parses the source file to find design units and dependencies
         """
+
         for match, line_number in self._iterDesignUnitMatches():
             locations = frozenset({(line_number, None), }) # type: LocationList
+
             if match['package_name'] is not None:
                 yield DesignUnit(path=self.filename,
                                  name=match['package_name'],
@@ -156,6 +161,6 @@ class VhdlParser(BaseSourceFile):
                                  locations=locations)
             elif match['context_name'] is not None:
                 yield DesignUnit(path=self.filename,
-                                 name=match['context'],
+                                 name=match['context_name'],
                                  type_=DesignUnitType.context,
                                  locations=locations)

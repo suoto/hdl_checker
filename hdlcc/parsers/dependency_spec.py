@@ -65,6 +65,6 @@ class DependencySpec(ParsedElement):
         return obj
 
     def __repr__(self):
-        return '{}.{}(library={}, name={}, locations={})'.format(
-            __name__, self.__class__.__name__, repr(self.library),
-            repr(self.name), repr(self.locations))
+        return '{}.{}(path={}, name={}, library={}, locations={})'.format(
+            __name__, self.__class__.__name__, repr(self.path),
+            repr(self.name), repr(self.library), repr(self.locations))

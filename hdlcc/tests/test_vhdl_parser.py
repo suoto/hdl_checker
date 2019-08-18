@@ -294,4 +294,51 @@ with such.A('VHDL source file object') as it:
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
+    with it.having('a context code'):
+        @it.has_setup
+        def setup():
+            it._code = ['context context_name is',
+                        '  library lib0;',
+                        '  use lib0.pkg0.all;',
+                        '  use lib0.pkg1.name1;',
+                        '  library lib1;',
+                        '  use lib1.all;',
+                        'end context;',]
+
+            writeListToFile(_FILENAME, it._code)
+            it._source_mtime = os.path.getmtime(_FILENAME)
+
+        @it.has_teardown
+        def teardown():
+            if os.path.exists(_FILENAME):
+                os.remove(_FILENAME)
+
+        @it.should('create the object with no errors')  # type: ignore
+        def test():
+            it.source = VhdlParser(_FILENAME)
+
+        @it.should('return the names of the packages found')  # type: ignore
+        def test():
+            it.assertCountEqual(
+                list(it.source.getDesignUnits()),
+                [DesignUnit(path=it.source.filename,
+                            type_=DesignUnitType.context,
+                            name='context_name',
+                            locations={(0, None), })])
+
+        @it.should('return its dependencies') # type: ignore
+        def test(): # type: () -> None
+            it.assertCountEqual(
+                it.source.getDependencies(),
+                [DependencySpec(path=it.source.filename, name='pkg0',
+                                library='lib0', locations=frozenset({(3, 7)})),
+                 DependencySpec(path=it.source.filename, name='pkg1',
+                                library='lib0', locations=frozenset({(4, 7)})),
+                 DependencySpec(path=it.source.filename, name='all',
+                                library='lib1', locations=frozenset({(6, 7)}))])
+
+        @it.should('return source modification time')  # type: ignore
+        def test():
+            it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
+
 it.createTests(globals())
