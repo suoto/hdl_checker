@@ -24,16 +24,16 @@ from hdlcc.parsed_element import LocationList, ParsedElement
 _logger = logging.getLogger(__name__)
 
 class DependencySpec(ParsedElement):
-    def __init__(self, path, name, library, locations=None):
+    def __init__(self, owner, name, library, locations=None):
         # type: (t.Path, str, t.LibraryName, Optional[LocationList]) -> None
-        self._path = path
+        self._owner = owner
         self._library = str(library)
         self._name = str(name)
         super(DependencySpec, self).__init__(locations)
 
     @property
-    def path(self):
-        return self._path
+    def owner(self):
+        return self._owner
 
     @property
     def name(self):
@@ -44,8 +44,13 @@ class DependencySpec(ParsedElement):
         return self._library
 
     @property
+    def case_sensitive(self): # type: () -> bool
+        ext = self.owner.split('.')[-1].lower()
+        return ext not in t.FileType.vhd.value
+
+    @property
     def __hash_key__(self):
-        return (self.path, self.library, self.name,
+        return (self.owner, self.library, self.name,
                 super(DependencySpec, self).__hash_key__)
 
     def __jsonEncode__(self):
@@ -65,6 +70,6 @@ class DependencySpec(ParsedElement):
         return obj
 
     def __repr__(self):
-        return '{}.{}(path={}, name={}, library={}, locations={})'.format(
-            __name__, self.__class__.__name__, repr(self.path),
+        return '{}(owner={}, name={}, library={}, locations={})'.format(
+            self.__class__.__name__, repr(self.owner),
             repr(self.name), repr(self.library), repr(self.locations))

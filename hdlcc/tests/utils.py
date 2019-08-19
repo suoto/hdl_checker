@@ -75,7 +75,11 @@ class SourceMock(object):
 
         self.library = library
         self._design_units = list(design_units or [])
-        self._dependencies = list(dependencies or [])
+        self._dependencies = set()
+        for dep_spec in dependencies or []:
+            #  if dep_spec.owner is None:
+            dep_spec._owner = self.filename
+            self._dependencies.add(dep_spec)
 
         self._createMockFile()
     @property
@@ -99,7 +103,9 @@ class SourceMock(object):
             lines.append("use {0}.{1};".format(dependency.library,
                                                dependency.name))
 
-        lines.append('')
+        # Separate if there was libraries already added
+        if lines:
+            lines.append('')
 
         for design_unit in self._design_units:
             type_ = design_unit['type']

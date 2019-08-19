@@ -20,10 +20,9 @@
 
 import logging
 import os.path as p
-import pprint
 from tempfile import mkdtemp
 from threading import RLock
-from typing import Any, Dict, FrozenSet, Iterable, List, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, Iterator, Set
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
@@ -31,7 +30,7 @@ from hdlcc.builders import BuilderName, getBuilderByName
 from hdlcc.design_unit import DesignUnit
 from hdlcc.parsers import (ConfigParser, DependencySpec, SourceFile,
                            getSourceFileObjects, getSourceParserFromPath)
-from hdlcc.utils import removeDirIfExists
+from hdlcc.utils import removeDirIfExists, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -52,9 +51,11 @@ def foundVunit(): # type: () -> bool
     """
     try:
         import vunit  # type: ignore pylint: disable=unused-import
+
         return True
     except ImportError: # pragma: no cover
         pass
+
     return False
 
 
@@ -68,7 +69,7 @@ class Database(object):
         self._paths = {} # type: Dict[t.Path, int]
         self._libraries = {} # type: Dict[t.Path, t.LibraryName]
         self._flags = {} # type: Dict[t.Path, t.BuildFlags]
-        self._design_units = {} # type: Dict[t.Path, Set[DesignUnit]]
+        self._design_units = set() # type: Set[DesignUnit]
         self._dependencies = {} # type: Dict[t.Path, Set[DependencySpec]]
         self._sources = {} # type: Dict[t.Path, SourceFile]
 
@@ -76,13 +77,19 @@ class Database(object):
 
     @property
     def builder_name(self): # type: (...) -> BuilderName
+        "Builder name"
         return self._builder_name
 
-    def _clean(self):
+    @property
+    def design_units(self): # type: (...) -> FrozenSet[DesignUnit]
+        "Set of design units found"
+        return frozenset(self._design_units)
+
+    def reset(self):
         self._paths = {}
         self._libraries = {}
         self._flags = {}
-        self._design_units = {}
+        self._design_units = set()
         self._dependencies = {}
         self._sources = {}
         #  self._design_units[path] = set(source.getDesignUnits())
@@ -92,47 +99,39 @@ class Database(object):
         self._addVunitIfFound()
 
     def accept(self, parser):  # type: (ConfigParser) -> None
+        "Updates the database from a configuration parser"
         # Clear up previous definitions
-        self._clean()
+        #  self.reset()
 
         config = parser.parse()
-        _logger.debug("Updating from\n%s", pprint.pformat(config))
+        #  _logger.debug("Updating from\n%s", pprint.pformat(config))
 
         self._builder_name = config.get('builder_name', self._builder_name)
 
+        self._addVunitIfFound()
+
         for source in config.get('sources', []):
-            _logger.debug('Adding %s', source)
+            #  _logger.debug('Adding %s', source)
             path = source.path
             # Default when updating is set the modification time to zero
             # because we're cleaning up the parsed info too
             self._paths[path] = 0
             self._libraries[path] = source.library
             self._flags[path] = source.flags
-
-
-        #  for path in parser.getPaths():
-        #      _logger.debug("Adding %s", path)
-        #      self._paths.add(path)
-        #      source = parser.getSourceByPath(path)
-        #      self._sources[path] = source
-        #      self._libraries[path] = source.library
-        #      self._flags[path] = list(source.flags)
-
-        #      self._design_units[path] = set(source.getDesignUnits())
-        #      self._dependencies[path] = set(source.getDependencies())
-
-        self._addVunitIfFound()
+            # TODO: Parse on a process pool
+            self._parsePathIfNeeded(path)
 
     def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
         """
         state = {}
+
         for path in self._paths:
             state[path] = {
                 'library': self._libraries[path],
                 'flags': self._flags[path],
-                'design_units': self._design_units[path],
+                'design_units': tuple(self._design_units),
                 'dependencies': self._dependencies[path]}
 
         return state
@@ -142,11 +141,13 @@ class Database(object):
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
+
         return self._flags.get(path, ())
 
     @property
     def paths(self): # type: () -> Iterable[t.Path]
         "Returns a list of paths currently in the database"
+
         return self._paths.keys()
 
     def getLibrary(self, path):
@@ -154,93 +155,30 @@ class Database(object):
 
     def _parsePathIfNeeded(self, path):
         # Sources will get parsed on demand
-        if p.getmtime(path) <= self._paths.get(path, 0):
+        mtime = p.getmtime(path)
+        if mtime == self._paths.get(path, 0):
             return
 
-        _logger.debug("Parsing '%s'", path)
-        source = getSourceParserFromPath(path)
-        self._design_units[path] = set(source.getDesignUnits())
-        self._dependencies[path] = set(source.getDependencies())
+        # Update the timestamp
+        self._paths[path] = mtime
+        # Remove all design units that referred to this path before adding new
+        # ones, but use the non API method for that to avoid recursing
+        if path in self._paths:
+            before = len(self._design_units)
+            self._design_units -= frozenset(self._getDesignUnitsByPath(path))
+            if before != len(self._design_units):
+                _logger.fatal("Removed %s design units",
+                              before - len(self._design_units))
 
-    def getDesignUnits(self, path):
-        self._parsePathIfNeeded(path)
-        return self._design_units.get(path, set())
-
-    def getKnownDesignUnits(self):
-        pass
-
-
-    def findSourcesByDesignUnit(self, unit, library='work',
-                                case_sensitive=False):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[SourceFile]
-        """
-        Return the source (or sources) that define the given design
-        unit. Case sensitive mode should be used when tracking
-        dependencies on Verilog files. VHDL should use VHDL
-        """
-
-        # Default to lower case if we're not handling case sensitive. VHDL
-        # source files are all converted to lower case when parsed, so the
-        # units they define are in lower case already
-        library_name = library if case_sensitive else library.lower()
-        unit_name = unit if case_sensitive else unit.lower()
-
-        sources = [] # type: List[SourceFile]
-
-        for source in self._sources.values():
-            source_library = source.library
-            design_unit_names = map(lambda x: x['name'],
-                                    source.getDesignUnits())
-            if not case_sensitive:
-                source_library = source_library.lower()
-                design_unit_names = map(lambda x: x.lower(), design_unit_names)
-
-            #  if source_library == library_name and unit_name in design_unit_names:
-            if unit_name in design_unit_names:
-                sources += [source]
-
-        if not sources:
-            _logger.warning("No source file defining '%s.%s'",
-                            library, unit)
-        return sources
-
-    def discoverSourceDependencies(self, unit, library, case_sensitive):
-        # type: (t.UnitName, t.LibraryName, bool) -> List[Tuple[SourceFile, t.LibraryName]]
-        """
-        Searches for sources that implement the given design unit. If
-        more than one file implements an entity or package with the same
-        name, there is no guarantee that the right one is selected
-        """
-
-        # Default to lower case if we're not handling case sensitive. VHDL
-        # source files are all converted to lower case when parsed, so the
-        # units they define are in lower case already
-        library_name = library if case_sensitive else library.lower()
-        unit_name = unit if case_sensitive else unit.lower()
-
-        sources = [] # type: List[Tuple[SourceFile, t.LibraryName]]
-
-        for source in self._sources.values():
-            source_library = source.library
-            design_unit_names = map(lambda x: x['name'],
-                                    source.getDesignUnits())
-            if not case_sensitive:
-                source_library = source_library.lower()
-                design_unit_names = map(lambda x: x.lower(), design_unit_names)
-
-            #  if source_library == library_name and unit_name in design_unit_names:
-            if unit_name in design_unit_names:
-                sources += [(source, library_name)]
-
-        if not sources:
-            _logger.warning("No source file defining '%s.%s'",
-                            library, unit)
-        return sources
+        src_parser = getSourceParserFromPath(path)
+        self._design_units = self._design_units.union(src_parser.getDesignUnits())
+        self._dependencies[path] = set(src_parser.getDependencies())
 
     def _addVunitIfFound(self): # type: () -> None
         """
         Tries to import files to support VUnit right out of the box
         """
+
         if not foundVunit() or self._builder_name == BuilderName.fallback:
             return
 
@@ -252,7 +190,7 @@ class Database(object):
         builder_class = getBuilderByName(self.builder_name)
 
         if 'systemverilog' in builder_class.file_types:
-            from vunit.verilog import VUnit    # type: ignore pylint: disable=import-error
+            from vunit.verilog import VUnit    # type: ignore # pylint: disable=import-error
             _logger.debug("Builder supports Verilog, using vunit.verilog.VUnit")
             builder_class.addExternalLibrary('verilog', 'vunit_lib')
             builder_class.addIncludePath(
@@ -284,6 +222,7 @@ class Database(object):
 
         # Communication library and array utility library are only
         # available on VHDL 2008
+
         if vunit_project.vhdl_standard == '2008':
             vunit_project.add_com()
             vunit_project.add_array_util()
@@ -295,6 +234,7 @@ class Database(object):
             vunit_flags = []
 
         _source_file_args = []
+
         for vunit_source_obj in vunit_project.get_compile_order():
             path = p.abspath(vunit_source_obj.name)
             library = vunit_source_obj.library.name
@@ -306,3 +246,102 @@ class Database(object):
 
         for source in getSourceFileObjects(_source_file_args):
             self._sources[source.filename] = source
+
+    def getDesignUnitsByPath(self, path): # type: (t.Path) -> Iterator[DesignUnit]
+        "Gets the design units for the given path if any"
+        self._parsePathIfNeeded(path)
+        return self._getDesignUnitsByPath(path)
+
+    def _getDesignUnitsByPath(self, path): # type: (t.Path) -> Iterator[DesignUnit]
+        """
+        Non public version of getDesignUnitsByPath, with the difference that
+        this does not check if the path has changed or not
+        """
+        return filter(lambda x: samefile(x.owner, path), self._design_units)
+
+    def findPathsByDesignUnit(self, unit, case_sensitive=False):
+        # type: (t.UnitName, bool) -> Iterator[t.Path]
+        """
+        Return the source (or sources) that define the given design
+        unit. Case sensitive mode should be used when tracking
+        dependencies on Verilog files. VHDL should use VHDL
+        """
+        cmp_name = unit if case_sensitive else unit.lower()
+
+        if case_sensitive:
+            return map(lambda x: x.owner,
+                       filter(lambda x: x.name == cmp_name,
+                              self.design_units))
+
+        return map(lambda x: x.owner,
+                   filter(lambda x: x.name.lower() == cmp_name,
+                          self.design_units))
+
+
+    def getDependencies(self, path):
+        # type: (t.Path) -> Set[DesignUnit]
+        """
+        Returns a list of paths that satisfy all the dependencies of the given
+        path.
+        """
+
+        _logger.warning("Searching inside %s", path)
+        deps = set() # type: Set[DependencySpec]
+        design_units = set() # type: Set[DesignUnit]
+
+        search_paths = set((path, ))
+
+        while search_paths:
+            dependencies_found = set() # type: Set[DependencySpec]
+
+            # Get the dependencies of the search paths and which design units
+            # they define
+            for search_path in search_paths:
+                _logger.debug("Searching %s", search_path)
+                dependencies_found = dependencies_found.union(self._dependencies[search_path])
+                design_units = design_units.union(self.getDesignUnitsByPath(search_path))
+
+            # Remove the ones we've already seen and add the new ones to the
+            # set tracking the dependencies seen since the search started
+            dependencies_found -= deps
+            deps = deps.union(dependencies_found)
+
+            # Paths to be searched on the next iteration are the paths of the
+            # dependencies we have not seen before
+            search_paths = set()
+            for dependency in dependencies_found:
+                search_paths = search_paths.union(
+                    self.findPathsByDesignUnit(dependency.name, dependency.case_sensitive))
+
+        return design_units
+
+
+def main(): # type: ignore #
+    import sys
+    from hdlcc.utils import setupLogging
+    setupLogging(sys.stdout, logging.INFO, True)
+    _logger = logging.getLogger(__name__)
+    import time
+    database = Database()
+    start = time.time()
+    database.accept(ConfigParser('/home/souto/dev/grlib/vimhdl.prj'))
+    end = time.time()
+    setup = end - start
+
+    start = time.time()
+    deps = database.getDependencies('/home/souto/dev/grlib/designs/leon3-xilinx-kc705/leon3mp.vhd')
+    end = time.time()
+
+    dep_search = end - start
+
+    _logger.info("Got %d deps", len(deps))
+    lines = 0
+    for dep in deps:
+        _logger.info("- %s", dep)
+        lines += open(dep.owner, 'r').read().count('\n')
+
+    print("Took %.2fs and %.2fs" % (setup, dep_search))
+    print("Processed %d lines" % lines)
+
+if __name__ == '__main__':
+    main()

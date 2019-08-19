@@ -105,7 +105,7 @@ with such.A('VHDL source file object') as it:
             it.assertNotEqual(design_units, None, "No design_units units found")
             it.assertCountEqual(
                 design_units,
-                [DesignUnit(path=it.source.filename,
+                [DesignUnit(owner=it.source.filename,
                             type_=DesignUnitType.entity,
                             name='clock_divider',
                             locations={(14, None), })])
@@ -124,13 +124,13 @@ with such.A('VHDL source file object') as it:
         def test():
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=_FILENAME, library='ieee',
+                [DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_1164', locations=[(2, 5),]),
-                 DependencySpec(path=_FILENAME, library='ieee',
+                 DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(3, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary', name='package_with_constants',
+                 DependencySpec(owner=_FILENAME, library='mylibrary', name='package_with_constants',
                                 locations=[(6, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='cherry_pick',
                                 locations=[(7, 7),
                                            (8, 5),]),
@@ -164,15 +164,15 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=_FILENAME, library='ieee',
+                [DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_1164', locations=[(4, 5),]),
-                 DependencySpec(path=_FILENAME, library='ieee',
+                 DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(5, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='package_with_constants', locations=[(8, 6),]),
-                 DependencySpec(path=_FILENAME, library='some_library',
+                 DependencySpec(owner=_FILENAME, library='some_library',
                                 name='some_package', locations=[(2, 9),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='cherry_pick', locations=[(9, 7),
                                                                (10, 5),]),
                  ])
@@ -185,15 +185,15 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=_FILENAME, library='ieee',
+                [DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_1164', locations=[(3, 5),]),
-                 DependencySpec(path=_FILENAME, library='ieee',
+                 DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(4, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='package_with_constants', locations=[(7, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='another_package', locations=[(1, 9),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='cherry_pick', locations=[(8, 7),
                                                                (9, 5),]),
                  ],)
@@ -206,13 +206,13 @@ with such.A('VHDL source file object') as it:
 
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=_FILENAME, library='ieee',
+                [DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_1164', locations=[(3, 5),]),
-                 DependencySpec(path=_FILENAME, library='ieee',
+                 DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(4, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='package_with_constants', locations=[(7, 6),]),
-                 DependencySpec(path=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='mylibrary',
                                 name='cherry_pick', locations=[(8, 7),
                                                                (9, 5),]),
                  ])
@@ -272,7 +272,7 @@ with such.A('VHDL source file object') as it:
         def test():
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
-                [DesignUnit(path=it.source.filename,
+                [DesignUnit(owner=it.source.filename,
                             type_=DesignUnitType.package,
                             name='package_with_constants',
                             locations={(7, None), })])
@@ -281,19 +281,19 @@ with such.A('VHDL source file object') as it:
         def test(): # type: () -> None
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=it.source.filename, library='ieee',
+                [DependencySpec(owner=it.source.filename, library='ieee',
                                 name='std_logic_1164', locations={(2, 5)}),
-                 DependencySpec(path=it.source.filename, library='ieee',
+                 DependencySpec(owner=it.source.filename, library='ieee',
                                 name='std_logic_arith', locations={(3, 5)}),
-                 DependencySpec(path=it.source.filename, library='ieee',
+                 DependencySpec(owner=it.source.filename, library='ieee',
                                 name='std_logic_unsigned', locations={(4, 5)}),
-                 DependencySpec(path=it.source.filename, library='work',
+                 DependencySpec(owner=it.source.filename, library='work',
                                 name='foo', locations={(12, 43)}),
-                 DependencySpec(path=it.source.filename, library='basic_library',
+                 DependencySpec(owner=it.source.filename, library='basic_library',
                                 name='very_common_pkg', locations={(14, 38)}),
-                 DependencySpec(path=it.source.filename, library='basic_library',
+                 DependencySpec(owner=it.source.filename, library='basic_library',
                                 name='package_with_constants', locations={(17, 1)}),
-                 DependencySpec(path=it.source.filename, library='basic_library',
+                 DependencySpec(owner=it.source.filename, library='basic_library',
                                 name='package_body_only', locations={(21, 1)}),
                  ])
 
@@ -328,7 +328,7 @@ with such.A('VHDL source file object') as it:
         def test():
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
-                [DesignUnit(path=it.source.filename,
+                [DesignUnit(owner=it.source.filename,
                             type_=DesignUnitType.context,
                             name='context_name',
                             locations={(0, None), })])
@@ -337,11 +337,11 @@ with such.A('VHDL source file object') as it:
         def test(): # type: () -> None
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(path=it.source.filename, name='pkg0',
+                [DependencySpec(owner=it.source.filename, name='pkg0',
                                 library='lib0', locations=frozenset({(3, 7)})),
-                 DependencySpec(path=it.source.filename, name='pkg1',
+                 DependencySpec(owner=it.source.filename, name='pkg1',
                                 library='lib0', locations=frozenset({(4, 7)})),
-                 DependencySpec(path=it.source.filename, name='all',
+                 DependencySpec(owner=it.source.filename, name='all',
                                 library='lib1', locations=frozenset({(6, 7)}))])
 
         @it.should('return source modification time')  # type: ignore

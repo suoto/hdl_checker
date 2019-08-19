@@ -35,21 +35,22 @@ class DesignUnit(ParsedElement):
     Specifies a design unit (uses mostly VHDL nomenclature)
     """
 
-    def __init__(self, path, type_, name, locations=None):
+    def __init__(self, owner, type_, name, locations=None):
         # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
-        self._path = path
+        self._owner = owner
         self._type = type_
         self._name = name
+
         super(DesignUnit, self).__init__(locations)
 
     def __repr__(self):
-        return '{}(path="{}", name="{}", type="{}", locations="{}"'.format(
-            self.__class__.__name__, self.path, self.name, self.type_,
+        return '{}(owner="{}", name="{}", type="{}", locations="{}"'.format(
+            self.__class__.__name__, self.owner, self.name, self.type_,
             self.locations)
 
     @property
-    def path(self):
-        return self._path
+    def owner(self):
+        return self._owner
 
     @property
     def type_(self):
@@ -60,5 +61,10 @@ class DesignUnit(ParsedElement):
         return self._name
 
     @property
+    def case_sensitive(self): # type: () -> bool
+        ext = self.owner.split('.')[-1].lower()
+        return ext not in t.FileType.vhd.value
+
+    @property
     def __hash_key__(self):
-        return (self.path, self.type_, self.name, super(DesignUnit, self).__hash_key__)
+        return (self.owner, self.type_, self.name, super(DesignUnit, self).__hash_key__)

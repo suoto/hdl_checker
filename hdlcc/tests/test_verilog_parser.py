@@ -69,7 +69,7 @@ module clock_divider
             _logger.debug("Design units: %s", design_units)
             it.assertCountEqual(
                 design_units,
-                [DesignUnit(path=it.source.filename,
+                [DesignUnit(owner=it.source.filename,
                             name='clock_divider',
                             type_=DesignUnitType.entity,
                             locations={(0, None),})])
@@ -118,7 +118,7 @@ endpackage
             _logger.debug("Design units: %s", design_units)
             it.assertCountEqual(
                 design_units,
-                [DesignUnit(path=it.source.filename,
+                [DesignUnit(owner=it.source.filename,
                             name='msgPkg',
                             type_=DesignUnitType.package,
                             locations={(0, None),})])

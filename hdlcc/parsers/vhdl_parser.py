@@ -103,7 +103,7 @@ class VhdlParser(BaseSourceFile):
 
         # Done parsing, won't add any more locations, so generate the specs
         for dep in dependencies.values():
-            yield DependencySpec(path=self.filename, # type: ignore
+            yield DependencySpec(owner=self.filename, # type: ignore
                                  name=dep['name'],
                                  library=dep['library'],
                                  locations=set(dep['locations']))
@@ -113,7 +113,7 @@ class VhdlParser(BaseSourceFile):
             line_number = text[:match.end()].count('\n')
             column_number = len(text[:match.start()].split('\n')[-1])
 
-            yield DependencySpec(path=self.filename, # type: ignore
+            yield DependencySpec(owner=self.filename, # type: ignore
                                  name=package_body_name,
                                  library=library,
                                  locations={(line_number + 1, column_number + 1),})
@@ -144,18 +144,18 @@ class VhdlParser(BaseSourceFile):
             locations = frozenset({(line_number, None), }) # type: LocationList
 
             if match['package_name'] is not None:
-                yield DesignUnit(path=self.filename,
+                yield DesignUnit(owner=self.filename,
                                  name=match['package_name'],
                                  type_=DesignUnitType.package,
                                  locations=locations)
 
             elif match['entity_name'] is not None:
-                yield DesignUnit(path=self.filename,
+                yield DesignUnit(owner=self.filename,
                                  name=match['entity_name'],
                                  type_=DesignUnitType.entity,
                                  locations=locations)
             elif match['context_name'] is not None:
-                yield DesignUnit(path=self.filename,
+                yield DesignUnit(owner=self.filename,
                                  name=match['context_name'],
                                  type_=DesignUnitType.context,
                                  locations=locations)

@@ -65,12 +65,12 @@ class VerilogParser(BaseSourceFile):
         for match, line_number in self._iterDesignUnitMatches():
             locations = frozenset({(line_number, None), }) # type: LocationList
             if match['module_name'] is not None:
-                yield DesignUnit(path=self.filename,
+                yield DesignUnit(owner=self.filename,
                                  name=match['module_name'],
                                  type_=DesignUnitType.entity,
                                  locations=locations)
             if match['package_name'] is not None:
-                yield DesignUnit(path=self.filename,
+                yield DesignUnit(owner=self.filename,
                                  name=match['package_name'],
                                  type_=DesignUnitType.package,
                                  locations=locations)
