@@ -44,7 +44,7 @@ class DesignUnit(ParsedElement):
         super(DesignUnit, self).__init__(locations)
 
     def __repr__(self):
-        return '{}(owner="{}", name="{}", type="{}", locations="{}"'.format(
+        return '{}(owner="{}", name="{}", type_={}, locations={})'.format(
             self.__class__.__name__, self.owner, self.name, self.type_,
             self.locations)
 

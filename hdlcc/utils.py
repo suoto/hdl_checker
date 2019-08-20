@@ -17,6 +17,7 @@
 "Common stuff"
 
 import abc
+import functools
 import logging
 import os
 import os.path as p
@@ -35,6 +36,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
     "Setup logging according to the command line parameters"
 
     # Copied from six source
+
     if sys.version_info[0] == 3:
         string_types = (str,)
     else:
@@ -56,6 +58,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
                 """
                 Tells if this stream accepts control chars
                 """
+
                 return self._color
 
             def write(self, text):
@@ -105,6 +108,7 @@ def setupLogging(stream, level, color=True): # pragma: no cover
 # From here: http://stackoverflow.com/a/8536476/1672783
 def terminateProcess(pid):
     "Terminate a process given its PID"
+
     if onWindows():
         import ctypes
         process_terminate = 1
@@ -117,8 +121,10 @@ def terminateProcess(pid):
 
 def isProcessRunning(pid):
     "Checks if a process is running given its PID"
+
     if onWindows():
         return _isProcessRunningOnWindows(pid)
+
     return _isProcessRunningOnPosix(pid)
 
 def _isProcessRunningOnPosix(pid):
@@ -127,6 +133,7 @@ def _isProcessRunningOnPosix(pid):
         os.kill(pid, 0)
     except OSError:
         return False
+
     return True
 
 def _isProcessRunningOnWindows(pid):
@@ -163,6 +170,7 @@ def _isProcessRunningOnWindows(pid):
     number_of_pids = int(cb_needed.value/sizeof(c_ulong()))
 
     pid_list = [i for i in list_of_pids][:number_of_pids]
+
     return int(pid) in pid_list
 
 
@@ -190,10 +198,13 @@ class UnknownTypeExtension(Exception):
 def getFileType(filename):
     "Gets the file type of a source file"
     extension = filename[str(filename).rfind('.') + 1:].lower()
+
     if extension in ('vhd', 'vhdl'):
         return 'vhdl'
+
     if extension in ('v', 'vh'):
         return 'verilog'
+
     if extension in ('sv', 'svh'):  # pragma: no cover
         return 'systemverilog'
     raise UnknownTypeExtension(filename)
@@ -204,6 +215,7 @@ if not hasattr(p, 'samefile'):
         Emulated version of os.path.samefile. This is needed for Python
         2.7 running on Windows (at least on Appveyor CI)
         """
+
         return os.stat(file1) == os.stat(file2)
 else:
     samefile = p.samefile # pylint: disable=invalid-name
@@ -215,6 +227,7 @@ def removeDuplicates(seq):
     """
     seen = set()
     seen_add = seen.add
+
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 # Copied from ycmd
@@ -224,6 +237,7 @@ def toBytes(value):  # pragma: no cover
     Assumes incoming strings are either UTF-8 or unicode (which is
     converted to UTF-8).
     """
+
     if not value:
         return bytes()
 
@@ -234,10 +248,12 @@ def toBytes(value):  # pragma: no cover
     # But they don't behave the same in one important aspect: iterating over a
     # bytes instance yields ints, while iterating over a (raw, py2) str yields
     # chars. We want consistent behavior so we force the use of bytes().
+
     if isinstance(value, bytes):
         return value
 
     # This is meant to catch Python 2's native str type.
+
     if isinstance(value, bytes):
         return bytes(value, encoding='utf8')
 
@@ -251,11 +267,14 @@ def toBytes(value):  # pragma: no cover
         # We can't just return value.encode('utf8') on both py2 & py3 because on
         # py2 that *sometimes* returns the built-in str type instead of the newbytes
         # type from python-future.
+
         if PY2:
             return bytes(value.encode('utf8'), encoding='utf8')
+
         return bytes(value, encoding='utf8')
 
     # This is meant to catch `int` and similar non-string/bytes types.
+
     return toBytes(str(value))
 
 def getTemporaryFilename(name):
@@ -277,6 +296,7 @@ def isFileReadable(path):
     """
     try:
         open(path, 'r').close()
+
         return True
     except IOError:
         return False
@@ -285,14 +305,17 @@ def getCachePath():
     """
     Get the base path of a folder used to cache data. MacOS is treated as Unix
     """
+
     if onWindows():
         return p.join(os.environ['LOCALAPPDATA'], 'Caches', 'hdlcc')
+
     return p.join(os.environ['HOME'], '.cache', 'hdlcc')
 
 def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
     """
     Runs a shell command and handles stdout catching
     """
+
     if env is not None: # pragma: no cover
         subp_env = env
     else:
@@ -343,13 +366,35 @@ class HashableByKey(object):
 
     def __eq__(self, other):
         """Overrides the default implementation"""
+
         if isinstance(other, self.__class__):
             return self.__hash_key__ == other.__hash_key__
+
         return NotImplemented  # pragma: no cover
 
     def __ne__(self, other):  # pragma: no cover
         """Overrides the default implementation (unnecessary in Python 3)"""
         result = self.__eq__(other)
+
         if result is not NotImplemented:
             return not result
+
         return NotImplemented
+
+def logCalls(func):  # pragma: no cover
+    "Decorator to Log calls to func"
+    import pprint
+
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
+        try:
+            result = func(self, *args, **kwargs)
+            _logger.info("%s => %s", _str, repr(result))
+
+            return result
+        except:
+            _logger.exception("Failed to run %s", _str)
+            raise
+
+    return wrapper

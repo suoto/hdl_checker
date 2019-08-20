@@ -62,12 +62,13 @@ class StandaloneProjectBuilder(HdlCodeCheckerBase):
 class SourceMock(object):
     _logger = logging.getLogger('SourceMock')
     base_path = ''
-    def __init__(self, library, design_units, dependencies=None, filename=None):
+    def __init__(self, design_units, library=None, dependencies=None, filename=None):
         if filename is not None:
             self._filename = p.join(self.base_path, filename)
         else:
-            self._filename = p.join(self.base_path,
-                                    library + '_' + design_units[0]['name'] + '.vhd')
+            self._filename = p.join(
+                self.base_path,
+                (library or 'lib_not_set') + '_' + design_units[0]['name'] + '.vhd')
 
         self.filetype = getFileType(self.filename)
         self.abspath = p.abspath(self.filename)

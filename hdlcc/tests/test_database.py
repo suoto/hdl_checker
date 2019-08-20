@@ -26,6 +26,7 @@ import unittest2  # type: ignore
 from nose2.tools import such  # type: ignore
 from nose2.tools.params import params  # type: ignore
 
+from hdlcc.utils import logCalls
 from hdlcc.builders import BuilderName
 from hdlcc.database import Database
 from hdlcc.design_unit import DesignUnit, DesignUnitType
@@ -41,11 +42,24 @@ TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
 
 TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, 'test_config_parser')
 
-
-#  such.unittest.TestCase.maxDiff = None
+such.unittest.TestCase.maxDiff = None
 
 class _SourceMock(SourceMock):
     base_path = TEST_TEMP_PATH
+
+    #  def __init__(self, design_units, library=None, dependencies=None, filename=None):
+    #      super(_SourceMock, self).__init__(
+    #          library=library, design_units=design_units,
+    #          dependencies=dependencies, filename=filename)
+
+class _Database(Database):
+    @logCalls
+    def getDependenciesPaths(self, path):
+        return super(_Database, self).getDependenciesPaths(path)
+
+def _temp(*args):
+    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
+    return p.join(TEST_TEMP_PATH, *args)
 
 
 def _configFromDict(parsed_dict):
@@ -75,7 +89,7 @@ class TestDatabase(unittest2.TestCase):
     def setUp(self):
         setupTestSuport(TEST_TEMP_PATH)
 
-        self.database = Database()
+        self.database = _Database()
 
         if six.PY2:
             self.assertCountEqual = assertCountEqual(self)
@@ -89,22 +103,31 @@ class TestDatabase(unittest2.TestCase):
         self.assertEqual(self.database.getFlags('any'), ())
 
     def test_accepts_basic_structure(self):
-        filename = p.join(TEST_TEMP_PATH, 'foo.vhd')
+        filename = _temp('foo.vhd')
 
         _SourceMock(
-            filename=filename,
-            library='some_lib',
-            design_units=[{'name' : 'target',
+            filename=_temp('foo.vhd'),
+            design_units=[{'name' : 'entity_a',
                            'type' : 'entity'}],
             dependencies=[
-                DependencySpec(owner=filename, library='some_lib', name='some_entity')])
+                DependencySpec(owner=_temp('foo.vhd'), library='work', name='some_entity')])
+
+        _SourceMock(
+            filename=_temp('oof.vhd'),
+            design_units=[{'name' : 'entity_b',
+                           'type' : 'entity'}],
+            dependencies=[
+                DependencySpec(owner=_temp('foo.vhd'), library='work', name='some_entity')])
 
         info = {
             'builder_name': BuilderName.fallback,
             'sources': set(
-                [ProjectSourceSpec(path=filename,
+                [ProjectSourceSpec(path=_temp('foo.vhd'),
                                    library='bar',
-                                   flags=('baz', 'flag')),]),
+                                   flags=('baz', 'flag')),
+                 ProjectSourceSpec(path=_temp('oof.vhd'),
+                                   library='ooflib',
+                                   flags=('oofflag0', 'oofflag1')),]),
             'single_build_flags' : {
                 'vhdl'          : ('single_vhd_flag',),
                 'verilog'       : ('single_verilog_flag',),
@@ -116,31 +139,61 @@ class TestDatabase(unittest2.TestCase):
 
         self.database.accept(_configFromDict(info))
 
-        key = p.abspath(filename)
         self.assertEqual(self.database.builder_name, BuilderName.fallback)
-        self.assertCountEqual(self.database.paths, (p.abspath(filename), ))
-        self.assertEqual(self.database.getLibrary(key), 'bar')
-        self.assertEqual(self.database.getFlags(key), ('baz', 'flag'))
+        self.assertCountEqual(self.database.paths,
+                              (_temp('foo.vhd'), _temp('oof.vhd')))
+        self.assertEqual(self.database.getLibrary(_temp('foo.vhd')), 'bar')
+        self.assertEqual(self.database.getLibrary(_temp('oof.vhd')), 'ooflib')
+        self.assertEqual(self.database.getFlags(_temp('foo.vhd')),
+                         ('baz', 'flag'))
+        self.assertEqual(self.database.getFlags(_temp('oof.vhd')),
+                         ('oofflag0', 'oofflag1'))
 
         _logger.info("Design units:")
 
-        for design_unit in self.database.getDesignUnitsByPath(key):
+        for design_unit in self.database.getDesignUnitsByPath(_temp('foo.vhd')):
             _logger.info(" - %s", design_unit)
 
         self.assertCountEqual(
-            self.database.getDesignUnitsByPath(key),
+            self.database.getDesignUnitsByPath(_temp('foo.vhd')),
             [DesignUnit(
-                owner=filename, name="target", type_=DesignUnitType.entity,
-                locations=frozenset({(3, None)}))])
+                owner=_temp('foo.vhd'), name='entity_a', type_=DesignUnitType.entity,
+                locations={(3, None)})])
 
         self.assertCountEqual(
-            self.database.findPathsByDesignUnit('target'),
-            [key, ])
+            self.database.findPathsByDesignUnit('entity_a'),
+            [_temp('foo.vhd'), ])
+
+    def test_update_info_if_source_changed(self):
+        self.test_accepts_basic_structure()
+
+        # SourceMock object writes a dummy VHDL, that should cause the
+        # timestamp to change
+        _SourceMock(
+            filename=_temp('foo.vhd'),
+            design_units=[{'name' : 'entity_b',
+                           'type' : 'entity'}],
+            dependencies=[])
+
+        self.assertCountEqual(
+            self.database.getDesignUnitsByPath(_temp('foo.vhd')),
+            [DesignUnit(
+                owner=_temp('foo.vhd'), name='entity_b', type_=DesignUnitType.entity,
+                locations={(0, None)})])
+
+        self.assertCountEqual(self.database.findPathsByDesignUnit('entity_a'), ())
+
+        self.assertCountEqual(self.database.findPathsByDesignUnit('entity_b'),
+                              [_temp('foo.vhd'), _temp('oof.vhd'), ])
+
 
 with such.A("database") as it:
+    if six.PY2:
+        it.assertCountEqual = assertCountEqual(it)
+
     @it.has_setup
     def setup():
-        it.database = Database()
+        it.database = _Database()
 
     @it.has_teardown
     def teardown():
@@ -151,129 +204,198 @@ with such.A("database") as it:
         def setup():
             it.sources = {
                 _SourceMock(
-                    filename='target.vhd',
-                    library='some_lib',
-                    design_units=[{'name' : 'target',
+                    filename='entity_a.vhd',
+                    design_units=[{'name' : 'entity_a',
                                    'type' : 'entity'}],
                     dependencies=[
-                        DependencySpec(None, 'direct_dep', 'some_lib'),
-                        DependencySpec(None, 'common_dep', 'some_lib'),]),
+                        DependencySpec(None, 'direct_dep', 'work'),
+                        DependencySpec(None, 'common_dep', 'work'),]),
 
                 _SourceMock(
                     filename='direct_dep.vhd',
-                    library='some_lib',
-                    design_units=[{'name' : 'direct_dep',
-                                   'type' : 'entity'}],
+                    design_units=[{'name' : 'direct_dep', 'type' : 'entity'},
+                                  {'name': 'side_effect_entity', 'type': 'entity'}],
                     dependencies=[
-                        DependencySpec('entity.vhd', 'indirect_dep', 'some_lib'),
-                        DependencySpec('entity.vhd', 'common_dep', 'some_lib')]),
+                        DependencySpec('entity.vhd', 'indirect_dep', 'work'),
+                        DependencySpec('entity.vhd', 'common_dep', 'work')]),
 
                 _SourceMock(
                     filename='indirect_dep.vhd',
-                    library='some_lib',
-                    design_units=[{'name' : 'indirect_dep',
-                                   'type' : 'package'}],
+                    design_units=[{'name' : 'indirect_dep', 'type' : 'package'},
+                                  {'name': 'side_effect_package', 'type': 'package'}],
                     dependencies=[
-                        DependencySpec('indirect_dep.vhd', 'indirect_dep', 'some_lib'),
-                        DependencySpec('indirect_dep.vhd', 'common_dep', 'some_lib')]),
+                        DependencySpec('indirect_dep.vhd', 'indirect_dep', 'work'),
+                        DependencySpec('indirect_dep.vhd', 'common_dep', 'work')]),
 
                 _SourceMock(
                     filename='common_dep.vhd',
-                    library='some_lib',
                     design_units=[{'name' : 'common_dep',
                                    'type' : 'package'}]),
 
                 _SourceMock(
                     filename='not_a_dependency.vhd',
-                    library='some_lib',
                     design_units=[{'name' : 'not_a_dependency',
                                    'type' : 'package'}],
                     dependencies=[
-                        DependencySpec('not_a_dependency.vhd', 'indirect_dep', 'some_lib'),
-                        DependencySpec('not_a_dependency.vhd', 'common_dep', 'some_lib')]),
+                        DependencySpec('not_a_dependency.vhd', 'indirect_dep', 'work'),
+                        DependencySpec('not_a_dependency.vhd', 'common_dep', 'work')]),
 
                 }
 
-            _logger.info("Sources:")
-            for source in it.sources:
-                _logger.info(" - %s", source)
             it.database.accept(_configFromSources(it.sources))
 
         @it.has_teardown
         def teardown():
             it.database.reset()
 
-        @it.should('do something')
+        @it.should('get correct dependencies of entity_a.vhd')  # type: ignore
         def test():
-            _logger.info("Design units:")
-            for item in it.database.design_units:
-                _logger.info("- %s", item)
-
-            _logger.info("Dependencies:")
-            for path, deps in it.database._dependencies.items():
-                _logger.info("- %s has %d dependencies", path, len(deps))
-                for dep in deps:
-                    _logger.info("  - %s", dep)
-
-
-            path = p.join(_SourceMock.base_path, 'target.vhd')
-            deps = it.database.getDependencies(path)
+            path = _temp('entity_a.vhd')
+            deps = it.database.getDependenciesPaths(path)
 
             _logger.info("Dependencies")
             for dep in deps:
                 _logger.info("- %s", dep)
 
-    with it.having('circular dependencies'):
+            it.assertCountEqual(deps, {_temp('common_dep.vhd'),
+                                       _temp('direct_dep.vhd'),
+                                       _temp('indirect_dep.vhd')})
+
+        @it.should('get correct dependencies of indirect_dep.vhd')  # type: ignore
+        def test():
+            path = _temp('indirect_dep.vhd')
+            deps = it.database.getDependenciesPaths(path)
+
+            _logger.info("Dependencies")
+            for dep in deps:
+                _logger.info("- %s", dep)
+
+            it.assertCountEqual(deps, {_temp("common_dep.vhd")})
+
+    with it.having('direct circular dependencies between 2 sources'):
         @it.has_setup
         def setup():
             it.sources = {
                 _SourceMock(
                     filename='unit_a.vhd',
-                    library='some_lib',
                     design_units=[{'name' : 'unit_a',
                                    'type' : 'entity'}],
                     dependencies=[
-                        DependencySpec(None, 'unit_b', 'some_lib')]),
+                        DependencySpec(None, 'unit_b', 'work')]),
 
                 _SourceMock(
                     filename='unit_b.vhd',
-                    library='some_lib',
                     design_units=[{'name' : 'unit_b',
                                    'type' : 'entity'}],
-                    dependencies=[DependencySpec(None, 'unit_a', 'some_lib'),],)
+                    dependencies=[DependencySpec(None, 'unit_a', 'work'),],)
             }
 
-            _logger.info("Sources:")
-            for source in it.sources:
-                _logger.info(" - %s", source)
             it.database.accept(_configFromSources(it.sources))
 
-        @it.should("handle it without looping forever")
+        @it.should("handle both sides")  # type: ignore
         def test():
-            _logger.info("Design units:")
-            for item in it.database.design_units:
-                _logger.info("- %s", item)
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_a.vhd')),
+                {_temp('unit_b.vhd')})
 
-            _logger.info("Dependencies:")
-            for path, deps in it.database._dependencies.items():
-                _logger.info("- %s has %d dependencies", path, len(deps))
-                for dep in deps:
-                    _logger.info("  - %s", dep)
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_b.vhd')),
+                {_temp('unit_a.vhd')})
+
+    with it.having('multilevel circular dependencies'):
+        @it.has_setup
+        def setup():
+            it.sources = {
+                _SourceMock(
+                    filename='unit_a.vhd',
+                    design_units=[{'name' : 'unit_a',
+                                   'type' : 'entity'}],
+                    dependencies=[
+                        DependencySpec(None, 'unit_b', 'work')]),
+
+                _SourceMock(
+                    filename='unit_b.vhd',
+                    design_units=[{'name' : 'unit_b',
+                                   'type' : 'entity'}],
+                    dependencies=[DependencySpec(None, 'unit_c', 'work'),],),
+
+                _SourceMock(
+                    filename='unit_c.vhd',
+                    design_units=[{'name' : 'unit_c',
+                                   'type' : 'entity'}],
+                    dependencies=[DependencySpec(None, 'unit_d', 'work'),],),
+
+                _SourceMock(
+                    filename='unit_d.vhd',
+                    design_units=[{'name' : 'unit_d',
+                                   'type' : 'entity'}],
+                    dependencies=[DependencySpec(None, 'unit_a', 'work'),],),
+
+                _SourceMock(
+                    filename='not_a_dependency.vhd',
+                    design_units=[{'name' : 'not_a_dependency',
+                                   'type' : 'package'}],
+                    dependencies=[
+                        DependencySpec('not_a_dependency.vhd', 'indirect_dep', 'work'),
+                        DependencySpec('not_a_dependency.vhd', 'common_dep', 'work')]),
+
+            }
+
+            it.database.accept(_configFromSources(it.sources))
+
+        @it.should("report all but the source in question")  # type: ignore
+        def test():
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_a.vhd')),
+                {_temp("unit_b.vhd"), _temp("unit_c.vhd"), _temp("unit_d.vhd"),})
+
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_b.vhd')),
+                {_temp("unit_a.vhd"), _temp("unit_c.vhd"), _temp("unit_d.vhd"),})
+
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_c.vhd')),
+                {_temp("unit_a.vhd"), _temp("unit_b.vhd"), _temp("unit_d.vhd"),})
+
+            it.assertCountEqual(
+                it.database.getDependenciesPaths(_temp('unit_d.vhd')),
+                {_temp("unit_a.vhd"), _temp("unit_b.vhd"), _temp("unit_c.vhd"), })
 
 
-            path = p.join(_SourceMock.base_path, 'unit_a.vhd')
-            deps = it.database.getDependencies(path)
+    with it.having('source only depending on itself'):
+        @it.has_setup
+        def setup():
+            it.sources = {
+                _SourceMock(
+                    filename='unit_a.vhd',
+                    design_units=[{'name' : 'unit_a',
+                                   'type' : 'entity'}],
+                    dependencies=[
+                        DependencySpec(None, 'unit_a', 'work')]),
 
-            _logger.info("Dependencies")
-            for dep in deps:
-                _logger.info("- %s", dep)
+                _SourceMock(
+                    filename='not_a_dependency.vhd',
+                    design_units=[{'name' : 'not_a_dependency',
+                                   'type' : 'package'}],
+                    dependencies=[
+                        DependencySpec('not_a_dependency.vhd', 'indirect_dep', 'work'),
+                        DependencySpec('not_a_dependency.vhd', 'common_dep', 'work')]),
 
+            }
 
-#          @it.should("resolve dependencies into a list of libraries and units")
+            it.database.accept(_configFromSources(it.sources))
+
+        @it.should("report all but the source in question")  # type: ignore
+        def test():
+            deps = it.database.getDependenciesPaths(_temp('unit_a.vhd'))
+
+            it.assertCountEqual(deps, ())
+
+#          @it.should("resolve dependencies into a list of libraries and units")  # type: ignore
 #          def test():
 #              source = mock.MagicMock()
 #              source.library = 'some_lib'
-#              source.getDependencies = mock.MagicMock(
+#              source.getDependenciesPaths = mock.MagicMock(
 #                  return_value=[DependencySpec(library='some_lib',
 #                                               name='some_dependency')])
 
@@ -281,11 +403,11 @@ with such.A("database") as it:
 #                             [DependencySpec(library='some_lib',
 #                                             name='some_dependency')])
 
-#          @it.should("eliminate the dependency of a source on itself")
+#          @it.should("eliminate the dependency of a source on itself")  # type: ignore
 #          def test():
 #              source = mock.MagicMock()
 #              source.library = 'some_lib'
-#              source.getDependencies = mock.MagicMock(
+#              source.getDependenciesPaths = mock.MagicMock(
 #                  return_value=[DependencySpec(library='some_lib',
 #                                               name='some_package')])
 
@@ -295,11 +417,11 @@ with such.A("database") as it:
 
 #              it.assertEqual(list(it.project._resolveRelativeNames(source)), [])
 
-#          @it.should("return the correct build sequence")
+#          @it.should("return the correct build sequence")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[
 #                      DependencySpec(library='some_lib', name='direct_dep'),
@@ -335,11 +457,11 @@ with such.A("database") as it:
 #                  it.assertEqual(it.project.getBuildSequence(target_src),
 #                                 [common_dep, indirect_dep, direct_dep])
 
-#          @it.should("not include sources that are not dependencies")
+#          @it.should("not include sources that are not dependencies")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[DependencySpec(library='some_lib',
 #                                               name='direct_dep')])
@@ -364,11 +486,11 @@ with such.A("database") as it:
 #                  it.assertEqual(it.project.getBuildSequence(target_src),
 #                                 [direct_dep])
 
-#          @it.should("handle cases where the source file for a dependency is not found")
+#          @it.should("handle cases where the source file for a dependency is not found")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[DependencySpec(library='some_lib',
 #                                               name='direct_dep')])
@@ -378,11 +500,11 @@ with such.A("database") as it:
 
 #                  it.assertEqual(it.project.getBuildSequence(target_src), [])
 
-#          @it.should("return empty list when the source has no dependencies")
+#          @it.should("return empty list when the source has no dependencies")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[])
 
@@ -391,11 +513,11 @@ with such.A("database") as it:
 
 #                  it.assertEqual(it.project.getBuildSequence(target_src), [])
 
-#          @it.should("identify circular dependencies")
+#          @it.should("identify circular dependencies")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[DependencySpec(library='some_lib',
 #                                               name='direct_dep')])
@@ -405,7 +527,7 @@ with such.A("database") as it:
 #                  design_units=[{'name' : 'direct_dep',
 #                                 'type' : 'entity'}],
 #                  dependencies=[DependencySpec(library='some_lib',
-#                                               name='target')])
+#                                               name='entity_a')])
 
 #              with mock.patch(__name__ + '.it.project.config_parser._sources',
 #                              {target_src.filename :  target_src,
@@ -414,12 +536,12 @@ with such.A("database") as it:
 #                  it.assertEqual(it.project.getBuildSequence(target_src),
 #                                 [direct_dep, ])
 
-#          @it.should("resolve conflicting dependencies by using signature")
+#          @it.should("resolve conflicting dependencies by using signature")  # type: ignore
 #          def test():
 #              target_src = _SourceMock(
 #                  library='some_lib',
 #                  filename='target_src.vhd',
-#                  design_units=[{'name' : 'target',
+#                  design_units=[{'name' : 'entity_a',
 #                                 'type' : 'entity'}],
 #                  dependencies=[DependencySpec(library='some_lib',
 #                                               name='direct_dep',
@@ -481,7 +603,7 @@ with such.A("database") as it:
 
 #                  it.assertEqual(it.project._outstanding_diags, set())
 
-#          @it.should("get builder messages by path")
+#          @it.should("get builder messages by path")  # type: ignore
 #          def test():
 #              source = _SourceMock(
 #                  library='some_lib',
@@ -500,7 +622,7 @@ with such.A("database") as it:
 #                                             line_number=1),
 #                       PathNotInProjectFile(path),])
 
-#          @it.should("warn when unable to recreate a builder described in cache")
+#          @it.should("warn when unable to recreate a builder described in cache")  # type: ignore
 #          @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: FailingBuilder)
 #          @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [FailingBuilder, ])
 #          def test():
@@ -532,13 +654,13 @@ with such.A("database") as it:
 #                              "systemverilog": []}},
 #                      "_timestamp": 1474839625.2375762,
 #                      "_sources": {},
-#                      "filename": p.join(TEST_TEMP_PATH, "/myproject.prj")}}
+#                      "filename": _temp("/myproject.prj")}}
 
-#              cache_path = p.join(TEST_TEMP_PATH, '.hdlcc', CACHE_NAME)
+#              cache_path = _temp('.hdlcc', CACHE_NAME)
 #              if p.exists(p.dirname(cache_path)):
 #                  shutil.rmtree(p.dirname(cache_path))
 
-#              os.mkdir(p.join(TEST_TEMP_PATH, '.hdlcc'))
+#              os.mkdir(_temp('.hdlcc'))
 
 #              with open(cache_path, 'w') as fd:
 #                  fd.write(repr(cache_content))
@@ -572,12 +694,12 @@ with such.A("database") as it:
 #              with disableVunit:
 #                  it.project = StandaloneProjectBuilder(it.project_file)
 
-#          @it.should('use mock builder')
+#          @it.should('use mock builder')  # type: ignore
 #          def test():
 #              it.assertTrue(isinstance(it.project.builder, MockBuilder),
 #                            "Builder should be {} but got {} instead".format(MockBuilder, it.project.builder))
 
-#          @it.should('get a list of sources')
+#          @it.should('get a list of sources')  # type: ignore
 #          def test():
 #              it.assertCountEqual(
 #                  it.project.getSources(),
@@ -603,7 +725,7 @@ with such.A("database") as it:
 #              it.config_parser_patch.stop()
 #              it.mock_builder_patch.stop()
 
-#          @it.should("get messages by path")
+#          @it.should("get messages by path")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'another_library',
 #                                'foo.vhd')
@@ -621,7 +743,7 @@ with such.A("database") as it:
 
 #              it.assertMsgQueueIsEmpty(it.project)
 
-#          @it.should("get messages with text")
+#          @it.should("get messages with text")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
 
@@ -665,9 +787,9 @@ with such.A("database") as it:
 #              it.assertCountEqual(expected, diagnostics)
 #              it.assertMsgQueueIsEmpty(it.project)
 
-#          @it.should("get messages with text for file outside the project file")
+#          @it.should("get messages with text for file outside the project file")  # type: ignore
 #          def test():
-#              filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
+#              filename = _temp('some_file.vhd')
 #              writeListToFile(filename, ["entity some_entity is end;", ])
 
 #              content = "\n".join(["library work;",
@@ -707,7 +829,7 @@ with such.A("database") as it:
 #              it.assertMsgQueueIsEmpty(it.project)
 
 
-#          @it.should("get updated messages")
+#          @it.should("get updated messages")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'another_library',
 #                                'foo.vhd')
@@ -736,7 +858,7 @@ with such.A("database") as it:
 
 #              it.assertMsgQueueIsEmpty(it.project)
 
-#          @it.should("get messages by path of a different source")
+#          @it.should("get messages by path of a different source")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library',
 #                                'clock_divider.vhd')
@@ -757,9 +879,9 @@ with such.A("database") as it:
 
 #              it.assertMsgQueueIsEmpty(it.project)
 
-#          @it.should("get messages from a source outside the project file")
+#          @it.should("get messages from a source outside the project file")  # type: ignore
 #          def test():
-#              filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
+#              filename = _temp('some_file.vhd')
 #              writeListToFile(filename, ['library some_lib;'])
 
 #              it.assertMsgQueueIsEmpty(it.project)
@@ -806,7 +928,7 @@ with such.A("database") as it:
 
 #              return calls
 
-#          @it.should("rebuild sources when needed within the same library")
+#          @it.should("rebuild sources when needed within the same library")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 #              rebuilds = [
@@ -825,7 +947,7 @@ with such.A("database") as it:
 #                   p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
 #                   p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-#          @it.should("rebuild sources when changing a package on different libraries")
+#          @it.should("rebuild sources when changing a package on different libraries")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 #              rebuilds = [
@@ -844,7 +966,7 @@ with such.A("database") as it:
 #                   p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
 #                   p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-#          @it.should("rebuild sources with path as a hint")
+#          @it.should("rebuild sources with path as a hint")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
@@ -868,7 +990,7 @@ with such.A("database") as it:
 #                   some_abs_path,
 #                   p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-#          @it.should("rebuild package if needed")
+#          @it.should("rebuild package if needed")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
@@ -889,7 +1011,7 @@ with such.A("database") as it:
 #                   p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
 #                   p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-#          @it.should("rebuild a combination of all")
+#          @it.should("rebuild a combination of all")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 
@@ -915,7 +1037,7 @@ with such.A("database") as it:
 #                   p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
 #                   p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
 
-#          @it.should("give up trying to rebuild after 20 attempts")
+#          @it.should("give up trying to rebuild after 20 attempts")  # type: ignore
 #          def test():
 #              filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
 

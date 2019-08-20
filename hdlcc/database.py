@@ -92,8 +92,6 @@ class Database(object):
         self._design_units = set()
         self._dependencies = {}
         self._sources = {}
-        #  self._design_units[path] = set(source.getDesignUnits())
-        #  self._dependencies[path] = set(source.getDependencies())
 
         # Re-add VUnit files back again
         self._addVunitIfFound()
@@ -119,7 +117,7 @@ class Database(object):
             self._libraries[path] = source.library
             self._flags[path] = source.flags
             # TODO: Parse on a process pool
-            self._parsePathIfNeeded(path)
+            self._parseSourceIfNeeded(path)
 
     def __jsonEncode__(self):
         """
@@ -153,21 +151,26 @@ class Database(object):
     def getLibrary(self, path):
         return self._libraries.get(path, None)
 
-    def _parsePathIfNeeded(self, path):
+    def _parseSourceIfNeeded(self, path):
         # Sources will get parsed on demand
         mtime = p.getmtime(path)
+
         if mtime == self._paths.get(path, 0):
             return
+
+        _logger.debug("Parsing %s (%s)", path, mtime)
 
         # Update the timestamp
         self._paths[path] = mtime
         # Remove all design units that referred to this path before adding new
         # ones, but use the non API method for that to avoid recursing
+
         if path in self._paths:
             before = len(self._design_units)
             self._design_units -= frozenset(self._getDesignUnitsByPath(path))
+
             if before != len(self._design_units):
-                _logger.fatal("Removed %s design units",
+                _logger.debug("Reparsing source removes %d design units",
                               before - len(self._design_units))
 
         src_parser = getSourceParserFromPath(path)
@@ -249,7 +252,8 @@ class Database(object):
 
     def getDesignUnitsByPath(self, path): # type: (t.Path) -> Iterator[DesignUnit]
         "Gets the design units for the given path if any"
-        self._parsePathIfNeeded(path)
+        self._parseSourceIfNeeded(path)
+
         return self._getDesignUnitsByPath(path)
 
     def _getDesignUnitsByPath(self, path): # type: (t.Path) -> Iterator[DesignUnit]
@@ -278,42 +282,46 @@ class Database(object):
                           self.design_units))
 
 
-    def getDependencies(self, path):
-        # type: (t.Path) -> Set[DesignUnit]
+    def getDependenciesPaths(self, path):
+        # type: (t.Path) -> Set[t.Path]
         """
         Returns a list of paths that satisfy all the dependencies of the given
         path.
         """
-
         _logger.warning("Searching inside %s", path)
         deps = set() # type: Set[DependencySpec]
-        design_units = set() # type: Set[DesignUnit]
+        all_paths = set() # type: Set[t.Path]
 
         search_paths = set((path, ))
 
         while search_paths:
-            dependencies_found = set() # type: Set[DependencySpec]
+            deps_found = set() # type: Set[DependencySpec]
 
             # Get the dependencies of the search paths and which design units
             # they define
+
             for search_path in search_paths:
                 _logger.debug("Searching %s", search_path)
-                dependencies_found = dependencies_found.union(self._dependencies[search_path])
-                design_units = design_units.union(self.getDesignUnitsByPath(search_path))
+                deps_found = deps_found.union(self._dependencies[search_path])
 
             # Remove the ones we've already seen and add the new ones to the
             # set tracking the dependencies seen since the search started
-            dependencies_found -= deps
-            deps = deps.union(dependencies_found)
+            deps_found -= deps
+            deps = deps.union(deps_found)
 
             # Paths to be searched on the next iteration are the paths of the
             # dependencies we have not seen before
             search_paths = set()
-            for dependency in dependencies_found:
-                search_paths = search_paths.union(
-                    self.findPathsByDesignUnit(dependency.name, dependency.case_sensitive))
 
-        return design_units
+            for dependency in deps_found:
+                search_paths = search_paths.union(
+                    self.findPathsByDesignUnit(dependency.name,
+                                               dependency.case_sensitive))
+
+            all_paths = all_paths.union(search_paths)
+
+        # Return what we've found excluding the initial path
+        return all_paths - {path}
 
 
 def main(): # type: ignore #
@@ -329,16 +337,17 @@ def main(): # type: ignore #
     setup = end - start
 
     start = time.time()
-    deps = database.getDependencies('/home/souto/dev/grlib/designs/leon3-xilinx-kc705/leon3mp.vhd')
+    deps = database.getDependenciesPaths('/home/souto/dev/grlib/designs/leon3-xilinx-kc705/leon3mp.vhd')
     end = time.time()
 
     dep_search = end - start
 
     _logger.info("Got %d deps", len(deps))
     lines = 0
-    for dep in deps:
+
+    for dep in sorted(deps):
         _logger.info("- %s", dep)
-        lines += open(dep.owner, 'r').read().count('\n')
+        lines += open(dep, 'r').read().count('\n')
 
     print("Took %.2fs and %.2fs" % (setup, dep_search))
     print("Processed %d lines" % lines)
