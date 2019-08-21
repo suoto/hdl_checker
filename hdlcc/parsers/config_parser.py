@@ -168,10 +168,9 @@ class ConfigParser(object):
                                             groupdict['parm_lang'], groupdict['value'])
             else:
                 for source_path in self._getSourcePaths(groupdict['path']):
-                    self._sources.add(
-                        ProjectSourceSpec(path=source_path,
-                                          library=groupdict['library'],
-                                          flags=_extractSet(groupdict['flags'])))
+                    self._sources.add((source_path,
+                                       groupdict['library'],
+                                       _extractSet(groupdict['flags'])))
 
     def _handleParsedParameter(self, parameter, lang, value): # type: (str, str, str) -> None
         """

@@ -30,7 +30,7 @@ from hdlcc.utils import logCalls
 from hdlcc.builders import BuilderName
 from hdlcc.database import Database
 from hdlcc.design_unit import DesignUnit, DesignUnitType
-from hdlcc.parsers import DependencySpec, ProjectSourceSpec
+from hdlcc.parsers import DependencySpec
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import (SourceMock, assertCountEqual, getTestTempPath,
                                sanitizePath, setupTestSuport, writeListToFile)
@@ -71,11 +71,7 @@ def _configFromDict(parsed_dict):
     return _ConfigParser()
 
 def _configFromSources(sources):
-    srcs = {
-        ProjectSourceSpec(
-            path=x.filename,
-            library=x.library,
-            flags=()) for x in sources}
+    srcs = {(x.library, x.filename, ()) for x in sources}
 
     class _ConfigParser(object):
         _dict = {'sources': set(srcs)}
@@ -102,9 +98,15 @@ class TestDatabase(unittest2.TestCase):
         self.assertEqual(self.database.getLibrary('any'), None)
         self.assertEqual(self.database.getFlags('any'), ())
 
-    def test_accepts_basic_structure(self):
-        filename = _temp('foo.vhd')
+    def test_accepts_empty_dict(self):
+        self.database.updateFromDict({})
 
+        self.assertEqual(self.database.builder_name, BuilderName.fallback)
+        self.assertCountEqual(self.database.paths, ())
+        self.assertEqual(self.database.getLibrary('any'), None)
+        self.assertEqual(self.database.getFlags('any'), ())
+
+    def test_accepts_basic_structure(self):
         _SourceMock(
             filename=_temp('foo.vhd'),
             design_units=[{'name' : 'entity_a',
@@ -121,13 +123,8 @@ class TestDatabase(unittest2.TestCase):
 
         info = {
             'builder_name': BuilderName.fallback,
-            'sources': set(
-                [ProjectSourceSpec(path=_temp('foo.vhd'),
-                                   library='bar',
-                                   flags=('baz', 'flag')),
-                 ProjectSourceSpec(path=_temp('oof.vhd'),
-                                   library='ooflib',
-                                   flags=('oofflag0', 'oofflag1')),]),
+            'sources': {('bar', _temp('foo.vhd'), ('baz', 'flag')),
+                        ('ooflib', _temp('oof.vhd'), ('oofflag0', 'oofflag1'))},
             'single_build_flags' : {
                 'vhdl'          : ('single_vhd_flag',),
                 'verilog'       : ('single_verilog_flag',),
@@ -257,9 +254,13 @@ with such.A("database") as it:
             for dep in deps:
                 _logger.info("- %s", dep)
 
-            it.assertCountEqual(deps, {_temp('common_dep.vhd'),
-                                       _temp('direct_dep.vhd'),
-                                       _temp('indirect_dep.vhd')})
+            # These might change depending on how Python sort the sets, but
+            # they do have to come before the direct dependency
+            it.assertCountEqual(deps[:2],
+                    {_temp('common_dep.vhd'),
+                     _temp('indirect_dep.vhd')})
+
+            it.assertCountEqual(deps[2:], {_temp('direct_dep.vhd')})
 
         @it.should('get correct dependencies of indirect_dep.vhd')  # type: ignore
         def test():
@@ -270,7 +271,7 @@ with such.A("database") as it:
             for dep in deps:
                 _logger.info("- %s", dep)
 
-            it.assertCountEqual(deps, {_temp("common_dep.vhd")})
+            it.assertEqual(deps, [_temp("common_dep.vhd")])
 
     with it.having('direct circular dependencies between 2 sources'):
         @it.has_setup
