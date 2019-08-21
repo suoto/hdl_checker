@@ -22,15 +22,16 @@ import logging
 import os.path as p
 from tempfile import mkdtemp
 from threading import RLock
-from typing import Any, Dict, FrozenSet, Iterable, Iterator, Set
+from typing import (Any, Dict, FrozenSet, Generator, Iterable, Iterator, List,
+                    Set, Tuple)
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import BuilderName, getBuilderByName
-from hdlcc.design_unit import DesignUnit
+from hdlcc.design_unit import DesignUnit, DesignUnitType
 from hdlcc.parsers import (ConfigParser, DependencySpec, SourceFile,
                            getSourceFileObjects, getSourceParserFromPath)
-from hdlcc.utils import removeDirIfExists, samefile
+from hdlcc.utils import removeDirIfExists, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -98,24 +99,19 @@ class Database(object):
 
     def accept(self, parser):  # type: (ConfigParser) -> None
         "Updates the database from a configuration parser"
-        # Clear up previous definitions
-        #  self.reset()
+        return self.updateFromDict(parser.parse())
 
-        config = parser.parse()
-        #  _logger.debug("Updating from\n%s", pprint.pformat(config))
+    def updateFromDict(self, config):  # type: (Any) -> None
+        "Updates the database from a dictionary"
 
         self._builder_name = config.get('builder_name', self._builder_name)
 
-        self._addVunitIfFound()
-
-        for source in config.get('sources', []):
-            #  _logger.debug('Adding %s', source)
-            path = source.path
+        for library, path, flags in config.get('sources', []):
             # Default when updating is set the modification time to zero
             # because we're cleaning up the parsed info too
             self._paths[path] = 0
-            self._libraries[path] = source.library
-            self._flags[path] = source.flags
+            self._libraries[path] = library
+            self._flags[path] = tuple(flags)
             # TODO: Parse on a process pool
             self._parseSourceIfNeeded(path)
 
@@ -158,7 +154,7 @@ class Database(object):
         if mtime == self._paths.get(path, 0):
             return
 
-        _logger.debug("Parsing %s (%s)", path, mtime)
+        #  _logger.debug("Parsing %s (%s)", path, mtime)
 
         # Update the timestamp
         self._paths[path] = mtime
@@ -290,7 +286,8 @@ class Database(object):
         """
         _logger.warning("Searching inside %s", path)
         deps = set() # type: Set[DependencySpec]
-        all_paths = set() # type: Set[t.Path]
+        #  all_paths = set() # type: Set[t.Path]
+        all_paths = [] # type: List[t.Path]
 
         search_paths = set((path, ))
 
@@ -318,39 +315,61 @@ class Database(object):
                     self.findPathsByDesignUnit(dependency.name,
                                                dependency.case_sensitive))
 
-            all_paths = all_paths.union(search_paths)
+            all_paths += search_paths
 
-        # Return what we've found excluding the initial path
-        return all_paths - {path}
+        # Remove the argument path from the list
+        while True:
+            try:
+                all_paths.remove(path)
+            except ValueError:
+                break
 
+        # List now has a list where the first dependency is at the bottom, so
+        # reverse it and make sure we don't return paths more than once
+        return removeDuplicates(reversed(all_paths))
 
-def main(): # type: ignore #
-    import sys
-    from hdlcc.utils import setupLogging
-    setupLogging(sys.stdout, logging.INFO, True)
-    _logger = logging.getLogger(__name__)
-    import time
-    database = Database()
-    start = time.time()
-    database.accept(ConfigParser('/home/souto/dev/grlib/vimhdl.prj'))
-    end = time.time()
-    setup = end - start
+    def getBuildSequence(self, path):
+        # type: (t.Path) -> Generator[Tuple[t.LibraryName, t.Path], None, None]
+        """
+        Gets the build sequence that satisfies the preconditions to compile the
+        given path
+        """
+        units_compiled = set() # type: Set[str]
 
-    start = time.time()
-    deps = database.getDependenciesPaths('/home/souto/dev/grlib/designs/leon3-xilinx-kc705/leon3mp.vhd')
-    end = time.time()
+        deps_paths = list(self.getDependenciesPaths(path))
 
-    dep_search = end - start
+        resolved_paths = {x for x in deps_paths if self._libraries.get(x, None) is not None}
 
-    _logger.info("Got %d deps", len(deps))
-    lines = 0
+        deps_paths = list(set(deps_paths) - resolved_paths)
+        deps_paths.sort(key=lambda x: len(self._dependencies[x]))
 
-    for dep in sorted(deps):
-        _logger.info("- %s", dep)
-        lines += open(dep, 'r').read().count('\n')
+        _logger.info("Got %d resolved paths", len(resolved_paths))
+        #  for rp in resolved_paths:
+        #      _logger.info("[%s] %s", self._libraries.get(rp), rp)
 
-    print("Took %.2fs and %.2fs" % (setup, dep_search))
-    print("Processed %d lines" % lines)
+        for i in range(10):
+            to_remove = set() # type: Set[t.Path]
+            for dep_path in deps_paths:
+                own = {x.name for x in self._getDesignUnitsByPath(dep_path)}
+                deps = {x.name for x in self._dependencies[dep_path]}
+                #  _logger.info("%s has %d dependencies: %s", dep_path, len(deps), deps)
+                still_needed = deps - units_compiled - own
+                if still_needed:
+                    _logger.debug("%s still needs %s", dep_path, still_needed)
+                else:
+                    _logger.info("Can compile %s", dep_path)
+                    yield 'work', dep_path
+                    to_remove.add(dep_path)
+                    units_compiled = units_compiled.union(
+                        {x.name for x in self._getDesignUnitsByPath(dep_path)})
 
-if __name__ == '__main__':
-    main()
+            deps_paths = list(set(deps_paths) - to_remove)
+            deps_paths.sort(key=lambda x: len(self._dependencies[x]))
+
+            _logger.debug("%d paths remaining: %s", len(deps_paths), deps_paths)
+            _logger.info("Got %d units compiled: %s", len(units_compiled),
+                         units_compiled)
+
+            if not to_remove:
+                _logger.warning("Nothing more to do after %d steps", i)
+                break

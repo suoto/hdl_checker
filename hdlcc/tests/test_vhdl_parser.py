@@ -96,7 +96,7 @@ with such.A('VHDL source file object') as it:
 
         @it.should('parse a file without errors')  # type: ignore
         def test():
-            it.source = VhdlParser(_FILENAME, library='mylibrary')
+            it.source = VhdlParser(_FILENAME)
 
         @it.should('return its entities')  # type: ignore
         def test():
@@ -117,8 +117,8 @@ with such.A('VHDL source file object') as it:
                          ", ".join([repr(x) for x in libraries]))
 
             it.assertCountEqual(libraries,
-                                ['mylibrary', 'ieee', 'lib1', 'lib2',
-                                 'lib3', 'lib4', 'lib5', 'lib6'])
+                                ['ieee', 'lib1', 'lib2', 'lib3', 'lib4',
+                                 'lib5', 'lib6'])
 
         @it.should('return its dependencies')  # type: ignore
         def test():
@@ -128,9 +128,9 @@ with such.A('VHDL source file object') as it:
                                 name='std_logic_1164', locations=[(2, 5),]),
                  DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(3, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary', name='package_with_constants',
+                 DependencySpec(owner=_FILENAME, library='work', name='package_with_constants',
                                 locations=[(6, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='cherry_pick',
                                 locations=[(7, 7),
                                            (8, 5),]),
@@ -140,19 +140,6 @@ with such.A('VHDL source file object') as it:
         @it.should('return source modification time')  # type: ignore
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
-
-        @it.should('find the matching library of a package')  # type: ignore
-        @params(
-            ('package', 'std_logic_1164', 'ieee'),
-            ('package', 'package_with_constants', 'mylibrary'))
-        def test_find_library(case, unit_type, unit_name, result):
-            _logger.info("Running test %s", case)
-            _logger.info("Unit: '%s' is a '%s'. Expected result is '%s'",
-                         unit_name, unit_type, result)
-
-            it.assertEqual(
-                result,
-                it.source.getMatchingLibrary(unit_type, unit_name))
 
         @it.should('return updated dependencies')  # type: ignore
         def test():
@@ -168,11 +155,11 @@ with such.A('VHDL source file object') as it:
                                 name='std_logic_1164', locations=[(4, 5),]),
                  DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(5, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='package_with_constants', locations=[(8, 6),]),
                  DependencySpec(owner=_FILENAME, library='some_library',
                                 name='some_package', locations=[(2, 9),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='cherry_pick', locations=[(9, 7),
                                                                (10, 5),]),
                  ])
@@ -189,11 +176,11 @@ with such.A('VHDL source file object') as it:
                                 name='std_logic_1164', locations=[(3, 5),]),
                  DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(4, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='package_with_constants', locations=[(7, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='another_package', locations=[(1, 9),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='cherry_pick', locations=[(8, 7),
                                                                (9, 5),]),
                  ],)
@@ -210,9 +197,9 @@ with such.A('VHDL source file object') as it:
                                 name='std_logic_1164', locations=[(3, 5),]),
                  DependencySpec(owner=_FILENAME, library='ieee',
                                 name='std_logic_arith', locations=[(4, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='package_with_constants', locations=[(7, 6),]),
-                 DependencySpec(owner=_FILENAME, library='mylibrary',
+                 DependencySpec(owner=_FILENAME, library='work',
                                 name='cherry_pick', locations=[(8, 7),
                                                                (9, 5),]),
                  ])
@@ -281,20 +268,20 @@ with such.A('VHDL source file object') as it:
         def test(): # type: () -> None
             it.assertCountEqual(
                 it.source.getDependencies(),
-                [DependencySpec(owner=it.source.filename, library='ieee',
-                                name='std_logic_1164', locations={(2, 5)}),
-                 DependencySpec(owner=it.source.filename, library='ieee',
-                                name='std_logic_arith', locations={(3, 5)}),
-                 DependencySpec(owner=it.source.filename, library='ieee',
-                                name='std_logic_unsigned', locations={(4, 5)}),
-                 DependencySpec(owner=it.source.filename, library='work',
-                                name='foo', locations={(12, 43)}),
-                 DependencySpec(owner=it.source.filename, library='basic_library',
-                                name='very_common_pkg', locations={(14, 38)}),
-                 DependencySpec(owner=it.source.filename, library='basic_library',
-                                name='package_with_constants', locations={(17, 1)}),
-                 DependencySpec(owner=it.source.filename, library='basic_library',
-                                name='package_body_only', locations={(21, 1)}),
+                [DependencySpec(name='std_logic_1164', library='ieee',
+                                owner=it.source.filename, locations={(2, 5)}),
+                 DependencySpec(name='std_logic_arith', library='ieee',
+                                owner=it.source.filename, locations={(3, 5)}),
+                 DependencySpec(name='std_logic_unsigned', library='ieee',
+                                owner=it.source.filename, locations={(4, 5)}),
+                 DependencySpec(name='foo', library='work',
+                                owner=it.source.filename, locations={(12, 43)}),
+                 DependencySpec(name='very_common_pkg', library='basic_library',
+                                owner=it.source.filename, locations={(14, 38)}),
+                 DependencySpec(name='package_with_constants', library='work',
+                                owner=it.source.filename, locations={(17, 1)}),
+                 DependencySpec(name='package_body_only', library='work',
+                                owner=it.source.filename, locations={(21, 1)}),
                  ])
 
         @it.should('return source modification time')  # type: ignore

@@ -16,16 +16,13 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base source file parser"
 
-# pylint:disable=useless-object-inheritance
-
 import abc
 import logging
 import os.path as p
-import re
 import time
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Set
+from typing import Any, Dict, Optional, Set
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.design_unit import DesignUnit
@@ -48,16 +45,15 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         used by the language
         """
 
-    def __init__(self, filename, library='work', flags=None):
-        self.filename = p.abspath(p.normpath(filename))
-        self.library = library
-        self.flags = flags if flags is not None else []
-        self._cache = {}
+    def __init__(self, filename):
+        # type: (t.Path, ) -> None
+        self.filename = t.Path(p.abspath(p.normpath(filename)))
+        self._cache = {} # type: Dict[str, Any]
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
         self._dependencies = None
-        self._design_units = None
+        self._design_units = None # type: Optional[Set[DesignUnit]]
         self._libraries = None
 
         self.shadow_filename = None
@@ -85,8 +81,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state['filename']
-        obj.library = state['library']
-        obj.flags = state['flags']
         obj.shadow_filename = None
         obj.filetype = state['filetype']
         obj._cache = state['_cache']  # pylint: disable=protected-access
@@ -99,17 +93,13 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return obj
 
     def __repr__(self):
-        return ("{}(library='{}', design_units={}, dependencies={}, "
-                "filename={})".format(self.__class__.__name__, self.library,
-                                      self._design_units, self._dependencies,
-                                      self.filename))
+        return ("{}(filename={}, design_units={}, dependencies={})".format(
+            self.__class__.__name__, self.filename, self._design_units,
+            self._dependencies))
 
     @property
     def __hash_key__(self):
-        return (self.library, self.filename, self._content)
-
-    def __str__(self):
-        return "[%s] %s" % (self.library, self.filename)
+        return (self.filename, self._content)
 
     def _changed(self):
         """
@@ -247,17 +237,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._libraries
 
-    def getMatchingLibrary(self, unit_type, unit_name):
-        """
-        Cached version of the _getMatchingLibrary method
-        """
-        key = ','.join(['getMatchingLibrary', unit_name, unit_type])
-        self._clearCachesIfChanged()
-        if key not in self._cache:
-            self._cache[key] = self._getMatchingLibrary(
-                unit_type, unit_name)
-        return self._cache[key]
-
     @abc.abstractmethod
     def _getSourceContent(self):
         """
@@ -287,12 +266,3 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         Parses the source and returns a list of dictionaries that
         describe its dependencies
         """
-
-    def _getMatchingLibrary(self, unit_type, unit_name):  # pylint: disable=inconsistent-return-statements
-        if unit_type == 'package':
-            match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
-                              self.getSourceContent(), flags=re.S)
-            if match.groupdict()['library_name'] == 'work':
-                return self.library
-            return match.groupdict()['library_name']
-        assert False, "%s, %s" % (unit_type, unit_name)

@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import Any, Dict, Generator, Set, Union
+from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.design_unit import DesignUnit, DesignUnitType
@@ -82,10 +82,9 @@ class VhdlParser(BaseSourceFile):
         text = self.getSourceContent()
 
         for match in lib_deps_regex.finditer(text):
-            library, unit = match.group().split('.')[:2]
 
-            if library == 'work':
-                library = self.library
+            library, unit = match.group().split('.')[:2] \
+                    # type: Tuple[Optional[t.LibraryName], str]
 
             line_number = text[:match.end()].count('\n')
             column_number = len(text[:match.start()].split('\n')[-1])
@@ -115,7 +114,7 @@ class VhdlParser(BaseSourceFile):
 
             yield DependencySpec(owner=self.filename, # type: ignore
                                  name=package_body_name,
-                                 library=library,
+                                 library='work',
                                  locations={(line_number + 1, column_number + 1),})
 
     def _getLibraries(self):
@@ -131,7 +130,6 @@ class VhdlParser(BaseSourceFile):
         # Replace references of 'work' for the actual library name
         if 'work' in libs:
             libs = libs - {'work'}
-            libs.add(self.library)
 
         return libs
 

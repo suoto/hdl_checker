@@ -82,9 +82,9 @@ module clock_divider
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-        @it.should('return only its own library')  # type: ignore
+        @it.should('return no libraries')  # type: ignore
         def test():
-            it.assertEqual(['work', ], it.source.getLibraries())
+            it.assertEqual(it.source.getLibraries(), [])
 
         @it.should('report as equal after recovering from cache via json')  # type: ignore
         def test():
@@ -123,8 +123,8 @@ endpackage
                             type_=DesignUnitType.package,
                             locations={(0, None),})])
 
-        @it.should('return only its own library')  # type: ignore
+        @it.should('return no libraries')  # type: ignore
         def test():
-            it.assertEqual(['work', ], it.source.getLibraries())
+            it.assertEqual(it.source.getLibraries(), [])
 
 it.createTests(globals())

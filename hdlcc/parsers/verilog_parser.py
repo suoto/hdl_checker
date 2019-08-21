@@ -76,4 +76,4 @@ class VerilogParser(BaseSourceFile):
                                  locations=locations)
 
     def _getLibraries(self):
-        return [self.library, ]
+        return set()
