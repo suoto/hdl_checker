@@ -20,15 +20,19 @@ from enum import Enum
 from typing import Optional
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.parsed_element import LocationList, ParsedElement
+
+from .identifier import Identifier
+from .parsed_element import LocationList, ParsedElement
 
 _logger = logging.getLogger(__name__)
 
+
 class DesignUnitType(Enum):
     "Specifies tracked design unit types"
-    package = 'package'
-    entity = 'entity'
-    context = 'context'
+    package = "package"
+    entity = "entity"
+    context = "context"
+
 
 class DesignUnit(ParsedElement):
     """
@@ -36,7 +40,7 @@ class DesignUnit(ParsedElement):
     """
 
     def __init__(self, owner, type_, name, locations=None):
-        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        # type: (t.Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
         self._owner = owner
         self._type = type_
         self._name = name
@@ -44,9 +48,18 @@ class DesignUnit(ParsedElement):
         super(DesignUnit, self).__init__(locations)
 
     def __repr__(self):
-        return '{}(owner="{}", name="{}", type_={}, locations={})'.format(
-            self.__class__.__name__, self.owner, self.name, self.type_,
-            self.locations)
+        return '{}(name="{}", type={}, owner={}, locations={})'.format(
+            self.__class__.__name__,
+            self.name,
+            self.type_,
+            repr(self.owner),
+            self.locations,
+        )
+
+    def __str__(self):
+        return "{}(name={}, type={}, owner={})".format(
+            self.__class__.__name__, repr(self.name), self.type_, repr(self.owner)
+        )
 
     @property
     def owner(self):
@@ -61,8 +74,8 @@ class DesignUnit(ParsedElement):
         return self._name
 
     @property
-    def case_sensitive(self): # type: () -> bool
-        ext = self.owner.split('.')[-1].lower()
+    def case_sensitive(self):  # type: () -> bool
+        ext = self.owner.split(".")[-1].lower()
         return ext not in t.FileType.vhd.value
 
     @property

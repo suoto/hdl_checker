@@ -21,18 +21,24 @@ import re
 from typing import Generator
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.design_unit import DesignUnit, DesignUnitType
-from hdlcc.parsed_element import LocationList
 from hdlcc.parsers.base_parser import BaseSourceFile
+
+from . import DesignUnit, DesignUnitType, Identifier, LocationList
 
 _logger = logging.getLogger(__name__)
 
 _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
 # Design unit scanner
-_DESIGN_UNIT_SCANNER = re.compile('|'.join([
-    r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
-    r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
-    ]), flags=re.S)
+_DESIGN_UNIT_SCANNER = re.compile(
+    "|".join(
+        [
+            r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
+            r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
+        ]
+    ),
+    flags=re.S,
+)
+
 
 class VerilogParser(BaseSourceFile):
     """
@@ -40,13 +46,13 @@ class VerilogParser(BaseSourceFile):
     source file
     """
 
-    _comment = re.compile(r'\/\*.*?\*\/|//[^(\r\n?|\n)]*', flags=re.DOTALL)
+    _comment = re.compile(r"\/\*.*?\*\/|//[^(\r\n?|\n)]*", flags=re.DOTALL)
 
     def _getSourceContent(self):
         # Remove multiline comments
-        content = open(self.filename, mode='rb').read().decode(errors='ignore')
-        lines = self._comment.sub('', content)
-        return re.sub(r'\r\n?|\n', ' ', lines, flags=re.S)
+        content = open(self.filename, mode="rb").read().decode(errors="ignore")
+        lines = self._comment.sub("", content)
+        return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
         """
@@ -56,24 +62,28 @@ class VerilogParser(BaseSourceFile):
         content = self.getSourceContent()
         for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
             start = match.start()
-            yield match.groupdict(), content[:start].count('\n')
+            yield match.groupdict(), content[:start].count("\n")
 
     def _getDependencies(self):
         return []
 
-    def _getDesignUnits(self): # type: () -> Generator[DesignUnit, None, None]
+    def _getDesignUnits(self):  # type: () -> Generator[DesignUnit, None, None]
         for match, line_number in self._iterDesignUnitMatches():
-            locations = frozenset({(line_number, None), }) # type: LocationList
-            if match['module_name'] is not None:
-                yield DesignUnit(owner=self.filename,
-                                 name=match['module_name'],
-                                 type_=DesignUnitType.entity,
-                                 locations=locations)
-            if match['package_name'] is not None:
-                yield DesignUnit(owner=self.filename,
-                                 name=match['package_name'],
-                                 type_=DesignUnitType.package,
-                                 locations=locations)
+            locations = frozenset({(line_number, None)})  # type: LocationList
+            if match["module_name"] is not None:
+                yield DesignUnit(
+                    owner=self.filename,
+                    name=Identifier(match["module_name"], case_sensitive=True),
+                    type_=DesignUnitType.entity,
+                    locations=locations,
+                )
+            if match["package_name"] is not None:
+                yield DesignUnit(
+                    owner=self.filename,
+                    name=Identifier(match["package_name"], case_sensitive=True),
+                    type_=DesignUnitType.package,
+                    locations=locations,
+                )
 
     def _getLibraries(self):
         return set()

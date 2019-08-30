@@ -25,10 +25,12 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Optional, Set
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.design_unit import DesignUnit
 from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
 
+from .elements.design_unit import DesignUnit  # pylint: disable=unused-import
+
 _logger = logging.getLogger(__name__)
+
 
 class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attributes
     """
@@ -48,12 +50,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     def __init__(self, filename):
         # type: (t.Path, ) -> None
         self.filename = t.Path(p.abspath(p.normpath(filename)))
-        self._cache = {} # type: Dict[str, Any]
+        self._cache = {}  # type: Dict[str, Any]
         self._content = None
         self._mtime = 0
         self.filetype = getFileType(self.filename)
         self._dependencies = None
-        self._design_units = None # type: Optional[Set[DesignUnit]]
+        self._design_units = None  # type: Optional[Set[DesignUnit]]
         self._libraries = None
 
         self.shadow_filename = None
@@ -68,10 +70,10 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
-        del state['_content']
-        del state['shadow_filename']
-        if 'raw_content' in state['_cache']:
-            del state['_cache']['raw_content']
+        del state["_content"]
+        del state["shadow_filename"]
+        if "raw_content" in state["_cache"]:
+            del state["_cache"]["raw_content"]
         return state
 
     @classmethod
@@ -80,22 +82,25 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         Returns an object of cls based on a given state"""
 
         obj = super(BaseSourceFile, cls).__new__(cls)
-        obj.filename = state['filename']
+        obj.filename = state["filename"]
         obj.shadow_filename = None
-        obj.filetype = state['filetype']
-        obj._cache = state['_cache']  # pylint: disable=protected-access
+        obj.filetype = state["filetype"]
+        obj._cache = state["_cache"]  # pylint: disable=protected-access
         obj._content = None  # pylint: disable=protected-access
-        obj._mtime = state['_mtime']  # pylint: disable=protected-access
-        obj._dependencies = state['_dependencies']  # pylint: disable=protected-access
-        obj._design_units = state['_design_units']  # pylint: disable=protected-access
-        obj._libraries = state['_libraries']  # pylint: disable=protected-access
+        obj._mtime = state["_mtime"]  # pylint: disable=protected-access
+        obj._dependencies = state["_dependencies"]  # pylint: disable=protected-access
+        obj._design_units = state["_design_units"]  # pylint: disable=protected-access
+        obj._libraries = state["_libraries"]  # pylint: disable=protected-access
 
         return obj
 
     def __repr__(self):
-        return ("{}(filename={}, design_units={}, dependencies={})".format(
-            self.__class__.__name__, self.filename, self._design_units,
-            self._dependencies))
+        return "{}(filename={}, design_units={}, dependencies={})".format(
+            self.__class__.__name__,
+            self.filename,
+            self._design_units,
+            self._dependencies,
+        )
 
     @property
     def __hash_key__(self):
@@ -137,8 +142,10 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
     def _getTemporaryFile(self):
         "Gets the temporary dump file context"
-        return NamedTemporaryFile(suffix='.' + self.filename.split('.')[-1],
-                                  prefix='temp_' + p.basename(self.filename))
+        return NamedTemporaryFile(
+            suffix="." + self.filename.split(".")[-1],
+            prefix="temp_" + p.basename(self.filename),
+        )
 
     @contextmanager
     def havingBufferContent(self, content):
@@ -193,13 +200,14 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         if self.shadow_filename:
             return self._content
-        if 'raw_content' not in self._cache or self._changed():
-            self._cache['raw_content'] = \
-                open(self.filename, mode='rb').read().decode(errors='ignore')
+        if "raw_content" not in self._cache or self._changed():
+            self._cache["raw_content"] = (
+                open(self.filename, mode="rb").read().decode(errors="ignore")
+            )
 
-        return self._cache['raw_content']
+        return self._cache["raw_content"]
 
-    def getDesignUnits(self): # type: () -> Set[DesignUnit]
+    def getDesignUnits(self):  # type: () -> Set[DesignUnit]
         """
         Cached version of the _getDesignUnits method
         """
@@ -220,7 +228,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         self._clearCachesIfChanged()
         if self._dependencies is None:
-            self._dependencies = self._getDependencies()
+            try:
+                self._dependencies = self._getDependencies()
+            except:
+                print("failed to parse %s" % self.filename)
+                _logger.exception("Failed to parse %s", self.filename)
+                raise
 
         return self._dependencies
 

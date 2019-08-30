@@ -14,20 +14,23 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"Spec for a parsed dependency"
 
 import logging
 from typing import Optional
 
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.parsed_element import LocationList, ParsedElement
+from .parsed_element import LocationList, ParsedElement
+from .identifier import Identifier
 
 _logger = logging.getLogger(__name__)
 
+
 class DependencySpec(ParsedElement):
     def __init__(self, owner, name, library, locations=None):
-        # type: (t.Path, str, t.LibraryName, Optional[LocationList]) -> None
+        # type: (t.Path, Identifier, Identifier, Optional[LocationList]) -> None
         self._owner = owner
-        self._library = str(library)
+        self._library = str(library) if library is not None else None
         self._name = str(name)
         super(DependencySpec, self).__init__(locations)
 
@@ -44,19 +47,23 @@ class DependencySpec(ParsedElement):
         return self._library
 
     @property
-    def case_sensitive(self): # type: () -> bool
-        ext = self.owner.split('.')[-1].lower()
+    def case_sensitive(self):  # type: () -> bool
+        ext = self.owner.split(".")[-1].lower()
         return ext not in t.FileType.vhd.value
 
     @property
     def __hash_key__(self):
-        return (self.owner, self.library, self.name,
-                super(DependencySpec, self).__hash_key__)
+        return (
+            self.owner,
+            self.library,
+            self.name,
+            super(DependencySpec, self).__hash_key__,
+        )
 
     def __jsonEncode__(self):
         state = super(DependencySpec, self).__jsonEncode__()
-        state['library'] = state['library']
-        state['name'] = state['name']
+        state["library"] = state["library"]
+        state["name"] = state["name"]
         return state
 
     @classmethod
@@ -65,11 +72,14 @@ class DependencySpec(ParsedElement):
         # pylint: disable=protected-access
         _logger.info("Recovering from %s", state)
         obj = super(DependencySpec, cls).__new__(cls)
-        obj._library = state['library']
-        obj._name = state['name']
+        obj._library = state["library"]
+        obj._name = state["name"]
         return obj
 
     def __repr__(self):
-        return '{}(owner={}, name={}, library={}, locations={})'.format(
-            self.__class__.__name__, repr(self.owner),
-            repr(self.name), repr(self.library), repr(self.locations))
+        return "{}(name={}, library={}, owner={})".format(
+            self.__class__.__name__,
+            repr(self.name),
+            repr(self.library) if self.library is not None else None,
+            repr(self.owner),
+        )

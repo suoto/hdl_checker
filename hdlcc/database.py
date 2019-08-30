@@ -20,6 +20,7 @@
 
 import logging
 import os.path as p
+#  from itertools import chain
 from tempfile import mkdtemp
 from threading import RLock
 from typing import (Any, Dict, FrozenSet, Generator, Iterable, Iterator, List,
@@ -170,7 +171,7 @@ class Database(object):
                               before - len(self._design_units))
 
         src_parser = getSourceParserFromPath(path)
-        self._design_units = self._design_units.union(src_parser.getDesignUnits())
+        self._design_units |= set(src_parser.getDesignUnits())
         self._dependencies[path] = set(src_parser.getDependencies())
 
     def _addVunitIfFound(self): # type: () -> None
@@ -281,13 +282,18 @@ class Database(object):
     def getDependenciesPaths(self, path):
         # type: (t.Path) -> Set[t.Path]
         """
-        Returns a list of paths that satisfy all the dependencies of the given
-        path.
+        Returns paths that when built will satisfy the dependencies needed by a
+        given path. The list is not sorted by build sequence and libraries are
+        not taken into consideration (design units defined in multiple files
+        will appear multiple times)
+
+        Dependencies not found within the project's list of files will generate
+        a warning but will otherwise be silently ignored. IEEE and STD
+        libraries will always be ignored
         """
         _logger.warning("Searching inside %s", path)
-        deps = set() # type: Set[DependencySpec]
-        #  all_paths = set() # type: Set[t.Path]
-        all_paths = [] # type: List[t.Path]
+        all_deps = set() # type: Set[DependencySpec]
+        dependencies_paths = set() # type: Set[t.Path]
 
         search_paths = set((path, ))
 
@@ -296,37 +302,35 @@ class Database(object):
 
             # Get the dependencies of the search paths and which design units
             # they define
-
             for search_path in search_paths:
-                _logger.debug("Searching %s", search_path)
-                deps_found = deps_found.union(self._dependencies[search_path])
+                _logger.debug("Path %s dependencies: %s", search_path, deps_found)
+                deps_found |= self._dependencies[search_path]
 
             # Remove the ones we've already seen and add the new ones to the
             # set tracking the dependencies seen since the search started
-            deps_found -= deps
-            deps = deps.union(deps_found)
+            deps_found -= all_deps
+            all_deps |= deps_found
 
             # Paths to be searched on the next iteration are the paths of the
             # dependencies we have not seen before
             search_paths = set()
 
             for dependency in deps_found:
-                search_paths = search_paths.union(
-                    self.findPathsByDesignUnit(dependency.name,
-                                               dependency.case_sensitive))
+                new_paths = set(self.findPathsByDesignUnit(dependency.name,
+                                                           dependency.case_sensitive))
+                if not new_paths:
+                    _logger.warning("Couldn't find where %s is defined", dependency)
 
-            all_paths += search_paths
+                search_paths |= new_paths
 
-        # Remove the argument path from the list
-        while True:
-            try:
-                all_paths.remove(path)
-            except ValueError:
-                break
+            # Union of both sets
+            dependencies_paths |= search_paths
 
         # List now has a list where the first dependency is at the bottom, so
-        # reverse it and make sure we don't return paths more than once
-        return removeDuplicates(reversed(all_paths))
+        # reverse it and make sure we don't return paths more than once. Also
+        # remote the request path, since we're supposed to only list
+        # dependencies
+        return dependencies_paths - {path}
 
     def getBuildSequence(self, path):
         # type: (t.Path) -> Generator[Tuple[t.LibraryName, t.Path], None, None]
@@ -360,8 +364,7 @@ class Database(object):
                     _logger.info("Can compile %s", dep_path)
                     yield 'work', dep_path
                     to_remove.add(dep_path)
-                    units_compiled = units_compiled.union(
-                        {x.name for x in self._getDesignUnitsByPath(dep_path)})
+                    units_compiled |= {x.name for x in self._getDesignUnitsByPath(dep_path)}
 
             deps_paths = list(set(deps_paths) - to_remove)
             deps_paths.sort(key=lambda x: len(self._dependencies[x]))

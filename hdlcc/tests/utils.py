@@ -25,50 +25,54 @@ import shutil
 import subprocess as subp
 import time
 from multiprocessing import Queue
+from typing import Tuple
 
 import mock
 import six
-from parameterized import parameterized_class
+from parameterized import parameterized_class  #type: ignore
 
 from hdlcc import exceptions
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
-from hdlcc.utils import (getCachePath, getFileType, onWindows,
-                         removeDuplicates, samefile)
+from hdlcc.utils import getCachePath, getFileType, onWindows, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
+
 class StandaloneProjectBuilder(HdlCodeCheckerBase):
     "Class for testing HdlCodeCheckerBase"
-    _msg_queue = Queue()
-    _ui_handler = logging.getLogger('UI')
+    _msg_queue = Queue()  # type: Queue[Tuple[str, str]]
+    _ui_handler = logging.getLogger("UI")
 
     def _handleUiInfo(self, message):
-        self._msg_queue.put(('info', message))
-        self._ui_handler.info('[UI INFO]: %s', message)
+        self._msg_queue.put(("info", message))
+        self._ui_handler.info("[UI INFO]: %s", message)
 
     def _handleUiWarning(self, message):
-        self._msg_queue.put(('warning', message))
-        self._ui_handler.info('[UI WARNING]: %s', message)
+        self._msg_queue.put(("warning", message))
+        self._ui_handler.info("[UI WARNING]: %s", message)
 
     def _handleUiError(self, message):
-        self._msg_queue.put(('error', message))
-        self._ui_handler.info('[UI ERROR]: %s', message)
+        self._msg_queue.put(("error", message))
+        self._ui_handler.info("[UI ERROR]: %s", message)
 
     def getUiMessages(self):
         while not self._msg_queue.empty():
             yield self._msg_queue.get()
 
+
 class SourceMock(object):
-    _logger = logging.getLogger('SourceMock')
-    base_path = ''
+    _logger = logging.getLogger("SourceMock")
+    base_path = ""
+
     def __init__(self, design_units, library=None, dependencies=None, filename=None):
         if filename is not None:
             self._filename = p.join(self.base_path, filename)
         else:
             self._filename = p.join(
                 self.base_path,
-                (library or 'lib_not_set') + '_' + design_units[0]['name'] + '.vhd')
+                (library or "lib_not_set") + "_" + design_units[0]["name"] + ".vhd",
+            )
 
         self.filetype = getFileType(self.filename)
         self.abspath = p.abspath(self.filename)
@@ -83,51 +87,58 @@ class SourceMock(object):
             self._dependencies.add(dep_spec)
 
         self._createMockFile()
+
     @property
     def filename(self):
         return self._filename
 
     def getLibraries(self):
-        return [x.library for x in self._dependencies]
+        return removeDuplicates([x.library for x in self._dependencies])
 
     def _createMockFile(self):
         self._logger.debug("Creating mock file: %s", self.filename)
-        libs = removeDuplicates(
-            [x.library for x in self._dependencies])
+        libs = self.getLibraries()
 
         lines = []
 
         for lib in libs:
-            lines.append("library {0};".format(lib))
+            lines.append("library {0};".format(lib or "work"))
 
         for dependency in self._dependencies:
-            lines.append("use {0}.{1};".format(dependency.library,
-                                               dependency.name))
+            lines.append(
+                "use {0}.{1};".format(dependency.library or "work", dependency.name)
+            )
 
         # Separate if there was libraries already added
         if lines:
-            lines.append('')
+            lines.append("")
 
         for design_unit in self._design_units:
-            type_ = design_unit['type']
-            name = design_unit['name']
+            type_ = design_unit["type"]
+            name = design_unit["name"]
 
             lines.append("{0} {1} is".format(type_, name))
-            lines.append('')
+            lines.append("")
             lines.append("end {0} {1};".format(type_, name))
-            lines.append('')
+            lines.append("")
 
         for i, line in enumerate(lines):
             self._logger.debug("%2d | %s", i + 1, line)
 
-        with open(self.filename, 'w') as fd:
-            fd.write('\n'.join(lines))
+        with open(self.filename, "w") as fd:
+            fd.write("\n".join(lines))
 
     def __repr__(self):
-        return ("{}(library='{}', design_units={}, dependencies={}, "
-                "filename={}".format(self.__class__.__name__, self.library,
-                                     self._design_units, self._dependencies,
-                                     self.filename))
+        return (
+            "{}(library='{}', design_units={}, dependencies={}, "
+            "filename={}".format(
+                self.__class__.__name__,
+                self.library,
+                self._design_units,
+                self._dependencies,
+                self.filename,
+            )
+        )
 
     def getmtime(self):
         return p.getmtime(self.filename)
@@ -146,9 +157,10 @@ class SourceMock(object):
 
 
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
-    _logger = logging.getLogger('MockBuilder')
-    builder_name = 'msim_mock'
-    file_types = ('vhdl', )
+    _logger = logging.getLogger("MockBuilder")
+    builder_name = "msim_mock"
+    file_types = ("vhdl",)
+
     def __init__(self, target_folder):
         self._target_folder = target_folder
         if not p.exists(self._target_folder):
@@ -156,10 +168,10 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
         super(MockBuilder, self).__init__(target_folder)
 
-    def _makeRecords(self, _): # pragma: no cover
+    def _makeRecords(self, _):  # pragma: no cover
         return []
 
-    def _shouldIgnoreLine(self, line): # pragma: no cover
+    def _shouldIgnoreLine(self, line):  # pragma: no cover
         return True
 
     def _checkEnvironment(self):
@@ -169,9 +181,10 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     def isAvailable():
         return True
 
-    def _buildSource(self, path, library, flags=None):  # pylint: disable=unused-argument
-        self._logger.debug("Building path=%s, library=%s, flags=%s",
-                           path, library, flags)
+    def _buildSource(self, path, library, flags=None):
+        self._logger.debug(
+            "Building path=%s, library=%s, flags=%s", path, library, flags
+        )
         return [], []
 
     def _createLibrary(self, library):  # pylint: disable=unused-argument
@@ -183,22 +196,22 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
 class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
-    builder_name = 'FailingBuilder'
+    builder_name = "FailingBuilder"
+
     def _checkEnvironment(self):
-        raise exceptions.SanityCheckError(
-            self.builder_name, "Fake error")
+        raise exceptions.SanityCheckError(self.builder_name, "Fake error")
 
 
-disableVunit = mock.patch('hdlcc.config_parser.foundVunit', lambda: False)
+disableVunit = mock.patch("hdlcc.config_parser.foundVunit", lambda: False)
 
 
 def sanitizePath(*args):
     """
     Join args with pathsep, gets the absolute path and normalizes
     """
-    return p.normpath(p.abspath(p.join(*args)))  # pylint: disable=no-value-for-parameter
-
-
+    return p.normpath(
+        p.abspath(p.join(*args))  # pylint: disable=no-value-for-parameter
+    )
 
 
 def assertCountEqual(it):  # pylint: disable=invalid-name
@@ -206,7 +219,7 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
     assert six.PY2, "Only needed on Python2"
 
     def wrapper(first, second, msg=None):
-        temp = list(second)   # make a mutable copy
+        temp = list(second)  # make a mutable copy
         not_found = []
         for elem in first:
             try:
@@ -217,71 +230,78 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
         error_details = []
 
         if not_found:
-            error_details += ['Second list is missing item {}'.format(x)
-                              for x in not_found]
+            error_details += [
+                "Second list is missing item {}".format(x) for x in not_found
+            ]
 
-        error_details += ['First list is missing item {}'.format(x) for x in
-                          temp]
+        error_details += ["First list is missing item {}".format(x) for x in temp]
 
         if error_details:
             # Add user message at the top
-            error_details = [msg, ] + error_details
-            error_details += ['', "Lists {} and {} differ".format(first, second)]
-            it.fail('\n'.join([str(x) for x in error_details]))
+            error_details = [msg] + error_details
+            error_details += ["", "Lists {} and {} differ".format(first, second)]
+            it.fail("\n".join([str(x) for x in error_details]))
 
     return wrapper
+
 
 def assertSameFile(it):  # pylint: disable=invalid-name
     def wrapper(first, second):
         if not samefile(p.abspath(first), p.abspath(second)):
-            it.fail("Paths '{}' and '{}' differ".format(p.abspath(first),
-                                                        p.abspath(second)))
+            it.fail(
+                "Paths '{}' and '{}' differ".format(p.abspath(first), p.abspath(second))
+            )
+
     return wrapper
 
-def writeListToFile(filename, _list): # pragma: no cover
+
+def writeListToFile(filename, _list):  # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     _logger.debug("Writing to %s", filename)
 
-    open(filename, mode='w').write(
-        '\n'.join([str(x) for x in _list]))
+    open(filename, mode="w").write("\n".join([str(x) for x in _list]))
 
     mtime = p.getmtime(filename)
     time.sleep(0.01)
 
     for i, line in enumerate(_list):
-        _logger.debug('%2d | %s', i + 1, line)
+        _logger.debug("%2d | %s", i + 1, line)
 
     if onWindows():
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
         _logger.debug(cmd)
         subp.check_call(cmd, shell=True)
     else:
-        subp.check_call(['touch', filename])
+        subp.check_call(["touch", filename])
 
     for i in range(10):
         if p.getmtime(filename) != mtime:
             break
         _logger.debug("Waiting...[%d]", i)
         time.sleep(0.1)
+
+
 if not onWindows():
     TEST_ENVS = {
-        'ghdl': os.environ['GHDL_PATH'],
-        'msim': os.environ['MODELSIM_PATH'],
-        'xvhdl': os.environ['XSIM_PATH'],
-        'fallback': None}
+        "ghdl": os.environ["GHDL_PATH"],
+        "msim": os.environ["MODELSIM_PATH"],
+        "xvhdl": os.environ["XSIM_PATH"],
+        "fallback": None,
+    }
 else:
-    TEST_ENVS = {'fallback': None}
+    TEST_ENVS = {"fallback": None}
 
 
 def parametrizeClassWithBuilders(cls):
     cls.assertSameFile = assertSameFile(cls)
 
-    keys = ['builder_name', 'builder_path']
+    keys = ["builder_name", "builder_path"]
     values = []
     for name, path in TEST_ENVS.items():
         values += [(name, path)]
 
     return parameterized_class(keys, values)(cls)
+
 
 def removeCacheData():
     cache_path = getCachePath()
@@ -289,18 +309,20 @@ def removeCacheData():
         shutil.rmtree(cache_path)
         _logger.info("Removed %s", cache_path)
 
+
 def getTestTempPath(name):
-    name = name.replace('.', '_')
-    path = p.abspath(p.join(os.environ['TOX_ENV_DIR'], 'tmp', name))
+    name = name.replace(".", "_")
+    path = p.abspath(p.join(os.environ["TOX_ENV_DIR"], "tmp", name))
     if not p.exists(path):
         os.makedirs(path)
     return path
+
 
 def setupTestSuport(path):
     """Copy contents of .ci/test_support_path/ to the given path"""
     _logger.info("Setting up test support at %s", path)
 
-    test_support_path = os.environ['CI_TEST_SUPPORT_PATH']
+    test_support_path = os.environ["CI_TEST_SUPPORT_PATH"]
 
     paths_to_copy = os.listdir(test_support_path)
 

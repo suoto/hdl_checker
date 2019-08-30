@@ -16,25 +16,28 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import FrozenSet, Optional, Set, Tuple
+from typing import Any, FrozenSet, Optional, Set, Tuple
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-Location = Tuple[Optional[int], Optional[int]]
+Location = Tuple[Any, Any]
 LocationList = FrozenSet[Location]
 
-class ParsedElement(HashableByKey):
 
+class ParsedElement(HashableByKey):
     def __init__(self, locations=None):
         # type: (Optional[LocationList]) -> None
         set_of_locations = set()  # type: Set[Location]
         for line_number, column_number in locations or []:
-            set_of_locations.add((
-                None if line_number is None else int(line_number),
-                None if column_number is None else int(column_number)))
+            set_of_locations.add(
+                (
+                    None if line_number is None else int(line_number),
+                    None if column_number is None else int(column_number),
+                )
+            )
 
         self._locations = frozenset(set_of_locations)
 
@@ -43,7 +46,7 @@ class ParsedElement(HashableByKey):
         return self._locations
 
     def __jsonEncode__(self):
-        return {'location': self.locations}
+        return {"location": self.locations}
 
     @classmethod
     def __jsonDecode__(cls, state):
@@ -51,9 +54,9 @@ class ParsedElement(HashableByKey):
         # pylint: disable=protected-access
         _logger.info("Recovering from %s", state)
         obj = super(ParsedElement, cls).__new__(cls)
-        obj._locations = {tuple(x) for x in state['locations']}
+        obj._locations = {tuple(x) for x in state["locations"]}
         return obj
 
     @property
     def __hash_key__(self):
-        return (self.locations, )
+        return (self.locations,)

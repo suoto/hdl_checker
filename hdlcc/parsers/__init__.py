@@ -27,7 +27,9 @@ from hdlcc import types as t  # pylint: disable=unused-import
 
 from .base_parser import BaseSourceFile
 from .config_parser import ConfigParser, ProjectSourceSpec
-from .dependency_spec import DependencySpec
+from .elements.dependency_spec import DependencySpec, LocationList
+from .elements.design_unit import DesignUnit, DesignUnitType
+from .elements.identifier import Identifier
 from .verilog_parser import VerilogParser
 from .vhdl_parser import VhdlParser
 
@@ -35,37 +37,41 @@ _logger = logging.getLogger(__name__)
 
 SourceFile = Union[VhdlParser, VerilogParser]
 
-def _isVhdl(path): # pragma: no cover
+
+def _isVhdl(path):  # pragma: no cover
     "Uses the file extension to check if the given path is a VHDL file"
-    if path.lower().endswith('.vhd'):
+    if path.lower().endswith(".vhd"):
         return True
-    if path.lower().endswith('.vhdl'):
+    if path.lower().endswith(".vhdl"):
         return True
     return False
 
-def _isVerilog(path): # pragma: no cover
+
+def _isVerilog(path):  # pragma: no cover
     """Uses the file extension to check if the given path is a Verilog
     or SystemVerilog file"""
-    if path.lower().endswith('.v'):
+    if path.lower().endswith(".v"):
         return True
-    if path.lower().endswith('.sv'):
+    if path.lower().endswith(".sv"):
         return True
     return False
 
-def getSourceParserFromPath(path): # type: (t.Path) -> SourceFile
+
+def getSourceParserFromPath(path):  # type: (t.Path) -> SourceFile
     """
     Returns either a VhdlParser or VerilogParser based on the path's file
     extension
     """
-    ext = path.split('.')[-1].lower()
+    ext = path.split(".")[-1].lower()
     if ext in t.FileType.vhd.value:
-        cls = VhdlParser # type: Type[Union[VhdlParser, VerilogParser]]
+        cls = VhdlParser  # type: Type[Union[VhdlParser, VerilogParser]]
     if ext in t.FileType.verilog.value:
         cls = VerilogParser
     if ext in t.FileType.systemverilog.value:
         cls = VerilogParser
 
     return cls(path)
+
 
 def getSourceFileObjects(kwargs_list, workers=None):
     """
@@ -77,7 +83,7 @@ def getSourceFileObjects(kwargs_list, workers=None):
     async_results = []
 
     for kwargs in kwargs_list:
-        if _isVhdl(kwargs['filename']):
+        if _isVhdl(kwargs["filename"]):
             cls = VhdlParser
         else:
             cls = VerilogParser
