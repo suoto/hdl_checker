@@ -381,12 +381,16 @@ class HashableByKey(object):
 
         return NotImplemented
 
+from typing import Any, Callable
+
 def logCalls(func):  # pragma: no cover
+    # type: (Callable) -> Callable
     "Decorator to Log calls to func"
     import pprint
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
+        # type: (...) -> Callable
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
             result = func(self, *args, **kwargs)

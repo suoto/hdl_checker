@@ -18,10 +18,8 @@
 
 # pylint: disable=useless-object-inheritance
 
-from hdlcc.utils import HashableByKey
 
-
-class Identifier(HashableByKey):
+class Identifier(object):
     """
     VHDL, Verilog or SystemVerilog identifier to make it easier to handle case
     and comparisons between them
@@ -29,37 +27,32 @@ class Identifier(HashableByKey):
 
     def __init__(self, name, case_sensitive):
         # type: (str, bool) -> None
-        self._name = name
-        self._case_sensitive = case_sensitive
+        self._name = str(name) if case_sensitive else str(name).lower()
+        self._display_name = str(name)
 
     @property
     def name(self):
-        "Identifier name as given when creating the object"
+        "Normalized identifier name"
         return self._name
 
     @property
-    def case_sensitive(self):
-        "Defines if case should be used when comparing identifiers"
-        return self._case_sensitive
+    def display_name(self):
+        "Identifier name as given when creating the object"
+        return self._display_name
 
-    def __hash_key__(self):
-        return self.name, self.case_sensitive
+    def __hash__(self):
+        return hash(self.name)
 
     def __repr__(self):
-        return "{}({}, {})".format(
-            self.__class__.__name__,
-            self.name,
-            "case" if self.case_sensitive else "nocase",
+        return "{}(name={}, display_name={})".format(
+            self.__class__.__name__, repr(self.name), repr(self.display_name)
         )
 
     def __eq__(self, other):
         """Overrides the default implementation"""
 
         if isinstance(other, self.__class__):
-            our_name = self.name if self.case_sensitive else self.name.lower()
-            other_name = other.name if other.case_sensitive else other.name.lower()
-
-            return str(our_name) == str(other_name)
+            return self.name == other.name
 
         return NotImplemented  # pragma: no cover
 

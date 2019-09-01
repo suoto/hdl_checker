@@ -16,7 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import Any, FrozenSet, Optional, Set, Tuple
+from typing import Any, FrozenSet, Iterable, Optional, Set, Tuple
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.utils import HashableByKey
@@ -24,7 +24,7 @@ from hdlcc.utils import HashableByKey
 _logger = logging.getLogger(__name__)
 
 Location = Tuple[Any, Any]
-LocationList = FrozenSet[Location]
+LocationList = Iterable[Location]
 
 
 class ParsedElement(HashableByKey):

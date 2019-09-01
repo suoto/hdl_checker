@@ -25,18 +25,29 @@ import shutil
 import subprocess as subp
 import time
 from multiprocessing import Queue
-from typing import Tuple
+from typing import Optional  # pylint: disable=unused-import
+from typing import Any, Callable, Dict, Iterable, Set, Tuple, Union
 
 import mock
 import six
-from parameterized import parameterized_class  #type: ignore
+from parameterized import parameterized_class  # type: ignore
 
 from hdlcc import exceptions
+from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.utils import getCachePath, getFileType, onWindows, removeDuplicates, samefile
 
+from hdlcc.parsers import (  # pylint: disable=unused-import; pylint: disable=unused-import
+    DependencySpec,
+    Identifier,
+    tAnyDesignUnit,
+)
+
 _logger = logging.getLogger(__name__)
+
+
+MockDep = Union[Tuple[str], Tuple[str, str]]
 
 
 class StandaloneProjectBuilder(HdlCodeCheckerBase):
@@ -65,26 +76,46 @@ class SourceMock(object):
     _logger = logging.getLogger("SourceMock")
     base_path = ""
 
-    def __init__(self, design_units, library=None, dependencies=None, filename=None):
+    def __init__(
+        self,
+        design_units,  # type: Iterable[Dict[str, str]]
+        library=None,  # type: str
+        dependencies=None,  # type: Iterable[MockDep]
+        filename=None,  # type: Optional[t.Path]
+    ):
+
+        self._design_units = list(design_units or [])
+
         if filename is not None:
             self._filename = p.join(self.base_path, filename)
         else:
+            library = "lib_not_set" if library is None else library
             self._filename = p.join(
-                self.base_path,
-                (library or "lib_not_set") + "_" + design_units[0]["name"] + ".vhd",
+                self.base_path, library, "_{}.vhd".format(self._design_units[0]["name"])
             )
 
         self.filetype = getFileType(self.filename)
         self.abspath = p.abspath(self.filename)
-        self.flags = []
+        self.flags = []  # type: ignore
 
         self.library = library
-        self._design_units = list(design_units or [])
-        self._dependencies = set()
+        self._dependencies = set()  # type: Set[DependencySpec]
         for dep_spec in dependencies or []:
-            #  if dep_spec.owner is None:
-            dep_spec._owner = self.filename
-            self._dependencies.add(dep_spec)
+            _name = dep_spec[0]
+            _library = "work"
+
+            try:
+                _library, _name = dep_spec
+            except ValueError:
+                pass
+
+            self._dependencies.add(
+                DependencySpec(
+                    t.Path(self._filename),
+                    Identifier(_name, False),
+                    Identifier(_library, False),
+                )
+            )
 
         self._createMockFile()
 
@@ -96,17 +127,20 @@ class SourceMock(object):
         return removeDuplicates([x.library for x in self._dependencies])
 
     def _createMockFile(self):
-        self._logger.debug("Creating mock file: %s", self.filename)
+        # type: () -> None
+        self._logger.debug("Creating mock file: %s", self)
         libs = self.getLibraries()
 
         lines = []
 
         for lib in libs:
-            lines.append("library {0};".format(lib or "work"))
+            lines.append("library {0};".format(lib.display_name))
 
         for dependency in self._dependencies:
             lines.append(
-                "use {0}.{1};".format(dependency.library or "work", dependency.name)
+                "use {0}.{1};".format(
+                    dependency.library.display_name, dependency.name.display_name
+                )
             )
 
         # Separate if there was libraries already added
@@ -122,8 +156,8 @@ class SourceMock(object):
             lines.append("end {0} {1};".format(type_, name))
             lines.append("")
 
-        for i, line in enumerate(lines):
-            self._logger.debug("%2d | %s", i + 1, line)
+        for i, line in enumerate(lines, 1):
+            self._logger.debug("%2d | %s", i, line)
 
         with open(self.filename, "w") as fd:
             fd.write("\n".join(lines))
@@ -142,9 +176,6 @@ class SourceMock(object):
 
     def getmtime(self):
         return p.getmtime(self.filename)
-
-    def __str__(self):
-        return "[%s] %s" % (self.library, self.filename)
 
     def getDesignUnits(self):
         return self._design_units
@@ -341,3 +372,10 @@ def setupTestSuport(path):
 
         _logger.info("Copying %s to %s", src, dest)
         shutil.copytree(src, dest)
+
+
+def logIterable(msg, iterable, func):
+    # type: (str, Iterable[Any], Callable) -> None
+    func(msg)
+    for i, item in enumerate(iterable, 1):
+        func("- {:2d} {}".format(i, item))

@@ -17,7 +17,7 @@
 
 import logging
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
 from hdlcc import types as t  # pylint: disable=unused-import
 
@@ -34,7 +34,7 @@ class DesignUnitType(Enum):
     context = "context"
 
 
-class DesignUnit(ParsedElement):
+class _DesignUnit(ParsedElement):
     """
     Specifies a design unit (uses mostly VHDL nomenclature)
     """
@@ -45,7 +45,7 @@ class DesignUnit(ParsedElement):
         self._type = type_
         self._name = name
 
-        super(DesignUnit, self).__init__(locations)
+        super(_DesignUnit, self).__init__(locations)
 
     def __repr__(self):
         return '{}(name="{}", type={}, owner={}, locations={})'.format(
@@ -80,4 +80,42 @@ class DesignUnit(ParsedElement):
 
     @property
     def __hash_key__(self):
-        return (self.owner, self.type_, self.name, super(DesignUnit, self).__hash_key__)
+        return (
+            self.owner,
+            self.type_,
+            self.name,
+            super(_DesignUnit, self).__hash_key__,
+        )
+
+
+class VhdlDesignUnit(_DesignUnit):
+    """
+    Specifies a design unit whose name is case insensitive
+    """
+
+    def __init__(self, owner, type_, name, locations=None):
+        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        super(VhdlDesignUnit, self).__init__(
+            owner=owner,
+            type_=type_,
+            name=Identifier(name, case_sensitive=False),
+            locations=locations,
+        )
+
+
+class VerilogDesignUnit(_DesignUnit):
+    """
+    Specifies a design unit whose name is case sensitive
+    """
+
+    def __init__(self, owner, type_, name, locations=None):
+        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        super(VerilogDesignUnit, self).__init__(
+            owner=owner,
+            type_=type_,
+            name=Identifier(name, case_sensitive=True),
+            locations=locations,
+        )
+
+
+tAnyDesignUnit = Union[VhdlDesignUnit, VerilogDesignUnit]

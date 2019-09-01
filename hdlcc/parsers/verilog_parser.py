@@ -23,7 +23,7 @@ from typing import Generator
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
 
-from . import DesignUnit, DesignUnitType, Identifier, LocationList
+from . import DesignUnitType, LocationList, VerilogDesignUnit
 
 _logger = logging.getLogger(__name__)
 
@@ -67,22 +67,21 @@ class VerilogParser(BaseSourceFile):
     def _getDependencies(self):
         return []
 
-    def _getDesignUnits(self):  # type: () -> Generator[DesignUnit, None, None]
+    def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
         for match, line_number in self._iterDesignUnitMatches():
-            locations = frozenset({(line_number, None)})  # type: LocationList
             if match["module_name"] is not None:
-                yield DesignUnit(
+                yield VerilogDesignUnit(
                     owner=self.filename,
-                    name=Identifier(match["module_name"], case_sensitive=True),
+                    name=match["module_name"],
                     type_=DesignUnitType.entity,
-                    locations=locations,
+                    locations={(line_number, None)},
                 )
             if match["package_name"] is not None:
-                yield DesignUnit(
+                yield VerilogDesignUnit(
                     owner=self.filename,
-                    name=Identifier(match["package_name"], case_sensitive=True),
+                    name=match["package_name"],
                     type_=DesignUnitType.package,
-                    locations=locations,
+                    locations={(line_number, None)},
                 )
 
     def _getLibraries(self):

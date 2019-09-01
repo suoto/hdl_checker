@@ -28,7 +28,12 @@ from hdlcc import types as t  # pylint: disable=unused-import
 from .base_parser import BaseSourceFile
 from .config_parser import ConfigParser, ProjectSourceSpec
 from .elements.dependency_spec import DependencySpec, LocationList
-from .elements.design_unit import DesignUnit, DesignUnitType
+from .elements.design_unit import (
+    DesignUnitType,
+    VerilogDesignUnit,
+    VhdlDesignUnit,
+    tAnyDesignUnit,
+)
 from .elements.identifier import Identifier
 from .verilog_parser import VerilogParser
 from .vhdl_parser import VhdlParser

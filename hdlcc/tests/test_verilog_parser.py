@@ -24,19 +24,20 @@ import os
 import six
 from nose2.tools import such  # type: ignore
 
-from hdlcc.parsers import DesignUnit, DesignUnitType, Identifier, VerilogParser
+from hdlcc.parsers import DesignUnitType, VerilogDesignUnit, VerilogParser
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
-_FILENAME = 'source.v'
+_FILENAME = "source.v"
 
-with such.A('Verilog source file object') as it:
+with such.A("Verilog source file object") as it:
     if six.PY2:
         it.assertCountEqual = assertCountEqual(it)
 
-    with it.having('a module code'):
+    with it.having("a module code"):
+
         @it.has_setup
         def setup():
             if os.path.exists(_FILENAME):
@@ -58,41 +59,47 @@ module clock_divider
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
-        @it.should('parse a file without errors')  # type: ignore
+        @it.should("parse a file without errors")  # type: ignore
         def test():
             it.source = VerilogParser(_FILENAME)
 
-        @it.should('return its design units')  # type: ignore
+        @it.should("return its design units")  # type: ignore
         def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertCountEqual(
                 design_units,
-                [DesignUnit(owner=it.source.filename,
-                            name=Identifier('clock_divider', case_sensitive=True),
-                            type_=DesignUnitType.entity,
-                            locations={(0, None),})])
+                [
+                    VerilogDesignUnit(
+                        owner=it.source.filename,
+                        name="clock_divider",
+                        type_=DesignUnitType.entity,
+                        locations={(0, None)},
+                    )
+                ],
+            )
 
-        @it.should('return no dependencies')  # type: ignore
+        @it.should("return no dependencies")  # type: ignore
         def test():
             it.assertEqual(it.source.getDependencies(), [])
 
-        @it.should('return source modification time')  # type: ignore
+        @it.should("return source modification time")  # type: ignore
         def test():
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
-        @it.should('return no libraries')  # type: ignore
+        @it.should("return no libraries")  # type: ignore
         def test():
             it.assertEqual(it.source.getLibraries(), [])
 
-        @it.should('report as equal after recovering from cache via json')  # type: ignore
+        @it.should("report as equal after recovering from cache")  # type:ignore
         def test():
             state = json.dumps(it.source, cls=StateEncoder)
             _logger.info("State before: %s", state)
             recovered = json.loads(state, object_hook=jsonObjectHook)
             it.assertEqual(it.source.filename, recovered.filename)
 
-    with it.having('a package code'):
+    with it.having("a package code"):
+
         @it.has_setup
         def setup():
             if os.path.exists(_FILENAME):
@@ -111,19 +118,25 @@ endpackage
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
-        @it.should('return its design units')  # type: ignore
+        @it.should("return its design units")  # type: ignore
         def test():
             design_units = list(it.source.getDesignUnits())
             _logger.debug("Design units: %s", design_units)
             it.assertCountEqual(
                 design_units,
-                [DesignUnit(owner=it.source.filename,
-                            name=Identifier('msgPkg', case_sensitive=True),
-                            type_=DesignUnitType.package,
-                            locations={(0, None),})])
+                [
+                    VerilogDesignUnit(
+                        owner=it.source.filename,
+                        name="msgPkg",
+                        type_=DesignUnitType.package,
+                        locations={(0, None)},
+                    )
+                ],
+            )
 
-        @it.should('return no libraries')  # type: ignore
+        @it.should("return no libraries")  # type: ignore
         def test():
             it.assertEqual(it.source.getLibraries(), [])
+
 
 it.createTests(globals())

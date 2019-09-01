@@ -23,7 +23,7 @@ from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
 
-from . import DependencySpec, DesignUnit, DesignUnitType, Identifier, LocationList
+from . import DependencySpec, VhdlDesignUnit, DesignUnitType, Identifier, LocationList
 
 _logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class VhdlParser(BaseSourceFile):
                 owner=self.filename,  # type: ignore
                 name=Identifier(dep["name"], False),
                 library=Identifier(dep["library"], False),
-                locations=frozenset(dep["locations"]),
+                locations=dep["locations"],
             )
 
         for match in _ADDITIONAL_DEPS_SCANNER.finditer(self.getSourceContent()):
@@ -130,7 +130,7 @@ class VhdlParser(BaseSourceFile):
                 owner=self.filename,
                 name=Identifier(package_body_name, False),
                 library=Identifier("work", False),
-                locations=frozenset({(line_number + 1, column_number + 1)}),
+                locations={(line_number + 1, column_number + 1)},
             )
 
     def _getLibraries(self):
@@ -149,16 +149,16 @@ class VhdlParser(BaseSourceFile):
 
         return libs
 
-    def _getDesignUnits(self):  # type: () -> Generator[DesignUnit, None, None]
+    def _getDesignUnits(self):  # type: () -> Generator[VhdlDesignUnit, None, None]
         """
         Parses the source file to find design units and dependencies
         """
 
         for match, line_number in self._iterDesignUnitMatches():
-            locations = frozenset({(line_number, None)})  # type: LocationList
+            locations = {(line_number, None)}
 
             if match["package_name"] is not None:
-                yield DesignUnit(
+                yield VhdlDesignUnit(
                     owner=self.filename,
                     name=match["package_name"],
                     type_=DesignUnitType.package,
@@ -166,14 +166,14 @@ class VhdlParser(BaseSourceFile):
                 )
 
             elif match["entity_name"] is not None:
-                yield DesignUnit(
+                yield VhdlDesignUnit(
                     owner=self.filename,
                     name=match["entity_name"],
                     type_=DesignUnitType.entity,
                     locations=locations,
                 )
             elif match["context_name"] is not None:
-                yield DesignUnit(
+                yield VhdlDesignUnit(
                     owner=self.filename,
                     name=match["context_name"],
                     type_=DesignUnitType.context,

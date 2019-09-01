@@ -27,7 +27,7 @@ import os.path as p
 import six
 from nose2.tools import such  # type: ignore
 
-from hdlcc.parsers import (DependencySpec, DesignUnit, DesignUnitType,
+from hdlcc.parsers import (DependencySpec, VhdlDesignUnit, DesignUnitType,
                            Identifier, VhdlParser)
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, assertSameFile, writeListToFile
@@ -114,7 +114,7 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 design_units,
                 [
-                    DesignUnit(
+                    VhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.entity,
                         name="clock_divider",
@@ -347,7 +347,7 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
-                    DesignUnit(
+                    VhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.package,
                         name="package_with_constants",
@@ -441,7 +441,7 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
-                    DesignUnit(
+                    VhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.context,
                         name="context_name",
@@ -459,19 +459,19 @@ with such.A("VHDL source file object") as it:
                         owner=it.source.filename,
                         name="pkg0",
                         library="lib0",
-                        locations=frozenset({(3, 7)}),
+                        locations={(3, 7)},
                     ),
                     _DependencySpec(
                         owner=it.source.filename,
                         name="pkg1",
                         library="lib0",
-                        locations=frozenset({(4, 7)}),
+                        locations={(4, 7)},
                     ),
                     _DependencySpec(
                         owner=it.source.filename,
                         name="all",
                         library="lib1",
-                        locations=frozenset({(6, 7)}),
+                        locations={(6, 7)},
                     ),
                 ],
             )
