@@ -18,7 +18,6 @@
 
 # pylint: disable=useless-object-inheritance
 
-import functools
 import logging
 import os.path as p
 import sys
@@ -30,6 +29,7 @@ from pyls.uris import to_fs_path # type: ignore
 
 from hdlcc.diagnostics import DiagType, FailedToCreateProject
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.utils import logCalls
 
 MONITORED_FILES = ('.vhd', '.vhdl', '.sv', '.svh', '.v', '.vh')
 CONFIG_FILES = ()
@@ -39,23 +39,6 @@ _logger = logging.getLogger(__name__)
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 DEFAULT_PROJECT_FILENAME = 'vimhdl.prj'
 PY2 = sys.version_info[0] == 2
-
-def _logCalls(func):  # pragma: no cover
-    "Decorator to Log calls to func"
-    import pprint
-
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
-        try:
-            result = func(self, *args, **kwargs)
-            _logger.info("%s => %s", _str, repr(result))
-            return result
-        except:
-            _logger.exception("Failed to run %s", _str)
-            raise
-
-    return wrapper
 
 
 def checkerDiagToLspDict(diag):
@@ -172,14 +155,14 @@ class HdlccLanguageServer(PythonLanguageServer):
         self._onProjectFileUpdate({'project_file': None})
         self._global_diags = set()
 
-    @_logCalls
+    @logCalls
     def capabilities(self):
         "Returns language server capabilities"
         return {
             'textDocumentSync': defines.TextDocumentSyncKind.FULL,
         }
 
-    @_logCalls
+    @logCalls
     def m_initialize(self, processId=None, rootUri=None, # pylint: disable=invalid-name
                      rootPath=None, initializationOptions=None, **_kwargs):
 
@@ -265,11 +248,11 @@ class HdlccLanguageServer(PythonLanguageServer):
         text = self.workspace.get_document(doc_uri).source
         return filter(filter_func, self._checker.getMessagesWithText(path, text))
 
-    @_logCalls
+    @logCalls
     def m_workspace__did_change_configuration(self, settings=None):
         self._onProjectFileUpdate(settings or {})
 
-    #  @_logCalls
+    #  @logCalls
     #  def m_workspace__did_change_watched_files(self, changes=None, **_kwargs):
     #      changed_monitored_files = set()
     #      config_changed = False

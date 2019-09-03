@@ -30,18 +30,33 @@ from hdlcc import builders, exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders import Fallback
 from hdlcc.database import Database
-from hdlcc.diagnostics import (CheckerDiagnostic, DependencyNotUnique,
-                               DiagType, PathNotInProjectFile)
-from hdlcc.parsers import (ConfigParser, DependencySpec, VerilogParser,
-                           VhdlParser, SourceFile)
+from hdlcc.diagnostics import (
+    CheckerDiagnostic,
+    DependencyNotUnique,
+    DiagType,
+    PathNotInProjectFile,
+)
+from hdlcc.parsers import (
+    ConfigParser,
+    DependencySpec,
+    VerilogParser,
+    VhdlParser,
+    tSourceFile,
+)
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import (getCachePath, getFileType, removeDirIfExists,
-                         removeDuplicates, removeIfExists, samefile)
+from hdlcc.utils import (
+    getCachePath,
+    getFileType,
+    removeDirIfExists,
+    removeDuplicates,
+    removeIfExists,
+    samefile,
+)
 
-CACHE_NAME = 'cache.json'
+CACHE_NAME = "cache.json"
 
-_logger = logging.getLogger('build messages')
+_logger = logging.getLogger("build messages")
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -54,14 +69,14 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self): # type: () -> None
+    def __init__(self):  # type: () -> None
         self._start_dir = p.abspath(os.curdir)
         self._logger = logging.getLogger(__name__)
-        self._build_sequence_cache = {} # type: Dict[str, Any]
-        self._outstanding_diags = set() # type: Set[CheckerDiagnostic]
+        self._build_sequence_cache = {}  # type: Dict[str, Any]
+        self._outstanding_diags = set()  # type: Set[CheckerDiagnostic]
         self._setup_lock = RLock()
 
-        self.config_file = None # type: Optional[t.Path]
+        self.config_file = None  # type: Optional[t.Path]
 
         self.database = Database()
         self.builder = Fallback(self._getWorkingPath())
@@ -70,7 +85,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._setupEnvIfNeeded()
         self._saveCache()
 
-    def setConfigFile(self, path): # type: (t.Path) -> None
+    def setConfigFile(self, path):  # type: (t.Path) -> None
         """
         Setting the configuration file will trigger parsing if the path is
         different than the one already set.
@@ -82,13 +97,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.config_file = path
         self.database.accept(ConfigParser(path))
 
-    def _getWorkingPath(self): # type: () -> t.Path
+    def _getWorkingPath(self):  # type: () -> t.Path
         """
         The working path will depend on the configuration file but it's
         guaranteed not to be None
         """
-        cache = p.abspath(self.config_file or '.')
-        return t.Path(p.join(getCachePath(), cache.replace(p.sep, '_')))
+        cache = p.abspath(self.config_file or ".")
+        return t.Path(p.join(getCachePath(), cache.replace(p.sep, "_")))
 
     def _getCacheFilename(self):
         """
@@ -104,14 +119,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         cache_fname = self._getCacheFilename()
 
-        state = {'_logger': {'name': self._logger.name,
-                             'level': self._logger.level},
-                 'builder': self.builder}
+        state = {
+            "_logger": {"name": self._logger.name, "level": self._logger.level},
+            "builder": self.builder,
+        }
 
         self._logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname)):
             os.makedirs(p.dirname(cache_fname))
-        json.dump(state, open(cache_fname, 'w'), indent=True, cls=StateEncoder)
+        json.dump(state, open(cache_fname, "w"), indent=True, cls=StateEncoder)
 
     def _recoverCacheIfPossible(self):
         """
@@ -122,19 +138,25 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         cache_fname = self._getCacheFilename()
 
         try:
-            cache = json.load(open(cache_fname, 'r'), object_hook=jsonObjectHook)
+            cache = json.load(open(cache_fname, "r"), object_hook=jsonObjectHook)
             self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
         except IOError:
-            self._logger.debug("Couldn't read cache file %s, skipping recovery",
-                               cache_fname)
+            self._logger.debug(
+                "Couldn't read cache file %s, skipping recovery", cache_fname
+            )
             return
         except ValueError as exception:
             self._handleUiWarning(
-                "Unable to recover cache from '{}': {}".format(cache_fname,
-                                                               str(exception)))
+                "Unable to recover cache from '{}': {}".format(
+                    cache_fname, str(exception)
+                )
+            )
 
-            self._logger.warning("Unable to recover cache from '%s': %s",
-                                 cache_fname, traceback.format_exc())
+            self._logger.warning(
+                "Unable to recover cache from '%s': %s",
+                cache_fname,
+                traceback.format_exc(),
+            )
             return
 
         self._setState(cache)
@@ -175,8 +197,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
                     self.builder = builder_class(cache_dir)
 
-                    self._logger.info("Selected builder is '%s'",
-                                      self.builder.builder_name)
+                    self._logger.info(
+                        "Selected builder is '%s'", self.builder.builder_name
+                    )
         except exceptions.SanityCheckError as exc:
             self._handleUiError("Failed to create builder '%s'" % exc.builder)
             self.builder = Fallback(self._getWorkingPath())
@@ -199,70 +222,70 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         Serializer load implementation
         """
-        self._logger = logging.getLogger(state['_logger']['name'])
-        self._logger.setLevel(state['_logger']['level'])
-        del state['_logger']
+        self._logger = logging.getLogger(state["_logger"]["name"])
+        self._logger.setLevel(state["_logger"]["level"])
+        del state["_logger"]
 
-        self.database = state['database']
+        self.database = state["database"]
 
         builder_name = self.database.builder_name
         self._logger.debug("Recovered builder is '%s'", builder_name)
         #  builder_class = hdlcc.builders.getBuilderByName(builder_name)
         #  self.builder = builder_class.recoverFromState(state['builder'])
-        self.builder = state['builder']
+        self.builder = state["builder"]
 
     @abc.abstractmethod
-    def _handleUiInfo(self, message): # type: (AnyStr) -> None
+    def _handleUiInfo(self, message):  # type: (AnyStr) -> None
         """
         Method that should be overriden to handle info messages from
         HDL Code Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiWarning(self, message): # type: (AnyStr) -> None
+    def _handleUiWarning(self, message):  # type: (AnyStr) -> None
         """
         Method that should be overriden to handle warning messages
         from HDL Code Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiError(self, message): # type: (AnyStr) -> None
+    def _handleUiError(self, message):  # type: (AnyStr) -> None
         """
         Method that should be overriden to handle errors messages
         from HDL Code Checker to the user
         """
 
-    def getSourceByPath(self, path):
-        # type: (t.Path) -> Tuple[SourceFile, List[CheckerDiagnostic]]
-        """
-        Get the source object, flags and any additional info to be displayed
-        """
-        try:
-            return self.database.getSourceByPath(path), []
-        except KeyError:
-            pass
+    #  def getSourceByPath(self, path):
+    #      # type: (t.Path) -> Tuple[tSourceFile, List[CheckerDiagnostic]]
+    #      """
+    #      Get the source object, flags and any additional info to be displayed
+    #      """
+    #      try:
+    #          return self.database.getSourceByPath(path), []
+    #      except KeyError:
+    #          pass
 
-        remarks = [] # type: List[CheckerDiagnostic]
+    #      remarks = [] # type: List[CheckerDiagnostic]
 
-        # If the source file was not found on the configuration file, add this
-        # as a remark.
-        # Also, create a source parser object with some library so the user can
-        # at least have some info on the source
-        if not isinstance(self.builder, Fallback):
-            remarks = [PathNotInProjectFile(p.abspath(path)), ]
+    #      # If the source file was not found on the configuration file, add this
+    #      # as a remark.
+    #      # Also, create a source parser object with some library so the user can
+    #      # at least have some info on the source
+    #      if not isinstance(self.builder, Fallback):
+    #          remarks = [PathNotInProjectFile(p.abspath(path)), ]
 
-        self._logger.info("Path %s not found in the project file",
-                          p.abspath(path))
+    #      self._logger.info("Path %s not found in the project file",
+    #                        p.abspath(path))
 
-        if getFileType(path) == 'vhdl':
-            source = VhdlParser(path, library='undefined') # type: SourceFile
-        else:
-            source = VerilogParser(path, library='undefined')
+    #      if getFileType(path) == 'vhdl':
+    #          source = VhdlParser(path, library='undefined') # type: tSourceFile
+    #      else:
+    #          source = VerilogParser(path, library='undefined')
 
-        return source, remarks
+    #      return source, remarks
 
     def _resolveRelativeNames(self, source):
-        # type: (SourceFile) -> Generator[DependencySpec, None, None]
+        # type: (tSourceFile) -> Generator[DependencySpec, None, None]
         """
         Translate raw dependency list parsed from a given source to the
         project name space
@@ -270,10 +293,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         for dependency in source.getDependencies():
             if dependency.library in self.builder.getBuiltinLibraries():
                 continue
-            if dependency.name == 'all':
+            if dependency.name == "all":
                 continue
-            if (dependency.library == source.library and \
-                    dependency.name in [x['name'] for x in source.getDesignUnits()]):
+            if dependency.library == source.library and dependency.name in [
+                x["name"] for x in source.getDesignUnits()
+            ]:
                 continue
             yield dependency
 
@@ -282,11 +306,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         Sorts a given set of build records
         """
-        return sorted(diagnostics, key=lambda x: \
-                (x.severity, x.line_number or 0, x.error_code or ''))
+        return sorted(
+            diagnostics,
+            key=lambda x: (x.severity, x.line_number or 0, x.error_code or ""),
+        )
 
     def updateBuildSequenceCache(self, source):
-        # type: (SourceFile) -> List[Tuple[SourceFile, t.LibraryName]]
+        # type: (tSourceFile) -> List[Tuple[tSourceFile, t.LibraryName]]
         """
         Wrapper to _resolveBuildSequence passing the initial build sequence
         list empty and caching the result
@@ -304,34 +330,39 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             else:
                 timestamp = 0
             self._build_sequence_cache[key] = {
-                'sequence': build_sequence,
-                'timestamp': timestamp}
+                "sequence": build_sequence,
+                "timestamp": timestamp,
+            }
         else:
-            cached_sequence = self._build_sequence_cache[key]['sequence']
-            cached_timestamp = self._build_sequence_cache[key]['timestamp']
+            cached_sequence = self._build_sequence_cache[key]["sequence"]
+            cached_timestamp = self._build_sequence_cache[key]["timestamp"]
             if cached_sequence:
                 current_timestamp = max(
                     max({x.getmtime() for x in cached_sequence if x}),
-                    source.getmtime() or 0)
+                    source.getmtime() or 0,
+                )
             else:
                 current_timestamp = 0
 
             if current_timestamp > cached_timestamp:
-                self._logger.debug("Timestamp change, rescanning build "
-                                   "sequence")
+                self._logger.debug("Timestamp change, rescanning build " "sequence")
                 self._build_sequence_cache[key] = {
-                    'sequence': self.getBuildSequence(source),
-                    'timestamp': current_timestamp}
+                    "sequence": self.getBuildSequence(source),
+                    "timestamp": current_timestamp,
+                }
 
-        return self._build_sequence_cache[key]['sequence']
+        return self._build_sequence_cache[key]["sequence"]
 
     def _reportDependencyNotUnique(self, non_resolved_dependency, actual, choices):
         """
         Reports a dependency failed to be resolved due to multiple files
         defining the required design unit
         """
-        locations = non_resolved_dependency.locations or \
-                    (non_resolved_dependency.filename, 1, None)
+        locations = non_resolved_dependency.locations or (
+            non_resolved_dependency.filename,
+            1,
+            None,
+        )
 
         for filename, line_number, column_number in locations:
             self._outstanding_diags.add(
@@ -339,20 +370,22 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                     filename=filename,
                     line_number=line_number,
                     column_number=column_number,
-                    design_unit='{}.{}'.format(non_resolved_dependency.library,
-                                               non_resolved_dependency.name),
+                    design_unit="{}.{}".format(
+                        non_resolved_dependency.library, non_resolved_dependency.name
+                    ),
                     actual=actual.filename,
-                    choices=list(choices)))
-
+                    choices=list(choices),
+                )
+            )
 
     def getBuildSequence(self, source):
-        # type: (SourceFile) -> List[Tuple[SourceFile, t.LibraryName]]
-        build_sequence = [] # type: List[Tuple[SourceFile, t.LibraryName]]
+        # type: (tSourceFile) -> List[Tuple[tSourceFile, t.LibraryName]]
+        build_sequence = []  # type: List[Tuple[tSourceFile, t.LibraryName]]
         self._resolveBuildSequence(source, build_sequence)
         return build_sequence
 
     def _resolveBuildSequence(self, source, build_sequence, reference=None):
-        # type: (SourceFile, List[Tuple[SourceFile, t.LibraryName]], Optional[SourceFile]) -> None
+        # type: (tSourceFile, List[Tuple[tSourceFile, t.LibraryName]], Optional[tSourceFile]) -> None
         """
         Recursively finds out the dependencies of the given source file
         """
@@ -366,7 +399,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             dependencies_list = self.database.discoverSourceDependencies(
                 unit=dependency.name,
                 library=dependency.library,
-                case_sensitive=source.filetype != 'vhdl')
+                case_sensitive=source.filetype != "vhdl",
+            )
 
             if not dependencies_list:
                 continue
@@ -380,7 +414,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 self._reportDependencyNotUnique(
                     non_resolved_dependency=dependency,
                     actual=selected_dependency[0],
-                    choices=[x[0] for x in dependencies_list])
+                    choices=[x[0] for x in dependencies_list],
+                )
 
             # Check if we found out that a dependency is the same we
             # found in the previous call to break the circular loop
@@ -389,8 +424,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 return
 
             if selected_dependency not in build_sequence:
-                self._resolveBuildSequence(selected_dependency[0], reference=source,
-                                           build_sequence=build_sequence)
+                self._resolveBuildSequence(
+                    selected_dependency[0],
+                    reference=source,
+                    build_sequence=build_sequence,
+                )
 
             if selected_dependency not in build_sequence:
                 build_sequence.append(selected_dependency)
@@ -398,7 +436,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         build_sequence = removeDuplicates(build_sequence)
 
     def _getBuilderMessages(self, source):
-        # type: (SourceFile) -> List[Dict[str, str]]
+        # type: (tSourceFile) -> List[Dict[str, str]]
         """
         Builds the given source taking care of recursively building its
         dependencies first
@@ -422,18 +460,16 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
             old = str(src.library)
             src.library = library
-            dep_records = self._buildAndHandleRebuilds(src, forced=False,
-                                                       flags=_flags)
+            dep_records = self._buildAndHandleRebuilds(src, forced=False, flags=_flags)
             src.library = old
 
             for record in dep_records:
                 if record.filename is None:
                     continue
-                if record.severity in (DiagType.ERROR, ):
+                if record.severity in (DiagType.ERROR,):
                     records.add(record)
 
-        records.update(self._buildAndHandleRebuilds(source, forced=True,
-                                                    flags=flags))
+        records.update(self._buildAndHandleRebuilds(source, forced=True, flags=flags))
 
         return self._sortBuildMessages(records)
 
@@ -452,8 +488,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             else:
                 return records
 
-        self._handleUiError("Unable to build '%s' after %d attempts" %
-                            (source.filename, self._MAX_REBUILD_ATTEMPTS))
+        self._handleUiError(
+            "Unable to build '%s' after %d attempts"
+            % (source.filename, self._MAX_REBUILD_ATTEMPTS)
+        )
 
         return {}
 
@@ -462,25 +500,29 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Resolves hints found in the rebuild list into source objects
         and rebuild them
         """
-        self._logger.info("Building '%s' triggers rebuilding: %s",
-                          source, ", ".join([str(x) for x in rebuilds]))
+        self._logger.info(
+            "Building '%s' triggers rebuilding: %s",
+            source,
+            ", ".join([str(x) for x in rebuilds]),
+        )
         for rebuild in rebuilds:
             self._logger.debug("Rebuild hint: '%s'", rebuild)
-            if 'rebuild_path' in rebuild:
-                rebuild_sources = [self.getSourceByPath(rebuild['rebuild_path'])[0]]
+            if "rebuild_path" in rebuild:
+                rebuild_sources = [self.getSourceByPath(rebuild["rebuild_path"])[0]]
             else:
-                unit_name = rebuild.get('unit_name', None)
-                library_name = rebuild.get('library_name', None)
-                unit_type = rebuild.get('unit_type', None)
+                unit_name = rebuild.get("unit_name", None)
+                library_name = rebuild.get("library_name", None)
+                unit_type = rebuild.get("unit_type", None)
 
                 if library_name is not None:
                     rebuild_sources = self.database.findSourcesByDesignUnit(
-                        unit_name, library_name)
+                        unit_name, library_name
+                    )
                 elif unit_type is not None:
-                    library = source.getMatchingLibrary(
-                        unit_type, unit_name)
+                    library = source.getMatchingLibrary(unit_type, unit_name)
                     rebuild_sources = self.database.findSourcesByDesignUnit(
-                        unit_name, library)
+                        unit_name, library
+                    )
                 else:  # pragma: no cover
                     assert False, "Don't know how to handle %s" % rebuild
 
@@ -496,24 +538,30 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return False
         return True
 
-    def getMessagesByPath(self, path, *args, **kwargs):
+    def getMessagesByPath(self, path):
         """
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
         self._setupEnvIfNeeded()
 
-        source, remarks = self.getSourceByPath(path)
-        return self._sortBuildMessages(
-            self.getMessagesBySource(source, *args, **kwargs) + remarks)
+        # These paths define the dependencies that the original path has. In
+        # the ideal case, each dependency is defined once and the config file
+        # specifies the correct library, in which case we don't add any extra
+        # warning.
+        #
+        # If a dependency is defined multiple times, issue a warning indicating
+        # which one is going to actually be used and which are the other
+        # options, just like what has been already implemented.
+        #
+        # If the library is not set for the a given path, try to guess it by
+        # (1) given every design unit defined in this file, (2) search for
+        # every file that also depends on it and (3) identify which library is
+        # used. If all of them converge on the same library name, just use
+        # that. If there's no agreement, use the library that satisfies the
+        # path in question but warn the user that something is not right
+        paths = self.database.discoverSourceDependencies(path)
 
-    def getMessagesBySource(self, source):
-        """
-        Returns the messages for the given source, including messages
-        from the configured builder (if available) and static checks
-        Extra arguments are
-        """
-        self._setupEnvIfNeeded()
         self._outstanding_diags = set()
 
         records = []
@@ -522,11 +570,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             pool = ThreadPool()
 
             static_check = pool.apply_async(
-                getStaticMessages, args=(source.getRawSourceContent().split('\n'), ))
+                getStaticMessages, args=(source.getRawSourceContent().split("\n"),)
+            )
 
             if self._isBuilderCallable():
-                builder_check = pool.apply_async(self._getBuilderMessages,
-                                                 args=[source, ])
+                builder_check = pool.apply_async(
+                    self._getBuilderMessages, args=[source]
+                )
                 records += builder_check.get()
 
             pool.close()
@@ -539,7 +589,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 records += [record]
 
         else:  # pragma: no cover
-            for record in getStaticMessages(source.getRawSourceContent().split('\n')):
+            for record in getStaticMessages(source.getRawSourceContent().split("\n")):
                 record.filename = source.filename
                 records += [record]
 

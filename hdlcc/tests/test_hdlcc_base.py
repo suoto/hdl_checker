@@ -28,8 +28,8 @@ import mock
 import six
 #  import unittest2
 #  from mock import patch
-from nose2.tools import such
-from nose2.tools.params import params
+from nose2.tools import such # type: ignore
+from nose2.tools.params import params # type: ignore
 
 import hdlcc
 from hdlcc.builders import Fallback
@@ -60,7 +60,7 @@ def patchClassMap(**kwargs):
 
     return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)
 
-class ConfigParserMock(hdlcc.config_parser.ConfigParser):
+class ConfigParserMock(hdlcc.parsers.config_parser.ConfigParser):
     def getBuilderName(self):
         return 'MockBuilder'
 
