@@ -32,7 +32,7 @@ from nose2.tools import such  # type: ignore
 import hdlcc.types as t
 from hdlcc.builders import BuilderName
 from hdlcc.database import Database
-from hdlcc.parsers import DependencySpec, DesignUnitType, Identifier, VhdlDesignUnit
+from hdlcc.parsers import DesignUnitType, VhdlDesignUnit
 
 from hdlcc.tests.utils import (  # sanitizePath,; writeListToFile,
     SourceMock,
@@ -204,14 +204,14 @@ class TestDatabase(unittest2.TestCase):
 
         # VHDL world, should find regardless of lower or upper case
         self.assertCountEqual(
-            self.database.findPathsByDesignUnit(
+            self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_a")
             ),
             {_path("foo.vhd")},
         )
 
         self.assertCountEqual(
-            self.database.findPathsByDesignUnit(
+            self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "ENTITY_A")
             ),
             {_path("foo.vhd")},
@@ -250,14 +250,14 @@ class TestDatabase(unittest2.TestCase):
         )
 
         self.assertCountEqual(
-            self.database.findPathsByDesignUnit(
+            self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_a")
             ),
             (),
         )
 
         self.assertCountEqual(
-            self.database.findPathsByDesignUnit(
+            self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_B")
             ),
             [_path("foo.vhd"), _path("oof.vhd")],
@@ -345,7 +345,7 @@ with such.A("database") as it:
         #  @it.should("find paths defining dependencies")  # type: ignore
         #  def test():
         #      # type: () -> None
-        #      paths = it.database.findPathsDefining(
+        #      paths = it.database.getPathsDefining(
         #          name=Identifier("common_dep", False), library=Identifier("work", False)
         #      )
 

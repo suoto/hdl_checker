@@ -70,6 +70,7 @@ def foundVunit():  # type: () -> bool
 
 
 class Database(object):
+    "Stores info on and provides operations for a project file set"
     __hash__ = None  # type: ignore
 
     def __init__(self):  # type: () -> None
@@ -95,6 +96,7 @@ class Database(object):
         return frozenset(self._design_units)
 
     def reset(self):
+        "Clears the database from previous data"
         self._builder_name = BuilderName.fallback
         self._paths = {}  # type: Dict[t.Path, int]
         self._libraries = {}  # type: Dict[t.Path, t.LibraryName]
@@ -159,6 +161,7 @@ class Database(object):
 
     def getLibrary(self, path):
         # type: (t.Path) -> Optional[str]
+        "Gets a library of a given source (this is likely to be removed)"
         if path not in self._paths:
             return None
         if path not in self._libraries:
@@ -166,6 +169,9 @@ class Database(object):
         return self._libraries[path].name
 
     def _parseSourceIfNeeded(self, path):
+        """
+        Parses a given path if needed, removing info from the database prior to that
+        """
         # Sources will get parsed on demand
         mtime = p.getmtime(path)
 
@@ -282,7 +288,7 @@ class Database(object):
         """
         return (x for x in self.design_units if samefile(x.owner, path))
 
-    def findPathsByDesignUnit(self, unit):
+    def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[t.Path]
         """
         Return the source (or sources) that define the given design
@@ -292,7 +298,15 @@ class Database(object):
             if (unit.name, unit.type_) == (design_unit.name, design_unit.type_):
                 yield design_unit.owner
 
-    def findPathsDefining(self, name, library=None):
+    def _inferLibrary(self, path):
+        """
+        Tries to infer which library the given path should be compiled on by
+        looking at where and how the design units it defines are used
+        """
+        _logger.fatal("Inferring library for path %s", path)
+        units = self.getDependenciesUnits
+
+    def getPathsDefining(self, name, library=None):
         # type: (Identifier, Optional[Identifier]) -> Iterable[t.Path]
         """
         Search for paths that define a given name optionally inside a library.
@@ -308,22 +322,28 @@ class Database(object):
 
         units = {unit for unit in self.design_units if unit.name == name}
 
-        _logger.debug("Units step 1: %s", units)
+        _logger.debug("Units step 1: %s", tuple(str(x) for x in units))
+
+        if not units:
+            _logger.warning("Could not find any source defining '%s'", name)
+            return ()
 
         if library is not None:
             units_matching_library = {
                 unit for unit in units if (self._libraries.get(unit.owner) == library)
             }
-            _logger.debug("Units step 2: %s", units_matching_library)
+            _logger.debug("Units step 2: %s", tuple(str(x) for x in units_matching_library))
 
-            # If no units match when using the library, it means the database
-            # is incomplete and we should try to infer the library from the
-            # usage of this unit
-            # TODO: Actually do that....!!
-            if units_matching_library:
+            if not units_matching_library:
+                # If no units match when using the library, it means the database
+                # is incomplete and we should try to infer the library from the
+                # usage of this unit
+                for owner in {x.owner for x in units}:
+                    self._inferLibrary(owner)
+            else:
                 units = units_matching_library
 
-        _logger.debug("Units step 3: %s", units)
+        _logger.debug("Units step 3: %s", tuple(str(x) for x in units))
 
         return (unit.owner for unit in units)
 
@@ -333,7 +353,7 @@ class Database(object):
         Tries to resolve undefined libraries by checking usages of 'name'
         """
         if library is None:
-            paths = tuple(self.findPathsDefining(name=name, library=None))
+            paths = tuple(self.getPathsDefining(name=name, library=None))
             if not paths:
                 _logger.warning("Couldn't find a path definint unit %s", name)
                 library = Identifier("work", False)
@@ -349,16 +369,11 @@ class Database(object):
 
     def getDependenciesUnits(self, path):
         # type: (t.Path) -> Set[Tuple[Identifier, Identifier]]
-        #  """
-        #  Returns paths that when built will satisfy the dependencies needed by a
-        #  given path. The list is not sorted by build sequence and libraries are
-        #  not taken into consideration (design units defined in multiple files
-        #  will appear multiple times)
-
-        #  Dependencies not found within the project's list of files will generate
-        #  a warning but will otherwise be silently ignored. IEEE and STD
-        #  libraries will always be ignored
-        #  """
+        """
+        Returns design units that should be compiled before compiling the given
+        path but only within the project file set. If a design unit can't be
+        found in any source, it will be silently ignored.
+        """
         #  _logger.debug("Getting dependencies' units %s", path)
         units = set()  # type: Set[Tuple[Identifier, Identifier]]
 
@@ -388,7 +403,7 @@ class Database(object):
             search_paths = set()
 
             for library, name in new_deps:
-                new_paths = set(self.findPathsDefining(name=name, library=library))
+                new_paths = set(self.getPathsDefining(name=name, library=library))
                 if not new_paths:
                     _logger.warning(
                         "Couldn't find where %s/%s is defined", library, name
@@ -423,7 +438,7 @@ class Database(object):
 
         paths = set(
             chain.from_iterable(
-                self.findPathsDefining(name=name, library=library)
+                self.getPathsDefining(name=name, library=library)
                 for library, name in units
             )
         )
