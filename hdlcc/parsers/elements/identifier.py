@@ -43,6 +43,9 @@ class Identifier(object):
     def __hash__(self):
         return hash(self.name)
 
+    def __str__(self):
+        return self.display_name
+
     def __repr__(self):
         return "{}(name={}, display_name={})".format(
             self.__class__.__name__, repr(self.name), repr(self.display_name)

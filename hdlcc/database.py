@@ -20,6 +20,7 @@
 
 import logging
 import os.path as p
+from itertools import chain
 from tempfile import mkdtemp
 from threading import RLock
 from typing import (  # List,
@@ -29,6 +30,7 @@ from typing import (  # List,
     Generator,
     Iterable,
     Iterator,
+    Optional,
     Set,
     Tuple,
 )
@@ -39,12 +41,11 @@ from hdlcc.builders import BuilderName, getBuilderByName
 from hdlcc.parsers import (  # DesignUnitType,
     ConfigParser,
     DependencySpec,
-    SourceFile,
-    getSourceFileObjects,
+    Identifier,
     getSourceParserFromPath,
     tAnyDesignUnit,
 )
-from hdlcc.utils import removeDirIfExists, samefile
+from hdlcc.utils import getFileType, removeDirIfExists, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class Database(object):
 
         self._builder_name = BuilderName.fallback
         self._paths = {}  # type: Dict[t.Path, int]
-        self._libraries = {}  # type: Dict[t.Path, t.LibraryName]
+        self._libraries = {}  # type: Dict[t.Path, Identifier]
         self._flags = {}  # type: Dict[t.Path, t.BuildFlags]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
         self._dependencies = {}  # type: Dict[t.Path, Set[DependencySpec]]
@@ -117,10 +118,14 @@ class Database(object):
             # Default when updating is set the modification time to zero
             # because we're cleaning up the parsed info too
             self._paths[path] = 0
-            self._libraries[path] = library
             self._flags[path] = tuple(flags)
             # TODO: Parse on a process pool
             self._parseSourceIfNeeded(path)
+
+            if library is not None:
+                self._libraries[path] = Identifier(
+                    library, case_sensitive=getFileType(path) != t.FileType.vhd
+                )
 
     def __jsonEncode__(self):
         """
@@ -153,7 +158,12 @@ class Database(object):
         return self._paths.keys()
 
     def getLibrary(self, path):
-        return self._libraries.get(path, None)
+        # type: (t.Path) -> Optional[str]
+        if path not in self._paths:
+            return None
+        if path not in self._libraries:
+            self._libraries[path] = Identifier("work", True)
+        return self._libraries[path].name
 
     def _parseSourceIfNeeded(self, path):
         # Sources will get parsed on demand
@@ -270,7 +280,7 @@ class Database(object):
         Non public version of getDesignUnitsByPath, with the difference that
         this does not check if the path has changed or not
         """
-        return filter(lambda x: samefile(x.owner, path), self._design_units)
+        return (x for x in self.design_units if samefile(x.owner, path))
 
     def findPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[t.Path]
@@ -282,97 +292,115 @@ class Database(object):
             if (unit.name, unit.type_) == (design_unit.name, design_unit.type_):
                 yield design_unit.owner
 
-    def findPathsDefining(self, dependency):
-        # type: (DependencySpec) -> Iterable[t.Path]
+    def findPathsDefining(self, name, library=None):
+        # type: (Identifier, Optional[Identifier]) -> Iterable[t.Path]
         """
-        Search for paths that possibly define a given dependency
+        Search for paths that define a given name optionally inside a library.
         """
-        # Search based only on the name first to then evaluate libraries of a
-        # smaller set
-        _logger.debug("dependency: %s", dependency)
-        for unit in self.design_units:
-            if unit.name == dependency.name:
-                yield unit.owner
+        assert isinstance(name, Identifier), "Invalid argument of type {}".format(
+            type(name)
+        )
+        assert (
+            isinstance(library, Identifier) or library is None
+        ), "Invalid argument of type {}".format(type(library))
 
-        #  if dependency.case_sensitive:
-        #      name_filter = lambda x: x.name == dependency.name
-        #  else:
-        #      name_filter = lambda x: x.name.lower() == dependency.name.lower()
+        _logger.debug("Finding paths defining %s.%s", library, name)
 
-        #  candidates = filter(name_filter, self.design_units)
-        #  paths = set()  # type: Set[t.Path]
+        units = {unit for unit in self.design_units if unit.name == name}
 
-        #  for candidate in candidates:
-        #      # If the dependency has no library set, all name matches matter
-        #      if dependency.library is None:
-        #          paths.add(candidate.owner)
+        _logger.debug("Units step 1: %s", units)
 
-        #  if dependency.library
+        if library is not None:
+            units_matching_library = {
+                unit for unit in units if (self._libraries.get(unit.owner) == library)
+            }
+            _logger.debug("Units step 2: %s", units_matching_library)
 
-        #  filter_func = lambda x:
-        #  if dependency.library is not None:
+            # If no units match when using the library, it means the database
+            # is incomplete and we should try to infer the library from the
+            # usage of this unit
+            # TODO: Actually do that....!!
+            if units_matching_library:
+                units = units_matching_library
 
-        #  if unit.case_sensitive:
-        #      filter_func = lambda x: x.name == unit.name and x.type_ == unit.type_
-        #  else:
-        #      filter_func = (
-        #          lambda x: x.name.lower() == unit.name.lower() and x.type_ == unit.type_
-        #      )
+        _logger.debug("Units step 3: %s", units)
 
-    def getDependenciesPaths(self, path):
-        # type: (t.Path) -> Set[t.Path]
+        return (unit.owner for unit in units)
+
+    def _resolveLibraryIfNeeded(self, library, name):
+        # type: (Identifier, Identifier) -> Tuple[Identifier, Identifier]
         """
-        Returns paths that when built will satisfy the dependencies needed by a
-        given path. The list is not sorted by build sequence and libraries are
-        not taken into consideration (design units defined in multiple files
-        will appear multiple times)
-
-        Dependencies not found within the project's list of files will generate
-        a warning but will otherwise be silently ignored. IEEE and STD
-        libraries will always be ignored
+        Tries to resolve undefined libraries by checking usages of 'name'
         """
-        _logger.debug("Getting paths for %s", path)
-        all_deps = set()  # type: Set[DependencySpec]
-        dependencies_paths = set()  # type: Set[t.Path]
+        if library is None:
+            paths = tuple(self.findPathsDefining(name=name, library=None))
+            if not paths:
+                _logger.warning("Couldn't find a path definint unit %s", name)
+                library = Identifier("work", False)
+                assert False
+            elif len(paths) == 1:
+                path = paths[0]
+                library = self._libraries[path]
+            else:
+                _logger.warning("Unit %s is defined in %d places", name, len(paths))
+                library = Identifier("work", False)
+                assert False
+        return library, name
+
+    def getDependenciesUnits(self, path):
+        # type: (t.Path) -> Set[Tuple[Identifier, Identifier]]
+        #  """
+        #  Returns paths that when built will satisfy the dependencies needed by a
+        #  given path. The list is not sorted by build sequence and libraries are
+        #  not taken into consideration (design units defined in multiple files
+        #  will appear multiple times)
+
+        #  Dependencies not found within the project's list of files will generate
+        #  a warning but will otherwise be silently ignored. IEEE and STD
+        #  libraries will always be ignored
+        #  """
+        #  _logger.debug("Getting dependencies' units %s", path)
+        units = set()  # type: Set[Tuple[Identifier, Identifier]]
 
         search_paths = set((path,))
+        own_units = {
+            (self._libraries.get(path, "work"), x.name)
+            for x in self.getDesignUnitsByPath(path)
+        }
 
         while search_paths:
-            deps_found = set()  # type: Set[DependencySpec]
-
             # Get the dependencies of the search paths and which design units
-            # they define
-            for search_path in search_paths:
-                deps_found |= self._dependencies[search_path]
+            # they define and remove the ones we've already seen
+            new_deps = {
+                (x.library, x.name)
+                for search_path in search_paths
+                for x in self._dependencies[search_path]
+            } - units
 
-            # Remove the ones we've already seen and add the new ones to the
-            # set tracking the dependencies seen since the search started
-            deps_found -= all_deps
-            all_deps |= deps_found
+            _logger.debug("New dependencies: %s", new_deps)
+
+            # Add the new ones to the set tracking the dependencies seen since
+            # the search started
+            units |= new_deps
 
             # Paths to be searched on the next iteration are the paths of the
             # dependencies we have not seen before
             search_paths = set()
 
-            for dependency in deps_found:
-                new_paths = set(self.findPathsDefining(dependency))
+            for library, name in new_deps:
+                new_paths = set(self.findPathsDefining(name=name, library=library))
                 if not new_paths:
-                    _logger.warning("Couldn't find where %s is defined", dependency)
+                    _logger.warning(
+                        "Couldn't find where %s/%s is defined", library, name
+                    )
 
                 search_paths |= new_paths
 
-            # Union of both sets
-            dependencies_paths |= search_paths
+            _logger.debug("Search paths: %s", search_paths)
 
-        _logger.info("Dependencies: %d", len(all_deps))
-        for dependency in all_deps:
-            _logger.info(" - %s", dependency)
-
-        # List now has a list where the first dependency is at the bottom, so
-        # reverse it and make sure we don't return paths more than once. Also
-        # remote the request path, since we're supposed to only list
-        # dependencies
-        return dependencies_paths - {path}
+        # Remove units defined by the path passed as argument
+        units -= own_units
+        return {self._resolveLibraryIfNeeded(library, name) for library, name in units}
 
     def getBuildSequence(self, path):
         # type: (t.Path) -> Generator[Tuple[t.LibraryName, t.Path], None, None]
@@ -380,46 +408,55 @@ class Database(object):
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
-        _logger.info("Searching %s (library=%s)", path, self._libraries.get(path, None))
-        units_compiled = set()  # type: Set[str]
+        _logger.debug(
+            "Getting build sequence for %s (library=%s)",
+            path,
+            self._libraries.get(path, "<???>"),
+        )
+        compiled = set()  # type: Set[str]
 
-        deps_paths = list(self.getDependenciesPaths(path))
+        units = set(self.getDependenciesUnits(path))
 
-        #  resolved_paths = set(filter(lambda x: x in self._libraries, deps_paths))
+        _logger.debug("Units to build: %d", len(units))
+        for _lib, _name in units:
+            _logger.debug("- %s, %s", repr(_lib), repr(_name))
 
-        #  deps_paths = list(set(deps_paths) - resolved_paths)
-        #  deps_paths.sort(key=lambda x: len(self._dependencies[x]))
+        paths = set(
+            chain.from_iterable(
+                self.findPathsDefining(name=name, library=library)
+                for library, name in units
+            )
+        )
 
-        #  _logger.info("Got %d resolved paths", len(resolved_paths))
-        #  for rp in resolved_paths:
-        #      _logger.info("[%s] %s", self._libraries.get(rp), rp)
+        _logger.debug("Paths to build: %d", len(paths))
+        for _path in paths:
+            _logger.debug("- %s", _path)
 
-        for i in range(10):
+        iteration_limit = len(paths)
+        # Limit the number of iterations to the worst case
+        for i in range(iteration_limit):
             to_remove = set()  # type: Set[t.Path]
-            for dep_path in deps_paths:
-                own = {x.name for x in self._getDesignUnitsByPath(dep_path)}
-                deps = {x.name for x in self._dependencies[dep_path]}
-                #  _logger.info("%s has %d dependencies: %s", dep_path, len(deps), deps)
-                still_needed = deps - units_compiled - own
+            for _path in paths:
+                own = {x.name for x in self._getDesignUnitsByPath(_path)}
+                deps = {x.name for x in self._dependencies[_path]}
+                #  _logger.info("%s has %d dependencies: %s", _path, len(deps), deps)
+                still_needed = deps - compiled - own
                 if still_needed:
-                    _logger.debug("%s still needs %s", dep_path, still_needed)
+                    _logger.debug("%s still needs %s", _path, still_needed)
                 else:
-                    _logger.info("Can compile %s", dep_path)
-                    yield "work", dep_path
-                    to_remove.add(dep_path)
-                    units_compiled |= {
-                        x.name for x in self._getDesignUnitsByPath(dep_path)
-                    }
+                    _logger.info("Can compile %s", _path)
+                    yield self.getLibrary(path) or "work", _path
+                    to_remove.add(_path)
+                    compiled |= {x.name for x in self._getDesignUnitsByPath(_path)}
 
-            deps_paths = list(set(deps_paths) - to_remove)
-            deps_paths.sort(key=lambda x: len(self._dependencies[x]))
+            paths -= to_remove
 
-            _logger.debug("%d paths remaining: %s", len(deps_paths), deps_paths)
+            _logger.debug("%d paths remaining: %s", len(units), units)
 
             if not to_remove:
                 _logger.info("Nothing more to do after %d steps", i)
-                break
+                return
 
-            _logger.info(
-                "Got %d units compiled: %s", len(units_compiled), units_compiled
-            )
+            _logger.info("Got %d units compiled: %s", len(compiled), compiled)
+
+        _logger.error("Iteration limit of %d reached", iteration_limit)

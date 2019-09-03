@@ -19,10 +19,10 @@ import logging
 from enum import Enum
 from typing import Optional, Union
 
-from hdlcc import types as t  # pylint: disable=unused-import
-
 from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement
+
+from hdlcc import types as t  # pylint: disable=unused-import
 
 _logger = logging.getLogger(__name__)
 

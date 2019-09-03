@@ -23,8 +23,6 @@ import os.path as p
 from multiprocessing.pool import ThreadPool as Pool
 from typing import Dict, Iterator, Optional, Set, Type, Union
 
-from hdlcc import types as t  # pylint: disable=unused-import
-
 from .base_parser import BaseSourceFile
 from .config_parser import ConfigParser, ProjectSourceSpec
 from .elements.dependency_spec import DependencySpec, LocationList
@@ -38,9 +36,12 @@ from .elements.identifier import Identifier
 from .verilog_parser import VerilogParser
 from .vhdl_parser import VhdlParser
 
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.utils import getFileType
+
 _logger = logging.getLogger(__name__)
 
-SourceFile = Union[VhdlParser, VerilogParser]
+tSourceFile = Union[VhdlParser, VerilogParser]
 
 
 def _isVhdl(path):  # pragma: no cover
@@ -62,21 +63,19 @@ def _isVerilog(path):  # pragma: no cover
     return False
 
 
-def getSourceParserFromPath(path):  # type: (t.Path) -> SourceFile
+PARSERS = {
+    t.FileType.vhd: VhdlParser,
+    t.FileType.verilog: VerilogParser,
+    t.FileType.systemverilog: VerilogParser,
+}  # type: Dict[t.FileType, Type[Union[VhdlParser, VerilogParser]]]
+
+
+def getSourceParserFromPath(path):  # type: (t.Path) -> tSourceFile
     """
     Returns either a VhdlParser or VerilogParser based on the path's file
     extension
     """
-    ext = path.split(".")[-1].lower()
-    if ext in t.FileType.vhd.value:
-        cls = VhdlParser  # type: Type[Union[VhdlParser, VerilogParser]]
-    if ext in t.FileType.verilog.value:
-        cls = VerilogParser
-    if ext in t.FileType.systemverilog.value:
-        cls = VerilogParser
-
-    return cls(path)
-
+    return PARSERS[getFileType(path)](path)
 
 def getSourceFileObjects(kwargs_list, workers=None):
     """

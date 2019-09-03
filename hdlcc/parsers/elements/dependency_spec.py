@@ -19,10 +19,10 @@
 import logging
 from typing import Optional
 
-from hdlcc import types as t  # pylint: disable=unused-import
-
 from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement
+
+from hdlcc import types as t  # pylint: disable=unused-import
 
 _logger = logging.getLogger(__name__)
 
@@ -33,7 +33,10 @@ class DependencySpec(ParsedElement):
     def __init__(self, owner, name, library=None, locations=None):
         # type: (t.Path, Identifier, Optional[Identifier], Optional[LocationList]) -> None
         assert isinstance(name, Identifier), "Incorrect arg: {}".format(name)
-        assert isinstance(library, Identifier), "Incorrect arg: {}".format(library)
+        assert library is None or isinstance(
+            library, Identifier
+        ), "Incorrect arg: {}".format(library)
+
         self._owner = owner
         self._library = library
         self._name = name
@@ -83,6 +86,6 @@ class DependencySpec(ParsedElement):
         return obj
 
     def __repr__(self):
-        return "{}(name={}, library={}, owner={})".format(
+        return "{}(name='{}', library='{}', owner={})".format(
             self.__class__.__name__, self.name, self.library, repr(self.owner)
         )

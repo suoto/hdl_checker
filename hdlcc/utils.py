@@ -28,6 +28,8 @@ import sys
 from tempfile import NamedTemporaryFile
 from threading import Lock
 
+from hdlcc import types as t
+
 PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
@@ -196,17 +198,15 @@ class UnknownTypeExtension(Exception):
 
 
 def getFileType(filename):
+    # type: (t.Path) -> t.FileType
     "Gets the file type of a source file"
-    extension = filename[str(filename).rfind('.') + 1:].lower()
-
-    if extension in ('vhd', 'vhdl'):
-        return 'vhdl'
-
-    if extension in ('v', 'vh'):
-        return 'verilog'
-
-    if extension in ('sv', 'svh'):  # pragma: no cover
-        return 'systemverilog'
+    ext = filename.split(".")[-1].lower()
+    if ext in t.FileType.vhd.value:
+        return t.FileType.vhd
+    if ext in t.FileType.verilog.value:
+        return t.FileType.verilog
+    if ext in t.FileType.systemverilog.value:
+        return t.FileType.systemverilog
     raise UnknownTypeExtension(filename)
 
 if not hasattr(p, 'samefile'):
