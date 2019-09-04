@@ -37,6 +37,7 @@ from .verilog_parser import VerilogParser
 from .vhdl_parser import VhdlParser
 
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.path import Path
 from hdlcc.utils import getFileType
 
 _logger = logging.getLogger(__name__)
@@ -70,12 +71,15 @@ PARSERS = {
 }  # type: Dict[t.FileType, Type[Union[VhdlParser, VerilogParser]]]
 
 
-def getSourceParserFromPath(path):  # type: (t.Path) -> tSourceFile
+
+
+def getSourceParserFromPath(path):  # type: (Path) -> tSourceFile
     """
     Returns either a VhdlParser or VerilogParser based on the path's file
     extension
     """
     return PARSERS[getFileType(path)](path)
+
 
 def getSourceFileObjects(kwargs_list, workers=None):
     """

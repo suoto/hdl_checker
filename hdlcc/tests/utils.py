@@ -36,6 +36,7 @@ from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.path import Path
 from hdlcc.utils import getCachePath, getFileType, onWindows, removeDuplicates, samefile
 
 from hdlcc.parsers import (  # pylint: disable=unused-import; pylint: disable=unused-import
@@ -81,21 +82,25 @@ class SourceMock(object):
         design_units,  # type: Iterable[Dict[str, str]]
         library=None,  # type: str
         dependencies=None,  # type: Iterable[MockDep]
-        filename=None,  # type: Optional[t.Path]
+        filename=None,  # type: Optional[Path]
     ):
 
         self._design_units = list(design_units or [])
 
         if filename is not None:
-            self._filename = p.join(self.base_path, filename)
+            self._filename = Path(p.join(self.base_path, filename.name))
         else:
             library = "lib_not_set" if library is None else library
-            self._filename = p.join(
-                self.base_path, library, "_{}.vhd".format(self._design_units[0]["name"])
+            self._filename = Path(
+                p.join(
+                    self.base_path,
+                    library,
+                    "_{}.vhd".format(self._design_units[0]["name"]),
+                )
             )
 
         self.filetype = getFileType(self.filename)
-        self.abspath = p.abspath(self.filename)
+        #  self.abspath = p.abspath(self.filename)
         self.flags = []  # type: ignore
 
         self.library = library
@@ -105,13 +110,13 @@ class SourceMock(object):
             _library = "work"
 
             try:
-                _library, _name = dep_spec
+                _library, _name = dep_spec  # type: ignore
             except ValueError:
                 pass
 
             self._dependencies.add(
                 DependencySpec(
-                    t.Path(self._filename),
+                    Path(self._filename),
                     Identifier(_name, False),
                     Identifier(_library, False),
                 )
@@ -121,6 +126,7 @@ class SourceMock(object):
 
     @property
     def filename(self):
+        # type: () -> Path
         return self._filename
 
     def getLibraries(self):
@@ -159,7 +165,7 @@ class SourceMock(object):
         for i, line in enumerate(lines, 1):
             self._logger.debug("%2d | %s", i, line)
 
-        with open(self.filename, "w") as fd:
+        with open(self.filename.name, "w") as fd:
             fd.write("\n".join(lines))
 
     def __repr__(self):
@@ -233,7 +239,7 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
         raise exceptions.SanityCheckError(self.builder_name, "Fake error")
 
 
-disableVunit = mock.patch("hdlcc.config_parser.foundVunit", lambda: False)
+disableVunit = mock.patch("hdlcc.builders.foundVunit", lambda: False)
 
 
 def sanitizePath(*args):

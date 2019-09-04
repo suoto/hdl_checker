@@ -23,6 +23,7 @@ from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement
 
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.path import Path
 
 _logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class _DesignUnit(ParsedElement):
     """
 
     def __init__(self, owner, type_, name, locations=None):
-        # type: (t.Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
+        # type: (Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
         self._owner = owner
         self._type = type_
         self._name = name
@@ -94,7 +95,7 @@ class VhdlDesignUnit(_DesignUnit):
     """
 
     def __init__(self, owner, type_, name, locations=None):
-        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VhdlDesignUnit, self).__init__(
             owner=owner,
             type_=type_,
@@ -109,7 +110,7 @@ class VerilogDesignUnit(_DesignUnit):
     """
 
     def __init__(self, owner, type_, name, locations=None):
-        # type: (t.Path, DesignUnitType, str, Optional[LocationList]) -> None
+        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VerilogDesignUnit, self).__init__(
             owner=owner,
             type_=type_,

@@ -20,10 +20,10 @@ import logging
 import re
 from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 
+from . import DependencySpec, DesignUnitType, Identifier, VhdlDesignUnit
+
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
-
-from . import DependencySpec, VhdlDesignUnit, DesignUnitType, Identifier, LocationList
 
 _logger = logging.getLogger(__name__)
 
@@ -60,15 +60,17 @@ class VhdlParser(BaseSourceFile):
     _comment = re.compile(r"--[^\n\r]*", flags=re.S)
 
     def _getSourceContent(self):
+        # type: (...) -> Any
         """
         Replace everything from comment ('--') until a line break and
         converts to lowercase
         """
-        content = open(self.filename, mode="rb").read().decode(errors="ignore")
+        content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
 
         return self._comment.sub("", content).lower()
 
     def _iterDesignUnitMatches(self):
+        # type: (...) -> Any
         """
         Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines
@@ -134,10 +136,11 @@ class VhdlParser(BaseSourceFile):
             )
 
     def _getLibraries(self):
+        # type: (...) -> Any
         """
         Parses the source file to find design units and dependencies
         """
-        libs = set()
+        libs = set()  # type: Set[str]
 
         for match in _LIBRARY_SCANNER.finditer(self.getSourceContent()):
             for group in match.groups():

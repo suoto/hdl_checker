@@ -18,22 +18,21 @@
 
 import abc
 import logging
-import os.path as p
 from typing import Dict, Optional, Set, Tuple
 
 from hdlcc import types as t
+from hdlcc.builders import AnyValidBuilder
+from hdlcc.path import Path
 from hdlcc.utils import getFileType
 
-_SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
-_HEADER_EXTENSIONS = 'vh', 'svh'
+_SOURCE_EXTENSIONS = "vhdl", "sv", "v"
+_HEADER_EXTENSIONS = "vh", "svh"
 
-_DEFAULT_LIBRARY_NAME = {
-        'vhdl': 'lib',
-        'verilog': 'lib',
-        'systemverilog': 'lib'}
+_DEFAULT_LIBRARY_NAME = {"vhdl": "lib", "verilog": "lib", "systemverilog": "lib"}
 
 Flags = str
-SourceSpec = Tuple[t.Path, Flags, t.LibraryName]
+SourceSpec = Tuple[Path, Flags, t.LibraryName]
+
 
 class BaseGenerator:
     """
@@ -42,43 +41,47 @@ class BaseGenerator:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self): # type: () -> None
+    def __init__(self):  # type: () -> None
         """
         """
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._sources = set() # type: Set[SourceSpec]
+        self._sources = set()  # type: Set[SourceSpec]
         self._include_paths = {
-            'verilog': set(),
-            'systemverilog': set()
-        } # type: Dict[str, Set[t.Path]]
-
+            t.FileType.verilog: set(),
+            t.FileType.systemverilog: set(),
+        }  # type: Dict[t.FileType, Set[str]]
 
     def _addSource(self, path, flags=None, library=None):
-        # type: (t.Path, Optional[Flags], Optional[str]) -> None
+        # type: (Path, Optional[Flags], Optional[str]) -> None
         """
         Add a source to project. 'flags' and 'library' are only used for
         regular sources and not for header files (files ending in .vh or .svh)
         """
-        self._logger.debug("Adding path %s (flags=%s, library=%s)",
-                           p.abspath(path), flags, library)
+        self._logger.debug(
+            "Adding path %s (flags=%s, library=%s)", path, flags, library
+        )
 
-        if p.basename(path).split('.')[-1].lower() in ('vh', 'svh'):
+        if path.basename().split(".")[-1].lower() in ("vh", "svh"):
             file_type = getFileType(path)
-            if file_type in ('verilog', 'systemverilog'):
-                self._include_paths[file_type].add(p.dirname(path))
+            if file_type in ("verilog", "systemverilog"):
+                self._include_paths[file_type].add(path.dirname())
         else:
-            self._sources.add((path,
-                               ' '.join([str(x) for x in flags or []]),
-                               library or '<undefined>'))
+            self._sources.add(
+                (
+                    path,
+                    " ".join([str(x) for x in flags or []]),
+                    library or "<undefined>",
+                )
+            )
 
     @abc.abstractmethod
-    def _populate(self): # type: () -> None
+    def _populate(self):  # type: () -> None
         """
         Method that will be called for generating the project file contets and
         should be implemented by child classes
         """
 
-    def _getPreferredBuilder(self): # type: () -> t.AnyValidBuilder
+    def _getPreferredBuilder(self):  # type: () -> AnyValidBuilder
         """
         Method should be overridden by child classes to express the preferred
         builder
@@ -93,21 +96,21 @@ class BaseGenerator:
 
         self._populate()
 
-        contents = ['# Files found: %s' % len(self._sources),]
+        contents = ["# Files found: %s" % len(self._sources)]
 
         builder = self._getPreferredBuilder()
         if builder is not NotImplemented:
-            contents += ['builder = %s' % builder]
+            contents += ["builder = %s" % builder]
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
         for lang in sorted(self._include_paths.keys()):
             paths = sorted(self._include_paths[lang])
             if paths:
-                contents += ['include_paths[%s] = %s' % (lang, ' '.join(paths))]
+                contents += ["include_paths[%s] = %s" % (lang, " ".join(paths))]
 
         if self._include_paths:
-            contents += ['']
+            contents += [""]
 
         # Add sources
         sources = []
@@ -119,9 +122,12 @@ class BaseGenerator:
         sources.sort(key=lambda x: x[2])
 
         for file_type, library, path, flags in sources:
-            contents += ['{0} {1} {2}{3}'.format(file_type, library, path,
-                                                 ' %s' % flags if flags else '')]
+            contents += [
+                "{0} {1} {2}{3}".format(
+                    file_type, library, path, " %s" % flags if flags else ""
+                )
+            ]
 
         self._logger.info("Resulting file has %d lines", len(contents))
 
-        return '\n'.join(contents)
+        return "\n".join(contents)

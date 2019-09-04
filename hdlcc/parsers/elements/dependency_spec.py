@@ -23,6 +23,7 @@ from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement
 
 from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.path import Path
 
 _logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class DependencySpec(ParsedElement):
     "Placeholder for a source dependency"
 
     def __init__(self, owner, name, library=None, locations=None):
-        # type: (t.Path, Identifier, Optional[Identifier], Optional[LocationList]) -> None
+        # type: (Path, Identifier, Optional[Identifier], Optional[LocationList]) -> None
         assert isinstance(name, Identifier), "Incorrect arg: {}".format(name)
         assert library is None or isinstance(
             library, Identifier

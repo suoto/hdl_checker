@@ -43,6 +43,7 @@ from hdlcc.parsers import (
     VhdlParser,
     tSourceFile,
 )
+from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
 from hdlcc.utils import (
@@ -76,7 +77,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._outstanding_diags = set()  # type: Set[CheckerDiagnostic]
         self._setup_lock = RLock()
 
-        self.config_file = None  # type: Optional[t.Path]
+        self.config_file = None  # type: Optional[Path]
 
         self.database = Database()
         self.builder = Fallback(self._getWorkingPath())
@@ -85,7 +86,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._setupEnvIfNeeded()
         self._saveCache()
 
-    def setConfigFile(self, path):  # type: (t.Path) -> None
+    def setConfigFile(self, path):  # type: (Path) -> None
         """
         Setting the configuration file will trigger parsing if the path is
         different than the one already set.
@@ -97,13 +98,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.config_file = path
         self.database.accept(ConfigParser(path))
 
-    def _getWorkingPath(self):  # type: () -> t.Path
+    def _getWorkingPath(self):  # type: () -> Path
         """
         The working path will depend on the configuration file but it's
         guaranteed not to be None
         """
         cache = p.abspath(self.config_file or ".")
-        return t.Path(p.join(getCachePath(), cache.replace(p.sep, "_")))
+        return Path(p.join(getCachePath(), cache.replace(p.sep, "_")))
 
     def _getCacheFilename(self):
         """
@@ -256,7 +257,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
 
     #  def getSourceByPath(self, path):
-    #      # type: (t.Path) -> Tuple[tSourceFile, List[CheckerDiagnostic]]
+    #      # type: (Path) -> Tuple[tSourceFile, List[CheckerDiagnostic]]
     #      """
     #      Get the source object, flags and any additional info to be displayed
     #      """

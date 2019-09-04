@@ -76,9 +76,20 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
                         self.line_number, self.column_number, error_code,
                         self.severity, self.text))
 
+    @property
     def __hash_key__(self):
         return (self.checker, self.column_number, self.error_code,
                 self.filename, self.line_number, self.severity, self.text)
+
+    #  def __hash__(self):
+    #      #  for item in ('checker', 'column_number', 'error_code',
+    #      #          'filename', 'line_number', 'severity', 'text'):
+    #      #      try:
+    #      #          hash(getattr(self, item))
+    #      #      except TypeError:
+    #      #          print("item %s is not hashable!" % item)
+    #      return super(CheckerDiagnostic, self).__hash__()
+    #      #  assert False, 'hey'
 
     def __eq__(self, other):
         if hash(self) != hash(other):
@@ -219,6 +230,17 @@ class BuilderDiag(CheckerDiagnostic):
             checker='{}/{}'.format(CHECKER_NAME, builder_name), text=text,
             filename=filename, severity=severity, line_number=line_number,
             column_number=column_number, error_code=error_code)
+
+    def __hash__(self):
+        #  for item in ('checker', 'column_number', 'error_code',
+        #          'filename', 'line_number', 'severity', 'text'):
+        #      try:
+        #          hash(getattr(self, item))
+        #      except TypeError:
+        #          print("item %s is not hashable!" % item)
+        return super(CheckerDiagnostic, self).__hash__()
+        #  assert False, 'hey'
+
 
 
 class FailedToCreateProject(CheckerDiagnostic):

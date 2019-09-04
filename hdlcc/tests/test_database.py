@@ -23,6 +23,7 @@
 
 import logging
 import os.path as p
+import time
 
 import six
 import unittest2  # type: ignore
@@ -33,13 +34,15 @@ import hdlcc.types as t
 from hdlcc.builders import BuilderName
 from hdlcc.database import Database
 from hdlcc.parsers import DesignUnitType, VhdlDesignUnit
+from hdlcc.path import Path
 
 from hdlcc.tests.utils import (  # sanitizePath,; writeListToFile,
-    SourceMock,
     assertCountEqual,
+    disableVunit,
     getTestTempPath,
-    setupTestSuport,
     logIterable,
+    setupTestSuport,
+    SourceMock,
 )
 
 _logger = logging.getLogger(__name__)
@@ -57,6 +60,10 @@ class _SourceMock(SourceMock):
 
 
 class _Database(Database):
+    def __init__(self, *args, **kwargs):
+        with disableVunit:
+            super(_Database, self).__init__(*args, **kwargs)
+
     def updateFromDict(self, config):
         super(_Database, self).updateFromDict(config)
         _logger.debug("State after updating:")
@@ -84,9 +91,9 @@ class _Database(Database):
 
 
 def _path(*args):
-    # type: (...) -> t.Path
+    # type: (...) -> Path
     "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
-    return t.Path(p.join(TEST_TEMP_PATH, *args))
+    return Path(p.join(TEST_TEMP_PATH, *args))
 
 
 def _configFromDict(parsed_dict):
@@ -112,6 +119,8 @@ def _configFromSources(sources):
 
 
 class TestDatabase(unittest2.TestCase):
+    maxDiff = None
+
     def setUp(self):
         # type: () -> None
         setupTestSuport(TEST_TEMP_PATH)
@@ -129,8 +138,8 @@ class TestDatabase(unittest2.TestCase):
 
         self.assertEqual(self.database.builder_name, BuilderName.fallback)
         self.assertCountEqual(self.database.paths, ())
-        self.assertEqual(self.database.getLibrary(t.Path("any")), None)
-        self.assertEqual(self.database.getFlags(t.Path("any")), ())
+        #  self.assertEqual(self.database.getLibrary(Path("any")), None)
+        self.assertEqual(self.database.getFlags(Path("any")), ())
 
     def test_accepts_empty_dict(self):
         # type: () -> None
@@ -138,8 +147,8 @@ class TestDatabase(unittest2.TestCase):
 
         self.assertEqual(self.database.builder_name, BuilderName.fallback)
         self.assertCountEqual(self.database.paths, ())
-        self.assertEqual(self.database.getLibrary(t.Path("any")), None)
-        self.assertEqual(self.database.getFlags(t.Path("any")), ())
+        #  self.assertEqual(self.database.getLibrary(Path("any")), None)
+        self.assertEqual(self.database.getFlags(Path("any")), ())
 
     def test_accepts_basic_structure(self):
         # type: () -> None
@@ -177,8 +186,8 @@ class TestDatabase(unittest2.TestCase):
 
         self.assertEqual(self.database.builder_name, BuilderName.fallback)
         self.assertCountEqual(self.database.paths, (_path("foo.vhd"), _path("oof.vhd")))
-        self.assertEqual(self.database.getLibrary(_path("foo.vhd")), "bar")
-        self.assertEqual(self.database.getLibrary(_path("oof.vhd")), "ooflib")
+        self.assertEqual(self.database.getLibrary(_path("foo.vhd")).name, "bar")
+        self.assertEqual(self.database.getLibrary(_path("oof.vhd")).name, "ooflib")
         self.assertEqual(self.database.getFlags(_path("foo.vhd")), ("baz", "flag"))
         self.assertEqual(
             self.database.getFlags(_path("oof.vhd")), ("oofflag0", "oofflag1")
@@ -205,14 +214,14 @@ class TestDatabase(unittest2.TestCase):
         # VHDL world, should find regardless of lower or upper case
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
-                VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_a")
+                VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_a")
             ),
             {_path("foo.vhd")},
         )
 
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
-                VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "ENTITY_A")
+                VhdlDesignUnit(Path(""), DesignUnitType.entity, "ENTITY_A")
             ),
             {_path("foo.vhd")},
         )
@@ -222,8 +231,10 @@ class TestDatabase(unittest2.TestCase):
         self.test_accepts_basic_structure()
 
         # Make sure the env is sane before actually testing
-        it.assertTrue(p.exists(_path("foo.vhd")))
-        timestamp = p.getmtime(_path("foo.vhd"))
+        it.assertTrue(p.exists(_path("foo.vhd").name))
+        timestamp = p.getmtime(_path("foo.vhd").name)
+
+        time.sleep(0.5)
 
         # SourceMock object writes a dummy VHDL, that should cause the
         # timestamp to change
@@ -234,7 +245,7 @@ class TestDatabase(unittest2.TestCase):
         )
 
         it.assertNotEqual(
-            timestamp, p.getmtime(_path("foo.vhd")), "Timestamp should've changed"
+            timestamp, p.getmtime(_path("foo.vhd").name), "Timestamp should've changed"
         )
 
         self.assertCountEqual(
@@ -251,14 +262,14 @@ class TestDatabase(unittest2.TestCase):
 
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
-                VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_a")
+                VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_a")
             ),
             (),
         )
 
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
-                VhdlDesignUnit(t.Path(""), DesignUnitType.entity, "entity_B")
+                VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_B")
             ),
             [_path("foo.vhd"), _path("oof.vhd")],
         )
@@ -268,20 +279,12 @@ with such.A("database") as it:
     if six.PY2:
         it.assertCountEqual = assertCountEqual(it)
 
-    @it.has_setup
-    def setup():
-        it.database = _Database()
-
-    #  @it.has_teardown
-    #  def teardown():
-    #      del it.database
-    #      #  it.database.reset()
-
     with it.having("only direct dependencies"):
 
         @it.has_setup
         def setup():
             # type: () -> None
+            it.database = _Database()
 
             it.sources = {
                 _SourceMock(
@@ -340,7 +343,7 @@ with such.A("database") as it:
 
         @it.has_teardown
         def teardown():
-            it.database.reset()
+            del it.database
 
         #  @it.should("find paths defining dependencies")  # type: ignore
         #  def test():
@@ -418,6 +421,8 @@ with such.A("database") as it:
         @it.has_setup
         def setup():
             # type: () -> None
+            it.database = _Database()
+
             it.sources = {
                 _SourceMock(
                     filename=_path("unit_a.vhd"),
@@ -437,7 +442,7 @@ with such.A("database") as it:
 
         @it.has_teardown
         def teardown():
-            it.database.reset()
+            del it.database
 
         @it.should("handle both sides")  # type: ignore
         def test():
@@ -455,6 +460,9 @@ with such.A("database") as it:
 
         @it.has_setup
         def setup():
+            # type: () -> None
+            it.database = _Database()
+
             it.sources = {
                 _SourceMock(
                     filename=_path("unit_a.vhd"),
@@ -492,7 +500,7 @@ with such.A("database") as it:
 
         @it.has_teardown
         def teardown():
-            it.database.reset()
+            del it.database
 
         @it.should("report all but the source in question")  # type: ignore
         def test():
@@ -516,6 +524,16 @@ with such.A("database") as it:
                 it.database.test_getDependenciesUnits(_path("unit_d.vhd")),
                 {("work", "unit_a"), ("work", "unit_b"), ("work", "unit_c")},
             )
+
+        @it.should("identify circular dependencies")  # type: ignore
+        def test():
+            # type: () -> None
+            it.assertCountEqual(
+                it.database.getBuildSequence(_path("unit_a.vhd")),
+                {("work", "unit_b"), ("work", "unit_c"), ("work", "unit_d")},
+            )
+
+            it.fail("stop")
 
         # Create the following setup:
         # - Library 'lib' with 'pkg_in_lib':
@@ -545,6 +563,7 @@ with such.A("database") as it:
         @it.has_setup
         def setup():
             # type: () -> None
+            it.database = _Database()
 
             it.sources = {
                 _SourceMock(
@@ -578,7 +597,7 @@ with such.A("database") as it:
 
         @it.has_teardown
         def teardown():
-            it.database.reset()
+            del it.database
 
         @it.should("get the correct build sequence")  # type: ignore
         def test():
@@ -598,6 +617,7 @@ with such.A("database") as it:
         @it.has_setup
         def setup():
             # type: () -> None
+            it.database = _Database()
 
             it.sources = {
                 _SourceMock(
@@ -627,25 +647,20 @@ with such.A("database") as it:
 
         @it.has_teardown
         def teardown():
-            it.database.reset()
+            del it.database
 
         @it.should("get correct dependencies of entity_a.vhd")  # type: ignore
         def test():
             # type: () -> None
-            #  filename=_path("no_lib_but_use_it_directly.vhd"),
-            #  filename=_path("with_lib_but_use_it_directly.vhd"),
-
-            logIterable("Libraries", it.database._libraries.items(), _logger.fatal)
-
-            sequence = it.database.getBuildSequence(
-                _path("no_lib_but_use_it_directly.vhd")
+            sequence = tuple(
+                it.database.getBuildSequence(_path("no_lib_but_use_it_directly.vhd"))
             )
 
-            logIterable("Build sequence", sequence, _logger.warning)
+            logIterable("Build sequence", sequence, _logger.info)
 
-            it.assertEqual(sequence)
+            it.assertEqual(sequence, (("find_me", _path("target_pkg.vhd")),))
 
-            it.fail("stop")
+            #  it.fail("stop")
 
             #  path = _path("entity_a.vhd")
             #  deps = it.database.test_getDependenciesUnits(path)

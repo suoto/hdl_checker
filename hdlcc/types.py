@@ -16,16 +16,18 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common type definitions for type hinting"
 from enum import Enum
-from typing import Any, Dict, NewType, Tuple
+from typing import Any, Dict, Tuple
+#  from hdlcc.path import Path
 
-Path = NewType('Path', str)
+#  Path = NewType('Path', str)
 BuildInfo = Dict[str, Any]
 BuildFlags = Tuple[str, ...]
 UnitName = str
 LibraryName = str
 ObjectState = Dict
 
+
 class FileType(Enum):
-    vhd = ('vhd', 'vhdl')
-    verilog = ('v', 'vh')
-    systemverilog = ('sv', 'svh')
+    vhd = ("vhd", "vhdl")
+    verilog = ("v", "vh")
+    systemverilog = ("sv", "svh")

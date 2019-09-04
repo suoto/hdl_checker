@@ -25,6 +25,7 @@ from threading import Lock
 
 from hdlcc.diagnostics import DiagType
 from hdlcc.exceptions import SanityCheckError
+from hdlcc.path import Path
 
 
 class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
@@ -36,17 +37,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     # Set an empty container for the default flags
     default_flags = {
-        'batch_build_flags' : {},
-        'single_build_flags' : {},
-        'global_build_flags' : {}} # type: dict
+        "batch_build_flags": {},
+        "single_build_flags": {},
+        "global_build_flags": {},
+    }  # type: dict
 
-    _external_libraries = {
-        'vhdl' : set(),
-        'verilog' : set()}  # type: dict
+    _external_libraries = {"vhdl": set(), "verilog": set()}  # type: dict
 
-    _include_paths = {
-        'vhdl' : set(),
-        'verilog' : set()}  # type: dict
+    _include_paths = {"vhdl": set(), "verilog": set()}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
@@ -77,17 +75,18 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
     def __init__(self, target_folder):
+        # type: (Path) -> None
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
-        self._target_folder = p.abspath(p.expanduser(target_folder))
+        self._logger = logging.getLogger(__package__ + "." + self.builder_name)
+        self._target_folder = p.abspath(p.expanduser(target_folder.name))
         self._build_info_cache = {}
         self._builtin_libraries = set()
         self._added_libraries = set()
 
         # Skip creating a folder for the fallback builder
-        if self.builder_name != 'fallback':
+        if self.builder_name != "fallback":
             if not p.exists(self._target_folder):
                 self._logger.info("Target folder '%s' was created", self._target_folder)
                 os.makedirs(self._target_folder)
@@ -99,10 +98,11 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         try:
             self._parseBuiltinLibraries()
             if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                if self._builtin_libraries: # pragma: no cover
-                    self._logger.debug("Builtin libraries: %s",
-                                       ', '.join(self._builtin_libraries))
-                else: # pragma: no cover
+                if self._builtin_libraries:  # pragma: no cover
+                    self._logger.debug(
+                        "Builtin libraries: %s", ", ".join(self._builtin_libraries)
+                    )
+                else:  # pragma: no cover
                     self._logger.debug("No builtin libraries found")
         except NotImplementedError:
             pass
@@ -114,9 +114,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
-        obj._logger = logging.getLogger(state.pop('_logger'))
-        obj._builtin_libraries = set(state.pop('_builtin_libraries'))
-        obj._added_libraries = set(state.pop('_added_libraries'))
+        obj._logger = logging.getLogger(state.pop("_logger"))
+        obj._builtin_libraries = set(state.pop("_builtin_libraries"))
+        obj._added_libraries = set(state.pop("_added_libraries"))
 
         obj._lock = Lock()
         obj._build_info_cache = {}
@@ -130,11 +130,11 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
-        state['_logger'] = self._logger.name
-        state['_builtin_libraries'] = list(self._builtin_libraries)
-        state['_added_libraries'] = list(self._added_libraries)
-        del state['_build_info_cache']
-        del state['_lock']
+        state["_logger"] = self._logger.name
+        state["_builtin_libraries"] = list(self._builtin_libraries)
+        state["_added_libraries"] = list(self._added_libraries)
+        del state["_build_info_cache"]
+        del state["_lock"]
         return state
 
     @staticmethod
@@ -181,35 +181,32 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         rebuilds = []
         for rebuild in parse_results:
-            unit_type = rebuild.get('unit_type', None)
-            library_name = rebuild.get('library_name', None)
-            unit_name = rebuild.get('unit_name', None)
-            rebuild_path = rebuild.get('rebuild_path', None)
+            unit_type = rebuild.get("unit_type", None)
+            library_name = rebuild.get("library_name", None)
+            unit_name = rebuild.get("unit_name", None)
+            rebuild_path = rebuild.get("rebuild_path", None)
 
             rebuild_info = None
             if None not in (unit_type, unit_name):
                 for dependency in source.getDependencies():
-                    if dependency.name == rebuild['unit_name']:
-                        rebuild_info = {'unit_type' : unit_type,
-                                        'unit_name' : unit_name}
+                    if dependency.name == rebuild["unit_name"]:
+                        rebuild_info = {"unit_type": unit_type, "unit_name": unit_name}
                         break
             elif None not in (library_name, unit_name):
-                rebuild_info = {'library_name' : library_name,
-                                'unit_name' : unit_name}
+                rebuild_info = {"library_name": library_name, "unit_name": unit_name}
             elif rebuild_path is not None:
                 # GHDL sometimes gives the full path of the file that
                 # should be recompiled
-                rebuild_info = {'rebuild_path' : rebuild_path}
+                rebuild_info = {"rebuild_path": rebuild_path}
             else:  # pragma: no cover
-                self._logger.warning("Don't know what to do with %s",
-                                     rebuild)
+                self._logger.warning("Don't know what to do with %s", rebuild)
 
             if rebuild_info is not None and rebuild_info not in rebuilds:
                 rebuilds.append(rebuild_info)
 
         return rebuilds
 
-    def _searchForRebuilds(self, line): # pragma: no cover
+    def _searchForRebuilds(self, line):  # pragma: no cover
         """
         Finds units that the builders is telling us to rebuild
         """
@@ -264,8 +261,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 line = line.replace(source.filename, source.shadow_filename)
 
             diagnostics = diagnostics.union(set(self._makeRecords(line)))
-            rebuilds += [x for x in self._getRebuilds(source, line) if x not in
-                         rebuilds]
+            rebuilds += [
+                x for x in self._getRebuilds(source, line) if x not in rebuilds
+            ]
 
         # If no filename is set, assume it's for the current path
         for diag in diagnostics:
@@ -276,7 +274,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return diagnostics, rebuilds
 
-    def _logBuildResults(self, diagnostics, rebuilds): # pragma: no cover
+    def _logBuildResults(self, diagnostics, rebuilds):  # pragma: no cover
         """
         Logs diagnostics and rebuilds only for debugging purposes
         """
@@ -312,24 +310,27 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
         if not self._isFileTypeSupported(source):
-            self._logger.fatal("Source '%s' with file type '%s' is not "
-                               "supported", source.filename,
-                               source.filetype)
+            self._logger.fatal(
+                "Source '%s' with file type '%s' is not " "supported",
+                source.filename,
+                source.filetype,
+            )
             return [], []
 
-        if source.abspath not in self._build_info_cache:
-            self._build_info_cache[source.abspath] = {
-                'compile_time' : 0,
-                'diagnostics' : [],
-                'rebuilds' : []}
+        if source.filename.abspath() not in self._build_info_cache:
+            self._build_info_cache[source.filename.abspath()] = {
+                "compile_time": 0,
+                "diagnostics": [],
+                "rebuilds": [],
+            }
 
-        cached_info = self._build_info_cache[source.abspath]
+        cached_info = self._build_info_cache[source.filename.abspath()]
 
         build = False
         if forced:
             build = True
             self._logger.info("Forcing build of %s", str(source))
-        elif source.getmtime() > cached_info['compile_time']:
+        elif source.getmtime() > cached_info["compile_time"]:
             build = True
             self._logger.info("Building %s", str(source))
 
@@ -339,24 +340,25 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             # Build a list of flags and pass it as tuple
             build_flags = source.flags + flags
             with self._lock:
-                diagnostics, rebuilds = \
-                        self._buildAndParse(source, flags=tuple(build_flags))
+                diagnostics, rebuilds = self._buildAndParse(
+                    source, flags=tuple(build_flags)
+                )
 
             for rebuild in rebuilds:
-                if 'library_name' in rebuild:
-                    if rebuild['library_name'] == 'work':
-                        rebuild['library_name'] = source.library
+                if "library_name" in rebuild:
+                    if rebuild["library_name"] == "work":
+                        rebuild["library_name"] = source.library
 
-            cached_info['diagnostics'] = diagnostics
-            cached_info['rebuilds'] = rebuilds
-            cached_info['compile_time'] = source.getmtime()
+            cached_info["diagnostics"] = diagnostics
+            cached_info["rebuilds"] = rebuilds
+            cached_info["compile_time"] = source.getmtime()
 
             if DiagType.ERROR in [x.severity for x in diagnostics]:
-                cached_info['compile_time'] = 0
+                cached_info["compile_time"] = 0
 
         else:
             self._logger.debug("Nothing to do for %s", source)
-            diagnostics = cached_info['diagnostics']
-            rebuilds = cached_info['rebuilds']
+            diagnostics = cached_info["diagnostics"]
+            rebuilds = cached_info["rebuilds"]
 
         return diagnostics, rebuilds

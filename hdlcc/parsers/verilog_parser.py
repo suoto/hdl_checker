@@ -18,12 +18,12 @@
 
 import logging
 import re
-from typing import Generator
+from typing import Any, Generator
+
+from . import DesignUnitType, LocationList, VerilogDesignUnit
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
-
-from . import DesignUnitType, LocationList, VerilogDesignUnit
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ _DESIGN_UNIT_SCANNER = re.compile(
 )
 
 
+
 class VerilogParser(BaseSourceFile):
     """
     Parses and stores information about a Verilog or SystemVerilog
@@ -49,12 +50,14 @@ class VerilogParser(BaseSourceFile):
     _comment = re.compile(r"\/\*.*?\*\/|//[^(\r\n?|\n)]*", flags=re.DOTALL)
 
     def _getSourceContent(self):
+        # type: (...) -> Any
         # Remove multiline comments
-        content = open(self.filename, mode="rb").read().decode(errors="ignore")
+        content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
         lines = self._comment.sub("", content)
         return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
+        # type: (...) -> Any
         """
         Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines

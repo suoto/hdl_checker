@@ -24,10 +24,12 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Optional, Set
 
-from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
-
+from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
 from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
+
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.path import Path
+from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
 
 _logger = logging.getLogger(__name__)
 
@@ -48,22 +50,23 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         """
 
     def __init__(self, filename):
-        # type: (t.Path, ) -> None
-        self.filename = t.Path(p.abspath(p.normpath(filename)))
+        # type: (Path, ) -> None
+        self.filename = Path(p.abspath(p.normpath(filename.name)))
         self._cache = {}  # type: Dict[str, Any]
         self._content = None
-        self._mtime = 0
+        self._mtime = 0  # type: Optional[float]
         self.filetype = getFileType(self.filename)
-        self._dependencies = None
+        self._dependencies = None  # type: Optional[Set[DependencySpec]]
         self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
         self._libraries = None
 
-        self.shadow_filename = None
+        self.shadow_filename = None  # type: Optional[Path]
 
-    @property
-    def abspath(self):
-        "Returns the absolute path of the source file"
-        return p.abspath(self.filename)
+    #  @property
+    #  def abspath(self):
+    #      # type: (...) -> Any
+    #      "Returns the absolute path of the source file"
+    #      return p.abspath(self.filename)
 
     def __jsonEncode__(self):
         """
@@ -107,15 +110,17 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return (self.filename, self._content)
 
     def _changed(self):
+        # type: (...) -> Any
         """
         Checks if the file changed based on the modification time
         provided by p.getmtime
         """
-        if self.getmtime() > self._mtime:
+        if None in (self._mtime, self.getmtime()):
             return True
-        return False
+        return bool(self.getmtime() > self._mtime)  # type: ignore
 
     def _clearCachesIfChanged(self):
+        # type: () -> None
         """
         Clears all the caches if the file has changed to force updating
         every parsed info
@@ -131,24 +136,27 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             self._cache = {}
 
     def getmtime(self):
+        # type: () -> Optional[float]
         """
         Gets file modification time as defined in p.getmtime
         """
         if self.shadow_filename:
             return 0
-        if not p.exists(self.filename):
+        if not p.exists(self.filename.name):
             return None
-        return p.getmtime(self.filename)
+        return self.filename.mtime()
 
     def _getTemporaryFile(self):
+        # type: () -> Any
         "Gets the temporary dump file context"
         return NamedTemporaryFile(
-            suffix="." + self.filename.split(".")[-1],
-            prefix="temp_" + p.basename(self.filename),
+            suffix="." + self.filename.name.split(".")[-1],
+            prefix="temp_" + self.filename.basename(),
         )
 
     @contextmanager
     def havingBufferContent(self, content):
+        # type: (...) -> Any
         """
         Context manager for handling a source file with a custom content
         that is different from the file it points to. This is intended to
@@ -180,6 +188,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
                 self.shadow_filename = None
 
     def getSourceContent(self):
+        # type: (...) -> Any
         """
         Cached version of the _getSourceContent method
         """
@@ -192,6 +201,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return self._content
 
     def getRawSourceContent(self):
+        # type: (...) -> Any
         """
         Gets the whole source content, without removing comments or
         other preprocessing
@@ -202,7 +212,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             return self._content
         if "raw_content" not in self._cache or self._changed():
             self._cache["raw_content"] = (
-                open(self.filename, mode="rb").read().decode(errors="ignore")
+                open(self.filename.name, mode="rb").read().decode(errors="ignore")
             )
 
         return self._cache["raw_content"]
@@ -211,25 +221,26 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         """
         Cached version of the _getDesignUnits method
         """
-        if not p.exists(self.filename):
+        if not p.exists(self.filename.name):
             return set()
         self._clearCachesIfChanged()
         if self._design_units is None:
-            self._design_units = self._getDesignUnits()
+            self._design_units = set(self._getDesignUnits())
 
         return self._design_units
 
     def getDependencies(self):
+        # type: () -> Set[DependencySpec]
         """
         Cached version of the _getDependencies method
         """
-        if not p.exists(self.filename):
-            return []
+        if not p.exists(self.filename.name):
+            return set()
 
         self._clearCachesIfChanged()
         if self._dependencies is None:
             try:
-                self._dependencies = self._getDependencies()
+                self._dependencies = set(self._getDependencies())
             except:
                 print("failed to parse %s" % self.filename)
                 _logger.exception("Failed to parse %s", self.filename)
@@ -238,10 +249,11 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return self._dependencies
 
     def getLibraries(self):
+        # type: (...) -> Any
         """
         Cached version of the _getLibraries method
         """
-        if not p.exists(self.filename):
+        if not p.exists(self.filename.name):
             return []
 
         self._clearCachesIfChanged()

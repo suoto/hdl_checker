@@ -20,13 +20,14 @@ import os
 import os.path as p
 from typing import Generator, List
 
-from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.utils import UnknownTypeExtension, getFileType, isFileReadable
-
 from .base_generator import BaseGenerator
 
-_SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
-_HEADER_EXTENSIONS = 'vh', 'svh'
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.path import Path
+from hdlcc.utils import UnknownTypeExtension, getFileType, isFileReadable
+
+_SOURCE_EXTENSIONS = "vhdl", "sv", "v"
+_HEADER_EXTENSIONS = "vh", "svh"
 
 
 class SimpleFinder(BaseGenerator):
@@ -34,14 +35,16 @@ class SimpleFinder(BaseGenerator):
     Implementation of BaseGenerator that searches for paths on a given
     set of paths recursively
     """
-    def __init__(self, paths): # type: (List[t.Path]) -> None
-        super(SimpleFinder, self).__init__()
-        self._logger.debug("Search paths: %s", [p.abspath(x) for x in  paths])
-        self._paths = paths
-        self._valid_extensions = tuple(list(_SOURCE_EXTENSIONS) +
-                                       list(_HEADER_EXTENSIONS))
 
-    def _getLibrary(self, path):  # type: (t.Path) -> str
+    def __init__(self, paths):  # type: (List[Path]) -> None
+        super(SimpleFinder, self).__init__()
+        self._logger.debug("Search paths: %s", [x.abspath() for x in paths])
+        self._paths = paths
+        self._valid_extensions = tuple(
+            list(_SOURCE_EXTENSIONS) + list(_HEADER_EXTENSIONS)
+        )
+
+    def _getLibrary(self, path):  # type: (Path) -> str
         """
         Returns the library name given the path. On this implementation this
         returns a default name; child classes can override this to provide
@@ -50,16 +53,16 @@ class SimpleFinder(BaseGenerator):
         """
         return NotImplemented
 
-    def _findSources(self): # type: () -> Generator[t.Path, None, None]
+    def _findSources(self):  # type: () -> Generator[Path, None, None]
         """
         Iterates over the paths and searches for relevant files by extension.
         """
         for path in self._paths:
-            for dirpath, _, filenames in os.walk(path):
+            for dirpath, _, filenames in os.walk(path.name):
                 for filename in filenames:
                     path = p.join(dirpath, filename)
 
-                    if not p.isfile(path):
+                    if not path.isfile():
                         continue
 
                     try:
@@ -70,11 +73,12 @@ class SimpleFinder(BaseGenerator):
                     except UnknownTypeExtension:
                         continue
 
-                    if isFileReadable(path):
+                    if isFileReadable(path.name):
                         yield path
 
-    def _populate(self): # type: (...) -> None
+    def _populate(self):  # type: (...) -> None
         for path in self._findSources():
             library = self._getLibrary(path)
-            self._addSource(path,
-                            library='work' if library is NotImplemented else library)
+            self._addSource(
+                path, library="work" if library is NotImplemented else library
+            )
