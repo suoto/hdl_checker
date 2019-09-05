@@ -47,7 +47,7 @@ from hdlcc.parsers import (
     tAnyDesignUnit,
 )
 from hdlcc.path import Path
-from hdlcc.utils import HashableByKey, getFileType, getMostCommonItem, samefile
+from hdlcc.utils import HashableByKey, getFileType, getMostCommonItem
 
 _logger = logging.getLogger(__name__)
 
@@ -108,6 +108,10 @@ class Database(HashableByKey):
 
     def _addSource(self, library, path, flags):
         # type: (str, Path, t.BuildFlags) -> None
+        """
+        Adds a source to the database, triggering its parsing even if the
+        source is already on the database
+        """
         # Default when updating is set the modification time to zero
         # because we're cleaning up the parsed info too
         self._paths[path] = 0
@@ -228,6 +232,17 @@ class Database(HashableByKey):
         self._design_units |= src_parser.getDesignUnits()
         self._dependencies[path] = src_parser.getDependencies()
 
+        # Clear caches from lru_caches
+        for attr_name in dir(self):
+            if attr_name.startswith("__"):
+                continue
+            try:
+                meth = getattr(getattr(self, attr_name), "cache_clear")
+                _logger.info("Clearning cache for %s", attr_name)
+                meth()
+            except AttributeError:
+                pass
+
     def _addVunitIfFound(self):  # type: () -> None
         """
         Tries to import files to support VUnit right out of the box
@@ -235,19 +250,18 @@ class Database(HashableByKey):
         for library, path, flags in getVunitSources(self._builder_name):
             self._addSource(library, path, flags)
 
-    @lru_cache(maxsize=128, typed=False)
     def getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
         "Gets the design units for the given path (if any)"
         self._parseSourceIfNeeded(path)
         return self._getDesignUnitsByPath(path)
 
+    @lru_cache(maxsize=128, typed=False)
     def _getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
         """
         Gets the design units for the given path (if any). Differs from the
         public method in that changes to the file are not checked before
         running.
         """
-        #  return {x for x in self.design_units if samefile(x.owner.name, path.name)}
         return {x for x in self.design_units if x.owner == path}
 
     def getPathsByDesignUnit(self, unit):
