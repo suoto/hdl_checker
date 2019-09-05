@@ -122,7 +122,10 @@ def getVunitSources(builder_name):
 
     builder_class = getBuilderByName(builder_name)
 
-    if "systemverilog" in builder_class.file_types:
+    # Prefer VHDL VUnit
+    if "vhdl" in builder_class.file_types:
+        from vunit import VUnit  # pylint: disable=import-error
+    elif "systemverilog" in builder_class.file_types:
         from vunit.verilog import (  # type: ignore # pylint: disable=import-error
             VUnit,
         )
@@ -132,8 +135,11 @@ def getVunitSources(builder_name):
         builder_class.addIncludePath(
             "verilog", p.join(p.dirname(vunit.__file__), "verilog", "include")
         )
-    else:
-        from vunit import VUnit  # pylint: disable=import-error
+    else:  # pragma: no cover
+        _logger.warning(
+            "Vunit found but no file types are supported by %s", builder_name
+        )
+        return
 
     output_path = mkdtemp()
 

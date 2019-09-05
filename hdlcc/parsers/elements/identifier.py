@@ -25,7 +25,7 @@ class Identifier(object):
     and comparisons between them
     """
 
-    def __init__(self, name, case_sensitive):
+    def __init__(self, name, case_sensitive=False):
         # type: (str, bool) -> None
         self._name = str(name) if case_sensitive else str(name).lower()
         self._display_name = str(name)

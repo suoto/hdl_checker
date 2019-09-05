@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
+"Class defining a parsed design unit"
 
 import logging
 from enum import Enum
@@ -64,20 +65,21 @@ class _DesignUnit(ParsedElement):
 
     @property
     def owner(self):
+        # type: () -> Path
+        "Owner of the design unit"
         return self._owner
 
     @property
     def type_(self):
+        # type: () -> DesignUnitType
+        "Design unit type"
         return self._type
 
     @property
     def name(self):
+        # type: () -> Identifier
+        "Design unit name"
         return self._name
-
-    @property
-    def case_sensitive(self):  # type: () -> bool
-        ext = self.owner.split(".")[-1].lower()
-        return ext not in t.FileType.vhd.value
 
     @property
     def __hash_key__(self):

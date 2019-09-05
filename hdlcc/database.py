@@ -20,7 +20,6 @@
 
 import logging
 import os.path as p
-from functools import lru_cache
 from itertools import chain
 from threading import RLock
 from typing import (  # List,
@@ -49,6 +48,12 @@ from hdlcc.parsers import (
 from hdlcc.path import Path
 from hdlcc.utils import HashableByKey, getFileType, getMostCommonItem
 
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache  # type: ignore
+
+
 _logger = logging.getLogger(__name__)
 
 
@@ -61,10 +66,17 @@ class Database(HashableByKey):
         self._builder_name = BuilderName.fallback
         self._paths = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
+        self._inferred_libraries = set()  # type: Set[Path]
         self._flags = {}  # type: Dict[Path, t.BuildFlags]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
         self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
         self._cache = {}  # type: Dict[Path, Set[tAnyDesignUnit]]
+
+        self._cached_methods = {
+            getattr(self, x)
+            for x in dir(self)
+            if hasattr(getattr(self, x), "cache_clear")
+        }
 
         self._addVunitIfFound()
 
@@ -82,6 +94,22 @@ class Database(HashableByKey):
         "Set of design units found"
         return frozenset(self._design_units)
 
+    def refresh(self):
+        # type: (...) -> Any
+        self._clearCaches()
+
+        _logger.warning("Inferred: %s", self._inferred_libraries)
+        while self._inferred_libraries:
+            try:
+                name = self._inferred_libraries.pop()
+                del self._libraries[name]
+                _logger.warning("Removing %s", name)
+            except KeyError:
+                pass
+
+        for path in self._paths:
+            self._parseSourceIfNeeded(path)
+
     def reset(self):
         "Clears the database from previous data"
         self._builder_name = BuilderName.fallback
@@ -90,6 +118,8 @@ class Database(HashableByKey):
         self._flags = {}
         self._design_units = set()
         self._dependencies = {}
+
+        self._clearCaches()
 
         # Re-add VUnit files back again
         self._addVunitIfFound()
@@ -162,11 +192,13 @@ class Database(HashableByKey):
         """
         if self._libraries.get(path, None):
             _logger.info(
-                "Replacing old library '%s' for %s with '%s'",
+                "Replacing old library '%s' for '%s' with '%s'",
                 self._libraries[path],
                 path,
                 library,
             )
+        else:
+            _logger.info("Setting library for '%s' to '%s'", path, library)
 
         self._libraries[path] = library
         # Extract the unresolved dependencies that will be replaced
@@ -192,8 +224,11 @@ class Database(HashableByKey):
         # type: (Path) -> Identifier
         "Gets a library of a given source (this is likely to be removed)"
         if path not in self._paths:
-            self._updatePathLibrary(path, Identifier("<path_not_found>", True))
+            # Add the path to the project but put it on a different library
+            self._parseSourceIfNeeded(path)
+            self._updatePathLibrary(path, Identifier("out_of_project", True))
         elif path not in self._libraries:
+            # Library is not defined, try to infer
             self._updatePathLibrary(path, self._inferLibraryIfNeeded(path))
         return self._libraries[path]
 
@@ -208,40 +243,26 @@ class Database(HashableByKey):
         if mtime == self._paths.get(path, 0):
             return
 
-        #  _logger.debug("Parsing %s (%s)", path, mtime)
-
         # Update the timestamp
         self._paths[path] = mtime
+
         # Remove all design units that referred to this path before adding new
         # ones, but use the non API method for that to avoid recursing
-
-        if path in self._paths:
-            before = len(self._design_units)
-            # Need to use _getDesignUnitsByPath to avoid circular recursion
-            self._design_units -= frozenset(self._getDesignUnitsByPath(path))
-
-            #  del self._cache[path]
-
-            if before != len(self._design_units):
-                _logger.debug(
-                    "Reparsing source removes %d design units",
-                    before - len(self._design_units),
-                )
+        self._design_units -= frozenset(self._getDesignUnitsByPath(path))
 
         src_parser = getSourceParserFromPath(path)
         self._design_units |= src_parser.getDesignUnits()
         self._dependencies[path] = src_parser.getDependencies()
+        self._clearCaches()
 
-        # Clear caches from lru_caches
-        for attr_name in dir(self):
-            if attr_name.startswith("__"):
-                continue
-            try:
-                meth = getattr(getattr(self, attr_name), "cache_clear")
-                _logger.info("Clearning cache for %s", attr_name)
-                meth()
-            except AttributeError:
-                pass
+        #  # If the library was inferred and the source changed, undo that
+        #  if self._libraries[path] in self._inferred_libraries:
+        #      del self._libraries[path]
+
+    def _clearCaches(self):
+        "Clear caches from lru_caches"
+        for meth in self._cached_methods:
+            meth.cache_clear()
 
     def _addVunitIfFound(self):  # type: () -> None
         """
@@ -283,12 +304,14 @@ class Database(HashableByKey):
         _logger.debug("Inferring library for path %s", path)
         # Find all units this path defines
         units = set(self.getDesignUnitsByPath(path))
-        _logger.debug("Units defined here: %s", units)
-        all_libraries = []  # type: List[Identifier]
-        # For each unit, find every dependency with the same name
-        for unit in units:
-            _logger.debug("Checking unit %s", unit)
-            all_libraries += list(self.getLibrariesReferredByUnit(name=unit.name))
+        _logger.debug("Units defined here: %s", list(map(str, units)))
+        # Store all cases to use in case there are multiple libraries that
+        # could be used. If that happens, we'll use the most common one
+        all_libraries = list(
+            chain.from_iterable(
+                self.getLibrariesReferredByUnit(name=unit.name) for unit in units
+            )
+        )
 
         libraries = set(all_libraries)
 
@@ -299,41 +322,45 @@ class Database(HashableByKey):
             library = libraries.pop()
         else:
             library = getMostCommonItem(all_libraries)
+            _msg = []
+            for lib in libraries:
+                _msg.append("%s (x%d)" % (lib, all_libraries.count(lib)))
             _logger.warning(
                 "Path %s is in %d libraries: %s, using %s",
                 path,
                 len(libraries),
-                list(map(str, libraries)),
+                ", ".join(_msg),
                 library,
             )
 
+        self._inferred_libraries.add(path)
         return library
 
+    @lru_cache()
     def getLibrariesReferredByUnit(self, name, library=None):
-        # type: (Identifier, Optional[Identifier]) -> Iterable[Identifier]
+        # type: (Identifier, Optional[Identifier]) -> List[Identifier]
         """
         Gets libraries that the (library, name) pair is used throughout the
         project
         """
-        for dependencies in self._dependencies.values():
-            #  if name not in (x.name for x in dependencies):
-            #      continue
+        result = []  # List[Identifier]
+        for path, dependencies in self._dependencies.items():
             for dependency in dependencies:
                 library = dependency.library
-                if library is None:
-                    continue
-                if name != dependency.name:
+                if library is None or name != dependency.name:
                     continue
 
                 # If the dependency's library refers to 'work', it's actually
                 # referring to the library its owner is in
                 if library.name == "work":
                     #
-                    library = self._libraries.get(dependency.owner, None)
-                    #  library = self.getLibrary(dependency.owner)
+                    library = self._libraries.get(path, None)
                 if library is not None:
-                    yield library
+                    result.append(library)
 
+        return result
+
+    @lru_cache()
     def getPathsDefining(self, name, library=None):
         # type: (Identifier, Optional[Identifier]) -> Iterable[Path]
         """
@@ -364,35 +391,15 @@ class Database(HashableByKey):
                 # is incomplete and we should try to infer the library from the
                 # usage of this unit
                 for owner in {x.owner for x in units}:
+                    # Force getting library for this path to trigger library
+                    # inference if needed
                     self.getLibrary(owner)
-                    #  self._inferLibraryIfNeeded(owner)
             else:
                 units = units_matching_library
 
         _logger.debug("Units step 3: %s", tuple(str(x) for x in units))
 
-        return (unit.owner for unit in units)
-
-    def _resolveLibraryIfNeeded(self, library, name):
-        # type: (Identifier, Identifier) -> Tuple[Identifier, Identifier]
-        """
-        Tries to resolve undefined libraries by checking usages of 'name'
-        """
-        if library is None:
-            paths = tuple(self.getPathsDefining(name=name, library=None))
-            if not paths:
-                _logger.warning("Couldn't find a path definint unit %s", name)
-                library = Identifier("work", False)
-                assert False
-            elif len(paths) == 1:
-                path = paths[0]
-                #  library = self._libraries[path]
-                library = self.getLibrary(path)
-            else:
-                _logger.warning("Unit %s is defined in %d places", name, len(paths))
-                library = Identifier("work", False)
-                assert False
-        return library, name
+        return {unit.owner for unit in units}
 
     def getDependenciesUnits(self, path):
         # type: (Path) -> Set[Tuple[Identifier, Identifier]]
@@ -419,7 +426,9 @@ class Database(HashableByKey):
                 for x in self._dependencies[search_path]
             } - units
 
-            _logger.debug("New dependencies: %s", new_deps)
+            _logger.debug(
+                "New dependencies: %s", list((str(x), str(y)) for x, y in new_deps)
+            )
 
             # Add the new ones to the set tracking the dependencies seen since
             # the search started
@@ -442,7 +451,7 @@ class Database(HashableByKey):
 
         # Remove units defined by the path passed as argument
         units -= own_units
-        return {self._resolveLibraryIfNeeded(library, name) for library, name in units}
+        return units
 
     def getBuildSequence(self, path):
         # type: (Path) -> Generator[Tuple[t.LibraryName, Path], None, None]
@@ -484,7 +493,7 @@ class Database(HashableByKey):
                 still_needed = deps - units_compiled - own
 
                 if still_needed:
-                    if _logger.isEnabledFor(logging.DEBUG):
+                    if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
                         _msg = [
                             (library.name, name.name) for library, name in still_needed
                         ]
