@@ -31,3 +31,20 @@ class FileType(Enum):
     vhd = ("vhd", "vhdl")
     verilog = ("v", "vh")
     systemverilog = ("sv", "svh")
+
+    #  @classmethod
+    def __jsonEncode__(self):
+        """
+        Gets a dict that describes the current state of this object
+        """
+        return {'value': self.name}
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        """Returns an object of cls based on a given state"""
+        name = state['value']
+        if name == 'vhd':
+            return FileType.vhd
+        if name == 'verilog':
+            return FileType.verilog
+        return FileType.systemverilog

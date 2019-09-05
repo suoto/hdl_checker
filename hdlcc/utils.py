@@ -237,7 +237,7 @@ if not hasattr(p, "samefile"):
 else:
     _samefile = p.samefile  # pylint: disable=invalid-name
 
-samefile = functools.lru_cache()(_samefile)
+samefile = _samefile
 
 
 def removeDuplicates(seq):

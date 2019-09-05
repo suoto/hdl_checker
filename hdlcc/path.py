@@ -27,6 +27,8 @@ class Path(object):
     "Path helper class to speed up comparing different paths"
 
     def __init__(self, name):
+        # type: (str) -> None
+        assert isinstance(name, str), "Invalid type for path: {}".format(name)
         self._name = name
         self._stat = None
 
@@ -87,3 +89,19 @@ class Path(object):
             return NotImplemented
 
         return not result
+
+    def __jsonEncode__(self):
+        """
+        Gets a dict that describes the current state of this object
+        """
+        return {"name": self.name}
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        """Returns an object of cls based on a given state"""
+
+        obj = super(Path, cls).__new__(cls)
+        obj._name = state["name"]
+        obj._stat = None
+
+        return obj

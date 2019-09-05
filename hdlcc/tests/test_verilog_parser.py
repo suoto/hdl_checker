@@ -22,13 +22,16 @@ import logging
 import os
 
 import six
+
 from nose2.tools import such  # type: ignore
 
 from hdlcc.parsers import DesignUnitType, VerilogDesignUnit, VerilogParser
+from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, writeListToFile
 
 _logger = logging.getLogger(__name__)
+
 
 _FILENAME = "source.v"
 
@@ -61,7 +64,7 @@ module clock_divider
 
         @it.should("parse a file without errors")  # type: ignore
         def test():
-            it.source = VerilogParser(_FILENAME)
+            it.source = VerilogParser(Path(_FILENAME))
 
         @it.should("return its design units")  # type: ignore
         def test():
@@ -81,7 +84,7 @@ module clock_divider
 
         @it.should("return no dependencies")  # type: ignore
         def test():
-            it.assertEqual(it.source.getDependencies(), [])
+            it.assertFalse(it.source.getDependencies())
 
         @it.should("return source modification time")  # type: ignore
         def test():
@@ -89,7 +92,7 @@ module clock_divider
 
         @it.should("return no libraries")  # type: ignore
         def test():
-            it.assertEqual(it.source.getLibraries(), [])
+            it.assertFalse(it.source.getLibraries())
 
         @it.should("report as equal after recovering from cache")  # type:ignore
         def test():

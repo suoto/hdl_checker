@@ -82,13 +82,13 @@ class SourceMock(object):
         design_units,  # type: Iterable[Dict[str, str]]
         library=None,  # type: str
         dependencies=None,  # type: Iterable[MockDep]
-        filename=None,  # type: Optional[Path]
+        filename=None,  # type: Optional[str]
     ):
 
         self._design_units = list(design_units or [])
 
         if filename is not None:
-            self._filename = Path(p.join(self.base_path, filename.name))
+            self._filename = Path(p.join(self.base_path, filename))
         else:
             library = "lib_not_set" if library is None else library
             self._filename = Path(
@@ -116,7 +116,7 @@ class SourceMock(object):
 
             self._dependencies.add(
                 DependencySpec(
-                    Path(self._filename),
+                    self._filename,
                     Identifier(_name, False),
                     Identifier(_library, False),
                 )
@@ -348,6 +348,7 @@ def removeCacheData():
 
 
 def getTestTempPath(name):
+    # type: (str) -> str
     name = name.replace(".", "_")
     path = p.abspath(p.join(os.environ["TOX_ENV_DIR"], "tmp", name))
     if not p.exists(path):
@@ -356,6 +357,7 @@ def getTestTempPath(name):
 
 
 def setupTestSuport(path):
+    # type: (str) -> None
     """Copy contents of .ci/test_support_path/ to the given path"""
     _logger.info("Setting up test support at %s", path)
 
@@ -385,3 +387,14 @@ def logIterable(msg, iterable, func):
     func(msg)
     for i, item in enumerate(iterable, 1):
         func("- {:2d} {}".format(i, item))
+
+
+if six.PY2:
+    from unittest2 import TestCase as _TestCase
+    class TestCase(_TestCase):
+        def __new__(cls, *args, **kwargs):
+            result = super(_TestCase, cls).__new__(cls, *args, **kwargs)
+            result.assertCountEqual = assertCountEqual(result)
+            return result
+else:
+    from unittest2 import TestCase

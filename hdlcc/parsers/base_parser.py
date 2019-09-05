@@ -51,7 +51,8 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
     def __init__(self, filename):
         # type: (Path, ) -> None
-        self.filename = Path(p.abspath(p.normpath(filename.name)))
+        assert isinstance(filename, Path), "Invalid type: {}".format(filename)
+        self.filename = filename
         self._cache = {}  # type: Dict[str, Any]
         self._content = None
         self._mtime = 0  # type: Optional[float]
@@ -77,6 +78,8 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         del state["shadow_filename"]
         if "raw_content" in state["_cache"]:
             del state["_cache"]["raw_content"]
+        del state["_design_units"]
+        del state["_dependencies"]
         return state
 
     @classmethod
@@ -91,8 +94,8 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         obj._cache = state["_cache"]  # pylint: disable=protected-access
         obj._content = None  # pylint: disable=protected-access
         obj._mtime = state["_mtime"]  # pylint: disable=protected-access
-        obj._dependencies = state["_dependencies"]  # pylint: disable=protected-access
-        obj._design_units = state["_design_units"]  # pylint: disable=protected-access
+        obj._dependencies = None  # pylint: disable=protected-access
+        obj._design_units = None  # pylint: disable=protected-access
         obj._libraries = state["_libraries"]  # pylint: disable=protected-access
 
         return obj

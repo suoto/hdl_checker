@@ -25,10 +25,17 @@ import os
 import os.path as p
 
 import six
+
 from nose2.tools import such  # type: ignore
 
-from hdlcc.parsers import (DependencySpec, VhdlDesignUnit, DesignUnitType,
-                           Identifier, VhdlParser)
+from hdlcc.parsers import (
+    DependencySpec,
+    DesignUnitType,
+    Identifier,
+    VhdlDesignUnit,
+    VhdlParser,
+)
+from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, assertSameFile, writeListToFile
 
@@ -39,12 +46,14 @@ _FILENAME = p.join(TEST_SUPPORT_PATH, "source.vhd")
 
 such.unittest.TestCase.maxDiff = None
 
+
 def _DependencySpec(owner, name, library, locations=None):
     return DependencySpec(
         owner=owner,
         name=Identifier(name, case_sensitive=False),
         library=Identifier(library, case_sensitive=False),
-        locations=locations)
+        locations=locations,
+    )
 
 
 with such.A("VHDL source file object") as it:
@@ -104,7 +113,7 @@ with such.A("VHDL source file object") as it:
 
         @it.should("parse a file without errors")  # type: ignore
         def test():
-            it.source = VhdlParser(_FILENAME)
+            it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return its entities")  # type: ignore
         def test():
@@ -138,25 +147,25 @@ with such.A("VHDL source file object") as it:
                 it.source.getDependencies(),
                 [
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
                         locations=[(2, 5)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
                         locations=[(3, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="package_with_constants",
                         locations=[(6, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="cherry_pick",
                         locations=[(7, 7), (8, 5)],
@@ -180,31 +189,31 @@ with such.A("VHDL source file object") as it:
                 it.source.getDependencies(),
                 [
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
                         locations=[(4, 5)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
                         locations=[(5, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="package_with_constants",
                         locations=[(8, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="some_library",
                         name="some_package",
                         locations=[(2, 9)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="cherry_pick",
                         locations=[(9, 7), (10, 5)],
@@ -222,31 +231,31 @@ with such.A("VHDL source file object") as it:
                 it.source.getDependencies(),
                 [
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
                         locations=[(3, 5)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
                         locations=[(4, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="package_with_constants",
                         locations=[(7, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="another_package",
                         locations=[(1, 9)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="cherry_pick",
                         locations=[(8, 7), (9, 5)],
@@ -264,25 +273,25 @@ with such.A("VHDL source file object") as it:
                 it.source.getDependencies(),
                 [
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
                         locations=[(3, 5)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
                         locations=[(4, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="package_with_constants",
                         locations=[(7, 6)],
                     ),
                     _DependencySpec(
-                        owner=_FILENAME,
+                        owner=Path(_FILENAME),
                         library="work",
                         name="cherry_pick",
                         locations=[(8, 7), (9, 5)],
@@ -290,7 +299,7 @@ with such.A("VHDL source file object") as it:
                 ],
             )
 
-        @it.should( # type: ignore
+        @it.should(  # type: ignore
             "report as equal after recovering from cache via json"
         )
         def test():
@@ -340,7 +349,7 @@ with such.A("VHDL source file object") as it:
 
         @it.should("parse a file without errors")  # type: ignore
         def test():
-            it.source = VhdlParser(_FILENAME)
+            it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return the names of the packages found")  # type: ignore
         def test():
@@ -434,7 +443,7 @@ with such.A("VHDL source file object") as it:
 
         @it.should("create the object with no errors")  # type: ignore
         def test():
-            it.source = VhdlParser(_FILENAME)
+            it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return the names of the packages found")  # type: ignore
         def test():
