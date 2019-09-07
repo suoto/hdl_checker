@@ -27,28 +27,30 @@ from contextlib import contextmanager
 from typing import Iterator, List
 
 import six
+
 from nose2.tools import such  # type: ignore
 
-from hdlcc.builders import BuilderName
+from hdlcc.builder_utils import BuilderName
 from hdlcc.exceptions import UnknownParameterError
-from hdlcc.parsers import ConfigParser, ProjectSourceSpec
-from hdlcc.tests.utils import (assertCountEqual, getTestTempPath,
-                               setupTestSuport)
+from hdlcc.parsers.config_parser import ConfigParser, ProjectSourceSpec
+from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport
 
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
+TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+
 
 @contextmanager
-def fileWithContent(content): # type: (List[bytes]) -> Iterator[str]
+def fileWithContent(content):  # type: (List[bytes]) -> Iterator[str]
     with tempfile.NamedTemporaryFile(delete=False) as fd:
         print("Writing to %s (%s)" % (fd, fd.name))
         fd.write(content)
         fd.flush()
         yield fd.name
 
-with such.A('config parser object') as it:
+
+with such.A("config parser object") as it:
 
     if six.PY2:
         # Can't use assertCountEqual for lists of unhashable types.
@@ -67,16 +69,16 @@ with such.A('config parser object') as it:
     #          if p.exists(temp_path):
     #              shutil.rmtree(temp_path)
 
-
-    @it.should("raise UnknownParameterError exception when an unknown "
-               "parameter is found")
+    @it.should(
+        "raise UnknownParameterError exception when an unknown " "parameter is found"
+    )
     def test_raises_exception():
         with it.assertRaises(UnknownParameterError):
-            with fileWithContent(b'foo = bar') as name:
+            with fileWithContent(b"foo = bar") as name:
                 parser = ConfigParser(name)
                 parser.parse()
 
-    with it.having('a regular file'):
+    with it.having("a regular file"):
 
         @it.has_setup
         def setup():
@@ -100,7 +102,7 @@ verilog work foo.v -some-flag some value
 systemverilog work bar.sv some sv flag
 """
 
-            with open(it.path, 'wb') as fd:
+            with open(it.path, "wb") as fd:
                 fd.write(contents)
                 fd.flush()
 
@@ -110,18 +112,24 @@ systemverilog work bar.sv some sv flag
             config = parser.parse()
 
             _logger.info("Parsed config:\n%s", pprint.pformat(config))
-            sources = config.pop('sources')
+            sources = config.pop("sources")
 
             it.assertDictEqual(
                 config,
-                {'builder_name': BuilderName.msim,
-                 'global_build_flags': {'systemverilog': (),
-                                        'verilog': (),
-                                        'vhdl': ('-global', '-global-build-flag')},
-                 'single_build_flags': {'systemverilog': (),
-                                        'verilog': (),
-                                        'vhdl': ('-single_build_flag_0', '-singlebuildflag')},
-                 })
+                {
+                    "builder_name": BuilderName.msim,
+                    "global_build_flags": {
+                        "systemverilog": (),
+                        "verilog": (),
+                        "vhdl": ("-global", "-global-build-flag"),
+                    },
+                    "single_build_flags": {
+                        "systemverilog": (),
+                        "verilog": (),
+                        "vhdl": ("-single_build_flag_0", "-singlebuildflag"),
+                    },
+                },
+            )
 
             class _ProjectSourceSpec(ProjectSourceSpec):
                 base_path = p.abspath(p.dirname(it.path))
@@ -131,26 +139,40 @@ systemverilog work bar.sv some sv flag
                         path = p.join(_ProjectSourceSpec.base_path, path)
 
                     super(_ProjectSourceSpec, self).__init__(
-                        path=path, library=library, flags=flags)
+                        path=path, library=library, flags=flags
+                    )
 
             it.assertCountEqual(
                 sources,
-                [_ProjectSourceSpec(path="sample_file.vhd",
-                                    library="work",
-                                    flags=('-sample_file_flag',)),
-                 _ProjectSourceSpec(path="sample_package.vhdl",
-                                    library="work",
-                                    flags=('-sample_package_flag',)),
-                 _ProjectSourceSpec(path="sample_testbench.VHD",
-                                    library="work",
-                                    flags=('-build-using', 'some', 'way')),
-                 _ProjectSourceSpec(path="/some/abs/path.VHDL",
-                                    library="lib", flags=()),
-                 _ProjectSourceSpec(path="foo.v",
-                                    library="work",
-                                    flags=('-some-flag', 'some', 'value')),
-                 _ProjectSourceSpec(path="bar.sv",
-                                    library="work",
-                                    flags=('some', 'sv', 'flag'))])
+                [
+                    _ProjectSourceSpec(
+                        path="sample_file.vhd",
+                        library="work",
+                        flags=("-sample_file_flag",),
+                    ),
+                    _ProjectSourceSpec(
+                        path="sample_package.vhdl",
+                        library="work",
+                        flags=("-sample_package_flag",),
+                    ),
+                    _ProjectSourceSpec(
+                        path="sample_testbench.VHD",
+                        library="work",
+                        flags=("-build-using", "some", "way"),
+                    ),
+                    _ProjectSourceSpec(
+                        path="/some/abs/path.VHDL", library="lib", flags=()
+                    ),
+                    _ProjectSourceSpec(
+                        path="foo.v",
+                        library="work",
+                        flags=("-some-flag", "some", "value"),
+                    ),
+                    _ProjectSourceSpec(
+                        path="bar.sv", library="work", flags=("some", "sv", "flag")
+                    ),
+                ],
+            )
+
 
 it.createTests(globals())

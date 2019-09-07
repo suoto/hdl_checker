@@ -15,16 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common type definitions for type hinting"
+from collections import namedtuple
 from enum import Enum
 from typing import Any, Dict, Tuple
-#  from hdlcc.path import Path
 
-#  Path = NewType('Path', str)
 BuildInfo = Dict[str, Any]
 BuildFlags = Tuple[str, ...]
 UnitName = str
 LibraryName = str
 ObjectState = Dict
+
+LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
 
 class FileType(Enum):
@@ -37,14 +38,14 @@ class FileType(Enum):
         """
         Gets a dict that describes the current state of this object
         """
-        return {'value': self.name}
+        return {"value": self.name}
 
     @classmethod
     def __jsonDecode__(cls, state):
         """Returns an object of cls based on a given state"""
-        name = state['value']
-        if name == 'vhd':
+        name = state["value"]
+        if name == "vhd":
             return FileType.vhd
-        if name == 'verilog':
+        if name == "verilog":
             return FileType.verilog
         return FileType.systemverilog

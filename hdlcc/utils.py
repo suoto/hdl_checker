@@ -28,7 +28,7 @@ import sys
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Lock
-from typing import Callable
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from hdlcc import types as t
 from hdlcc.path import Path
@@ -338,21 +338,20 @@ def getCachePath():
 
 
 def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
+    # type: (Union[Tuple[str], List[str]], bool, Optional[Dict], Optional[str]) -> Iterable[str]
     """
     Runs a shell command and handles stdout catching
     """
-
-    if env is not None:  # pragma: no cover
-        subp_env = env
-    else:
-        subp_env = os.environ
-
     _logger.debug(" ".join(cmd_with_args))
 
     try:
         stdout = list(
             subp.check_output(
-                cmd_with_args, stderr=subp.STDOUT, shell=shell, env=subp_env, cwd=cwd
+                cmd_with_args,
+                stderr=subp.STDOUT,
+                shell=shell,
+                env=env or os.environ,
+                cwd=cwd,
             ).splitlines()
         )
     except subp.CalledProcessError as exc:

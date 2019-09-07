@@ -28,9 +28,10 @@ import sys
 import time
 from typing import Any, Iterable, List, Set, Tuple
 
-from hdlcc.builders import BuilderName
+from hdlcc.builder_utils import BuilderName
 from hdlcc.database import Database
-from hdlcc.parsers import DesignUnitType, Identifier, VhdlDesignUnit
+from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 
 from hdlcc.tests.utils import (  # sanitizePath,; writeListToFile,
@@ -421,6 +422,8 @@ class TestIncludesVunit(TestCase):
             "vhdl",
             "vunit_context.vhd",
         )
+
+        logIterable("Design units:", self.database.design_units, _logger.fatal)
 
         self.assertCountEqual(
             self.database.getPathsDefining(Identifier("vunit_context")),

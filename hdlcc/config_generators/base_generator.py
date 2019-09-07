@@ -21,7 +21,7 @@ import logging
 from typing import Dict, Optional, Set, Tuple
 
 from hdlcc import types as t
-from hdlcc.builders import AnyValidBuilder
+from hdlcc.builder_utils import AnyValidBuilder
 from hdlcc.path import Path
 from hdlcc.utils import getFileType
 
@@ -61,10 +61,10 @@ class BaseGenerator:
             "Adding path %s (flags=%s, library=%s)", path, flags, library
         )
 
-        if path.basename().split(".")[-1].lower() in ("vh", "svh"):
+        if path.basename.split(".")[-1].lower() in ("vh", "svh"):
             file_type = getFileType(path)
             if file_type in ("verilog", "systemverilog"):
-                self._include_paths[file_type].add(path.dirname())
+                self._include_paths[file_type].add(path.dirname)
         else:
             self._sources.add(
                 (

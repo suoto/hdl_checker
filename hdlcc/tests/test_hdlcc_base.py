@@ -32,12 +32,14 @@ from nose2.tools import such # type: ignore
 from nose2.tools.params import params # type: ignore
 
 import hdlcc
-from hdlcc.builders import Fallback
-from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
+from hdlcc.builders.fallback import Fallback
+from hdlcc.diagnostics import (DependencyNotUnique,
                                LibraryShouldBeOmited, ObjectIsNeverUsed,
                                PathNotInProjectFile)
 from hdlcc.hdlcc_base import CACHE_NAME
-from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
+from hdlcc.parsers.verilog_parser import VerilogParser
+from hdlcc.parsers.vhdl_parser import VhdlParser
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
                                StandaloneProjectBuilder, assertCountEqual,
                                assertSameFile, disableVunit, getTestTempPath,

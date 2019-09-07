@@ -36,14 +36,10 @@ from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.utils import getCachePath, getFileType, onWindows, removeDuplicates, samefile
-
-from hdlcc.parsers import (  # pylint: disable=unused-import; pylint: disable=unused-import
-    DependencySpec,
-    Identifier,
-    tAnyDesignUnit,
-)
 
 _logger = logging.getLogger(__name__)
 
@@ -239,7 +235,7 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
         raise exceptions.SanityCheckError(self.builder_name, "Fake error")
 
 
-disableVunit = mock.patch("hdlcc.builders.foundVunit", lambda: False)
+disableVunit = mock.patch("hdlcc.builder_utils.foundVunit", lambda: False)
 
 
 def sanitizePath(*args):
@@ -250,6 +246,26 @@ def sanitizePath(*args):
         p.abspath(p.join(*args))  # pylint: disable=no-value-for-parameter
     )
 
+
+def assertSameFile(it):  # pylint: disable=invalid-name
+    def wrapper(first, second, msg=None):
+        try:
+            os.stat(first)
+        except TypeError:
+            it.fail("Invalid first argument of type {}".format(type(first)))
+        try:
+            os.stat(second)
+        except TypeError:
+            it.fail("Invalid first argument of type {}".format(type(second)))
+        if not samefile(p.abspath(first), p.abspath(second)):
+            _msg = "" if msg is None else "{}\n".format(msg)
+            it.fail(
+                "{}Paths '{}' and '{}' differ".format(
+                    _msg, p.abspath(first), p.abspath(second)
+                )
+            )
+
+    return wrapper
 
 def assertCountEqual(it):  # pylint: disable=invalid-name
 
@@ -281,15 +297,6 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
 
     return wrapper
 
-
-def assertSameFile(it):  # pylint: disable=invalid-name
-    def wrapper(first, second):
-        if not samefile(p.abspath(first), p.abspath(second)):
-            it.fail(
-                "Paths '{}' and '{}' differ".format(p.abspath(first), p.abspath(second))
-            )
-
-    return wrapper
 
 
 def writeListToFile(filename, _list):  # pragma: no cover
@@ -391,10 +398,13 @@ def logIterable(msg, iterable, func):
 
 if six.PY2:
     from unittest2 import TestCase as _TestCase
+
     class TestCase(_TestCase):
         def __new__(cls, *args, **kwargs):
             result = super(_TestCase, cls).__new__(cls, *args, **kwargs)
             result.assertCountEqual = assertCountEqual(result)
             return result
+
+
 else:
     from unittest2 import TestCase

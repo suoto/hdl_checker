@@ -27,7 +27,7 @@ from typing import Dict, Iterator, Optional, Set
 
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import BuilderName
+from hdlcc.builder_utils import BuilderName
 from hdlcc.path import Path
 from hdlcc.utils import HashableByKey
 
@@ -67,7 +67,7 @@ class ProjectSourceSpec(HashableByKey):
 
     def __init__(self, path, library=None, flags=None):
         # type: (Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
-        self._path = p.normpath(path.abspath())
+        self._path = p.normpath(path.abspath)
         self._library = library
         self._flags = tuple(flags or [])
 
@@ -129,7 +129,7 @@ class ConfigParser(object):
         """
         Checks if we should parse the configuration file
         """
-        return self.filename.mtime() > self._timestamp
+        return self.filename.mtime > self._timestamp
 
     def _updateTimestamp(self):
         """
@@ -211,7 +211,7 @@ class ConfigParser(object):
         # If the path to the source file was not absolute, we assume
         # it was relative to the config file base path
         if not p.isabs(source_path):
-            fname_base_dir = p.dirname(self.filename.abspath())
+            fname_base_dir = p.dirname(self.filename.abspath)
             source_path = p.join(fname_base_dir, source_path)
 
         # Convert paths found to Path

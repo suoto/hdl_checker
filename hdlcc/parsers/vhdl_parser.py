@@ -20,7 +20,9 @@ import logging
 import re
 from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 
-from . import DependencySpec, DesignUnitType, Identifier, VhdlDesignUnit
+from .elements.dependency_spec import DependencySpec
+from .elements.design_unit import DesignUnitType, VhdlDesignUnit
+from .elements.identifier import Identifier
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile

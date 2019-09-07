@@ -18,9 +18,12 @@
 
 # pylint: disable=useless-object-inheritance
 
+import logging
 import os.path as p
 from os import stat
 from typing import AnyStr
+
+_logger = logging.getLogger(__name__)
 
 
 class Path(object):
@@ -28,28 +31,30 @@ class Path(object):
 
     def __init__(self, name):
         # type: (str) -> None
-        assert isinstance(name, str), "Invalid type for path: {}".format(name)
+        assert isinstance(name, (str, unicode)), "Invalid type for path: {} ({})".format(
+            name, type(name)
+        )
         self._name = name
         self._stat = None
 
+    @property
     def mtime(self):
         # type: () -> float
         return p.getmtime(self.name)
 
-    def isfile(self):
-        # type: () -> bool
-        return p.isfile(self.name)
-
+    @property
     def abspath(self):
-        # type: () -> AnyStr
+        # type: () -> str
         return p.abspath(self.name)
 
+    @property
     def basename(self):
-        # type: () -> AnyStr
+        # type: () -> str
         return p.basename(self.name)
 
+    @property
     def dirname(self):
-        # type: () -> AnyStr
+        # type: () -> str
         return p.dirname(self.name)
 
     @property
@@ -73,9 +78,10 @@ class Path(object):
 
     def __eq__(self, other):
         """Overrides the default implementation"""
-
         try:
-            return p.samestat(self.stat, other.stat)
+            if p.exists(self.name):
+                return p.samestat(self.stat, other.stat)
+            return self.abspath == other.abspath
         except AttributeError:
             return False
 

@@ -20,6 +20,7 @@
 
 import logging
 import os.path as p
+from collections import namedtuple
 from itertools import chain
 from threading import RLock
 from typing import (  # List,
@@ -37,14 +38,12 @@ from typing import (  # List,
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import BuilderName, getVunitSources
-from hdlcc.parsers import (
-    ConfigParser,
-    DependencySpec,
-    Identifier,
-    getSourceParserFromPath,
-    tAnyDesignUnit,
-)
+from hdlcc.builder_utils import BuilderName, getVunitSources
+from hdlcc.parser_utils import getSourceParserFromPath
+from hdlcc.parsers.config_parser import ConfigParser
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.utils import HashableByKey, getFileType, getMostCommonItem
 
@@ -96,14 +95,13 @@ class Database(HashableByKey):
 
     def refresh(self):
         # type: (...) -> Any
-        self._clearCaches()
+        self._clearLruCaches()
 
-        _logger.warning("Inferred: %s", self._inferred_libraries)
         while self._inferred_libraries:
             try:
                 name = self._inferred_libraries.pop()
                 del self._libraries[name]
-                _logger.warning("Removing %s", name)
+                _logger.debug("Removed inferred library '%s'", name)
             except KeyError:
                 pass
 
@@ -119,7 +117,7 @@ class Database(HashableByKey):
         self._design_units = set()
         self._dependencies = {}
 
-        self._clearCaches()
+        self._clearLruCaches()
 
         # Re-add VUnit files back again
         self._addVunitIfFound()
@@ -130,17 +128,16 @@ class Database(HashableByKey):
 
     def updateFromDict(self, config):  # type: (Any) -> None
         "Updates the database from a dictionary"
-
         self._builder_name = config.get("builder_name", self._builder_name)
 
         for library, path, flags in config.get("sources", []):
             self._addSource(library, Path(path), flags)
 
     def _addSource(self, library, path, flags):
-        # type: (str, Path, t.BuildFlags) -> None
+        # type: (Optional[str], Path, t.BuildFlags) -> None
         """
         Adds a source to the database, triggering its parsing even if the
-        source is already on the database
+        source has already been added previously
         """
         # Default when updating is set the modification time to zero
         # because we're cleaning up the parsed info too
@@ -253,13 +250,13 @@ class Database(HashableByKey):
         src_parser = getSourceParserFromPath(path)
         self._design_units |= src_parser.getDesignUnits()
         self._dependencies[path] = src_parser.getDependencies()
-        self._clearCaches()
+        self._clearLruCaches()
 
         #  # If the library was inferred and the source changed, undo that
         #  if self._libraries[path] in self._inferred_libraries:
         #      del self._libraries[path]
 
-    def _clearCaches(self):
+    def _clearLruCaches(self):
         "Clear caches from lru_caches"
         for meth in self._cached_methods:
             meth.cache_clear()
@@ -284,6 +281,10 @@ class Database(HashableByKey):
         running.
         """
         return {x for x in self.design_units if x.owner == path}
+
+    def getDependenciesByPath(self, path):
+        # type: (Path) -> Set[t.LibraryAndUnit]
+        return {t.LibraryAndUnit(x.library, x.name) for x in self._dependencies[path]}
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]

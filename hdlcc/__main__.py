@@ -19,7 +19,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "hdlcc main entry point"
 
-import sys
+#  import sys
 
-from hdlcc.standalone import main
-sys.exit(main())
+#  from hdlcc.standalone import main
+#  sys.exit(main())

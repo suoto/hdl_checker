@@ -25,13 +25,13 @@ import six
 
 from nose2.tools import such  # type: ignore
 
-from hdlcc.parsers import DesignUnitType, VerilogDesignUnit, VerilogParser
+from hdlcc.parsers.elements.design_unit import DesignUnitType
+from hdlcc.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, writeListToFile
 
 _logger = logging.getLogger(__name__)
-
 
 _FILENAME = "source.v"
 

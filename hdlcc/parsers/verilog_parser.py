@@ -20,7 +20,7 @@ import logging
 import re
 from typing import Any, Generator
 
-from . import DesignUnitType, LocationList, VerilogDesignUnit
+from .elements.design_unit import DesignUnitType, VerilogDesignUnit
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
@@ -38,7 +38,6 @@ _DESIGN_UNIT_SCANNER = re.compile(
     ),
     flags=re.S,
 )
-
 
 
 class VerilogParser(BaseSourceFile):

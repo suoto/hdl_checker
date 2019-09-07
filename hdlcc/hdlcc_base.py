@@ -28,7 +28,7 @@ from typing import Any, AnyStr, Dict, Generator, List, Optional, Set, Tuple
 
 from hdlcc import builders, exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builders import Fallback
+from hdlcc.builders.fallback import Fallback
 from hdlcc.database import Database
 from hdlcc.diagnostics import (
     CheckerDiagnostic,
@@ -36,13 +36,11 @@ from hdlcc.diagnostics import (
     DiagType,
     PathNotInProjectFile,
 )
-from hdlcc.parsers import (
-    ConfigParser,
-    DependencySpec,
-    VerilogParser,
-    VhdlParser,
-    tSourceFile,
-)
+from hdlcc.parser_utils import tSourceFile
+from hdlcc.parsers.config_parser import ConfigParser
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.verilog_parser import VerilogParser
+from hdlcc.parsers.vhdl_parser import VhdlParser
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages

@@ -147,14 +147,14 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             return 0
         if not p.exists(self.filename.name):
             return None
-        return self.filename.mtime()
+        return self.filename.mtime
 
     def _getTemporaryFile(self):
         # type: () -> Any
         "Gets the temporary dump file context"
         return NamedTemporaryFile(
             suffix="." + self.filename.name.split(".")[-1],
-            prefix="temp_" + self.filename.basename(),
+            prefix="temp_" + self.filename.basename,
         )
 
     @contextmanager

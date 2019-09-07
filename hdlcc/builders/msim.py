@@ -20,11 +20,13 @@ import os
 import os.path as p
 import re
 from shutil import copyfile
+from typing import Any, Iterable, List, Optional
 
 from .base_builder import BaseBuilder
 
 from hdlcc import types as t
 from hdlcc.diagnostics import BuilderDiag, DiagType
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.utils import getFileType, runShellCommand
 
@@ -74,7 +76,7 @@ class MSim(BaseBuilder):
 
     _BuilderLibraryScanner = re.compile(
         r"^\"(?P<library_name>\w+)\""
-        r"\s+maps to directory\s*"
+        r"\s+maps to directory\s+"
         r"(?P<library_path>.*)\.$",
         re.I,
     )
@@ -101,25 +103,15 @@ class MSim(BaseBuilder):
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
 
-    def __init__(self, target_folder):
-        # type: (Path) -> None
+    def __init__(self, target_folder, *args, **kwargs):
+        # type: (...) -> None
         self._version = ""
-        super(MSim, self).__init__(target_folder)
-        self._modelsim_ini = p.join(self._target_folder, "modelsim.ini")
-
-        # Use vlib with '-type directory' switch to get a more consistent
-        # folder organization. The vlib command has 3 variants:
-        # - version <= 6.2: "Old" library organization
-        # - 6.3 <= version <= 10.2: Has the switch but defaults to directory
-        # version >= 10.2+: Has the switch and the default is not directory
-        if self._version >= "10.2":  # pragma: no cover
-            self._vlib_args = ["-type", "directory"]
-        else:  # pragma: no cover
-            self._vlib_args = []
-        self._logger.debug("vlib arguments: '%s'", str(self._vlib_args))
+        self._modelsim_ini = Path(p.join(target_folder.name, "modelsim.ini"))
+        super(MSim, self).__init__(target_folder, *args, **kwargs)
 
     def _makeRecords(self, line):
-        for match in self._stdout_message_scanner(line):
+        # type: (str) -> Iterable[BuilderDiag]
+        for match in self._stdout_message_scanner(line):  # type: ignore
             info = match.groupdict()
 
             self._logger.debug("Parsed dict: %s", repr(info))
@@ -142,7 +134,7 @@ class MSim(BaseBuilder):
             column_number = info.get("column_number")
 
             if filename is not None:
-                diag.filename = filename
+                diag.filename = Path(filename)
             if line_number is not None:
                 diag.line_number = line_number
             if column_number is not None:
@@ -176,12 +168,15 @@ class MSim(BaseBuilder):
             return False
 
     def _parseBuiltinLibraries(self):
+        # type: (...) -> Any
         "Discovers libraries that exist regardless before we do anything"
         if not self._iniFileExists():
             self._createIniFile()
         for line in runShellCommand(["vmap"]):
             for match in self._BuilderLibraryScanner.finditer(line):
-                self._builtin_libraries.add(match.groupdict()["library_name"])
+                self._builtin_libraries.add(
+                    Identifier(match.groupdict()["library_name"], True)
+                )
 
     def getBuiltinLibraries(self):
         return self._builtin_libraries
@@ -205,6 +200,7 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, path, library, flags=None):
+        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
         filetype = getFileType(path)
         if filetype == t.FileType.vhd:
             return self._buildVhdl(path, library, flags)
@@ -214,28 +210,31 @@ class MSim(BaseBuilder):
         self._logger.error(  # pragma: no cover
             "Unknown file type %s for path '%s'", filetype, path
         )
-        return None  # pragma: no cover
+        return ""
 
     def _getExtraFlags(self, lang):
+        # type: (str) -> Iterable[str]
         """
         Gets extra flags configured for the specific language
         """
-        libs = []
+        libs = []  # type: List[str]
         for library in self._added_libraries.union(self._external_libraries[lang]):
-            libs = ["-L", library]
+            libs = ["-L", library.name]
         for path in self._include_paths[lang]:
             libs += ["+incdir+" + str(path)]
         return libs
 
     def _buildVhdl(self, path, library, flags=None):
+        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
         "Builds a VHDL file"
+        assert isinstance(library, Identifier)
         cmd = [
             "vcom",
             "-modelsimini",
-            self._modelsim_ini,
+            self._modelsim_ini.name,
             "-quiet",
             "-work",
-            p.join(self._target_folder, library),
+            p.join(self._target_folder, library.name),
         ]
         if flags:  # pragma: no cover
             cmd += flags
@@ -244,15 +243,17 @@ class MSim(BaseBuilder):
         return runShellCommand(cmd)
 
     def _buildVerilog(self, path, library, flags=None):
+        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
         "Builds a Verilog/SystemVerilog file"
         cmd = [
             "vlog",
             "-modelsimini",
-            self._modelsim_ini,
+            self._modelsim_ini.name,
             "-quiet",
             "-work",
-            p.join(self._target_folder, library),
+            p.join(self._target_folder, library.name),
         ]
+
         if getFileType(path) == t.FileType.systemverilog:
             cmd += ["-sv"]
         if flags:  # pragma: no cover
@@ -264,44 +265,38 @@ class MSim(BaseBuilder):
         return runShellCommand(cmd)
 
     def _createLibrary(self, library):
-        library = library.lower()
+        # type: (Identifier) -> None
         if library in self._builtin_libraries:
-            self._logger.info("Library %s is built in", library)
+            self._logger.debug("Library '%s' is built in", library)
             return
 
         if not self._iniFileExists() and library in self._added_libraries:
-            self._logger.info("Library %s not added", library)
+            self._logger.debug("Library '%s' not added", library)
             return
 
         self._added_libraries.add(library)
-        try:
-            if p.exists(p.join(self._target_folder, library)):
-                return
-            self._mapLibrary(library)
-        except:  # pragma: no cover
-            self._logger.debug(
-                "Current dir when exception was raised: %s", p.abspath(os.curdir)
-            )
-            raise
+        if p.exists(p.join(self._target_folder, library.name)):
+            self._logger.debug("Path for library '%s' already exists", library)
+            return
+        self._mapLibrary(library)
+        self._logger.debug("Added and mapped library '%s'", library)
 
     def _iniFileExists(self):
+        # type: (...) -> bool
         """
         Checks if the modelsim.ini file exists at the expected location
         """
-        _modelsim_ini = p.join(self._target_folder, "modelsim.ini")
-
-        return p.exists(_modelsim_ini)
+        return p.exists(self._modelsim_ini.abspath)
 
     def _createIniFile(self):
+        # type: (...) -> Any
         """
         Adds a library to a non-existent ModelSim init file
         """
-        _modelsim_ini = p.join(self._target_folder, "modelsim.ini")
-
         if not p.exists(self._target_folder):  # pragma: no cover
             os.makedirs(self._target_folder)
 
-        self._logger.debug("Creating modelsim.ini at '%s'", p.abspath(_modelsim_ini))
+        self._logger.debug("Creating modelsim.ini at '%s'", self._modelsim_ini)
 
         modelsim_env = os.environ.get("MODELSIM")
         if modelsim_env is not None:  # pragma: no cover
@@ -312,7 +307,7 @@ class MSim(BaseBuilder):
             )
             # Copy the modelsim.ini as indicated by the MODELSIM environment
             # variable
-            copyfile(modelsim_env, _modelsim_ini)
+            copyfile(modelsim_env, self._modelsim_ini.abspath)
         else:
             runShellCommand(["vmap", "-c"], cwd=self._target_folder)
 
@@ -326,19 +321,18 @@ class MSim(BaseBuilder):
         )
 
     def _mapLibrary(self, library):
+        # type: (Identifier) -> None
         """
         Adds a library to an existing ModelSim init file
         """
-        runShellCommand(
-            ["vlib"] + self._vlib_args + [p.join(self._target_folder, library)]
-        )
+        runShellCommand(["vlib", p.join(self._target_folder, library.name)])
 
         runShellCommand(
             [
                 "vmap",
                 "-modelsimini",
-                self._modelsim_ini,
-                library,
-                p.join(self._target_folder, library),
+                self._modelsim_ini.name,
+                library.name,
+                p.join(self._target_folder, library.name),
             ]
         )

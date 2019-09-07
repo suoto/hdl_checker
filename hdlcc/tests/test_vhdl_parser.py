@@ -28,13 +28,10 @@ import six
 
 from nose2.tools import such  # type: ignore
 
-from hdlcc.parsers import (
-    DependencySpec,
-    DesignUnitType,
-    Identifier,
-    VhdlDesignUnit,
-    VhdlParser,
-)
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.parsers.vhdl_parser import VhdlParser
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import assertCountEqual, assertSameFile, writeListToFile

@@ -38,7 +38,7 @@ class SimpleFinder(BaseGenerator):
 
     def __init__(self, paths):  # type: (List[Path]) -> None
         super(SimpleFinder, self).__init__()
-        self._logger.debug("Search paths: %s", [x.abspath() for x in paths])
+        self._logger.debug("Search paths: %s", [x.abspath for x in paths])
         self._paths = paths
         self._valid_extensions = tuple(
             list(_SOURCE_EXTENSIONS) + list(_HEADER_EXTENSIONS)
@@ -62,7 +62,7 @@ class SimpleFinder(BaseGenerator):
                 for filename in filenames:
                     path = p.join(dirpath, filename)
 
-                    if not path.isfile():
+                    if not p.isfile(path.name):
                         continue
 
                     try:

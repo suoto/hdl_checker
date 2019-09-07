@@ -19,20 +19,27 @@
 import json
 import logging
 
-from hdlcc import builders, parsers, path, types
+from hdlcc import path, types
+from hdlcc.builders.fallback import Fallback
+from hdlcc.builders.ghdl import GHDL
+from hdlcc.builders.msim import MSim
+from hdlcc.builders.xvhdl import XVHDL
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.verilog_parser import VerilogParser
+from hdlcc.parsers.vhdl_parser import VhdlParser
 
 _logger = logging.getLogger(__name__)
 
 # Maps class names added by the decoder to the actual class on Python side to
 # recreate an object
 CLASS_MAP = {
-    "DependencySpec": parsers.DependencySpec,
-    "VerilogParser": parsers.VerilogParser,
-    "VhdlParser": parsers.VhdlParser,
-    "GHDL": builders.GHDL,
-    "MSim": builders.MSim,
-    "XVHDL": builders.XVHDL,
-    "Fallback": builders.Fallback,
+    "DependencySpec": DependencySpec,
+    "VerilogParser": VerilogParser,
+    "VhdlParser": VhdlParser,
+    "GHDL": GHDL,
+    "MSim": MSim,
+    "XVHDL": XVHDL,
+    "Fallback": Fallback,
     "Path": path.Path,
     "FileType": types.FileType,
 }
