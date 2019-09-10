@@ -36,7 +36,7 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = "msim"
-    file_types = {t.FileType.vhd, t.FileType.verilog, t.FileType.systemverilog}
+    file_types = {t.FileType.vhdl, t.FileType.verilog, t.FileType.systemverilog}
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
@@ -202,7 +202,7 @@ class MSim(BaseBuilder):
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
         filetype = getFileType(path)
-        if filetype == t.FileType.vhd:
+        if filetype == t.FileType.vhdl:
             return self._buildVhdl(path, library, flags)
         if filetype in (t.FileType.verilog, t.FileType.systemverilog):
             return self._buildVerilog(path, library, flags)

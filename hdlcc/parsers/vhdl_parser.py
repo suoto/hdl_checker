@@ -118,10 +118,16 @@ class VhdlParser(BaseSourceFile):
 
         # Done parsing, won't add any more locations, so generate the specs
         for dep in dependencies.values():
+            # Remove references to 'work' (will treat library=None as work,
+            # which also means not set in case of packages)
+            if dep["library"].lower() == "work":
+                dep_library = None
+            else:
+                dep_library = Identifier(dep["library"], False)
             yield DependencySpec(
                 owner=self.filename,  # type: ignore
                 name=Identifier(dep["name"], False),
-                library=Identifier(dep["library"], False),
+                library=dep_library,
                 locations=dep["locations"],
             )
 
@@ -133,7 +139,7 @@ class VhdlParser(BaseSourceFile):
             yield DependencySpec(
                 owner=self.filename,
                 name=Identifier(package_body_name, False),
-                library=Identifier("work", False),
+                library=None,
                 locations={(line_number + 1, column_number + 1)},
             )
 

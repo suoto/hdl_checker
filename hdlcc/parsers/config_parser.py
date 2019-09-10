@@ -23,13 +23,12 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Dict, Iterator, Optional, Set
+from typing import Any, Dict, Iterator, Set, Tuple
 
 from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builder_utils import BuilderName
 from hdlcc.path import Path
-from hdlcc.utils import HashableByKey
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -62,40 +61,6 @@ def _extractSet(entry):  # type: (str) -> t.BuildFlags
     return tuple(_splitAtWhitespaces(string))
 
 
-class ProjectSourceSpec(HashableByKey):
-    """Holder class to specify the interface with config parsers"""
-
-    def __init__(self, path, library=None, flags=None):
-        # type: (Path, Optional[t.LibraryName], Optional[t.BuildFlags]) -> None
-        self._path = p.normpath(path.abspath)
-        self._library = library
-        self._flags = tuple(flags or [])
-
-    @property
-    def path(self):
-        "Returns the absolute and normalized path"
-        return self._path
-
-    @property
-    def library(self):  # type: () -> Optional[t.LibraryName]
-        "Returns parsed library name (may be None)"
-        return self._library
-
-    @property
-    def flags(self):  # type: () -> t.BuildFlags
-        "Parsed flags or an empty list if no flags were found"
-        return self._flags
-
-    @property
-    def __hash_key__(self):
-        return (self.path, self.library, self.flags)
-
-    def __repr__(self):
-        return '{}(path="{}", library="{}", flags={})'.format(
-            self.__class__.__name__, self.path, self.library, self.flags
-        )
-
-
 class ConfigParser(object):
     """
     Configuration info provider
@@ -118,7 +83,10 @@ class ConfigParser(object):
             "global_build_flags": {"vhdl": (), "verilog": (), "systemverilog": ()},
         }  # type: Dict[str, BuildFlagsMap]
 
-        self._sources = set()  # type: Set[ProjectSourceSpec]
+        self._sources = set()  # type: Set[Tuple[Path, str, t.BuildFlags]]
+        #  source_path,
+        #  groupdict["library"],
+        #  _extractSet(groupdict["flags"]),
 
         self.filename = filename
 
@@ -132,10 +100,11 @@ class ConfigParser(object):
         return self.filename.mtime > self._timestamp
 
     def _updateTimestamp(self):
+        # type: (...) -> Any
         """
         Updates our timestamp with the configuration file
         """
-        self._timestamp = p.getmtime(self.filename)
+        self._timestamp = self.filename.mtime
 
     def isParsing(self):  # type: () -> bool
         "Checks if parsing is ongoing in another thread"
@@ -145,6 +114,7 @@ class ConfigParser(object):
         return locked
 
     def _parseIfNeeded(self):
+        # type: () -> None
         """
         Locks accesses to parsed attributes and parses the configuration file
         """
@@ -203,11 +173,11 @@ class ConfigParser(object):
         else:
             raise exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePaths(self, path):  # type: (Path) -> Iterator[Path]
+    def _getSourcePaths(self, path):  # type: (str) -> Iterator[Path]
         """
         Normalizes and handles absolute/relative paths
         """
-        source_path = p.normpath(p.expanduser(path.name))
+        source_path = p.normpath(p.expanduser(path))
         # If the path to the source file was not absolute, we assume
         # it was relative to the config file base path
         if not p.isabs(source_path):
@@ -218,6 +188,7 @@ class ConfigParser(object):
         return map(Path, glob(source_path) or [source_path])
 
     def parse(self):
+        # type: (...) -> Any
         """
         Parses the file if it hasn't been parsed before or if the config file
         has been changed
@@ -225,7 +196,10 @@ class ConfigParser(object):
         self._parseIfNeeded()
         data = self._flags.copy()
         data.update(
-            {"builder_name": self._parms["builder"], "sources": set(self._sources)}
+            {  # type: ignore
+                "builder_name": self._parms["builder"],
+                "sources": set(self._sources),
+            }
         )
 
         return data

@@ -38,7 +38,7 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = "ghdl"
-    file_types = {t.FileType.vhd}
+    file_types = {t.FileType.vhdl}
 
     # Default build flags
     default_flags = {"global_build_flags": {"vhdl": ["-fexplicit", "-frelaxed-rules"]}}

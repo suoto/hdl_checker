@@ -20,10 +20,9 @@
 
 import logging
 import os.path as p
-from collections import namedtuple
 from itertools import chain
 from threading import RLock
-from typing import (  # List,
+from typing import (
     Any,
     Dict,
     FrozenSet,
@@ -35,6 +34,8 @@ from typing import (  # List,
     Set,
     Tuple,
 )
+
+import six
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
@@ -54,6 +55,8 @@ except ImportError:
 
 
 _logger = logging.getLogger(__name__)
+
+_work = Identifier("work", False)
 
 
 class Database(HashableByKey):
@@ -130,11 +133,28 @@ class Database(HashableByKey):
         "Updates the database from a dictionary"
         self._builder_name = config.get("builder_name", self._builder_name)
 
-        for library, path, flags in config.get("sources", []):
-            self._addSource(library, Path(path), flags)
+        for source in config.get("sources", []):
+            # Skip empty entries
+            if not source:
+                continue
 
-    def _addSource(self, library, path, flags):
-        # type: (Optional[str], Path, t.BuildFlags) -> None
+            # Set defaults
+            library, flags = (None, tuple())  # type: Tuple[Optional[str], t.BuildFlags]
+
+            # Each entry can be a string (path) or a tuple where the first item
+            # is the path and the second item is dict with 'library' and/of
+            # 'flags' defined
+            if isinstance(source, six.string_types):
+                path = source
+            else:
+                path = source[0]
+                info = source[1]
+                library = info.get("library", None)
+                flags = info.get("flags", tuple())
+            self._addSource(Path(path), library, flags)
+
+    def _addSource(self, path, library, flags):
+        # type: (Path, Optional[str], t.BuildFlags) -> None
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
@@ -148,7 +168,7 @@ class Database(HashableByKey):
 
         if library is not None:
             self._libraries[path] = Identifier(
-                library, case_sensitive=getFileType(path) != t.FileType.vhd
+                library, case_sensitive=getFileType(path) != t.FileType.vhdl
             )
 
     def __jsonEncode__(self):
@@ -200,7 +220,7 @@ class Database(HashableByKey):
         self._libraries[path] = library
         # Extract the unresolved dependencies that will be replaced
         unresolved_dependencies = {
-            x for x in self._dependencies[path] if x.library.name == "work"
+            x for x in self._dependencies[path] if x.library is None
         }
 
         # DependencySpec is not mutable, so we actually need to replace the objects
@@ -226,7 +246,7 @@ class Database(HashableByKey):
             self._updatePathLibrary(path, Identifier("out_of_project", True))
         elif path not in self._libraries:
             # Library is not defined, try to infer
-            self._updatePathLibrary(path, self._inferLibraryIfNeeded(path))
+            self._updatePathLibrary(path, self._inferLibraryIfNeeded(path) or _work)
         return self._libraries[path]
 
     def _parseSourceIfNeeded(self, path):
@@ -266,7 +286,7 @@ class Database(HashableByKey):
         Tries to import files to support VUnit right out of the box
         """
         for library, path, flags in getVunitSources(self._builder_name):
-            self._addSource(library, path, flags)
+            self._addSource(path, library, flags)
 
     def getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
         "Gets the design units for the given path (if any)"
@@ -283,8 +303,8 @@ class Database(HashableByKey):
         return {x for x in self.design_units if x.owner == path}
 
     def getDependenciesByPath(self, path):
-        # type: (Path) -> Set[t.LibraryAndUnit]
-        return {t.LibraryAndUnit(x.library, x.name) for x in self._dependencies[path]}
+        # type: (Path) -> Set[DependencySpec]
+        return self._dependencies[path].copy()
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]
@@ -302,10 +322,9 @@ class Database(HashableByKey):
         Tries to infer which library the given path should be compiled on by
         looking at where and how the design units it defines are used
         """
-        _logger.debug("Inferring library for path %s", path)
         # Find all units this path defines
         units = set(self.getDesignUnitsByPath(path))
-        _logger.debug("Units defined here: %s", list(map(str, units)))
+        _logger.debug("Units defined here in %s: %s", path, list(map(str, units)))
         # Store all cases to use in case there are multiple libraries that
         # could be used. If that happens, we'll use the most common one
         all_libraries = list(
@@ -318,7 +337,7 @@ class Database(HashableByKey):
 
         if not libraries:
             _logger.warning("Couldn't work out a library for path %s", path)
-            library = Identifier("__unknown_library_name__", False)
+            library = _work  # Identifier("__unknown_library_name__", False)
         elif len(libraries) == 1:
             library = libraries.pop()
         else:
@@ -353,8 +372,7 @@ class Database(HashableByKey):
 
                 # If the dependency's library refers to 'work', it's actually
                 # referring to the library its owner is in
-                if library.name == "work":
-                    #
+                if library is None:
                     library = self._libraries.get(path, None)
                 if library is not None:
                     result.append(library)
@@ -371,8 +389,6 @@ class Database(HashableByKey):
 
         units = {unit for unit in self.design_units if unit.name == name}
 
-        _logger.debug("Units step 1: %s", tuple(str(x) for x in units))
-
         if not units:
             _logger.warning(
                 "Could not find any source defining '%s' (%s)", name, library
@@ -383,9 +399,6 @@ class Database(HashableByKey):
             units_matching_library = {
                 unit for unit in units if (self.getLibrary(unit.owner) == library)
             }
-            _logger.debug(
-                "Units step 2: %s", tuple(str(x) for x in units_matching_library)
-            )
 
             if not units_matching_library:
                 # If no units match when using the library, it means the database
@@ -398,9 +411,16 @@ class Database(HashableByKey):
             else:
                 units = units_matching_library
 
-        _logger.debug("Units step 3: %s", tuple(str(x) for x in units))
+        paths = {unit.owner for unit in units}
 
-        return {unit.owner for unit in units}
+        _logger.debug(
+            "Found %d paths defining %s: %s",
+            len(paths),
+            tuple(str(x) for x in units),
+            paths,
+        )
+
+        return paths
 
     def getDependenciesUnits(self, path):
         # type: (Path) -> Set[Tuple[Identifier, Identifier]]
@@ -409,7 +429,6 @@ class Database(HashableByKey):
         path but only within the project file set. If a design unit can't be
         found in any source, it will be silently ignored.
         """
-        #  _logger.debug("Getting dependencies' units %s", path)
         units = set()  # type: Set[Tuple[Identifier, Identifier]]
 
         search_paths = set((path,))
@@ -422,9 +441,9 @@ class Database(HashableByKey):
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen
             new_deps = {
-                (x.library, x.name)
+                (dependency.library, dependency.name)
                 for search_path in search_paths
-                for x in self._dependencies[search_path]
+                for dependency in self._dependencies[search_path]
             } - units
 
             _logger.debug(
@@ -455,7 +474,7 @@ class Database(HashableByKey):
         return units
 
     def getBuildSequence(self, path):
-        # type: (Path) -> Generator[Tuple[t.LibraryName, Path], None, None]
+        # type: (Path) -> Generator[Tuple[Identifier, Path], None, None]
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path
@@ -475,13 +494,7 @@ class Database(HashableByKey):
         iteration_limit = len(paths_to_build)
 
         for i in range(iteration_limit):
-            paths_to_remove = set()  # type: Set[Path]
-
-            #  _logger.warning(
-            #      "### %d units remaining: %s",
-            #      len(units_to_build),
-            #      list("%s.%s" % (x[0], x[1]) for x in units_to_build),
-            #  )
+            paths_built = set()  # type: Set[Path]
 
             for current_path in paths_to_build:
                 current_path_library = self.getLibrary(current_path)
@@ -490,25 +503,34 @@ class Database(HashableByKey):
                     for x in self.getDesignUnitsByPath(current_path)
                 }
 
-                deps = {(x.library, x.name) for x in self._dependencies[current_path]}
+                deps = {
+                    (x.library or _work, x.name)
+                    for x in self._dependencies[current_path]
+                }
                 still_needed = deps - units_compiled - own
 
                 if still_needed:
                     if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                        _msg = [
-                            (library.name, name.name) for library, name in still_needed
-                        ]
+                        _msg = [(library, name.name) for library, name in still_needed]
                         _logger.debug("%s still needs %s", current_path, _msg)
                 else:
-                    yield self.getLibrary(current_path).name, current_path
-                    paths_to_remove.add(current_path)
+                    yield self.getLibrary(current_path), current_path
+                    paths_built.add(current_path)
                     units_compiled |= own
 
-            paths_to_build -= paths_to_remove
+            paths_to_build -= paths_built
             units_to_build -= units_compiled
 
-            if not paths_to_remove:
-                _logger.info("Nothing more to do after %d steps", i)
+            if not paths_built:
+                if paths_to_build:
+                    _logger.warning(
+                        "%d paths were not built: %s",
+                        len(paths_to_build),
+                        list(map(str, paths_to_build)),
+                    )
+                else:
+                    _logger.info("Nothing more to do after %d steps", i)
+
                 return
 
             _logger.info(

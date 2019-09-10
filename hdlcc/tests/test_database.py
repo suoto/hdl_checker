@@ -24,6 +24,7 @@
 import logging
 import os
 import os.path as p
+import pprint
 import sys
 import time
 from typing import Any, Iterable, List, Set, Tuple
@@ -127,13 +128,14 @@ def _configFromDict(parsed_dict):
 
 
 def _configFromSources(sources):
-    srcs = {(x.library, x.filename.name, ()) for x in sources}
+    srcs = [(x.filename.name, {"library": x.library}) for x in sources]
 
     class _ConfigParser(object):  # pylint: disable=too-few-public-methods
-        _dict = {"sources": set(srcs)}
+        _dict = {"sources": tuple(srcs)}
 
         def parse(self):  # pylint: disable=no-self-use
-            return _ConfigParser._dict
+            _logger.info("_configFromSources:\n%s", pprint.pformat(_ConfigParser._dict))
+            return _ConfigParser._dict.copy()
 
     return _ConfigParser()
 
@@ -184,10 +186,13 @@ class TestDatabase(TestCase):
 
         info = {
             "builder_name": BuilderName.fallback,
-            "sources": {
-                ("bar", _path("foo.vhd"), ("baz", "flag")),
-                ("ooflib", _path("oof.vhd"), ("oofflag0", "oofflag1")),
-            },
+            "sources": (
+                (_path("foo.vhd"), {"library": "bar", "flags": ("baz", "flag")}),
+                (
+                    _path("oof.vhd"),
+                    {"library": "ooflib", "flags": ("oofflag0", "oofflag1")},
+                ),
+            ),
             "single_build_flags": {
                 "vhdl": ("single_vhd_flag",),
                 "verilog": ("single_verilog_flag",),
@@ -547,10 +552,10 @@ class TestDirectDependencies(TestCase):
         # '- direct_dep_b
         #    '- common_dep
 
-        common_dep = ("work", _Path("common_dep.vhd"))
-        indirect_dep = ("work", _Path("indirect_dep.vhd"))
-        direct_dep_a = ("work", _Path("direct_dep_a.vhd"))
-        direct_dep_b = ("work", _Path("direct_dep_a.vhd"))
+        common_dep = (Identifier("work"), _Path("common_dep.vhd"))
+        indirect_dep = (Identifier("work"), _Path("indirect_dep.vhd"))
+        direct_dep_a = (Identifier("work"), _Path("direct_dep_a.vhd"))
+        direct_dep_b = (Identifier("work"), _Path("direct_dep_a.vhd"))
 
         # First item must be common dep
         self.assertEqual(sequence[0], common_dep)
@@ -683,15 +688,6 @@ class TestMultilevelCircularDependencies(TestCase):
             {("work", "unit_a"), ("work", "unit_b"), ("work", "unit_c")},
         )
 
-    #  def test_identifies_circular_dependencies(self):
-    #      # type: (...) -> Any
-    #      self.assertCountEqual(
-    #          self.database.getBuildSequence(_Path("unit_a.vhd")),
-    #          {("work", "unit_b"), ("work", "unit_c"), ("work", "unit_d")},
-    #      )
-
-    #      self.fail("stop")
-
 
 class TestAmbiguousSourceSet(TestCase):
     # Create the following setup:
@@ -767,7 +763,10 @@ class TestAmbiguousSourceSet(TestCase):
         # Both are on the same level, their order don't matter
         self.assertCountEqual(
             sequence,
-            {("lib", _Path("some_package.vhd")), ("lib", _Path("some_entity.vhd"))},
+            {
+                (Identifier("lib"), _Path("some_package.vhd")),
+                (Identifier("lib"), _Path("some_entity.vhd")),
+            },
         )
 
 
@@ -817,7 +816,7 @@ class TestIndirectLibraryInference(TestCase):
 
         logIterable("Build sequence", sequence, _logger.info)
 
-        self.assertEqual(sequence, (("find_me", _Path("target_pkg.vhd")),))
+        self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 
     def test_infer_library_from_path(self):
         # type: (...) -> Any
@@ -827,7 +826,7 @@ class TestIndirectLibraryInference(TestCase):
 
         logIterable("Build sequence", sequence, _logger.info)
 
-        self.assertEqual(sequence, (("find_me", _Path("target_pkg.vhd")),))
+        self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 
         #  self.fail("stop")
 

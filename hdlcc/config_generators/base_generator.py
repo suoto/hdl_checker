@@ -63,7 +63,7 @@ class BaseGenerator:
 
         if path.basename.split(".")[-1].lower() in ("vh", "svh"):
             file_type = getFileType(path)
-            if file_type in ("verilog", "systemverilog"):
+            if file_type in (t.FileType.verilog, t.FileType.systemverilog):
                 self._include_paths[file_type].add(path.dirname)
         else:
             self._sources.add(
@@ -104,10 +104,12 @@ class BaseGenerator:
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
-        for lang in sorted(self._include_paths.keys()):
-            paths = sorted(self._include_paths[lang])
+        for lang in (t.FileType.verilog, t.FileType.systemverilog):
+            paths = self._include_paths[lang]
             if paths:
-                contents += ["include_paths[%s] = %s" % (lang, " ".join(paths))]
+                contents += [
+                    "include_paths[%s] = %s" % (lang.toString(), " ".join(sorted(paths)))
+                ]
 
         if self._include_paths:
             contents += [""]
@@ -119,12 +121,12 @@ class BaseGenerator:
             file_type = getFileType(path)
             sources.append((file_type, library, path, flags))
 
-        sources.sort(key=lambda x: x[2])
+        sources.sort(key=lambda x: x[2].abspath)
 
         for file_type, library, path, flags in sources:
             contents += [
                 "{0} {1} {2}{3}".format(
-                    file_type, library, path, " %s" % flags if flags else ""
+                    file_type.toString(), library, path, " %s" % flags if flags else ""
                 )
             ]
 

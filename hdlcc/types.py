@@ -29,9 +29,12 @@ LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
 
 class FileType(Enum):
-    vhd = ("vhd", "vhdl")
+    vhdl = ("vhd", "vhdl")
     verilog = ("v", "vh")
     systemverilog = ("sv", "svh")
+
+    def toString(self):
+        return str(self.name)
 
     #  @classmethod
     def __jsonEncode__(self):
@@ -45,7 +48,7 @@ class FileType(Enum):
         """Returns an object of cls based on a given state"""
         name = state["value"]
         if name == "vhd":
-            return FileType.vhd
+            return FileType.vhdl
         if name == "verilog":
             return FileType.verilog
         return FileType.systemverilog

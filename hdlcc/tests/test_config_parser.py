@@ -24,7 +24,7 @@ import os.path as p
 import pprint
 import tempfile
 from contextlib import contextmanager
-from typing import Iterator, List
+from typing import Any, Iterator, List
 
 import six
 
@@ -32,7 +32,8 @@ from nose2.tools import such  # type: ignore
 
 from hdlcc.builder_utils import BuilderName
 from hdlcc.exceptions import UnknownParameterError
-from hdlcc.parsers.config_parser import ConfigParser, ProjectSourceSpec
+from hdlcc.parsers.config_parser import ConfigParser
+from hdlcc.path import Path
 from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport
 
 _logger = logging.getLogger(__name__)
@@ -42,13 +43,15 @@ TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
 
 
 @contextmanager
-def fileWithContent(content):  # type: (List[bytes]) -> Iterator[str]
+def fileWithContent(content):  # type: (bytes) -> Iterator[str]
     with tempfile.NamedTemporaryFile(delete=False) as fd:
         print("Writing to %s (%s)" % (fd, fd.name))
         fd.write(content)
         fd.flush()
         yield fd.name
 
+
+such.unittest.TestCase.maxDiff = None
 
 with such.A("config parser object") as it:
 
@@ -59,6 +62,7 @@ with such.A("config parser object") as it:
 
     @it.has_setup
     def setup():
+        # type: (...) -> Any
         setupTestSuport(TEST_TEMP_PATH)
 
     #  @it.has_teardown
@@ -73,16 +77,18 @@ with such.A("config parser object") as it:
         "raise UnknownParameterError exception when an unknown " "parameter is found"
     )
     def test_raises_exception():
+        # type: (...) -> Any
         with it.assertRaises(UnknownParameterError):
             with fileWithContent(b"foo = bar") as name:
-                parser = ConfigParser(name)
+                parser = ConfigParser(Path(name))
                 parser.parse()
 
     with it.having("a regular file"):
 
         @it.has_setup
         def setup():
-            it.path = tempfile.mktemp()
+            # type: (...) -> Any
+            it.path = Path(tempfile.mktemp())
 
             contents = b"""
 single_build_flags[vhdl] = -single_build_flag_0 -singlebuildflag
@@ -93,7 +99,7 @@ target_dir = .build
 
 vhdl work sample_file.vhd -sample_file_flag
 vhdl work sample_package.vhdl -sample_package_flag
-vhdl work sample_testbench.VHD -build-using some way
+vhdl work TESTBENCH.VHD -build-in some way
 
 vhdl lib /some/abs/path.VHDL
 
@@ -102,12 +108,13 @@ verilog work foo.v -some-flag some value
 systemverilog work bar.sv some sv flag
 """
 
-            with open(it.path, "wb") as fd:
+            with open(it.path.name, "wb") as fd:
                 fd.write(contents)
                 fd.flush()
 
         @it.should("find the correct info")
         def test_parsing_regular_file():
+            # type: (...) -> Any
             parser = ConfigParser(it.path)
             config = parser.parse()
 
@@ -131,46 +138,18 @@ systemverilog work bar.sv some sv flag
                 },
             )
 
-            class _ProjectSourceSpec(ProjectSourceSpec):
-                base_path = p.abspath(p.dirname(it.path))
-
-                def __init__(self, path, library=None, flags=None):
-                    if not p.isabs(path):
-                        path = p.join(_ProjectSourceSpec.base_path, path)
-
-                    super(_ProjectSourceSpec, self).__init__(
-                        path=path, library=library, flags=flags
-                    )
+            def _resolve(path):
+                return Path(p.join(it.path.dirname, path))
 
             it.assertCountEqual(
                 sources,
                 [
-                    _ProjectSourceSpec(
-                        path="sample_file.vhd",
-                        library="work",
-                        flags=("-sample_file_flag",),
-                    ),
-                    _ProjectSourceSpec(
-                        path="sample_package.vhdl",
-                        library="work",
-                        flags=("-sample_package_flag",),
-                    ),
-                    _ProjectSourceSpec(
-                        path="sample_testbench.VHD",
-                        library="work",
-                        flags=("-build-using", "some", "way"),
-                    ),
-                    _ProjectSourceSpec(
-                        path="/some/abs/path.VHDL", library="lib", flags=()
-                    ),
-                    _ProjectSourceSpec(
-                        path="foo.v",
-                        library="work",
-                        flags=("-some-flag", "some", "value"),
-                    ),
-                    _ProjectSourceSpec(
-                        path="bar.sv", library="work", flags=("some", "sv", "flag")
-                    ),
+                    (_resolve("sample_file.vhd"), "work", ("-sample_file_flag",)),
+                    (_resolve("sample_package.vhdl"), "work", ("-sample_package_flag",)),
+                    (_resolve("TESTBENCH.VHD"), "work", ("-build-in", "some", "way")),
+                    (Path("/some/abs/path.VHDL"), "lib", ()),
+                    (_resolve("foo.v"), "work", ("-some-flag", "some", "value")),
+                    (_resolve("bar.sv"), "work", ("some", "sv", "flag")),
                 ],
             )
 

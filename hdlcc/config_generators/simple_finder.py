@@ -18,7 +18,7 @@
 
 import os
 import os.path as p
-from typing import Generator, List
+from typing import Iterable, List
 
 from .base_generator import BaseGenerator
 
@@ -36,10 +36,10 @@ class SimpleFinder(BaseGenerator):
     set of paths recursively
     """
 
-    def __init__(self, paths):  # type: (List[Path]) -> None
+    def __init__(self, paths):  # type: (List[str]) -> None
         super(SimpleFinder, self).__init__()
-        self._logger.debug("Search paths: %s", [x.abspath for x in paths])
-        self._paths = paths
+        self._logger.debug("Search paths: %s", paths)
+        self._paths = {Path(x) for x in paths}
         self._valid_extensions = tuple(
             list(_SOURCE_EXTENSIONS) + list(_HEADER_EXTENSIONS)
         )
@@ -53,28 +53,29 @@ class SimpleFinder(BaseGenerator):
         """
         return NotImplemented
 
-    def _findSources(self):  # type: () -> Generator[Path, None, None]
+    def _findSources(self):
+        # type: (...) -> Iterable[Path]
         """
         Iterates over the paths and searches for relevant files by extension.
         """
         for path in self._paths:
             for dirpath, _, filenames in os.walk(path.name):
                 for filename in filenames:
-                    path = p.join(dirpath, filename)
+                    full_path = Path(p.join(dirpath, filename))
 
-                    if not p.isfile(path.name):
+                    if not p.isfile(full_path.name):
                         continue
 
                     try:
                         # getFileType will fail if the file's extension is not
                         # valid (one of '.vhd', '.vhdl', '.v', '.vh', '.sv',
                         # '.svh')
-                        getFileType(filename)
+                        getFileType(full_path)
                     except UnknownTypeExtension:
                         continue
 
-                    if isFileReadable(path.name):
-                        yield path
+                    if isFileReadable(full_path):
+                        yield full_path
 
     def _populate(self):  # type: (...) -> None
         for path in self._findSources():

@@ -54,6 +54,7 @@ BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fal
 
 
 class TestConfigGenerator(unittest2.TestCase):
+    maxDiff = None
     @classmethod
     def setUpClass(cls):
         setupTestSuport(TEST_TEMP_PATH)
@@ -103,7 +104,7 @@ class TestConfigGenerator(unittest2.TestCase):
 
     @mock.patch(
         "hdlcc.config_generators.simple_finder.isFileReadable",
-        lambda path: "nonreadable" not in path,
+        lambda path: "nonreadable" not in path.name,
     )
     def test_run_simple_config_gen(self):
         data = {
@@ -117,13 +118,13 @@ class TestConfigGenerator(unittest2.TestCase):
 
         intro = [
             "# Files found: 5",
-            "include_paths[systemverilog] = "
-            + p.join(self.dummy_test_path, "sv_includes"),
             "include_paths[verilog] = %s %s"
             % (
                 p.join(self.dummy_test_path, "path_a"),
                 p.join(self.dummy_test_path, "v_includes"),
             ),
+            "include_paths[systemverilog] = "
+            + p.join(self.dummy_test_path, "sv_includes"),
             "",
         ]
 

@@ -215,7 +215,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
             if None not in (unit_type, unit_name):
                 for dependency in self._database.getDependenciesByPath(source):
-                    if dependency.unit.name == rebuild["unit_name"]:
+                    if dependency.name.name == rebuild["unit_name"]:
                         rebuilds.add(RebuildUnit(unit_name, unit_type))
                         break
             elif None not in (library_name, unit_name):
@@ -273,10 +273,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Runs _buildSource method and parses the output to find message
         records and units that should be rebuilt
         """
-        self._createLibrary(Identifier('work'))
+        if library is None:
+            library = self._database.getLibrary(source)  # or Identifier("work")
+
+        self._createLibraryIfNeeded(library)
+
         for lib in (x.library for x in self._database.getDependenciesByPath(source)):
-            if lib not in self.getBuiltinLibraries():
-                self._createLibrary(lib)
+            #  lib = lib or Identifier("work")
+            self._createLibraryIfNeeded(lib or Identifier("work"))
 
         diagnostics = set()  # type: Set[CheckerDiagnostic]
         rebuilds = set()  # type: Set[RebuildInfo]
@@ -330,6 +334,12 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             self._logger.debug("Rebuilds found")
             for rebuild in rebuilds:
                 self._logger.debug(rebuild)
+
+    def _createLibraryIfNeeded(self, library):
+        # type: (Identifier) -> None
+        if library in self._added_libraries | self._builtin_libraries:
+            return
+        self._createLibrary(library)
 
     @abc.abstractmethod
     def _createLibrary(self, library):

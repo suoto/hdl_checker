@@ -214,8 +214,8 @@ def getFileType(filename):
     # type: (Path) -> t.FileType
     "Gets the file type of a source file"
     ext = filename.name.split(".")[-1].lower()
-    if ext in t.FileType.vhd.value:
-        return t.FileType.vhd
+    if ext in t.FileType.vhdl.value:
+        return t.FileType.vhdl
     if ext in t.FileType.verilog.value:
         return t.FileType.verilog
     if ext in t.FileType.systemverilog.value:

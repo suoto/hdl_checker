@@ -23,6 +23,8 @@ import os.path as p
 from os import stat
 from typing import AnyStr
 
+import six
+
 _logger = logging.getLogger(__name__)
 
 
@@ -31,9 +33,9 @@ class Path(object):
 
     def __init__(self, name):
         # type: (str) -> None
-        assert isinstance(name, (str, unicode)), "Invalid type for path: {} ({})".format(
-            name, type(name)
-        )
+        assert isinstance(
+            name, six.string_types
+        ), "Invalid type for path: {} ({})".format(name, type(name))
         self._name = name
         self._stat = None
 

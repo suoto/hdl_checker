@@ -65,7 +65,7 @@ def _isVerilog(path):  # pragma: no cover
 
 
 PARSERS = {
-    t.FileType.vhd: VhdlParser,
+    t.FileType.vhdl: VhdlParser,
     t.FileType.verilog: VerilogParser,
     t.FileType.systemverilog: VerilogParser,
 }  # type: Dict[t.FileType, Type[Union[VhdlParser, VerilogParser]]]

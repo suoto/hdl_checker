@@ -123,7 +123,7 @@ def getVunitSources(builder_name):
     builder_class = getBuilderByName(builder_name)
 
     # Prefer VHDL VUnit
-    if t.FileType.vhd in builder_class.file_types:
+    if t.FileType.vhdl in builder_class.file_types:
         from vunit import VUnit  # pylint: disable=import-error
     elif t.FileType.systemverilog in builder_class.file_types:
         from vunit.verilog import (  # type: ignore # pylint: disable=import-error

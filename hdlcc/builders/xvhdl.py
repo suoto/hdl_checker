@@ -38,7 +38,7 @@ class XVHDL(BaseBuilder):
     # Implementation of abstract class properties
     builder_name = "xvhdl"
     # TODO: Add xvlog support
-    file_types = {t.FileType.vhd}
+    file_types = {t.FileType.vhdl}
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(

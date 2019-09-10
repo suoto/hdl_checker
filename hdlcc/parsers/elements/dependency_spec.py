@@ -59,7 +59,7 @@ class DependencySpec(ParsedElement):
     @property
     def case_sensitive(self):  # type: () -> bool
         ext = self.owner.split(".")[-1].lower()
-        return ext not in t.FileType.vhd.value
+        return ext not in t.FileType.vhdl.value
 
     @property
     def __hash_key__(self):
