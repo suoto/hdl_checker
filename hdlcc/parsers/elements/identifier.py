@@ -28,6 +28,7 @@ class Identifier(object):
     def __init__(self, name, case_sensitive=False):
         # type: (str, bool) -> None
         self._name = str(name) if case_sensitive else str(name).lower()
+        self.case_sensitive = case_sensitive
         self._display_name = str(name)
 
     @property
@@ -55,7 +56,9 @@ class Identifier(object):
         """Overrides the default implementation"""
 
         if isinstance(other, self.__class__):
-            return self.name == other.name
+            self_name = self.display_name if other.case_sensitive else self.display_name.lower()
+            other_name = other.display_name if self.case_sensitive else other.display_name.lower()
+            return self_name == other_name
 
         return NotImplemented  # pragma: no cover
 
