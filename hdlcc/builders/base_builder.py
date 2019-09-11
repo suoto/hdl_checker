@@ -31,7 +31,7 @@ from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.utils import getFileType
 
-#  from hdlcc.database import Database  # pylint: disable=unused-import
+from hdlcc.database import Database  # pylint: disable=unused-import
 
 RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
 RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])

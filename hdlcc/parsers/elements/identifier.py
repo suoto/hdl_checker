@@ -48,6 +48,8 @@ class Identifier(object):
         return self.display_name
 
     def __repr__(self):
+        if self.name == self.display_name:
+            return "{}({})".format(self.__class__.__name__, repr(self.name))
         return "{}({}, display_name={})".format(
             self.__class__.__name__, repr(self.name), repr(self.display_name)
         )
@@ -72,15 +74,19 @@ class Identifier(object):
             return not result
 
         return NotImplemented
+
+
 class VhdlIdentifier(Identifier):
     "Equivalent of Identifier(name, case_sensitive=False)"
+
     def __init__(self, name):
         # type: (str, ) -> None
         super(VhdlIdentifier, self).__init__(name=name, case_sensitive=False)
 
+
 class VerilogIdentifier(Identifier):
     "Equivalent of Identifier(name, case_sensitive=True)"
+
     def __init__(self, name):
         # type: (str, ) -> None
         super(VerilogIdentifier, self).__init__(name=name, case_sensitive=True)
-

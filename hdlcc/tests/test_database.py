@@ -81,11 +81,13 @@ class _Database(Database):
                 _logger.debug("      - %s", dependency)
 
     def test_getDependenciesUnits(self, path):
-        # type: (Path) -> Set[Tuple[Identifier, Identifier]]
-        return {
-            (library.name, name.name)
-            for library, name in super(_Database, self).getDependenciesUnits(path)
-        }
+        # type: (Path) -> Iterable[Tuple[Identifier, Identifier]]
+        _msg = []
+        for library, name in super(_Database, self).getDependenciesUnits(path):
+            yield getattr(library, "name", None), name.name
+            _msg.append((library, name))
+
+        _logger.debug("%s: %s", path, _msg)
 
     def test_reportCacheInfo(self):
         # Print cache stats
@@ -153,7 +155,7 @@ class TestDatabase(TestCase):
         # type: (...) -> Any
         self.database.accept(_configFromDict({}))
 
-        self.assertEqual(self.database.builder_name, BuilderName.fallback)
+        self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
         any_path = _Path("any.vhd")
         # Make sure the path exists
@@ -165,7 +167,7 @@ class TestDatabase(TestCase):
         # type: (...) -> Any
         self.database.updateFromDict({})
 
-        self.assertEqual(self.database.builder_name, BuilderName.fallback)
+        self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
         #  self.assertEqual(self.database.getLibrary(Path("any")), None)
         self.assertEqual(self.database.getFlags(Path("any")), ())
@@ -302,7 +304,7 @@ class TestDatabase(TestCase):
         sources = {
             _SourceMock(
                 filename=_path("file_0.vhd"),
-                library="work",
+                library="some_library",
                 design_units=[{"name": "some_package", "type": "package"}],
                 dependencies=(
                     ("work", "relative_dependency"),
@@ -311,7 +313,7 @@ class TestDatabase(TestCase):
             ),
             _SourceMock(
                 filename=_path("collateral.vhd"),
-                library="work",
+                library="another_library",
                 design_units=[{"name": "collateral_package", "type": "package"}],
                 dependencies=(("work", "foo"), ("lib", "bar")),
             ),
@@ -319,14 +321,14 @@ class TestDatabase(TestCase):
 
         self.database.accept(_configFromSources(sources))
 
-        # Check libraries before actually testing are ok
+        # Check libraries before actually testing
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("file_0.vhd")),
-            {("work", "relative_dependency"), ("lib", "direct_dependency")},
+            {("some_library", "relative_dependency"), ("lib", "direct_dependency")},
         )
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("collateral.vhd")),
-            {("work", "foo"), ("lib", "bar")},
+            {("another_library", "foo"), ("lib", "bar")},
         )
 
         # Update the library of a path
@@ -341,7 +343,7 @@ class TestDatabase(TestCase):
         )
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("collateral.vhd")),
-            {("work", "foo"), ("lib", "bar")},
+            {("another_library", "foo"), ("lib", "bar")},
         )
 
     def test_infers_uses_most_common_library_if_needed(self):
@@ -405,41 +407,41 @@ class TestDatabase(TestCase):
         )
 
 
-class TestIncludesVunit(TestCase):
-    def setUp(self):
-        # type: (...) -> Any
-        _logger.info("Setting up %s", self)
-        self.database = Database()
+#  class TestIncludesVunit(TestCase):
+#      def setUp(self):
+#          # type: (...) -> Any
+#          _logger.info("Setting up %s", self)
+#          self.database = Database()
 
-    def tearDown(self):
-        # type: (...) -> Any
-        _logger.info("Tearing down %s", self)
-        del self.database
+#      def tearDown(self):
+#          # type: (...) -> Any
+#          _logger.info("Tearing down %s", self)
+#          del self.database
 
-    def test_has_vunit_context(self):
-        # type: (...) -> Any
-        expected = p.join(
-            os.environ["TOX_ENV_DIR"],
-            "lib",
-            "python%d.%d" % (sys.version_info.major, sys.version_info.minor),
-            "site-packages",
-            "vunit",
-            "vhdl",
-            "vunit_context.vhd",
-        )
+#      def test_has_vunit_context(self):
+#          # type: (...) -> Any
+#          expected = p.join(
+#              os.environ["TOX_ENV_DIR"],
+#              "lib",
+#              "python%d.%d" % (sys.version_info.major, sys.version_info.minor),
+#              "site-packages",
+#              "vunit",
+#              "vhdl",
+#              "vunit_context.vhd",
+#          )
 
-        logIterable("Design units:", self.database.design_units, _logger.fatal)
+#          logIterable("Design units:", self.database.design_units, _logger.fatal)
 
-        self.assertCountEqual(
-            self.database.getPathsDefining(Identifier("vunit_context")),
-            {Path(expected)},
-        )
-        #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg
-        #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg/
-        #  _logger.fatal(
-        #      "context: %s", set(self.database.getPathsDefining(Identifier("vunit_context")))
-        #  )
-        #  self.fail("stop")
+#          self.assertCountEqual(
+#              self.database.getPathsDefining(Identifier("vunit_context")),
+#              {Path(expected)},
+#          )
+#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg
+#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg/
+#          #  _logger.fatal(
+#          #      "context: %s", set(self.database.getPathsDefining(Identifier("vunit_context")))
+#          #  )
+#          #  self.fail("stop")
 
 
 class TestDirectDependencies(TestCase):
@@ -451,7 +453,7 @@ class TestDirectDependencies(TestCase):
         sources = {
             _SourceMock(
                 filename=_path("entity_a.vhd"),
-                library="work",
+                library="lib",
                 design_units=[{"name": "entity_a", "type": "entity"}],
                 dependencies=(
                     ("ieee", "numeric_std.all"),
@@ -462,7 +464,7 @@ class TestDirectDependencies(TestCase):
             ),
             _SourceMock(
                 filename=_path("direct_dep_a.vhd"),
-                library="work",
+                library="lib",
                 design_units=[
                     {"name": "direct_dep_a", "type": "entity"},
                     {"name": "side_effect_entity", "type": "entity"},
@@ -471,13 +473,13 @@ class TestDirectDependencies(TestCase):
             ),
             _SourceMock(
                 filename=_path("direct_dep_b.vhd"),
-                library="work",
+                library="lib",
                 design_units=[{"name": "direct_dep_b", "type": "entity"}],
                 dependencies=[("work", "common_dep")],
             ),
             _SourceMock(
                 filename=_path("indirect_dep.vhd"),
-                library="work",
+                library="lib",
                 design_units=[
                     {"name": "indirect_dep", "type": "package"},
                     {"name": "indirect_dep", "type": "package body"},
@@ -487,7 +489,7 @@ class TestDirectDependencies(TestCase):
             ),
             _SourceMock(
                 filename=_path("common_dep.vhd"),
-                library="work",
+                library="lib",
                 design_units=[
                     {"name": "common_dep", "type": "package"},
                     {"name": "common_dep", "type": "package body"},
@@ -495,7 +497,7 @@ class TestDirectDependencies(TestCase):
             ),
             _SourceMock(
                 filename=_path("not_a_dependency.vhd"),
-                library="work",
+                library="lib",
                 design_units=[{"name": "not_a_dependency", "type": "package"}],
                 dependencies=(("common_dep",), ("indirect_dep",)),
             ),
@@ -531,10 +533,10 @@ class TestDirectDependencies(TestCase):
             deps,
             {
                 ("ieee", "numeric_std"),
-                ("work", "common_dep"),
-                ("work", "indirect_dep"),
-                ("work", "direct_dep_a"),
-                ("work", "direct_dep_b"),
+                ("lib", "common_dep"),
+                ("lib", "indirect_dep"),
+                ("lib", "direct_dep_a"),
+                ("lib", "direct_dep_b"),
             },
         )
 
@@ -552,10 +554,10 @@ class TestDirectDependencies(TestCase):
         # '- direct_dep_b
         #    '- common_dep
 
-        common_dep = (Identifier("work"), _Path("common_dep.vhd"))
-        indirect_dep = (Identifier("work"), _Path("indirect_dep.vhd"))
-        direct_dep_a = (Identifier("work"), _Path("direct_dep_a.vhd"))
-        direct_dep_b = (Identifier("work"), _Path("direct_dep_a.vhd"))
+        common_dep = (Identifier("lib"), _Path("common_dep.vhd"))
+        indirect_dep = (Identifier("lib"), _Path("indirect_dep.vhd"))
+        direct_dep_a = (Identifier("lib"), _Path("direct_dep_a.vhd"))
+        direct_dep_b = (Identifier("lib"), _Path("direct_dep_a.vhd"))
 
         # First item must be common dep
         self.assertEqual(sequence[0], common_dep)
@@ -570,11 +572,10 @@ class TestDirectDependencies(TestCase):
 
     def test_get_correct_dependencies_of_indirect_dep(self):
         # type: (...) -> Any
-        deps = self.database.test_getDependenciesUnits(_Path("indirect_dep.vhd"))
-
-        logIterable("Dependencies", deps, _logger.info)
-
-        self.assertCountEqual(deps, {("work", "common_dep")})
+        self.assertCountEqual(
+            self.database.test_getDependenciesUnits(_Path("indirect_dep.vhd")),
+            {("lib", "common_dep")},
+        )
 
 
 class TestDirectCircularDependencies(TestCase):
@@ -586,13 +587,13 @@ class TestDirectCircularDependencies(TestCase):
         sources = {
             _SourceMock(
                 filename=_path("unit_a.vhd"),
-                library="work",
+                library="lib",
                 design_units=[{"name": "unit_a", "type": "entity"}],
                 dependencies=[("work", "unit_b")],
             ),
             _SourceMock(
                 filename=_path("unit_b.vhd"),
-                library="work",
+                library="lib",
                 design_units=[{"name": "unit_b", "type": "entity"}],
                 dependencies=[("work", "unit_a")],
             ),
@@ -610,12 +611,12 @@ class TestDirectCircularDependencies(TestCase):
         # type: (...) -> Any
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_a.vhd")),
-            (("work", "unit_b"),),
+            (("lib", "unit_b"),),
         )
 
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_b.vhd")),
-            (("work", "unit_a"),),
+            (("lib", "unit_a"),),
         )
 
 

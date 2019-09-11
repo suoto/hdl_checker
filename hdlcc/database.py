@@ -33,14 +33,14 @@ from typing import (
     Optional,
     Set,
     Tuple,
+    Union,
 )
+
 import six
 
 #  from hdlcc import exceptions
 from hdlcc import types as t  # pylint: disable=unused-import
-from hdlcc.builder_utils import BuilderName, getVunitSources
 from hdlcc.parser_utils import getSourceParserFromPath
-from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
@@ -52,10 +52,12 @@ try:
 except ImportError:
     from backports.functools_lru_cache import lru_cache  # type: ignore
 
-
 _logger = logging.getLogger(__name__)
-_work = Identifier("work", False)
+_default_library_name = Identifier("library")
 
+tResolvedLibrary = Identifier
+tUnresolvedLibrary = Union[Identifier, None]
+tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
 
 class Database(HashableByKey):
     "Stores info on and provides operations for a project file set"
@@ -63,7 +65,7 @@ class Database(HashableByKey):
     def __init__(self):  # type: () -> None
         self._lock = RLock()
 
-        self._builder_name = BuilderName.fallback
+        self._builder_name = None  # type: Union[str, None]
         self._paths = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
         self._inferred_libraries = set()  # type: Set[Path]
@@ -78,14 +80,14 @@ class Database(HashableByKey):
             if hasattr(getattr(self, x), "cache_clear")
         }
 
-        self._addVunitIfFound()
+        #  self._addVunitIfFound()
 
     @property
     def __hash_key__(self):
         return 0
 
     @property
-    def builder_name(self):  # type: (...) -> BuilderName
+    def builder_name(self):  # type: (...) -> Union[str, None]
         "Builder name"
         return self._builder_name
 
@@ -111,7 +113,7 @@ class Database(HashableByKey):
 
     def reset(self):
         "Clears the database from previous data"
-        self._builder_name = BuilderName.fallback
+        self._builder_name = None
         self._paths = {}
         self._libraries = {}
         self._flags = {}
@@ -121,15 +123,15 @@ class Database(HashableByKey):
         self._clearLruCaches()
 
         # Re-add VUnit files back again
-        self._addVunitIfFound()
+        #  self._addVunitIfFound()
 
-    def accept(self, parser):  # type: (ConfigParser) -> None
+    def accept(self, parser):
         "Updates the database from a configuration parser"
         return self.updateFromDict(parser.parse())
 
     def updateFromDict(self, config):  # type: (Any) -> None
         "Updates the database from a dictionary"
-        self._builder_name = config.get("builder_name", self._builder_name)
+        self._builder_name = config.get("builder_name", None)
 
         for source in config.get("sources", []):
             # Skip empty entries
@@ -236,7 +238,7 @@ class Database(HashableByKey):
         self._dependencies[path] -= unresolved_dependencies
 
     def getLibrary(self, path):
-        # type: (Path) -> Identifier
+        # type: (Path) -> tUnresolvedLibrary
         "Gets a library of a given source (this is likely to be removed)"
         if path not in self._paths:
             # Add the path to the project but put it on a different library
@@ -244,8 +246,11 @@ class Database(HashableByKey):
             self._updatePathLibrary(path, Identifier("out_of_project", True))
         elif path not in self._libraries:
             # Library is not defined, try to infer
-            self._updatePathLibrary(path, self._inferLibraryIfNeeded(path) or _work)
-        return self._libraries[path]
+            _logger.info("Library for '%s' not set, inferring it", path)
+            library = self._inferLibraryIfNeeded(path)
+            if library is not None:
+                self._updatePathLibrary(path, library)
+        return self._libraries.get(path, None)
 
     def _parseSourceIfNeeded(self, path):
         # type: (Path) -> None
@@ -279,12 +284,12 @@ class Database(HashableByKey):
         for meth in self._cached_methods:
             meth.cache_clear()
 
-    def _addVunitIfFound(self):  # type: () -> None
-        """
-        Tries to import files to support VUnit right out of the box
-        """
-        for library, path, flags in getVunitSources(self._builder_name):
-            self._addSource(path, library, flags)
+    #  def _addVunitIfFound(self):  # type: () -> None
+    #      """
+    #      Tries to import files to support VUnit right out of the box
+    #      """
+    #      for library, path, flags in getVunitSources():
+    #          self._addSource(path, library, flags)
 
     def getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
         "Gets the design units for the given path (if any)"
@@ -315,7 +320,7 @@ class Database(HashableByKey):
                 yield design_unit.owner
 
     def _inferLibraryIfNeeded(self, path):
-        # type: (Path) -> Identifier
+        # type: (Path) -> tUnresolvedLibrary
         """
         Tries to infer which library the given path should be compiled on by
         looking at where and how the design units it defines are used
@@ -335,7 +340,7 @@ class Database(HashableByKey):
 
         if not libraries:
             _logger.warning("Couldn't work out a library for path %s", path)
-            library = _work  # Identifier("__unknown_library_name__", False)
+            library = None
         elif len(libraries) == 1:
             library = libraries.pop()
         else:
@@ -356,7 +361,7 @@ class Database(HashableByKey):
 
     @lru_cache()
     def getLibrariesReferredByUnit(self, name, library=None):
-        # type: (Identifier, Optional[Identifier]) -> List[Identifier]
+        # type: (Identifier, tUnresolvedLibrary) -> List[Identifier]
         """
         Gets libraries that the (library, name) pair is used throughout the
         project
@@ -379,14 +384,13 @@ class Database(HashableByKey):
 
     @lru_cache()
     def getPathsDefining(self, name, library=None):
-        # type: (Identifier, Optional[Identifier]) -> Iterable[Path]
+        # type: (Identifier, tUnresolvedLibrary) -> Iterable[Path]
         """
         Search for paths that define a given name optionally inside a library.
         """
         _logger.debug("Searching for paths defining %s.%s", library, name)
 
         units = {unit for unit in self.design_units if unit.name == name}
-
 
         if not units:
             _logger.warning(
@@ -422,13 +426,13 @@ class Database(HashableByKey):
         return paths
 
     def getDependenciesUnits(self, path):
-        # type: (Path) -> Set[Tuple[Identifier, Identifier]]
+        # type: (Path) -> Set[tLibraryUnitTuple]
         """
         Returns design units that should be compiled before compiling the given
         path but only within the project file set. If a design unit can't be
         found in any source, it will be silently ignored.
         """
-        units = set()  # type: Set[Tuple[Identifier, Identifier]]
+        units = set()  # type: Set[tLibraryUnitTuple]
 
         search_paths = set((path,))
         own_units = {
@@ -440,11 +444,18 @@ class Database(HashableByKey):
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen
             new_deps = {
-                (self.getLibrary(dependency.owner), dependency.name)
+                #  (, dependency.name)
+                (
+                    dependency.library or self.getLibrary(dependency.owner),
+                    dependency.name,
+                )
                 for search_path in search_paths
                 for dependency in self._dependencies[search_path]
             } - units
 
+            _logger.debug(
+                "Searching %s resulted in dependencies: %s", search_paths, new_deps
+            )
 
             # Add the new ones to the set tracking the dependencies seen since
             # the search started
@@ -482,7 +493,7 @@ class Database(HashableByKey):
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
-        units_compiled = set()  # type: Set[Tuple[Identifier, Identifier]]
+        units_compiled = set()  # type: Set[tLibraryUnitTuple]
         units_to_build = self.getDependenciesUnits(path)
         paths_to_build = set(
             chain.from_iterable(
@@ -507,7 +518,7 @@ class Database(HashableByKey):
                 }
 
                 deps = {
-                    (x.library or _work, x.name)
+                    (x.library or self.getLibrary(x.owner), x.name)
                     for x in self._dependencies[current_path]
                 }
                 still_needed = deps - units_compiled - own
@@ -517,7 +528,9 @@ class Database(HashableByKey):
                         _msg = [(library, name.name) for library, name in still_needed]
                         _logger.debug("%s still needs %s", current_path, _msg)
                 else:
-                    yield self.getLibrary(current_path), current_path
+                    yield self.getLibrary(
+                        current_path
+                    ) or _default_library_name, current_path
                     paths_built.add(current_path)
                     units_compiled |= own
 
