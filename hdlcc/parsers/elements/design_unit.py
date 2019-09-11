@@ -20,7 +20,7 @@ import logging
 from enum import Enum
 from typing import Optional, Union
 
-from .identifier import Identifier
+from .identifier import Identifier, VhdlIdentifier, VerilogIdentifier
 from .parsed_element import LocationList, ParsedElement
 
 from hdlcc import types as t  # pylint: disable=unused-import
@@ -101,7 +101,7 @@ class VhdlDesignUnit(_DesignUnit):
         super(VhdlDesignUnit, self).__init__(
             owner=owner,
             type_=type_,
-            name=Identifier(name, case_sensitive=False),
+            name=VhdlIdentifier(name),
             locations=locations,
         )
 
@@ -116,7 +116,7 @@ class VerilogDesignUnit(_DesignUnit):
         super(VerilogDesignUnit, self).__init__(
             owner=owner,
             type_=type_,
-            name=Identifier(name, case_sensitive=True),
+            name=VerilogIdentifier(name),
             locations=locations,
         )
 

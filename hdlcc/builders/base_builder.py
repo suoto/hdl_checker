@@ -122,7 +122,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 if self._builtin_libraries:  # pragma: no cover
                     self._logger.debug(
                         "Builtin libraries: %s",
-                        tuple(map(str, self._builtin_libraries)),
+                        tuple(self._builtin_libraries),
                     )
                 else:  # pragma: no cover
                     self._logger.debug("No builtin libraries found")

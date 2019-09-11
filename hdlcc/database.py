@@ -510,9 +510,7 @@ class Database(HashableByKey):
                 still_needed = deps - units_compiled - own
 
                 if still_needed:
-                    if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                        _msg = [(library, name.name) for library, name in still_needed]
-                        _logger.debug("%s still needs %s", current_path, _msg)
+                    _logger.debug("%s still needs %s", current_path, still_needed)
                 else:
                     yield self.getLibrary(current_path), current_path
                     paths_built.add(current_path)

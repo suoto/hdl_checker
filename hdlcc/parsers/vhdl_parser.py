@@ -22,7 +22,7 @@ from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 
 from .elements.dependency_spec import DependencySpec
 from .elements.design_unit import DesignUnitType, VhdlDesignUnit
-from .elements.identifier import Identifier
+from .elements.identifier import VhdlIdentifier
 
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
@@ -39,15 +39,15 @@ _DESIGN_UNIT_SCANNER = re.compile(
             r"\bcontext\s+(?P<context_name>\w+)\s+is\b",
         ]
     ),
-    flags=re.M,
+    flags=re.MULTILINE | re.IGNORECASE
 )
 
 _LIBRARY_SCANNER = re.compile(
-    r"library\s+([a-z]\w*(?:\s*,\s*[a-z]\w*){0,})\s*;", flags=re.M | re.I
+    r"library\s+([a-z]\w*(?:\s*,\s*[a-z]\w*){0,})\s*;", flags=re.MULTILINE | re.IGNORECASE
 )
 
 _ADDITIONAL_DEPS_SCANNER = re.compile(
-    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.M
+    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.MULTILINE | re.IGNORECASE
 )
 
 IncompleteDependency = Dict[str, Union[str, Set[Any]]]
@@ -69,7 +69,7 @@ class VhdlParser(BaseSourceFile):
         """
         content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
 
-        return self._comment.sub("", content).lower()
+        return self._comment.sub("", content)
 
     def _iterDesignUnitMatches(self):
         # type: (...) -> Any
@@ -86,7 +86,7 @@ class VhdlParser(BaseSourceFile):
     def _getDependencies(self):  # type: () -> Generator[DependencySpec, None, None]
         libs = set(self.getLibraries() + ["work"])
         lib_deps_regex = re.compile(
-            r"|".join([r"%s\.\w+" % x for x in libs]), flags=re.I
+            r"|".join([r"%s\.\w+" % x for x in libs]), flags=re.IGNORECASE
         )
 
         dependencies = {}  # type: ignore
@@ -123,10 +123,10 @@ class VhdlParser(BaseSourceFile):
             if dep["library"].lower() == "work":
                 dep_library = None
             else:
-                dep_library = Identifier(dep["library"], False)
+                dep_library = VhdlIdentifier(dep["library"])
             yield DependencySpec(
                 owner=self.filename,  # type: ignore
-                name=Identifier(dep["name"], False),
+                name=VhdlIdentifier(dep["name"]),
                 library=dep_library,
                 locations=dep["locations"],
             )
@@ -138,7 +138,7 @@ class VhdlParser(BaseSourceFile):
 
             yield DependencySpec(
                 owner=self.filename,
-                name=Identifier(package_body_name, False),
+                name=VhdlIdentifier(package_body_name),
                 library=None,
                 locations={(line_number + 1, column_number + 1)},
             )

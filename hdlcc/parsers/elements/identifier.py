@@ -27,9 +27,9 @@ class Identifier(object):
 
     def __init__(self, name, case_sensitive=False):
         # type: (str, bool) -> None
-        self._name = str(name) if case_sensitive else str(name).lower()
         self.case_sensitive = case_sensitive
         self._display_name = str(name)
+        self._name = self._display_name.lower()
 
     @property
     def name(self):
@@ -55,10 +55,12 @@ class Identifier(object):
     def __eq__(self, other):
         """Overrides the default implementation"""
 
-        if isinstance(other, self.__class__):
-            self_name = self.display_name if other.case_sensitive else self.display_name.lower()
-            other_name = other.display_name if self.case_sensitive else other.display_name.lower()
-            return self_name == other_name
+        try:
+            if self.case_sensitive and other.case_sensitive:
+                return self.display_name == other.display_name
+            return self.name == other.name
+        except AttributeError:
+            pass
 
         return NotImplemented  # pragma: no cover
 
@@ -70,3 +72,16 @@ class Identifier(object):
             return not result
 
         return NotImplemented
+
+class VhdlIdentifier(Identifier):
+    "Equivalent of Identifier(name, case_sensitive=False)"
+    def __init__(self, name):
+        # type: (str, ) -> None
+        super(VhdlIdentifier, self).__init__(name=name, case_sensitive=False)
+
+class VerilogIdentifier(Identifier):
+    "Equivalent of Identifier(name, case_sensitive=True)"
+    def __init__(self, name):
+        # type: (str, ) -> None
+        super(VerilogIdentifier, self).__init__(name=name, case_sensitive=True)
+

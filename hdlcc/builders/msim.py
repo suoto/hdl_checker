@@ -175,7 +175,7 @@ class MSim(BaseBuilder):
         for line in runShellCommand(["vmap"]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 self._builtin_libraries.add(
-                    Identifier(match.groupdict()["library_name"], True)
+                    Identifier(match.groupdict()["library_name"], False)
                 )
 
     def getBuiltinLibraries(self):
