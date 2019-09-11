@@ -52,15 +52,15 @@ class _DesignUnit(ParsedElement):
     def __repr__(self):
         return '{}(name="{}", type={}, owner={}, locations={})'.format(
             self.__class__.__name__,
-            self.name,
-            self.type_,
+            repr(self.name),
+            repr(self.type_),
             repr(self.owner),
             self.locations,
         )
 
     def __str__(self):
-        return "{}(name={}, type={}, owner={})".format(
-            self.__class__.__name__, repr(self.name), self.type_, repr(self.owner)
+        return "{}(name='{}', type={}, owner='{}')".format(
+            self.__class__.__name__, self.name.display_name, self.type_, str(self.owner)
         )
 
     @property

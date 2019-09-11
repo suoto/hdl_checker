@@ -45,10 +45,12 @@ such.unittest.TestCase.maxDiff = None
 
 
 def _DependencySpec(owner, name, library, locations=None):
+    if library is not None:
+        library = Identifier(library, case_sensitive=False)
     return DependencySpec(
         owner=owner,
         name=Identifier(name, case_sensitive=False),
-        library=Identifier(library, case_sensitive=False),
+        library=library,
         locations=locations,
     )
 
@@ -157,13 +159,13 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="package_with_constants",
                         locations=[(6, 6)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="cherry_pick",
                         locations=[(7, 7), (8, 5)],
                     ),
@@ -199,7 +201,7 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="package_with_constants",
                         locations=[(8, 6)],
                     ),
@@ -211,7 +213,7 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="cherry_pick",
                         locations=[(9, 7), (10, 5)],
                     ),
@@ -241,19 +243,19 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="package_with_constants",
                         locations=[(7, 6)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="another_package",
                         locations=[(1, 9)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="cherry_pick",
                         locations=[(8, 7), (9, 5)],
                     ),
@@ -283,13 +285,13 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="package_with_constants",
                         locations=[(7, 6)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
-                        library="work",
+                        library=None,
                         name="cherry_pick",
                         locations=[(8, 7), (9, 5)],
                     ),
@@ -387,7 +389,7 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         name="foo",
-                        library="work",
+                        library=None,
                         owner=it.source.filename,
                         locations={(12, 43)},
                     ),
@@ -399,13 +401,13 @@ with such.A("VHDL source file object") as it:
                     ),
                     _DependencySpec(
                         name="package_with_constants",
-                        library="work",
+                        library=None,
                         owner=it.source.filename,
                         locations={(17, 1)},
                     ),
                     _DependencySpec(
                         name="package_body_only",
-                        library="work",
+                        library=None,
                         owner=it.source.filename,
                         locations={(21, 1)},
                     ),

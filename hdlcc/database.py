@@ -34,7 +34,6 @@ from typing import (
     Set,
     Tuple,
 )
-
 import six
 
 #  from hdlcc import exceptions
@@ -55,7 +54,6 @@ except ImportError:
 
 
 _logger = logging.getLogger(__name__)
-
 _work = Identifier("work", False)
 
 
@@ -389,6 +387,7 @@ class Database(HashableByKey):
 
         units = {unit for unit in self.design_units if unit.name == name}
 
+
         if not units:
             _logger.warning(
                 "Could not find any source defining '%s' (%s)", name, library
@@ -437,18 +436,15 @@ class Database(HashableByKey):
         }
 
         while search_paths:
-            list(self.getLibrary(search_path) for search_path in search_paths)
+            #  list(self.getLibrary(search_path) for search_path in search_paths)
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen
             new_deps = {
-                (dependency.library, dependency.name)
+                (self.getLibrary(dependency.owner), dependency.name)
                 for search_path in search_paths
                 for dependency in self._dependencies[search_path]
             } - units
 
-            _logger.debug(
-                "New dependencies: %s", list((str(x), str(y)) for x, y in new_deps)
-            )
 
             # Add the new ones to the set tracking the dependencies seen since
             # the search started
@@ -463,6 +459,13 @@ class Database(HashableByKey):
                 if not new_paths:
                     _logger.warning(
                         "Couldn't find where %s/%s is defined", library, name
+                    )
+                elif len(new_paths) > 1:
+                    _logger.warning(
+                        "%s/%s is defined in multiple files: %s",
+                        library,
+                        name,
+                        new_paths,
                     )
 
                 search_paths |= new_paths
@@ -510,7 +513,9 @@ class Database(HashableByKey):
                 still_needed = deps - units_compiled - own
 
                 if still_needed:
-                    _logger.debug("%s still needs %s", current_path, still_needed)
+                    if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                        _msg = [(library, name.name) for library, name in still_needed]
+                        _logger.debug("%s still needs %s", current_path, _msg)
                 else:
                     yield self.getLibrary(current_path), current_path
                     paths_built.add(current_path)
@@ -528,7 +533,6 @@ class Database(HashableByKey):
                     )
                 else:
                     _logger.info("Nothing more to do after %d steps", i)
-
                 return
 
             _logger.info(

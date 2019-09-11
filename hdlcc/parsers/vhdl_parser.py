@@ -64,8 +64,7 @@ class VhdlParser(BaseSourceFile):
     def _getSourceContent(self):
         # type: (...) -> Any
         """
-        Replace everything from comment ('--') until a line break and
-        converts to lowercase
+        Replace everything from comment ('--') until a line break
         """
         content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
 
@@ -84,9 +83,9 @@ class VhdlParser(BaseSourceFile):
             yield match.groupdict(), content[:start].count("\n")
 
     def _getDependencies(self):  # type: () -> Generator[DependencySpec, None, None]
-        libs = set(self.getLibraries() + ["work"])
         lib_deps_regex = re.compile(
-            r"|".join([r"%s\.\w+" % x for x in libs]), flags=re.IGNORECASE
+            r"|".join([r"%s\.\w+" % x for x in set(self.getLibraries() + ["work"])]),
+            flags=re.I,
         )
 
         dependencies = {}  # type: ignore
