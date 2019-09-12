@@ -19,12 +19,7 @@ from collections import namedtuple
 from enum import Enum
 from typing import Any, Dict, Tuple
 
-BuildInfo = Dict[str, Any]
 BuildFlags = Tuple[str, ...]
-UnitName = str
-LibraryName = str
-ObjectState = Dict
-
 LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
 

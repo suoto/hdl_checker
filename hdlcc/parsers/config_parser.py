@@ -26,9 +26,9 @@ from threading import RLock
 from typing import Any, Dict, Iterator, Set, Tuple
 
 from hdlcc import exceptions
-from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builder_utils import BuilderName
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -46,10 +46,10 @@ _configFileScan = re.compile(
 ).finditer
 # pylint: enable=invalid-name
 
-BuildFlagsMap = Dict[str, t.BuildFlags]
+BuildFlagsMap = Dict[str, BuildFlags]
 
 
-def _extractSet(entry):  # type: (str) -> t.BuildFlags
+def _extractSet(entry):  # type: (str) -> BuildFlags
     """
     Extract a list by splitting a string at whitespaces, removing
     empty values caused by leading/trailing/multiple whitespaces
@@ -83,7 +83,7 @@ class ConfigParser(object):
             "global_build_flags": {"vhdl": (), "verilog": (), "systemverilog": ()},
         }  # type: Dict[str, BuildFlagsMap]
 
-        self._sources = set()  # type: Set[Tuple[Path, str, t.BuildFlags]]
+        self._sources = set()  # type: Set[Tuple[Path, str, BuildFlags]]
         #  source_path,
         #  groupdict["library"],
         #  _extractSet(groupdict["flags"]),

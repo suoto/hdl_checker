@@ -24,10 +24,10 @@ from typing import Any, Iterable, List, Optional
 
 from .base_builder import BaseBuilder
 
-from hdlcc import types as t
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import runShellCommand
 
 
@@ -38,10 +38,10 @@ class GHDL(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = "ghdl"
-    file_types = {t.FileType.vhdl}
+    file_types = {FileType.vhdl}
 
     # Default build flags
-    default_flags = {"global_build_flags": {"vhdl": ["-fexplicit", "-frelaxed-rules"]}}
+    default_flags = {"global_build_flags": {FileType.vhdl: ["-fexplicit", "-frelaxed-rules"]}}
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(
@@ -146,7 +146,7 @@ class GHDL(BaseBuilder):
                     self._builtin_libraries.add(Identifier(name.strip().lower()))
 
     def _getGhdlArgs(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> List[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
         """
         Return the GHDL arguments that are common to most calls
         """
@@ -172,21 +172,21 @@ class GHDL(BaseBuilder):
         return cmd
 
     def _analyzeSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> List[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
         """
         Runs GHDL with analyze source switch
         """
         return ["ghdl", "-a"] + self._getGhdlArgs(path, library, flags)
 
     def _checkSyntax(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> List[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
         """
         Runs GHDL with syntax check switch
         """
         return ["ghdl", "-s"] + self._getGhdlArgs(path, library, flags)
 
     def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         self._importSource(path, library, flags)
 
         stdout = []  # type: List[str]

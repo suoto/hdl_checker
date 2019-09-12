@@ -24,7 +24,7 @@ from typing import Any, Iterable, List, Optional
 
 from .base_builder import BaseBuilder
 
-from hdlcc import types as t
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
@@ -36,7 +36,7 @@ class MSim(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = "msim"
-    file_types = {t.FileType.vhdl, t.FileType.verilog, t.FileType.systemverilog}
+    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
@@ -84,19 +84,19 @@ class MSim(BaseBuilder):
     # Default build flags
     default_flags = {
         "batch_build_flags": {
-            "vhdl": ["-defercheck", "-nocheck", "-permissive"],
-            "verilog": ["-permissive"],
-            "systemverilog": ["-permissive"],
+            FileType.vhdl: ["-defercheck", "-nocheck", "-permissive"],
+            FileType.verilog: ["-permissive"],
+            FileType.systemverilog: ["-permissive"],
         },
         "single_build_flags": {
-            "vhdl": ["-check_synthesis", "-lint", "-rangecheck", "-pedanticerrors"],
-            "verilog": ["-lint", "-hazards", "-pedanticerrors"],
-            "systemverilog": ["-lint", "-hazards", "-pedanticerrors"],
+            FileType.vhdl: ["-check_synthesis", "-lint", "-rangecheck", "-pedanticerrors"],
+            FileType.verilog: ["-lint", "-hazards", "-pedanticerrors"],
+            FileType.systemverilog: ["-lint", "-hazards", "-pedanticerrors"],
         },
         "global_build_flags": {
-            "vhdl": ["-explicit"],
-            "verilog": [],
-            "systemverilog": [],
+            FileType.vhdl: ["-explicit"],
+            FileType.verilog: [],
+            FileType.systemverilog: [],
         },
     }
 
@@ -200,11 +200,11 @@ class MSim(BaseBuilder):
         return rebuilds
 
     def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         filetype = getFileType(path)
-        if filetype == t.FileType.vhdl:
+        if filetype == FileType.vhdl:
             return self._buildVhdl(path, library, flags)
-        if filetype in (t.FileType.verilog, t.FileType.systemverilog):
+        if filetype in (FileType.verilog, FileType.systemverilog):
             return self._buildVerilog(path, library, flags)
 
         self._logger.error(  # pragma: no cover
@@ -213,7 +213,7 @@ class MSim(BaseBuilder):
         return ""
 
     def _getExtraFlags(self, lang):
-        # type: (str) -> Iterable[str]
+        # type: (FileType) -> Iterable[str]
         """
         Gets extra flags configured for the specific language
         """
@@ -225,7 +225,7 @@ class MSim(BaseBuilder):
         return libs
 
     def _buildVhdl(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         "Builds a VHDL file"
         assert isinstance(library, Identifier)
         cmd = [
@@ -243,7 +243,7 @@ class MSim(BaseBuilder):
         return runShellCommand(cmd)
 
     def _buildVerilog(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         "Builds a Verilog/SystemVerilog file"
         cmd = [
             "vlog",
@@ -254,12 +254,12 @@ class MSim(BaseBuilder):
             p.join(self._target_folder, library.name),
         ]
 
-        if getFileType(path) == t.FileType.systemverilog:
+        if getFileType(path) == FileType.systemverilog:
             cmd += ["-sv"]
         if flags:  # pragma: no cover
             cmd += flags
 
-        cmd += self._getExtraFlags("verilog")
+        cmd += self._getExtraFlags(FileType.verilog)
         cmd += [path.name]
 
         return runShellCommand(cmd)

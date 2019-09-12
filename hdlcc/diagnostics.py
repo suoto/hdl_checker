@@ -42,8 +42,6 @@ class DiagType(object):  # pylint: disable=too-few-public-methods
     STYLE_ERROR = "Error (style)"
 
 
-
-
 class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-attributes
     """
     Base container for diagnostics
@@ -83,7 +81,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
     def __repr__(self):
         return (
             '{}(checker="{}", filename={}, line_number={}, column_number={}, '
-            'error_code={}, severity={}, text={})'.format(
+            "error_code={}, severity={}, text={})".format(
                 self.__class__.__name__,
                 repr(self.checker),
                 repr(self.filename),

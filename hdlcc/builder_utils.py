@@ -27,8 +27,8 @@ from .builders.ghdl import GHDL
 from .builders.msim import MSim
 from .builders.xvhdl import XVHDL
 
-from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.path import Path  # pylint: disable=unused-import
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import removeDirIfExists
 
 _logger = logging.getLogger(__name__)
@@ -105,11 +105,11 @@ _VUNIT_FLAGS = {
         "2002": ("--std=02",),
         "2008": ("--std=08",),
     },
-}  # type: Dict[BuilderName, Dict[str, t.BuildFlags]]
+}  # type: Dict[BuilderName, Dict[str, BuildFlags]]
 
 
 def getVunitSources(builder_name):
-    # type: (BuilderName) -> Iterable[Tuple[t.LibraryName, Path, t.BuildFlags]]
+    # type: (BuilderName) -> Iterable[Tuple[str, Path, BuildFlags]]
     "Foo bar"
     if not foundVunit():  # or self._builder_name == BuilderName.fallback:
         return
@@ -123,9 +123,9 @@ def getVunitSources(builder_name):
     builder_class = getBuilderByName(builder_name)
 
     # Prefer VHDL VUnit
-    if t.FileType.vhdl in builder_class.file_types:
+    if FileType.vhdl in builder_class.file_types:
         from vunit import VUnit  # pylint: disable=import-error
-    elif t.FileType.systemverilog in builder_class.file_types:
+    elif FileType.systemverilog in builder_class.file_types:
         from vunit.verilog import (  # type: ignore # pylint: disable=import-error
             VUnit,
         )
@@ -146,7 +146,7 @@ def getVunitSources(builder_name):
     # Create a dummy VUnit project to get info on its sources
     vunit_project = VUnit.from_argv(["--output-path", output_path])
 
-    flags = tuple()  # type: t.BuildFlags
+    flags = tuple()  # type: BuildFlags
     # Get extra flags for building VUnit sources
     try:
         flags = _VUNIT_FLAGS[builder_name][vunit_project.vhdl_standard]

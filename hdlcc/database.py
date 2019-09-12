@@ -26,7 +26,6 @@ from typing import (
     Any,
     Dict,
     FrozenSet,
-    Generator,
     Iterable,
     Iterator,
     List,
@@ -38,8 +37,12 @@ from typing import (
 
 import six
 
-#  from hdlcc import exceptions
-from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.types import BuildFlags, FileType
+from hdlcc.diagnostics import (
+    CheckerDiagnostic,
+    DependencyNotUnique,
+    PathNotInProjectFile,
+)
 from hdlcc.parser_utils import getSourceParserFromPath
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
@@ -59,6 +62,7 @@ tResolvedLibrary = Identifier
 tUnresolvedLibrary = Union[Identifier, None]
 tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
 
+
 class Database(HashableByKey):
     "Stores info on and provides operations for a project file set"
 
@@ -69,10 +73,10 @@ class Database(HashableByKey):
         self._paths = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
         self._inferred_libraries = set()  # type: Set[Path]
-        self._flags = {}  # type: Dict[Path, t.BuildFlags]
+        self._flags = {}  # type: Dict[Path, BuildFlags]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
         self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
-        self._cache = {}  # type: Dict[Path, Set[tAnyDesignUnit]]
+        self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
 
         self._cached_methods = {
             getattr(self, x)
@@ -119,6 +123,7 @@ class Database(HashableByKey):
         self._flags = {}
         self._design_units = set()
         self._dependencies = {}
+        self._diags = dict()
 
         self._clearLruCaches()
 
@@ -139,7 +144,7 @@ class Database(HashableByKey):
                 continue
 
             # Set defaults
-            library, flags = (None, tuple())  # type: Tuple[Optional[str], t.BuildFlags]
+            library, flags = (None, tuple())  # type: Tuple[Optional[str], BuildFlags]
 
             # Each entry can be a string (path) or a tuple where the first item
             # is the path and the second item is dict with 'library' and/of
@@ -154,7 +159,7 @@ class Database(HashableByKey):
             self._addSource(Path(path), library, flags)
 
     def _addSource(self, path, library, flags):
-        # type: (Path, Optional[str], t.BuildFlags) -> None
+        # type: (Path, Optional[str], BuildFlags) -> None
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
@@ -168,8 +173,20 @@ class Database(HashableByKey):
 
         if library is not None:
             self._libraries[path] = Identifier(
-                library, case_sensitive=getFileType(path) != t.FileType.vhdl
+                library, case_sensitive=getFileType(path) != FileType.vhdl
             )
+
+    def _addDiagnostic(self, diagnostic):
+        # type: (CheckerDiagnostic) -> None
+        """
+        Adds a diagnostic to the diagnostic map. Diagnostics can then be read
+        to report processing internals and might make it to the user interface
+        """
+        assert diagnostic.filename is not None
+        if diagnostic.filename not in self._diags:
+            self._diags[diagnostic.filename] = set()
+
+        self._diags[diagnostic.filename].add(diagnostic)
 
     def __jsonEncode__(self):
         """
@@ -188,7 +205,7 @@ class Database(HashableByKey):
         return state
 
     def getFlags(self, path):
-        # type: (Path) -> t.BuildFlags
+        # type: (Path) -> BuildFlags
         """
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
@@ -243,7 +260,9 @@ class Database(HashableByKey):
         if path not in self._paths:
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)
-            self._updatePathLibrary(path, Identifier("out_of_project", True))
+            self._updatePathLibrary(path, Identifier("not_in_project", True))
+            self._addDiagnostic(PathNotInProjectFile(path))
+
         elif path not in self._libraries:
             # Library is not defined, try to infer
             _logger.info("Library for '%s' not set, inferring it", path)
@@ -340,6 +359,7 @@ class Database(HashableByKey):
 
         if not libraries:
             _logger.warning("Couldn't work out a library for path %s", path)
+            #  self._diags[path].add(PathNotInProjectFile(path))
             library = None
         elif len(libraries) == 1:
             library = libraries.pop()
@@ -440,11 +460,9 @@ class Database(HashableByKey):
         }
 
         while search_paths:
-            #  list(self.getLibrary(search_path) for search_path in search_paths)
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen
             new_deps = {
-                #  (, dependency.name)
                 (
                     dependency.library or self.getLibrary(dependency.owner),
                     dependency.name,
@@ -452,6 +470,7 @@ class Database(HashableByKey):
                 for search_path in search_paths
                 for dependency in self._dependencies[search_path]
             } - units
+
 
             _logger.debug(
                 "Searching %s resulted in dependencies: %s", search_paths, new_deps
@@ -478,6 +497,13 @@ class Database(HashableByKey):
                         name,
                         new_paths,
                     )
+                    #  self._diags[path].add(DependencyNotUnique(
+                    #      filename=path,
+                    #      design_unit='%s.%s' % (library, name),
+                    #      actual=
+                    #      choices=
+                    #      line_number=
+                    #      column_number=))
 
                 search_paths |= new_paths
 
@@ -488,7 +514,7 @@ class Database(HashableByKey):
         return units
 
     def getBuildSequence(self, path):
-        # type: (Path) -> Generator[Tuple[Identifier, Path], None, None]
+        # type: (Path) -> Iterable[Tuple[Identifier, Path]]
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path

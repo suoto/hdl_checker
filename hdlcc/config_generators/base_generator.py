@@ -31,7 +31,7 @@ _HEADER_EXTENSIONS = "vh", "svh"
 _DEFAULT_LIBRARY_NAME = {"vhdl": "lib", "verilog": "lib", "systemverilog": "lib"}
 
 Flags = str
-SourceSpec = Tuple[Path, Flags, t.LibraryName]
+SourceSpec = Tuple[Path, Flags, str]
 
 
 class BaseGenerator:

@@ -22,12 +22,10 @@
 # pylint: disable=useless-object-inheritance
 
 import logging
-import os
 import os.path as p
 import pprint
-import sys
 import time
-from typing import Any, Iterable, List, Set, Tuple
+from typing import Any, Iterable, Tuple
 
 from hdlcc.builder_utils import BuilderName
 from hdlcc.database import Database
@@ -35,8 +33,7 @@ from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 
-from hdlcc.tests.utils import (  # sanitizePath,; writeListToFile,
-    assertCountEqual,
+from hdlcc.tests.utils import (
     disableVunit,
     getTestTempPath,
     logIterable,
@@ -87,7 +84,16 @@ class _Database(Database):
             yield getattr(library, "name", None), name.name
             _msg.append((library, name))
 
-        _logger.debug("%s: %s", path, _msg)
+        _logger.debug("getDependenciesUnits('%s') => %s", path, _msg)
+
+    def test_getBuildSequence(self, path):
+        # type: (Path) -> Iterable[Tuple[Identifier, Path]]
+        _msg = []
+        for library, build_path in super(_Database, self).getBuildSequence(path):
+            yield library, build_path
+            _msg.append((getattr(library, "name", None), build_path.name))
+
+        _logger.debug("getBuildSequence('%s') => %s", path, _msg)
 
     def test_reportCacheInfo(self):
         # Print cache stats
@@ -160,7 +166,9 @@ class TestDatabase(TestCase):
         any_path = _Path("any.vhd")
         # Make sure the path exists
         open(any_path.name, "w").close()
-        self.assertEqual(self.database.getLibrary(any_path).name, "out_of_project")
+        self.assertEqual(
+            self.database.getLibrary(any_path), Identifier("not_in_project", False)
+        )
         self.assertEqual(self.database.getFlags(any_path), ())
 
     def test_accepts_empty_dict(self):
@@ -211,8 +219,12 @@ class TestDatabase(TestCase):
 
         self.assertEqual(self.database.builder_name, BuilderName.fallback)
         self.assertCountEqual(self.database.paths, (_Path("foo.vhd"), _Path("oof.vhd")))
-        self.assertEqual(self.database.getLibrary(_Path("foo.vhd")).name, "bar")
-        self.assertEqual(self.database.getLibrary(_Path("oof.vhd")).name, "ooflib")
+        self.assertEqual(
+            self.database.getLibrary(_Path("foo.vhd")), Identifier("bar", False)
+        )
+        self.assertEqual(
+            self.database.getLibrary(_Path("oof.vhd")), Identifier("ooflib", False)
+        )
         self.assertEqual(self.database.getFlags(_Path("foo.vhd")), ("baz", "flag"))
         self.assertEqual(
             self.database.getFlags(_Path("oof.vhd")), ("oofflag0", "oofflag1")
@@ -386,7 +398,8 @@ class TestDatabase(TestCase):
         )
 
         self.assertEqual(
-            self.database.getLibrary(_Path("some_dependency.vhd")).name, "lib_a"
+            self.database.getLibrary(_Path("some_dependency.vhd")),
+            Identifier("lib_a", False),
         )
 
         # Change one of the sources to use a different library to force the
@@ -403,7 +416,8 @@ class TestDatabase(TestCase):
         time.sleep(0.1)
 
         self.assertEqual(
-            self.database.getLibrary(_Path("some_dependency.vhd")).name, "lib_b"
+            self.database.getLibrary(_Path("some_dependency.vhd")),
+            Identifier("lib_b", False),
         )
 
 
@@ -526,8 +540,6 @@ class TestDirectDependencies(TestCase):
         # type: (...) -> Any
         deps = list(self.database.test_getDependenciesUnits(_Path("entity_a.vhd")))
 
-        logIterable("Dependencies", deps, _logger.info)
-
         # Indirect dependencies should always come first
         self.assertCountEqual(
             deps,
@@ -542,9 +554,7 @@ class TestDirectDependencies(TestCase):
 
     def test_get_correct_build_sequency_of_entity_a(self):
         # type: (...) -> Any
-        sequence = list(self.database.getBuildSequence(_Path("entity_a.vhd")))
-
-        logIterable("Build sequence", sequence, _logger.info)
+        sequence = list(self.database.test_getBuildSequence(_Path("entity_a.vhd")))
 
         # entity_a
         # '- common_dep
@@ -757,9 +767,7 @@ class TestAmbiguousSourceSet(TestCase):
 
     def test_get_the_correct_build_sequence(self):
         # type: (...) -> Any
-        sequence = tuple(self.database.getBuildSequence(_Path("top.vhd")))
-
-        logIterable("Build sequence", sequence, _logger.debug)
+        sequence = tuple(self.database.test_getBuildSequence(_Path("top.vhd")))
 
         # Both are on the same level, their order don't matter
         self.assertCountEqual(
@@ -812,20 +820,18 @@ class TestIndirectLibraryInference(TestCase):
     def test_infer_library_when_using_directly(self):
         # type: (...) -> Any
         sequence = tuple(
-            self.database.getBuildSequence(_Path("no_lib_but_use_it_directly.vhd"))
+            self.database.test_getBuildSequence(_Path("no_lib_but_use_it_directly.vhd"))
         )
-
-        logIterable("Build sequence", sequence, _logger.info)
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 
     def test_infer_library_from_path(self):
         # type: (...) -> Any
         sequence = tuple(
-            self.database.getBuildSequence(_Path("with_lib_but_use_it_directly.vhd"))
+            self.database.test_getBuildSequence(
+                _Path("with_lib_but_use_it_directly.vhd")
+            )
         )
-
-        logIterable("Build sequence", sequence, _logger.info)
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 

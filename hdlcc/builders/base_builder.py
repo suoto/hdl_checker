@@ -24,14 +24,13 @@ from collections import namedtuple
 from threading import Lock
 from typing import Any, Dict, Iterable, Optional, Set, Tuple, Union
 
-from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.database import Database  # pylint: disable=unused-import
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import getFileType
-
-from hdlcc.database import Database  # pylint: disable=unused-import
 
 RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
 RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])
@@ -58,9 +57,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         "global_build_flags": {},
     }  # type: Dict
 
-    _external_libraries = {"vhdl": set(), "verilog": set()}  # type: dict
+    _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
-    _include_paths = {"vhdl": set(), "verilog": set()}  # type: dict
+    _include_paths = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
@@ -121,8 +120,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
                 if self._builtin_libraries:  # pragma: no cover
                     self._logger.debug(
-                        "Builtin libraries: %s",
-                        tuple(self._builtin_libraries),
+                        "Builtin libraries: %s", tuple(self._builtin_libraries)
                     )
                 else:  # pragma: no cover
                     self._logger.debug("No builtin libraries found")
@@ -260,8 +258,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     @abc.abstractmethod
     def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
-        # type (Path, Identifier, Optional[t.BuildFlags]) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+        # type (Path, Identifier, Optional[BuildFlags]) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
         """
         Callback called to actually build the source
         """

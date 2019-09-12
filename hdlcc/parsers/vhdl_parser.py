@@ -96,7 +96,7 @@ class VhdlParser(BaseSourceFile):
 
             library, unit = match.group().split(".")[
                 :2
-            ]  # type: Tuple[Optional[t.LibraryName], str]
+            ]  # type: Tuple[Optional[str], str]
 
             line_number = text[: match.end()].count("\n")
             column_number = len(text[: match.start()].split("\n")[-1])

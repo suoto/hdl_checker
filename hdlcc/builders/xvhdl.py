@@ -25,11 +25,11 @@ from typing import Any, Iterable, Optional
 
 from .base_builder import BaseBuilder
 
-from hdlcc import types as t
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
-from hdlcc.utils import runShellCommand
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
+from hdlcc.utils import runShellCommand
 
 
 class XVHDL(BaseBuilder):
@@ -38,7 +38,7 @@ class XVHDL(BaseBuilder):
     # Implementation of abstract class properties
     builder_name = "xvhdl"
     # TODO: Add xvlog support
-    file_types = {t.FileType.vhdl}
+    file_types = {FileType.vhdl}
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
@@ -79,7 +79,7 @@ class XVHDL(BaseBuilder):
         super(XVHDL, self).__init__(*args, **kwargs)
         self._xvhdlini = p.join(self._target_folder, ".xvhdl.init")
         # Create the ini file
-        open(self._xvhdlini, 'w').close()
+        open(self._xvhdlini, "w").close()
         self._builtin_libraries = set(
             map(
                 Identifier,
@@ -175,7 +175,7 @@ class XVHDL(BaseBuilder):
             fd.write(content)
 
     def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[t.BuildFlags]) -> Iterable[str]
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         cmd = [
             "xvhdl",
             "--nolog",
