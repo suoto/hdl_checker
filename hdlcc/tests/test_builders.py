@@ -584,9 +584,15 @@ class TestBuilder(TestCase):
                 {"unit_type": "package", "unit_name": "very_common_pkg"},
                 RebuildUnit(name="very_common_pkg", type_="package"),
             ),
+            # Should replace 'work' with the path's library
             (
                 {"library_name": "work", "unit_name": "foo"},
-                RebuildLibraryUnit(name="foo", library="work"),
+                RebuildLibraryUnit(name="foo", library="some_lib"),
+            ),
+            # Should not touch the library name when != 'work'
+            (
+                {"library_name": "foo", "unit_name": "bar"},
+                RebuildLibraryUnit(name="bar", library="foo"),
             ),
             ({"rebuild_path": "some_path"}, RebuildPath("some_path")),
         ]
@@ -594,6 +600,7 @@ class TestBuilder(TestCase):
     def test_get_rebuilds(self, rebuild_info, expected):
         # type: (...) -> Any
         _logger.info("Rebuild info is %s", rebuild_info)
+        library = Identifier("some_lib", False)
         with mock.patch.object(
             self.builder, "_searchForRebuilds", return_value=[rebuild_info]
         ):
@@ -608,7 +615,8 @@ class TestBuilder(TestCase):
             )
 
             self.assertCountEqual(
-                self.builder._getRebuilds(_source("source.vhd"), ""), {expected}
+                self.builder._getRebuilds(_source("source.vhd"), "", library),
+                {expected},
             )
 
 

@@ -254,6 +254,7 @@ class Database(HashableByKey):
         # Safe to remove the unresolved ones
         self._dependencies[path] -= unresolved_dependencies
 
+    @lru_cache()
     def getLibrary(self, path):
         # type: (Path) -> tUnresolvedLibrary
         "Gets a library of a given source (this is likely to be removed)"

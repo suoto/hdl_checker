@@ -41,7 +41,7 @@ class GHDL(BaseBuilder):
     file_types = {FileType.vhdl}
 
     # Default build flags
-    default_flags = {"global_build_flags": {FileType.vhdl: ["-fexplicit", "-frelaxed-rules"]}}
+    default_flags = {"global_build_flags": {FileType.vhdl: ("-fexplicit", "-frelaxed-rules")}}
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(

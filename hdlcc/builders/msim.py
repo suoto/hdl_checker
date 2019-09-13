@@ -84,19 +84,24 @@ class MSim(BaseBuilder):
     # Default build flags
     default_flags = {
         "batch_build_flags": {
-            FileType.vhdl: ["-defercheck", "-nocheck", "-permissive"],
-            FileType.verilog: ["-permissive"],
-            FileType.systemverilog: ["-permissive"],
+            FileType.vhdl: ("-defercheck", "-nocheck", "-permissive"),
+            FileType.verilog: ("-permissive"),
+            FileType.systemverilog: ("-permissive"),
         },
         "single_build_flags": {
-            FileType.vhdl: ["-check_synthesis", "-lint", "-rangecheck", "-pedanticerrors"],
-            FileType.verilog: ["-lint", "-hazards", "-pedanticerrors"],
-            FileType.systemverilog: ["-lint", "-hazards", "-pedanticerrors"],
+            FileType.vhdl: (
+                "-check_synthesis",
+                "-lint",
+                "-rangecheck",
+                "-pedanticerrors",
+            ),
+            FileType.verilog: ("-lint", "-hazards", "-pedanticerrors"),
+            FileType.systemverilog: ("-lint", "-hazards", "-pedanticerrors"),
         },
         "global_build_flags": {
-            FileType.vhdl: ["-explicit"],
-            FileType.verilog: [],
-            FileType.systemverilog: [],
+            FileType.vhdl: ("-explicit"),
+            FileType.verilog: (),
+            FileType.systemverilog: (),
         },
     }
 
