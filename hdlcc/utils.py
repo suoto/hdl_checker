@@ -30,8 +30,8 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-from hdlcc import types as t
 from hdlcc.path import Path
+from hdlcc.types import FileType
 
 PY2 = sys.version_info[0] == 2
 
@@ -194,33 +194,6 @@ def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
 
 def onMac():  # pragma: no cover # pylint: disable=missing-docstring
     return sys.platform == "darwin"
-
-
-class UnknownTypeExtension(Exception):
-    """
-    Exception thrown when trying to get the file type of an unknown extension.
-    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
-    """
-
-    def __init__(self, path):
-        super(UnknownTypeExtension, self).__init__()
-        self._path = path
-
-    def __str__(self):
-        return "Couldn't determine file type for path '%s'" % self._path
-
-
-def getFileType(filename):
-    # type: (Path) -> t.FileType
-    "Gets the file type of a source file"
-    ext = filename.name.split(".")[-1].lower()
-    if ext in t.FileType.vhdl.value:
-        return t.FileType.vhdl
-    if ext in t.FileType.verilog.value:
-        return t.FileType.verilog
-    if ext in t.FileType.systemverilog.value:
-        return t.FileType.systemverilog
-    raise UnknownTypeExtension(filename)
 
 
 if not hasattr(p, "samefile"):

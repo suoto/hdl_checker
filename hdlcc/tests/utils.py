@@ -33,13 +33,13 @@ import six
 from parameterized import parameterized_class  # type: ignore
 
 from hdlcc import exceptions
-from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.types import FileType
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.utils import getCachePath, getFileType, onWindows, removeDuplicates, samefile
+from hdlcc.utils import getCachePath, onWindows, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class SourceMock(object):
                 )
             )
 
-        self.filetype = getFileType(self.filename)
+        self.filetype = FileType.fromPath(self.filename)
         #  self.abspath = p.abspath(self.filename)
         self.flags = []  # type: ignore
 

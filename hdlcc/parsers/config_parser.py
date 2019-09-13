@@ -28,7 +28,7 @@ from typing import Any, Dict, Iterator, Set, Tuple
 from hdlcc import exceptions
 from hdlcc.builder_utils import BuilderName
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags
+from hdlcc.types import BuildFlags, FileType
 
 # pylint: disable=invalid-name
 _splitAtWhitespaces = re.compile(r"\s+").split
@@ -45,8 +45,6 @@ _configFileScan = re.compile(
     flags=re.I,
 ).finditer
 # pylint: enable=invalid-name
-
-BuildFlagsMap = Dict[str, BuildFlags]
 
 
 def _extractSet(entry):  # type: (str) -> BuildFlags
@@ -69,24 +67,22 @@ class ConfigParser(object):
     _list_parms = ("single_build_flags", "global_build_flags")
 
     _single_value_parms = ("builder",)
-    _deprecated_parameters = ("target_dir",)
+    _deprecated_parameters = ("target_dir", "single_build_flags")
 
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
     def __init__(self, filename):  # type: (Path) -> None
         self._logger.debug("Creating config parser for filename '%s'", filename)
 
-        self._parms = {"builder": BuilderName.fallback}
+        self._parms = {"builder": BuilderName.fallback.name}
 
         self._flags = {
-            "single_build_flags": {"vhdl": (), "verilog": (), "systemverilog": ()},
-            "global_build_flags": {"vhdl": (), "verilog": (), "systemverilog": ()},
-        }  # type: Dict[str, BuildFlagsMap]
+            FileType.vhdl: (),
+            FileType.verilog: (),
+            FileType.systemverilog: (),
+        }  # type: Dict[FileType, BuildFlags]
 
         self._sources = set()  # type: Set[Tuple[Path, str, BuildFlags]]
-        #  source_path,
-        #  groupdict["library"],
-        #  _extractSet(groupdict["flags"]),
 
         self.filename = filename
 
@@ -166,10 +162,10 @@ class ConfigParser(object):
             self._logger.debug("Ignoring deprecated parameter '%s'", parameter)
         elif parameter in self._single_value_parms:
             self._logger.debug("Handling '%s' as a single value", parameter)
-            self._parms[parameter] = BuilderName.fromString(value)
+            self._parms[parameter] = value
         elif parameter in self._list_parms:
             self._logger.debug("Handling '%s' as a list of values", parameter)
-            self._flags[parameter][lang] = _extractSet(value)
+            self._flags[FileType(lang)] = _extractSet(value)
         else:
             raise exceptions.UnknownParameterError(parameter)
 
@@ -194,12 +190,12 @@ class ConfigParser(object):
         has been changed
         """
         self._parseIfNeeded()
-        data = self._flags.copy()
-        data.update(
-            {  # type: ignore
-                "builder_name": self._parms["builder"],
-                "sources": set(self._sources),
-            }
-        )
+        data = {
+            "builder_name": self._parms["builder"],
+            "sources": set(self._sources),
+        }  # type: Dict[Any, Any]
+
+        for filetype, flags in self._flags.items():
+            data.update({filetype.name: {"flags": flags}})
 
         return data

@@ -30,7 +30,6 @@ from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import BuildFlags, FileType
-from hdlcc.utils import getFileType
 
 RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
 RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])
@@ -217,7 +216,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                         rebuilds.add(RebuildUnit(unit_name, unit_type))
                         break
             elif None not in (library_name, unit_name):
-                if library_name == 'work':
+                if library_name == "work":
                     library_name = library.name
                 rebuilds.add(RebuildLibraryUnit(unit_name, library_name))
             elif rebuild_path is not None:
@@ -268,7 +267,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     def _getFlags(self, path):
         # type: (Path) -> BuildFlags
         return tuple(self._database.getFlags(path)) + tuple(
-            self.default_flags.get("single_build_flags", {}).get(getFileType(path), ())
+            self.default_flags.get("single_build_flags", {}).get(
+                FileType.fromPath(path), ()
+            )
         )
 
     def _buildAndParse(
@@ -357,7 +358,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         Checks if a given path is supported by this builder
         """
-        return getFileType(path) in self.file_types
+        return FileType.fromPath(path) in self.file_types
 
     def build(self, path, library, forced=False):
         # type: (Path, Identifier, bool) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
@@ -370,7 +371,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             self._logger.warning(
                 "Path '%s' with file type '%s' is not " "supported",
                 path,
-                getFileType(path),
+                FileType.fromPath(path),
             )
             return set(), set()
 

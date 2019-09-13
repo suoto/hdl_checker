@@ -48,7 +48,7 @@ from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.utils import HashableByKey, getFileType, getMostCommonItem
+from hdlcc.utils import HashableByKey, getMostCommonItem
 
 try:
     from functools import lru_cache
@@ -173,7 +173,7 @@ class Database(HashableByKey):
 
         if library is not None:
             self._libraries[path] = Identifier(
-                library, case_sensitive=getFileType(path) != FileType.vhdl
+                library, case_sensitive=FileType.fromPath(path) != FileType.vhdl
             )
 
     def _addDiagnostic(self, diagnostic):

@@ -20,10 +20,9 @@ import abc
 import logging
 from typing import Dict, Optional, Set, Tuple
 
-from hdlcc import types as t
 from hdlcc.builder_utils import AnyValidBuilder
 from hdlcc.path import Path
-from hdlcc.utils import getFileType
+from hdlcc.types import FileType
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
 _HEADER_EXTENSIONS = "vh", "svh"
@@ -47,9 +46,9 @@ class BaseGenerator:
         self._logger = logging.getLogger(self.__class__.__name__)
         self._sources = set()  # type: Set[SourceSpec]
         self._include_paths = {
-            t.FileType.verilog: set(),
-            t.FileType.systemverilog: set(),
-        }  # type: Dict[t.FileType, Set[str]]
+            FileType.verilog: set(),
+            FileType.systemverilog: set(),
+        }  # type: Dict[FileType, Set[str]]
 
     def _addSource(self, path, flags=None, library=None):
         # type: (Path, Optional[Flags], Optional[str]) -> None
@@ -62,8 +61,8 @@ class BaseGenerator:
         )
 
         if path.basename.split(".")[-1].lower() in ("vh", "svh"):
-            file_type = getFileType(path)
-            if file_type in (t.FileType.verilog, t.FileType.systemverilog):
+            file_type = FileType.fromPath(path)
+            if file_type in (FileType.verilog, FileType.systemverilog):
                 self._include_paths[file_type].add(path.dirname)
         else:
             self._sources.add(
@@ -104,11 +103,11 @@ class BaseGenerator:
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
-        for lang in (t.FileType.verilog, t.FileType.systemverilog):
+        for lang in (FileType.verilog, FileType.systemverilog):
             paths = self._include_paths[lang]
             if paths:
                 contents += [
-                    "include_paths[%s] = %s" % (lang.toString(), " ".join(sorted(paths)))
+                    "include_paths[%s] = %s" % (lang.name, " ".join(sorted(paths)))
                 ]
 
         if self._include_paths:
@@ -118,7 +117,7 @@ class BaseGenerator:
         sources = []
 
         for path, flags, library in self._sources:
-            file_type = getFileType(path)
+            file_type = FileType.fromPath(path)
             sources.append((file_type, library, path, flags))
 
         sources.sort(key=lambda x: x[2].abspath)
@@ -126,7 +125,7 @@ class BaseGenerator:
         for file_type, library, path, flags in sources:
             contents += [
                 "{0} {1} {2}{3}".format(
-                    file_type.toString(), library, path, " %s" % flags if flags else ""
+                    file_type.name, library, path, " %s" % flags if flags else ""
                 )
             ]
 

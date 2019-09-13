@@ -23,9 +23,13 @@ import logging
 import os.path as p
 import pprint
 import tempfile
+import time
 from contextlib import contextmanager
+from multiprocessing import Event
+from threading import Thread
 from typing import Any, Iterator, List
 
+import mock
 import six
 
 from nose2.tools import such  # type: ignore
@@ -124,17 +128,10 @@ systemverilog work bar.sv some sv flag
             it.assertDictEqual(
                 config,
                 {
-                    "builder_name": BuilderName.msim,
-                    "global_build_flags": {
-                        "systemverilog": (),
-                        "verilog": (),
-                        "vhdl": ("-global", "-global-build-flag"),
-                    },
-                    "single_build_flags": {
-                        "systemverilog": (),
-                        "verilog": (),
-                        "vhdl": ("-single_build_flag_0", "-singlebuildflag"),
-                    },
+                    "builder_name": BuilderName.msim.name,
+                    "vhdl": {"flags": ("-global", "-global-build-flag")},
+                    "verilog": {"flags": ()},
+                    "systemverilog": {"flags": ()},
                 },
             )
 
@@ -145,13 +142,55 @@ systemverilog work bar.sv some sv flag
                 sources,
                 [
                     (_resolve("sample_file.vhd"), "work", ("-sample_file_flag",)),
-                    (_resolve("sample_package.vhdl"), "work", ("-sample_package_flag",)),
+                    (
+                        _resolve("sample_package.vhdl"),
+                        "work",
+                        ("-sample_package_flag",),
+                    ),
                     (_resolve("TESTBENCH.VHD"), "work", ("-build-in", "some", "way")),
                     (Path("/some/abs/path.VHDL"), "lib", ()),
                     (_resolve("foo.v"), "work", ("-some-flag", "some", "value")),
                     (_resolve("bar.sv"), "work", ("some", "sv", "flag")),
                 ],
             )
+
+        @it.should("only parse when the file actually changes")
+        def test_only_parse_when_source_changes():
+            # type: (...) -> Any
+            parser = ConfigParser(it.path)
+
+            _logger.info("Parsing %s for the 1st time", it.path)
+            with mock.patch.object(parser, "_parseLine") as _parseLine:
+                parser.parse()
+                _parseLine.assert_called()
+
+            time.sleep(0.1)
+
+            _logger.info("Parsing %s for the 2nd time", it.path)
+            with mock.patch.object(parser, "_parseLine") as _parseLine:
+                parser.parse()
+                _parseLine.assert_not_called()
+
+        @it.should("report parsing in progress")
+        def test_should_report_parsing_in_progress():
+            # type: (...) -> Any
+            parser = ConfigParser(it.path)
+
+            event = Event()
+
+            # Make parsing wait until we set the event to mitigate race
+            # conditions
+            def _parse(*args, **kwargs):
+                it.assertTrue(event.wait(timeout=3), "Timeout waiting for event")
+
+            with mock.patch.object(parser, "_parse", _parse):
+                thread = Thread(target=parser.parse)
+                thread.start()
+                time.sleep(0.1)
+                it.assertTrue(
+                    parser.isParsing(), "Parser should indicate it's still parsing"
+                )
+                event.set()
 
 
 it.createTests(globals())

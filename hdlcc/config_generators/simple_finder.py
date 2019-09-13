@@ -22,9 +22,9 @@ from typing import Iterable, List
 
 from .base_generator import BaseGenerator
 
-from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.path import Path
-from hdlcc.utils import UnknownTypeExtension, getFileType, isFileReadable
+from hdlcc.types import FileType, UnknownTypeExtension
+from hdlcc.utils import isFileReadable
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
 _HEADER_EXTENSIONS = "vh", "svh"
@@ -67,10 +67,10 @@ class SimpleFinder(BaseGenerator):
                         continue
 
                     try:
-                        # getFileType will fail if the file's extension is not
+                        # FileType.fromPath will fail if the file's extension is not
                         # valid (one of '.vhd', '.vhdl', '.v', '.vh', '.sv',
                         # '.svh')
-                        getFileType(full_path)
+                        FileType.fromPath(full_path)
                     except UnknownTypeExtension:
                         continue
 

@@ -17,21 +17,44 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import Any, Dict, Tuple
+from typing import Tuple
+
+from hdlcc.path import Path
 
 BuildFlags = Tuple[str, ...]
 LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
 
+class UnknownTypeExtension(Exception):
+    """
+    Exception thrown when trying to get the file type of an unknown extension.
+    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
+    """
+
+    def __init__(self, path):
+        super(UnknownTypeExtension, self).__init__()
+        self._path = path
+
+    def __str__(self):
+        return "Couldn't determine file type for path '%s'" % self._path
+
+
 class FileType(Enum):
-    vhdl = ("vhd", "vhdl")
-    verilog = ("v", "vh")
-    systemverilog = ("sv", "svh")
+    vhdl = "vhdl"
+    verilog = "verilog"
+    systemverilog = "systemverilog"
 
-    def toString(self):
-        return str(self.name)
+    @staticmethod
+    def fromPath(path):
+        ext = path.name.split(".")[-1].lower()
+        if ext in ("vhd", "vhdl"):
+            return FileType.vhdl
+        if ext in ("v", "vh"):
+            return FileType.verilog
+        if ext in ("sv", "svh"):
+            return FileType.systemverilog
+        raise UnknownTypeExtension(path)
 
-    #  @classmethod
     def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
@@ -41,9 +64,4 @@ class FileType(Enum):
     @classmethod
     def __jsonDecode__(cls, state):
         """Returns an object of cls based on a given state"""
-        name = state["value"]
-        if name == "vhd":
-            return FileType.vhdl
-        if name == "verilog":
-            return FileType.verilog
-        return FileType.systemverilog
+        return cls(state["value"])

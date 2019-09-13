@@ -28,7 +28,7 @@ from hdlcc.types import BuildFlags, FileType
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.utils import getFileType, runShellCommand
+from hdlcc.utils import runShellCommand
 
 
 class MSim(BaseBuilder):
@@ -206,7 +206,7 @@ class MSim(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
-        filetype = getFileType(path)
+        filetype = FileType.fromPath(path)
         if filetype == FileType.vhdl:
             return self._buildVhdl(path, library, flags)
         if filetype in (FileType.verilog, FileType.systemverilog):
@@ -259,7 +259,7 @@ class MSim(BaseBuilder):
             p.join(self._target_folder, library.name),
         ]
 
-        if getFileType(path) == FileType.systemverilog:
+        if FileType.fromPath(path) == FileType.systemverilog:
             cmd += ["-sv"]
         if flags:  # pragma: no cover
             cmd += flags

@@ -27,9 +27,9 @@ from typing import Any, Dict, Optional, Set
 from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
 from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
 
-from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.types import FileType
 from hdlcc.path import Path
-from hdlcc.utils import HashableByKey, getFileType, removeDuplicates, toBytes
+from hdlcc.utils import HashableByKey, removeDuplicates, toBytes
 
 _logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         self._cache = {}  # type: Dict[str, Any]
         self._content = None
         self._mtime = 0  # type: Optional[float]
-        self.filetype = getFileType(self.filename)
+        self.filetype = FileType.fromPath(self.filename)
         self._dependencies = None  # type: Optional[Set[DependencySpec]]
         self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
         self._libraries = None
