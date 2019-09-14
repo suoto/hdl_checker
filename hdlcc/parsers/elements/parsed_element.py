@@ -45,18 +45,6 @@ class ParsedElement(HashableByKey):
     def locations(self):
         return self._locations
 
-    def __jsonEncode__(self):
-        return {"location": self.locations}
-
-    @classmethod
-    def __jsonDecode__(cls, state):
-        """Returns an object of cls based on a given state"""
-        # pylint: disable=protected-access
-        _logger.info("Recovering from %s", state)
-        obj = super(ParsedElement, cls).__new__(cls)
-        obj._locations = {tuple(x) for x in state["locations"]}
-        return obj
-
     @property
     def __hash_key__(self):
         return (self.locations,)

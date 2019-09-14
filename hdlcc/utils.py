@@ -372,7 +372,7 @@ class HashableByKey(object):
         try:
             return hash(self.__hash_key__)
         except:
-            print("Couldn't hash %s" % self.__hash_key__)
+            print("Couldn't hash %s" % repr(self.__hash_key__))
             raise
 
     def __eq__(self, other):

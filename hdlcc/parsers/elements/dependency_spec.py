@@ -71,20 +71,24 @@ class DependencySpec(ParsedElement):
         )
 
     def __jsonEncode__(self):
-        state = super(DependencySpec, self).__jsonEncode__()
-        state["library"] = state["library"]
-        state["name"] = state["name"]
-        return state
+        #  def __init__(self, owner, name, library=None, locations=None):
+        return {
+            "owner": self.owner,
+            "name": self.name,
+            "library": self.library,
+            "locations": tuple(self.locations),
+        }
 
     @classmethod
     def __jsonDecode__(cls, state):
         """Returns an object of cls based on a given state"""
-        # pylint: disable=protected-access
-        _logger.info("Recovering from %s", state)
-        obj = super(DependencySpec, cls).__new__(cls)
-        obj._library = state["library"]
-        obj._name = state["name"]
-        return obj
+        return cls(
+            library=state.pop("library"),
+            name=state.pop("name"),
+            owner=state.pop("owner"),
+            locations=state.pop("locations"),
+        )
+        #  return obj
 
     def __repr__(self):
         return "{}(name='{}', library='{}', owner={}, locations={})".format(

@@ -85,8 +85,8 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     @classmethod
     def __jsonDecode__(cls, state):
         """
-        Returns an object of cls based on a given state"""
-
+        Returns an object of cls based on a given state
+        """
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state["filename"]
         obj.shadow_filename = None

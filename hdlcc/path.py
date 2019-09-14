@@ -39,6 +39,9 @@ class Path(object):
         self._name = name
         self._stat = None
 
+    def __jsonEncode__(self):
+        return {'name': self.name}
+
     @property
     def mtime(self):
         # type: () -> float

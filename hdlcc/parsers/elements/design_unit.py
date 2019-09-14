@@ -20,7 +20,7 @@ import logging
 from enum import Enum
 from typing import Optional, Union
 
-from .identifier import Identifier, VhdlIdentifier, VerilogIdentifier
+from .identifier import Identifier, VerilogIdentifier, VhdlIdentifier
 from .parsed_element import LocationList, ParsedElement
 
 from hdlcc import types as t  # pylint: disable=unused-import
@@ -29,7 +29,7 @@ from hdlcc.path import Path
 _logger = logging.getLogger(__name__)
 
 
-class DesignUnitType(Enum):
+class DesignUnitType(str, Enum):
     "Specifies tracked design unit types"
     package = "package"
     entity = "entity"
@@ -61,6 +61,25 @@ class _DesignUnit(ParsedElement):
     def __str__(self):
         return "{}(name='{}', type={}, owner='{}')".format(
             self.__class__.__name__, self.name.display_name, self.type_, str(self.owner)
+        )
+
+    def __jsonEncode__(self):
+        return {
+            "owner": self.owner,
+            "type_": self.type_,
+            "name": self.name,
+            "locations": tuple(self.locations),
+        }
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        """Returns an object of cls based on a given state"""
+        # pylint: disable=protected-access
+        return cls(
+            state.pop("owner"),
+            state.pop("type_"),
+            state.pop("name"),
+            state.pop("locations", None),
         )
 
     @property
@@ -99,10 +118,7 @@ class VhdlDesignUnit(_DesignUnit):
     def __init__(self, owner, type_, name, locations=None):
         # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VhdlDesignUnit, self).__init__(
-            owner=owner,
-            type_=type_,
-            name=VhdlIdentifier(name),
-            locations=locations,
+            owner=owner, type_=type_, name=VhdlIdentifier(name), locations=locations
         )
 
 
@@ -114,10 +130,7 @@ class VerilogDesignUnit(_DesignUnit):
     def __init__(self, owner, type_, name, locations=None):
         # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VerilogDesignUnit, self).__init__(
-            owner=owner,
-            type_=type_,
-            name=VerilogIdentifier(name),
-            locations=locations,
+            owner=owner, type_=type_, name=VerilogIdentifier(name), locations=locations
         )
 
 

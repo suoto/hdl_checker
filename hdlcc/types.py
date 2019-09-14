@@ -40,12 +40,15 @@ class UnknownTypeExtension(Exception):
 
 
 class FileType(Enum):
+    "RTL file types"
     vhdl = "vhdl"
     verilog = "verilog"
     systemverilog = "systemverilog"
 
     @staticmethod
     def fromPath(path):
+        # type: (Path) -> FileType
+        "Extracts FileType from the given path's extension"
         ext = path.name.split(".")[-1].lower()
         if ext in ("vhd", "vhdl"):
             return FileType.vhdl

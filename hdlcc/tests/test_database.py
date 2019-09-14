@@ -21,26 +21,27 @@
 # pylint: disable=protected-access
 # pylint: disable=useless-object-inheritance
 
+import json
 import logging
 import os.path as p
-import pprint
 import time
-from typing import Any, Iterable, Tuple
+from typing import Any, Dict, Iterable, Set, Tuple, Union
 
-from hdlcc.builder_utils import BuilderName
 from hdlcc.database import Database
+from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-
+from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.tests.utils import (
+    SourceMock,
+    TestCase,
     disableVunit,
     getTestTempPath,
     logIterable,
     setupTestSuport,
-    SourceMock,
-    TestCase,
 )
+from hdlcc.types import BuildFlags
 
 _logger = logging.getLogger(__name__)
 
@@ -59,8 +60,9 @@ class _Database(Database):
         with disableVunit:
             super(_Database, self).__init__(*args, **kwargs)
 
-    def updateFromDict(self, config):
-        super(_Database, self).updateFromDict(config)
+    def addSources(self, entries):
+        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]]) -> None
+        super(_Database, self).addSources(entries)
         _logger.debug("State after updating:")
 
         _logger.debug("- %d design units:", len(self.design_units))
@@ -69,7 +71,9 @@ class _Database(Database):
 
         _logger.debug("- %d paths:", len(self._paths))
         for path, timestamp in self._paths.items():
-            dependencies = self._dependencies.get(path, {})
+            dependencies = self._dependencies.get(
+                path, set()
+            )  # type: Set[DependencySpec]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
             _logger.debug("    - library:      : %s", self._libraries.get(path, "<??>"))
             _logger.debug("    - flags:        : %s", self._flags.get(path, "-"))
@@ -113,6 +117,8 @@ class _Database(Database):
         else:
             _logger.info("No cache info for %s", self)
 
+    #  def __jsonEncode__(self):
+
 
 def _path(*args):
     # type: (str) -> str
@@ -125,27 +131,20 @@ def _Path(*args):
     return Path(_path(*args))
 
 
-def _configFromDict(parsed_dict):
-    class _ConfigParser(object):  # pylint: disable=too-few-public-methods
-        _dict = parsed_dict.copy()
-
-        def parse(self):  # pylint: disable=no-self-use
-            return _ConfigParser._dict
-
-    return _ConfigParser()
-
-
 def _configFromSources(sources):
-    srcs = [(x.filename.name, {"library": x.library}) for x in sources]
+    for source in sources:
+        info = {}
+        if source.library:
+            info["library"] = source.library
+        if source.flags:
+            info["flags"] = source.flags
 
-    class _ConfigParser(object):  # pylint: disable=too-few-public-methods
-        _dict = {"sources": tuple(srcs)}
-
-        def parse(self):  # pylint: disable=no-self-use
-            _logger.info("_configFromSources:\n%s", pprint.pformat(_ConfigParser._dict))
-            return _ConfigParser._dict.copy()
-
-    return _ConfigParser()
+        # Yield a string only or a (str, dict) tuple to test both conversions
+        # (this mimics the supported JSON scheme)
+        if info:
+            yield source.filename.name, info
+        else:
+            yield source.filename.name
 
 
 class TestDatabase(TestCase):
@@ -157,11 +156,11 @@ class TestDatabase(TestCase):
         setupTestSuport(TEST_TEMP_PATH)
         self.database = _Database()
 
-    def test_accepts_empty_ConfigParser(self):
+    def test_accepts_empty_sources_list(self):
         # type: (...) -> Any
-        self.database.accept(_configFromDict({}))
+        self.database.addSources([])
 
-        self.assertEqual(self.database.builder_name, None)
+        #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
         any_path = _Path("any.vhd")
         # Make sure the path exists
@@ -173,9 +172,9 @@ class TestDatabase(TestCase):
 
     def test_accepts_empty_dict(self):
         # type: (...) -> Any
-        self.database.updateFromDict({})
+        self.database.addSources({})
 
-        self.assertEqual(self.database.builder_name, None)
+        #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
         #  self.assertEqual(self.database.getLibrary(Path("any")), None)
         self.assertEqual(self.database.getFlags(Path("any")), ())
@@ -194,30 +193,17 @@ class TestDatabase(TestCase):
             dependencies={("some_entity",)},
         )
 
-        info = {
-            "builder_name": BuilderName.fallback,
-            "sources": (
+        self.database.addSources(
+            [
                 (_path("foo.vhd"), {"library": "bar", "flags": ("baz", "flag")}),
                 (
                     _path("oof.vhd"),
                     {"library": "ooflib", "flags": ("oofflag0", "oofflag1")},
                 ),
-            ),
-            "single_build_flags": {
-                "vhdl": ("single_vhd_flag",),
-                "verilog": ("single_verilog_flag",),
-                "systemverilog": ("single_systemverilog_flag",),
-            },
-            "global_build_flags": {
-                "vhdl": ("global_vhd_flag",),
-                "verilog": ("global_verilog_flag",),
-                "systemverilog": ("global_systemverilog_flag",),
-            },
-        }
+            ]
+        )
 
-        self.database.accept(_configFromDict(info))
-
-        self.assertEqual(self.database.builder_name, BuilderName.fallback)
+        #  self.assertEqual(self.database.builder_name, BuilderName.fallback)
         self.assertCountEqual(self.database.paths, (_Path("foo.vhd"), _Path("oof.vhd")))
         self.assertEqual(
             self.database.getLibrary(_Path("foo.vhd")), Identifier("bar", False)
@@ -331,7 +317,7 @@ class TestDatabase(TestCase):
             ),
         }
 
-        self.database.accept(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources))
 
         # Check libraries before actually testing
         self.assertCountEqual(
@@ -361,7 +347,7 @@ class TestDatabase(TestCase):
     def test_infers_uses_most_common_library_if_needed(self):
         # type: (...) -> Any
         # Given a design unit used in multiple ways, use the most common one
-        self.database.accept(
+        self.database.addSources(
             _configFromSources(
                 {
                     _SourceMock(
@@ -419,6 +405,50 @@ class TestDatabase(TestCase):
             self.database.getLibrary(_Path("some_dependency.vhd")),
             Identifier("lib_b", False),
         )
+
+    def test_2(self):
+        database = Database()
+
+        database.addSources(
+            _configFromSources(
+                {
+                    _SourceMock(
+                        filename=_path("file_0.vhd"),
+                        library="some_library",
+                        design_units=[{"name": "some_package", "type": "package"}],
+                        dependencies=(
+                            ("work", "relative_dependency"),
+                            ("lib", "direct_dependency"),
+                        ),
+                    ),
+                    _SourceMock(
+                        filename=_path("collateral.vhd"),
+                        library="another_library",
+                        design_units=[
+                            {"name": "collateral_package", "type": "package"}
+                        ],
+                        dependencies=(("work", "foo"), ("lib", "bar")),
+                    ),
+                }
+            )
+        )
+
+        from pprint import pformat
+
+        state = json.dumps(database, cls=StateEncoder, indent=True)
+
+        _logger.info("database in json:\n%s", state)
+
+        recovered = json.loads(state, object_hook=jsonObjectHook)
+
+        self.assertCountEqual(database.design_units, recovered.design_units)
+        self.assertDictEqual(database._paths, recovered._paths)
+        self.assertDictEqual(database._libraries, recovered._libraries)
+        self.assertCountEqual(database._inferred_libraries, recovered._inferred_libraries)
+        self.assertDictEqual(database._flags, recovered._flags)
+        self.assertDictEqual(database._dependencies, recovered._dependencies)
+
+        self.fail("stop")
 
 
 #  class TestIncludesVunit(TestCase):
@@ -517,7 +547,7 @@ class TestDirectDependencies(TestCase):
             ),
         }
 
-        self.database.accept(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources))
 
     def tearDown(self):
         # type: (...) -> Any
@@ -609,7 +639,7 @@ class TestDirectCircularDependencies(TestCase):
             ),
         }
 
-        self.database.accept(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources))
 
     def tearDown(self):
         # type: (...) -> Any
@@ -669,7 +699,7 @@ class TestMultilevelCircularDependencies(TestCase):
             ),
         }
 
-        self.database.accept(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources))
 
     def tearDown(self):
         # type: (...) -> Any
@@ -700,83 +730,83 @@ class TestMultilevelCircularDependencies(TestCase):
         )
 
 
-class TestAmbiguousSourceSet(TestCase):
-    # Create the following setup:
-    # - Library 'lib' with 'pkg_in_lib':
-    #   - All sources using 'lib.pkg_in_lib' should work
-    #   - Sources inside 'lib' should be able to use 'lib.pkg_in_lib' or
-    #     'work.pkg_in_lib'
-    # - Source without library set, with entity 'pkg_in_indirect'
-    #   - Every source using this package should use
-    #     'indirect.pkg_in_indirect'
-    #   - At least one source in 'indirect' referring to 'pkg_in_indirect'
-    #     as 'work.pkg_in_indirect'
-    # - Source without library set, with entity 'pkg_in_implicit'
-    #   - Every source using this package should use
-    #     'implicit.pkg_in_implicit'
+#  class TestAmbiguousSourceSet(TestCase):
+#      # Create the following setup:
+#      # - Library 'lib' with 'pkg_in_lib':
+#      #   - All sources using 'lib.pkg_in_lib' should work
+#      #   - Sources inside 'lib' should be able to use 'lib.pkg_in_lib' or
+#      #     'work.pkg_in_lib'
+#      # - Source without library set, with entity 'pkg_in_indirect'
+#      #   - Every source using this package should use
+#      #     'indirect.pkg_in_indirect'
+#      #   - At least one source in 'indirect' referring to 'pkg_in_indirect'
+#      #     as 'work.pkg_in_indirect'
+#      # - Source without library set, with entity 'pkg_in_implicit'
+#      #   - Every source using this package should use
+#      #     'implicit.pkg_in_implicit'
 
-    # Test that we can infer the correct libraries:
-    # If the library is not set for the a given path, try to guess it by
-    # (1) given every design unit defined in this file
-    # (2) search for every file that also depends on it and
-    # (3) identify which library is used
-    # If all of them converge on the same library name, just use that.
-    # If there's no agreement, use the library that satisfies the path
-    # in question but warn the user that something is not right
+#      # Test that we can infer the correct libraries:
+#      # If the library is not set for the a given path, try to guess it by
+#      # (1) given every design unit defined in this file
+#      # (2) search for every file that also depends on it and
+#      # (3) identify which library is used
+#      # If all of them converge on the same library name, just use that.
+#      # If there's no agreement, use the library that satisfies the path
+#      # in question but warn the user that something is not right
 
-    def setUp(self):
-        # type: (...) -> Any
-        _logger.info("Setting up %s", self)
-        self.database = _Database()
+#      def setUp(self):
+#          # type: (...) -> Any
+#          _logger.info("Setting up %s", self)
+#          self.database = _Database()
 
-        sources = {
-            _SourceMock(
-                filename=_path("top.vhd"),
-                library="lib",
-                design_units=[{"name": "top", "type": "entity"}],
-                dependencies=[
-                    ("ieee", "std_logic_unsigned"),
-                    ("lib", "some_package"),
-                    ("lib", "some_entity"),
-                ],
-            ),
-            _SourceMock(
-                filename=_path("some_entity.vhd"),
-                library="lib",
-                design_units=[{"name": "some_entity", "type": "entity"}],
-            ),
-            _SourceMock(
-                filename=_path("some_package.vhd"),
-                library="lib",
-                design_units=[{"name": "some_package", "type": "package"}],
-            ),
-            _SourceMock(
-                filename=_path("not_a_dependency.vhd"),
-                design_units=[{"name": "not_a_dependency", "type": "package"}],
-                dependencies=[("lib", "top")],
-            ),
-        }
+#          sources = {
+#              _SourceMock(
+#                  filename=_path("top.vhd"),
+#                  library="lib",
+#                  design_units=[{"name": "top", "type": "entity"}],
+#                  dependencies=[
+#                      ("ieee", "std_logic_unsigned"),
+#                      ("lib", "some_package"),
+#                      ("lib", "some_entity"),
+#                  ],
+#              ),
+#              _SourceMock(
+#                  filename=_path("some_entity.vhd"),
+#                  library="lib",
+#                  design_units=[{"name": "some_entity", "type": "entity"}],
+#              ),
+#              _SourceMock(
+#                  filename=_path("some_package.vhd"),
+#                  library="lib",
+#                  design_units=[{"name": "some_package", "type": "package"}],
+#              ),
+#              _SourceMock(
+#                  filename=_path("not_a_dependency.vhd"),
+#                  design_units=[{"name": "not_a_dependency", "type": "package"}],
+#                  dependencies=[("lib", "top")],
+#              ),
+#          }
 
-        self.database.accept(_configFromSources(sources))
+#          self.database.addSources(_configFromSources(sources))
 
-    def tearDown(self):
-        # type: (...) -> Any
-        _logger.info("Tearing down %s", self)
-        self.database.test_reportCacheInfo()
-        del self.database
+#      def tearDown(self):
+#          # type: (...) -> Any
+#          _logger.info("Tearing down %s", self)
+#          self.database.test_reportCacheInfo()
+#          del self.database
 
-    def test_get_the_correct_build_sequence(self):
-        # type: (...) -> Any
-        sequence = tuple(self.database.test_getBuildSequence(_Path("top.vhd")))
+#      def test_get_the_correct_build_sequence(self):
+#          # type: (...) -> Any
+#          sequence = tuple(self.database.test_getBuildSequence(_Path("top.vhd")))
 
-        # Both are on the same level, their order don't matter
-        self.assertCountEqual(
-            sequence,
-            {
-                (Identifier("lib"), _Path("some_package.vhd")),
-                (Identifier("lib"), _Path("some_entity.vhd")),
-            },
-        )
+#          # Both are on the same level, their order don't matter
+#          self.assertCountEqual(
+#              sequence,
+#              {
+#                  (Identifier("lib"), _Path("some_package.vhd")),
+#                  (Identifier("lib"), _Path("some_entity.vhd")),
+#              },
+#          )
 
 
 class TestIndirectLibraryInference(TestCase):
@@ -809,7 +839,7 @@ class TestIndirectLibraryInference(TestCase):
             ),
         }
 
-        self.database.accept(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources))
 
     def tearDown(self):
         # type: (...) -> Any
@@ -834,21 +864,3 @@ class TestIndirectLibraryInference(TestCase):
         )
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
-
-        #  self.fail("stop")
-
-        #  path = _path("entity_a.vhd")
-        #  deps = self.database.test_getDependenciesUnits(path)
-
-        #  logIterable("Dependencies", deps, _logger.info)
-
-        #  # Indirect dependencies should always come first
-        #  self.assertCountEqual(
-        #      deps,
-        #      {
-        #          _path("common_dep.vhd"),
-        #          _path("indirect_dep.vhd"),
-        #          _path("direct_dep_a.vhd"),
-        #          _path("direct_dep_b.vhd"),
-        #      },
-        #  )

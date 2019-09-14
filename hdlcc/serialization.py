@@ -18,13 +18,21 @@
 
 import json
 import logging
+from pprint import pformat
 
 from hdlcc import path, types
 from hdlcc.builders.fallback import Fallback
 from hdlcc.builders.ghdl import GHDL
 from hdlcc.builders.msim import MSim
 from hdlcc.builders.xvhdl import XVHDL
+from hdlcc.database import Database
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
+from hdlcc.parsers.elements.design_unit import VerilogDesignUnit, VhdlDesignUnit
+from hdlcc.parsers.elements.identifier import (
+    Identifier,
+    VerilogIdentifier,
+    VhdlIdentifier,
+)
 from hdlcc.parsers.verilog_parser import VerilogParser
 from hdlcc.parsers.vhdl_parser import VhdlParser
 
@@ -33,15 +41,21 @@ _logger = logging.getLogger(__name__)
 # Maps class names added by the decoder to the actual class on Python side to
 # recreate an object
 CLASS_MAP = {
+    "Database": Database,
     "DependencySpec": DependencySpec,
-    "VerilogParser": VerilogParser,
-    "VhdlParser": VhdlParser,
-    "GHDL": GHDL,
-    "MSim": MSim,
-    "XVHDL": XVHDL,
     "Fallback": Fallback,
-    "Path": path.Path,
     "FileType": types.FileType,
+    "GHDL": GHDL,
+    "Identifier": Identifier,
+    "MSim": MSim,
+    "Path": path.Path,
+    "VerilogIdentifier": VerilogIdentifier,
+    "VerilogParser": VerilogParser,
+    "VhdlDesignUnit": VhdlDesignUnit,
+    "VerilogDesignUnit": VerilogDesignUnit,
+    "VhdlIdentifier": VhdlIdentifier,
+    "VhdlParser": VhdlParser,
+    "XVHDL": XVHDL,
 }
 
 
@@ -63,6 +77,7 @@ class StateEncoder(json.JSONEncoder):
                     o.__class__.__name__,
                 )
             dct["__class__"] = o.__class__.__name__
+            _logger.debug("object: %s, result:\n%s", repr(o), pformat(dct))
             return dct
         # Let the base class default method raise the TypeError
         try:

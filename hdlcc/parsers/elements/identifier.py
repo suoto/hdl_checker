@@ -41,6 +41,13 @@ class Identifier(object):
         "Identifier name as given when creating the object"
         return self._display_name
 
+    def __jsonEncode__(self):
+        return {"name": self.display_name, "case_sensitive": self.case_sensitive}
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        return cls(name=state.pop("name"), case_sensitive=state.pop("case_sensitive"))
+
     def __hash__(self):
         return hash(self.name)
 
@@ -83,6 +90,10 @@ class VhdlIdentifier(Identifier):
         # type: (str, ) -> None
         super(VhdlIdentifier, self).__init__(name=name, case_sensitive=False)
 
+    @classmethod
+    def __jsonDecode__(cls, state):
+        return cls(name=state.pop("name"))
+
 
 class VerilogIdentifier(Identifier):
     "Equivalent of Identifier(name, case_sensitive=True)"
@@ -90,3 +101,7 @@ class VerilogIdentifier(Identifier):
     def __init__(self, name):
         # type: (str, ) -> None
         super(VerilogIdentifier, self).__init__(name=name, case_sensitive=True)
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        return cls(name=state.pop("name"))

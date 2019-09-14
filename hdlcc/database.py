@@ -195,17 +195,46 @@ class Database(HashableByKey):
         """
         Gets a dict that describes the current state of this object
         """
-        state = {}
+        state = {"sources": []}
 
         for path in self._paths:
-            state[path] = {
-                "library": self._libraries[path],
-                "flags": self._flags[path],
-                "design_units": tuple(self._design_units),
-                "dependencies": self._dependencies[path],
-            }
+            state["sources"].append(
+                {
+                    "path": path,
+                    "mtime": self._paths[path],
+                    "library": self._libraries[path],
+                    "flags": self._flags[path],
+                    "dependencies": tuple(self._dependencies[path]),
+                    "diags": tuple(self._diags.get(path, ())),
+                }
+            )
+
+        state["inferred_libraries"] = tuple(self._inferred_libraries)
+        state["design_units"] = tuple(self._design_units)
 
         return state
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        # pylint: disable=protected-access
+        obj = super(Database, cls).__new__(cls)
+        obj._design_units = {x for x in state.pop("design_units")}
+        obj._inferred_libraries = {x for x in state.pop("inferred_libraries")}
+        obj._paths = {}  # type: Dict[Path, float]
+        obj._libraries = {}  # type: Dict[Path, Identifier]
+        obj._flags = {}  # type: Dict[Path, BuildFlags]
+        obj._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
+        obj._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
+        for info in state.pop("sources"):
+            path = info.pop("path")
+            obj._paths[path] = float(info.pop("mtime"))
+            obj._libraries[path] = info.pop("library")
+            obj._flags[path] = tuple(info.pop("flags"))
+            obj._dependencies[path] = {x for x in info.pop("dependencies")}
+            obj._diags[path] = {x for x in info.pop("diags")}
+        # pylint: enable=protected-access
+
+        return obj
 
     def getFlags(self, path):
         # type: (Path) -> BuildFlags
@@ -474,7 +503,6 @@ class Database(HashableByKey):
                 for search_path in search_paths
                 for dependency in self._dependencies[search_path]
             } - units
-
 
             _logger.debug(
                 "Searching %s resulted in dependencies: %s", search_paths, new_deps
