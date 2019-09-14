@@ -20,6 +20,7 @@
 
 import logging
 import os.path as p
+from collections import namedtuple
 from itertools import chain
 from threading import RLock
 from typing import (
@@ -37,7 +38,6 @@ from typing import (
 
 import six
 
-from hdlcc.types import BuildFlags, FileType
 from hdlcc.diagnostics import (
     CheckerDiagnostic,
     DependencyNotUnique,
@@ -48,6 +48,7 @@ from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import HashableByKey, getMostCommonItem
 
 try:
@@ -63,13 +64,33 @@ tUnresolvedLibrary = Union[Identifier, None]
 tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
 
 
+class SourceEntry(namedtuple("SourceEntry", ("path", "library", "flags"))):
+    """
+    Placeholder for a source definintion that will get added to the database
+    """
+
+    @classmethod
+    def _make(cls, iterable):  # pylint: disable=arguments-differ
+        path = iterable
+        info = {}
+
+        if not isinstance(path, six.string_types):
+            path = iterable[0]
+            info = iterable[1]
+
+        library = info.get("library", None)
+        flags = info.get("flags", tuple())
+
+        return super(SourceEntry, cls)._make([path, library, flags])
+
+
 class Database(HashableByKey):
     "Stores info on and provides operations for a project file set"
 
     def __init__(self):  # type: () -> None
         self._lock = RLock()
 
-        self._builder_name = None  # type: Union[str, None]
+        #  self._builder_name = None  # type: Union[str, None]
         self._paths = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
         self._inferred_libraries = set()  # type: Set[Path]
@@ -130,33 +151,15 @@ class Database(HashableByKey):
         # Re-add VUnit files back again
         #  self._addVunitIfFound()
 
-    def accept(self, parser):
-        "Updates the database from a configuration parser"
-        return self.updateFromDict(parser.parse())
-
-    def updateFromDict(self, config):  # type: (Any) -> None
-        "Updates the database from a dictionary"
-        self._builder_name = config.get("builder_name", None)
-
-        for source in config.get("sources", []):
-            # Skip empty entries
-            if not source:
-                continue
-
-            # Set defaults
-            library, flags = (None, tuple())  # type: Tuple[Optional[str], BuildFlags]
-
-            # Each entry can be a string (path) or a tuple where the first item
-            # is the path and the second item is dict with 'library' and/of
-            # 'flags' defined
-            if isinstance(source, six.string_types):
-                path = source
-            else:
-                path = source[0]
-                info = source[1]
-                library = info.get("library", None)
-                flags = info.get("flags", tuple())
-            self._addSource(Path(path), library, flags)
+    def addSources(self, entries):
+        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]]) -> None
+        """
+        Updates the database from a iterable containing tuples in the format
+        (path, {"library": library_name, "flags": path_specific_flags})
+        """
+        for entry in entries:
+            source = SourceEntry._make(entry)
+            self._addSource(Path(source.path), source.library, source.flags)
 
     def _addSource(self, path, library, flags):
         # type: (Path, Optional[str], BuildFlags) -> None
