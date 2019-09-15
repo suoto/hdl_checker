@@ -61,7 +61,8 @@ def _clear():
 def _setupLogging(stream, level): # pragma: no cover
     "Setup logging according to the command line parameters"
     color = False
-    if hasattr(stream, 'isatty') and stream.isatty():
+
+    if getattr(stream, 'isatty', False):
         try:
             from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
             color = True
