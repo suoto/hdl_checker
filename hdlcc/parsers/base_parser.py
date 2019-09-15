@@ -19,17 +19,14 @@
 import abc
 import logging
 import os.path as p
-import time
-from contextlib import contextmanager
-from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Optional, Set
 
 from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
 from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
 
-from hdlcc.types import FileType
 from hdlcc.path import Path
-from hdlcc.utils import HashableByKey, removeDuplicates, toBytes
+from hdlcc.types import FileType
+from hdlcc.utils import HashableByKey, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
@@ -61,23 +58,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
         self._libraries = None
 
-        self.shadow_filename = None  # type: Optional[Path]
-
-    #  @property
-    #  def abspath(self):
-    #      # type: (...) -> Any
-    #      "Returns the absolute path of the source file"
-    #      return p.abspath(self.filename)
-
     def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
         del state["_content"]
-        del state["shadow_filename"]
-        if "raw_content" in state["_cache"]:
-            del state["_cache"]["raw_content"]
         del state["_design_units"]
         del state["_dependencies"]
         return state
@@ -89,7 +75,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         """
         obj = super(BaseSourceFile, cls).__new__(cls)
         obj.filename = state["filename"]
-        obj.shadow_filename = None
         obj.filetype = state["filetype"]
         obj._cache = state["_cache"]  # pylint: disable=protected-access
         obj._content = None  # pylint: disable=protected-access
@@ -118,8 +103,8 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         Checks if the file changed based on the modification time
         provided by p.getmtime
         """
-        if None in (self._mtime, self.getmtime()):
-            return True
+        if not p.exists(str(self.filename)):
+            return False
         return bool(self.getmtime() > self._mtime)  # type: ignore
 
     def _clearCachesIfChanged(self):
@@ -129,10 +114,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         every parsed info
         """
         if self._changed():
-            # Since the content was set by the caller, we can't really clear
-            # this unless we're handling with a proper file
-            if not self.shadow_filename:
-                self._content = None
+            self._content = None
             self._dependencies = None
             self._design_units = None
             self._libraries = None
@@ -143,52 +125,9 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         """
         Gets file modification time as defined in p.getmtime
         """
-        if self.shadow_filename:
-            return 0
         if not p.exists(self.filename.name):
             return None
         return self.filename.mtime
-
-    def _getTemporaryFile(self):
-        # type: () -> Any
-        "Gets the temporary dump file context"
-        return NamedTemporaryFile(
-            suffix="." + self.filename.name.split(".")[-1],
-            prefix="temp_" + self.filename.basename,
-        )
-
-    @contextmanager
-    def havingBufferContent(self, content):
-        # type: (...) -> Any
-        """
-        Context manager for handling a source file with a custom content
-        that is different from the file it points to. This is intended to
-        allow as-you-type checking
-        """
-        with self._getTemporaryFile() as tmp_file:
-            _logger.debug("Dumping content to %s", tmp_file.name)
-            # Save attributes that will be overwritten
-            mtime, prev_content = self._mtime, self._content
-
-            self.shadow_filename = self.filename
-
-            # Overwrite attributes
-            self.filename = tmp_file.name
-            self._content = content
-            self._mtime = time.time()
-            # Dump data to the temporary file
-            tmp_file.file.write(toBytes(self._content))
-            tmp_file.file.flush()
-
-            try:
-                yield
-            finally:
-                _logger.debug("Clearing buffer content")
-
-                # Restore previous values
-                self._mtime, self._content = mtime, prev_content
-                self.filename = self.shadow_filename
-                self.shadow_filename = None
 
     def getSourceContent(self):
         # type: (...) -> Any
@@ -202,23 +141,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             self._mtime = self.getmtime()
 
         return self._content
-
-    def getRawSourceContent(self):
-        # type: (...) -> Any
-        """
-        Gets the whole source content, without removing comments or
-        other preprocessing
-        """
-        self._clearCachesIfChanged()
-
-        if self.shadow_filename:
-            return self._content
-        if "raw_content" not in self._cache or self._changed():
-            self._cache["raw_content"] = (
-                open(self.filename.name, mode="rb").read().decode(errors="ignore")
-            )
-
-        return self._cache["raw_content"]
 
     def getDesignUnits(self):  # type: () -> Set[tAnyDesignUnit]
         """
@@ -244,7 +166,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         if self._dependencies is None:
             try:
                 self._dependencies = set(self._getDependencies())
-            except:
+            except:  # pragma: no cover
                 print("failed to parse %s" % self.filename)
                 _logger.exception("Failed to parse %s", self.filename)
                 raise

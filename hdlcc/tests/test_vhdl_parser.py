@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import os.path as p
+import time
 
 import six
 
@@ -183,6 +184,8 @@ with such.A("VHDL source file object") as it:
             code.insert(0, "library some_library;")
             code.insert(1, "    use some_library.some_package;")
             writeListToFile(_FILENAME, code)
+
+            time.sleep(0.1)
 
             it.assertCountEqual(
                 it.source.getDependencies(),
