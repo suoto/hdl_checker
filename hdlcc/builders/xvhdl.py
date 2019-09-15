@@ -21,7 +21,7 @@ import os.path as p
 import re
 import shutil
 import tempfile
-from typing import Any, Iterable, Optional
+from typing import Iterable, Optional
 
 from .base_builder import BaseBuilder
 
@@ -145,11 +145,6 @@ class XVHDL(BaseBuilder):
             return False
         finally:
             shutil.rmtree(temp_dir)
-
-    def getBuiltinLibraries(self):
-        # FIXME: Built-in libraries should not be statically defined
-        # like this. Review this at some point
-        return self._builtin_libraries
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None

@@ -117,9 +117,6 @@ class GHDL(BaseBuilder):
         except OSError:
             return False
 
-    def getBuiltinLibraries(self):
-        return self._builtin_libraries
-
     def _parseBuiltinLibraries(self):
         # type: (...) -> Any
         """

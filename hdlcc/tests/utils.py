@@ -247,8 +247,10 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     def _createLibrary(self, library):  # pylint: disable=unused-argument
         pass
 
-    def getBuiltinLibraries(self):  # pylint: disable=unused-argument
-        return []
+    def _parseBuiltinLibraries(self):
+        # type: (...) -> Any
+        self._builtin_libraries = {Identifier("ieee"), Identifier("std")}
+
 
 
 class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method

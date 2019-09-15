@@ -162,7 +162,7 @@ class TestBuilder(TestCase):
             expected += ["modelsim_lib"]
 
         for lib in map(Identifier, expected):
-            self.assertIn(lib, self.builder.getBuiltinLibraries())
+            self.assertIn(lib, self.builder.builtin_libraries)
 
     @parameterized.parameterized.expand(
         [

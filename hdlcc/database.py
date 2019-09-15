@@ -655,13 +655,15 @@ class Database(HashableByKey):
         units -= own_units
         return units
 
-    def getBuildSequence(self, path):
-        # type: (Path) -> Iterable[Tuple[Identifier, Path]]
+    def getBuildSequence(self, path, builtin_libraries=None):
+        # type: (Path, Optional[Iterable[Identifier]]) -> Iterable[Tuple[Identifier, Path]]
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
         units_compiled = set()  # type: Set[tLibraryUnitTuple]
+        builtin_libraries = frozenset(builtin_libraries or [])
+
         units_to_build = self.getDependenciesUnits(path)
         paths_to_build = set(
             chain.from_iterable(
@@ -688,7 +690,10 @@ class Database(HashableByKey):
                 deps = {
                     (x.library or self.getLibrary(x.owner), x.name)
                     for x in self._dependencies[current_path]
+                    if x.library not in builtin_libraries
                 }
+
+                # Units still needed are the ones we haven't seen before
                 still_needed = deps - units_compiled - own
 
                 if still_needed:

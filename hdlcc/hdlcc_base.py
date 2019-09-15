@@ -189,10 +189,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         if not p.isabs(str(path)):
             path = Path(p.join(str(self.root_dir), str(path)))
 
-        sequence = list(self.database.getBuildSequence(path))
-        _logger.info("Build sequence is %s", sequence)
-
-        for dep_library, dep_path in sequence:
+        for dep_library, dep_path in self.database.getBuildSequence(
+            path, self.builder.builtin_libraries
+        ):
             for record in self._buildAndHandleRebuilds(dep_path, dep_library):
                 if record.severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
                     yield record

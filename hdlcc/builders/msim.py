@@ -24,10 +24,10 @@ from typing import Any, Iterable, List, Optional
 
 from .base_builder import BaseBuilder
 
-from hdlcc.types import BuildFlags, FileType
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import runShellCommand
 
 
@@ -182,9 +182,6 @@ class MSim(BaseBuilder):
                 self._builtin_libraries.add(
                     Identifier(match.groupdict()["library_name"], False)
                 )
-
-    def getBuiltinLibraries(self):
-        return self._builtin_libraries
 
     def _searchForRebuilds(self, line):
         rebuilds = []

@@ -243,12 +243,13 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def getBuiltinLibraries(self):
+    @property
+    def builtin_libraries(self):
         # type: (...) -> Any
         """
         Return a list with the libraries this compiler currently knows
         """
+        return frozenset(self._builtin_libraries)
 
     @abc.abstractmethod
     def _checkEnvironment(self):

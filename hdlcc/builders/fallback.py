@@ -51,6 +51,3 @@ class Fallback(BaseBuilder):
 
     def _createLibrary(self, library): # pragma: no cover
         pass
-
-    def getBuiltinLibraries(self): # pragma: no cover
-        return []
