@@ -17,12 +17,18 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, Union
 
 from hdlcc.path import Path
 
 BuildFlags = Tuple[str, ...]
 LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
+
+RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
+RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])
+RebuildPath = namedtuple("RebuildPath", ["path"])
+
+RebuildInfo = Union[RebuildUnit, RebuildLibraryUnit, RebuildPath]
 
 
 class UnknownTypeExtension(Exception):

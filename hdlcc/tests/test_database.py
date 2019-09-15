@@ -28,6 +28,7 @@ import time
 from typing import Any, Dict, Iterable, Set, Tuple, Union
 
 from hdlcc.database import Database
+from hdlcc.diagnostics import PathNotInProjectFile
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
@@ -60,9 +61,9 @@ class _Database(Database):
         with disableVunit:
             super(_Database, self).__init__(*args, **kwargs)
 
-    def addSources(self, entries):
-        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]]) -> None
-        super(_Database, self).addSources(entries)
+    def addSources(self, entries, root_dir):
+        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
+        super(_Database, self).addSources(entries, root_dir)
         _logger.debug("State after updating:")
 
         _logger.debug("- %d design units:", len(self.design_units))
@@ -70,7 +71,8 @@ class _Database(Database):
             _logger.debug("  - %s", unit)
 
         _logger.debug("- %d paths:", len(self._paths))
-        for path, timestamp in self._paths.items():
+        for path in self._paths:
+            timestamp = self._parse_timestamp[path]
             dependencies = self._dependencies.get(
                 path, set()
             )  # type: Set[DependencySpec]
@@ -158,7 +160,7 @@ class TestDatabase(TestCase):
 
     def test_accepts_empty_sources_list(self):
         # type: (...) -> Any
-        self.database.addSources([])
+        self.database.addSources([], TEST_TEMP_PATH)
 
         #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
@@ -172,7 +174,7 @@ class TestDatabase(TestCase):
 
     def test_accepts_empty_dict(self):
         # type: (...) -> Any
-        self.database.addSources({})
+        self.database.addSources({}, TEST_TEMP_PATH)
 
         #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
@@ -200,7 +202,8 @@ class TestDatabase(TestCase):
                     _path("oof.vhd"),
                     {"library": "ooflib", "flags": ("oofflag0", "oofflag1")},
                 ),
-            ]
+            ],
+            TEST_TEMP_PATH,
         )
 
         #  self.assertEqual(self.database.builder_name, BuilderName.fallback)
@@ -317,7 +320,7 @@ class TestDatabase(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
 
         # Check libraries before actually testing
         self.assertCountEqual(
@@ -380,7 +383,8 @@ class TestDatabase(TestCase):
                         design_units=[{"name": "some_dependency", "type": "package"}],
                     ),
                 }
-            )
+            ),
+            TEST_TEMP_PATH,
         )
 
         self.assertEqual(
@@ -406,7 +410,7 @@ class TestDatabase(TestCase):
             Identifier("lib_b", False),
         )
 
-    def test_2(self):
+    def test_json_encoding_and_decoding(self):
         database = Database()
 
         database.addSources(
@@ -430,10 +434,9 @@ class TestDatabase(TestCase):
                         dependencies=(("work", "foo"), ("lib", "bar")),
                     ),
                 }
-            )
+            ),
+            TEST_TEMP_PATH,
         )
-
-        from pprint import pformat
 
         state = json.dumps(database, cls=StateEncoder, indent=True)
 
@@ -442,13 +445,157 @@ class TestDatabase(TestCase):
         recovered = json.loads(state, object_hook=jsonObjectHook)
 
         self.assertCountEqual(database.design_units, recovered.design_units)
-        self.assertDictEqual(database._paths, recovered._paths)
+        self.assertCountEqual(database._paths, recovered._paths)
+        self.assertDictEqual(database._parse_timestamp, recovered._parse_timestamp)
         self.assertDictEqual(database._libraries, recovered._libraries)
-        self.assertCountEqual(database._inferred_libraries, recovered._inferred_libraries)
+        self.assertCountEqual(
+            database._inferred_libraries, recovered._inferred_libraries
+        )
         self.assertDictEqual(database._flags, recovered._flags)
         self.assertDictEqual(database._dependencies, recovered._dependencies)
 
-        self.fail("stop")
+    def test_removing_a_path_that_was_added(self):
+        self.database.addSources(
+            _configFromSources(
+                {
+                    _SourceMock(
+                        filename=_path("file_0.vhd"),
+                        library="some_library",
+                        design_units=[{"name": "some_package", "type": "package"}],
+                        dependencies=(
+                            ("work", "relative_dependency"),
+                            ("lib", "direct_dependency"),
+                        ),
+                    ),
+                    _SourceMock(
+                        filename=_path("collateral.vhd"),
+                        library="another_library",
+                        design_units=[
+                            {"name": "collateral_package", "type": "package"}
+                        ],
+                        dependencies=(("work", "foo"), ("lib", "bar")),
+                    ),
+                }
+            ),
+            TEST_TEMP_PATH,
+        )
+
+        file_0 = _Path("file_0.vhd")
+        collateral = _Path("collateral.vhd")
+        # Make sure there's design units detected for all files
+        self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+        self.assertEqual(str(self.database.getLibrary(file_0)), "some_library")
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+        self.database.removeSource(file_0)
+
+        # file_0.vhd units will still be found (parsing does not depent on the
+        # source being added or not)
+        self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
+        # collateral.vhd units should continue to be found
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+
+        # file_0.vhd is not on the project anymore, so library should reflect
+        # that
+        self.assertEqual(str(self.database.getLibrary(file_0)), "not_in_project")
+        # collateral.vhd units should continue to be found
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+    def test_removing_an_existing_path_that_was_not_added(self):
+        self.database.addSources(
+            _configFromSources(
+                {
+                    _SourceMock(
+                        filename=_path("collateral.vhd"),
+                        library="another_library",
+                        design_units=[
+                            {"name": "collateral_package", "type": "package"}
+                        ],
+                        dependencies=(("work", "foo"), ("lib", "bar")),
+                    )
+                }
+            ),
+            TEST_TEMP_PATH,
+        )
+
+        file_0 = _Path("file_0.vhd")
+        collateral = _Path("collateral.vhd")
+        # Same as previous test, but file_0.vhd is not on the project
+        self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+        # In this case, the library will change to the default library used for
+        # files that weren't added
+        self.assertEqual(str(self.database.getLibrary(file_0)), "not_in_project")
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+        self.database.removeSource(file_0)
+
+        # file_0.vhd units will still be found (parsing does not depent on the
+        # source being added or not)
+        self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
+        # collateral.vhd units should continue to be found
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+
+        # file_0.vhd is not on the project anymore, so library should reflect
+        # that
+        self.assertEqual(str(self.database.getLibrary(file_0)), "not_in_project")
+        # collateral.vhd units should continue to be found
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+    def test_removing_a_non_existing_path_that_was_not_added(self):
+        self.database.addSources(
+            _configFromSources(
+                {
+                    _SourceMock(
+                        filename=_path("collateral.vhd"),
+                        library="another_library",
+                        design_units=[
+                            {"name": "collateral_package", "type": "package"}
+                        ],
+                        dependencies=(("work", "foo"), ("lib", "bar")),
+                    )
+                }
+            ),
+            TEST_TEMP_PATH,
+        )
+
+        path = Path("/some/path.vhd")
+        self.assertFalse(p.exists(str(path)))
+
+        # Try removing before any operation fills any table inside the
+        # database. Nothing should change before and after
+        before = self.database.__jsonEncode__()
+        self.database.removeSource(path)
+        self.assertDictEqual(self.database.__jsonEncode__(), before)
+
+        collateral = _Path("collateral.vhd")
+
+        # Same as previous test, but path.vhd is not on the project
+        self.assertFalse(list(self.database.getDesignUnitsByPath(path)))
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+        # In this case, the library will change to the default library used for
+        # files that weren't added
+        self.assertEqual(str(self.database.getLibrary(path)), "not_in_project")
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+        self.database.removeSource(path)
+
+        # path.vhd units shouldn't be found anymore
+        self.assertFalse(list(self.database.getDesignUnitsByPath(path)))
+        # collateral.vhd units should continue to be found
+        self.assertTrue(list(self.database.getDesignUnitsByPath(collateral)))
+
+        # path.vhd is not on the project anymore
+        self.assertEqual(str(self.database.getLibrary(path)), "not_in_project")
+        # collateral.vhd units should continue to be found
+        self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
+
+        # Also test that a diagnostic indicating the path hasn't been added has
+        # been created
+        self.assertCountEqual(
+            self.database.getDiagnosticsForPath(path), [PathNotInProjectFile(path)]
+        )
 
 
 #  class TestIncludesVunit(TestCase):
@@ -547,7 +694,7 @@ class TestDirectDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -639,7 +786,7 @@ class TestDirectCircularDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -699,7 +846,7 @@ class TestMultilevelCircularDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -787,7 +934,8 @@ class TestMultilevelCircularDependencies(TestCase):
 #              ),
 #          }
 
-#          self.database.addSources(_configFromSources(sources))
+#          self.database.addSources(_configFromSources(sources),
+#          TEST_TEMP_PATH)
 
 #      def tearDown(self):
 #          # type: (...) -> Any
@@ -839,7 +987,7 @@ class TestIndirectLibraryInference(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources))
+        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any

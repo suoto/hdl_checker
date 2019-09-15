@@ -23,7 +23,7 @@ import logging
 import os.path as p
 #  import os.path as p
 from multiprocessing.pool import ThreadPool as Pool
-from typing import Any, Dict, Iterable, Set, Type, Union
+from typing import Any, Dict, Iterable, Set, Tuple, Type, Union
 
 #  from .base_parser import BaseSourceFile
 #  from .config_parser import ConfigParser, ProjectSourceSpec
@@ -101,3 +101,46 @@ def getSourceFileObjects(kwargs_list, workers=None):
     results = [x.get() for x in async_results]
 
     return results
+
+
+def _makeAbsoluteIfNeeded(root, paths):
+    # type: (str, Iterable[str]) -> Iterable[str]
+    for path in paths:
+        if p.isabs(path):
+            yield path
+        else:
+            yield p.join(root, path)
+
+
+def getIncludedConfigs(base_config, root_dir="."):
+    # type: (Dict[str, Any], str) -> Iterable[Tuple[str, Dict[str, Any]]]
+    "Returns configuration contents of included files"
+    # Copy the dict to avoid messing up with the caller's env
+    config = base_config.copy()
+
+    # Will search for inclusion clauses recursivelly but we need to keep
+    # track of infinite loops
+    checked_paths = set()  # type: Set[str]
+
+    paths = set(_makeAbsoluteIfNeeded(root_dir, config.pop("include", ())))
+
+    while paths:
+        path = paths.pop()
+        checked_paths.add(path)
+
+        if not p.exists(path):
+            _logger.warning("Skipping included path '%s' (no such file)", path)
+            continue
+
+        # Load the config from the file
+        try:
+            config = json.load(open(path, "r"))
+        except json.decoder.JSONDecodeError:
+            _logger.warning("Failed to decode file %s", path)
+            continue
+
+        extracted_paths = set(_makeAbsoluteIfNeeded(path, config.pop("include", ())))
+        # Add new paths to the set so they get parsed as well
+        paths |= extracted_paths - checked_paths
+
+        yield path, config

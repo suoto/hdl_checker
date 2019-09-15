@@ -22,20 +22,21 @@ import os
 import os.path as p
 from collections import namedtuple
 from threading import Lock
-from typing import Any, Dict, Iterable, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, Optional, Set, Tuple
 
 from hdlcc.database import Database  # pylint: disable=unused-import
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags, FileType
-
-RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
-RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])
-RebuildPath = namedtuple("RebuildPath", ["path"])
-
-RebuildInfo = Union[RebuildUnit, RebuildLibraryUnit, RebuildPath]
+from hdlcc.types import (
+    BuildFlags,
+    FileType,
+    RebuildInfo,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+)
 
 ParsedRebuilds = namedtuple(
     "ParsedElement", ["unit_type", "library_name", "unit_name", "rebuild_path"]
@@ -361,7 +362,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         return FileType.fromPath(path) in self.file_types
 
     def build(self, path, library, forced=False):
-        # type: (Path, Identifier, bool) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
+        # type: (Path, Identifier, bool) -> Tuple[Set[CheckerDiagnostic], Set[RebuildInfo]]
         """
         Method that interfaces with parents and implements the building
         chain

@@ -136,21 +136,32 @@ systemverilog work bar.sv some sv flag
             )
 
             def _resolve(path):
-                return Path(p.join(it.path.dirname, path))
+                return p.join(it.path.dirname, path)
 
             it.assertCountEqual(
                 sources,
                 [
-                    (_resolve("sample_file.vhd"), "work", ("-sample_file_flag",)),
+                    (
+                        _resolve("sample_file.vhd"),
+                        {"library": "work", "flags": ("-sample_file_flag",)},
+                    ),
                     (
                         _resolve("sample_package.vhdl"),
-                        "work",
-                        ("-sample_package_flag",),
+                        {"library": "work", "flags": ("-sample_package_flag",)},
                     ),
-                    (_resolve("TESTBENCH.VHD"), "work", ("-build-in", "some", "way")),
-                    (Path("/some/abs/path.VHDL"), "lib", ()),
-                    (_resolve("foo.v"), "work", ("-some-flag", "some", "value")),
-                    (_resolve("bar.sv"), "work", ("some", "sv", "flag")),
+                    (
+                        _resolve("TESTBENCH.VHD"),
+                        {"library": "work", "flags": ("-build-in", "some", "way")},
+                    ),
+                    ("/some/abs/path.VHDL", {"library": "lib", "flags": ()}),
+                    (
+                        _resolve("foo.v"),
+                        {"library": "work", "flags": ("-some-flag", "some", "value")},
+                    ),
+                    (
+                        _resolve("bar.sv"),
+                        {"library": "work", "flags": ("some", "sv", "flag")},
+                    ),
                 ],
             )
 
@@ -175,6 +186,7 @@ systemverilog work bar.sv some sv flag
         def test_should_report_parsing_in_progress():
             # type: (...) -> Any
             parser = ConfigParser(it.path)
+            it.assertFalse(parser.isParsing(), "Parser should not be busy right now")
 
             event = Event()
 

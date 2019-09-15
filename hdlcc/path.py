@@ -39,9 +39,6 @@ class Path(object):
         self._name = name
         self._stat = None
 
-    def __jsonEncode__(self):
-        return {'name': self.name}
-
     @property
     def mtime(self):
         # type: () -> float
@@ -84,10 +81,12 @@ class Path(object):
     def __eq__(self, other):
         """Overrides the default implementation"""
         try:
-            if p.exists(self.name):
-                return p.samestat(self.stat, other.stat)
+            return p.samestat(self.stat, other.stat)
+        except OSError:
+            # One of the files doesn't exist, so we'll compare the strings only
             return self.abspath == other.abspath
         except AttributeError:
+            # One of the objects doesn't have a 'stat' attribute
             return False
 
         return NotImplemented  # pragma: no cover

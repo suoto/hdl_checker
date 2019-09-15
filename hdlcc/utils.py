@@ -292,7 +292,7 @@ def isFileReadable(path):
     Checks if a given file is readable
     """
     try:
-        open(path.name, "r").close()
+        open(str(path), "r").close()
 
         return True
     except IOError:

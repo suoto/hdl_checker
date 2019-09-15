@@ -49,7 +49,7 @@ from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import BuildFlags, FileType
-from hdlcc.utils import HashableByKey, getMostCommonItem
+from hdlcc.utils import HashableByKey, getMostCommonItem, isFileReadable
 
 try:
     from functools import lru_cache
@@ -57,9 +57,8 @@ except ImportError:
     from backports.functools_lru_cache import lru_cache  # type: ignore
 
 _logger = logging.getLogger(__name__)
-_default_library_name = Identifier("library")
+_DEFAULT_LIBRARY_NAME = Identifier("library")
 
-tResolvedLibrary = Identifier
 tUnresolvedLibrary = Union[Identifier, None]
 tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
 
@@ -90,8 +89,8 @@ class Database(HashableByKey):
     def __init__(self):  # type: () -> None
         self._lock = RLock()
 
-        #  self._builder_name = None  # type: Union[str, None]
-        self._paths = {}  # type: Dict[Path, float]
+        self._paths = set()  # type: Set[Path]
+        self._parse_timestamp = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
         self._inferred_libraries = set()  # type: Set[Path]
         self._flags = {}  # type: Dict[Path, BuildFlags]
@@ -99,22 +98,16 @@ class Database(HashableByKey):
         self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
         self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
 
+        # Use this to know which methods should be cache
         self._cached_methods = {
             getattr(self, x)
             for x in dir(self)
             if hasattr(getattr(self, x), "cache_clear")
         }
 
-        #  self._addVunitIfFound()
-
     @property
     def __hash_key__(self):
         return 0
-
-    @property
-    def builder_name(self):  # type: (...) -> Union[str, None]
-        "Builder name"
-        return self._builder_name
 
     @property
     def design_units(self):  # type: (...) -> FrozenSet[tAnyDesignUnit]
@@ -133,51 +126,94 @@ class Database(HashableByKey):
             except KeyError:
                 pass
 
-        for path in self._paths:
+        for path in self.paths:
             self._parseSourceIfNeeded(path)
 
-    def reset(self):
-        "Clears the database from previous data"
-        self._builder_name = None
-        self._paths = {}
-        self._libraries = {}
-        self._flags = {}
-        self._design_units = set()
-        self._dependencies = {}
-        self._diags = dict()
-
-        self._clearLruCaches()
-
-        # Re-add VUnit files back again
-        #  self._addVunitIfFound()
-
-    def addSources(self, entries):
-        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]]) -> None
+    def addSources(self, entries, root_dir):
+        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
         """
         Updates the database from a iterable containing tuples in the format
         (path, {"library": library_name, "flags": path_specific_flags})
         """
         for entry in entries:
-            source = SourceEntry._make(entry)
-            self._addSource(Path(source.path), source.library, source.flags)
+            try:
+                source = SourceEntry._make(entry)
+                path = source.path
+                if not p.abspath(path):
+                    path = p.join(root_dir, path)
+                self.addSource(Path(path), source.library, source.flags)
+            except:  # pragma: no cover
+                _logger.exception("Failed to convert %s", entry)
+                raise
 
-    def _addSource(self, path, library, flags):
+    def addSource(self, path, library, flags):
         # type: (Path, Optional[str], BuildFlags) -> None
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
         """
-        # Default when updating is set the modification time to zero
-        # because we're cleaning up the parsed info too
-        self._paths[path] = 0
+        self._paths.add(path)
         self._flags[path] = tuple(flags)
-        # TODO: Parse on a process pool
-        self._parseSourceIfNeeded(path)
-
         if library is not None:
             self._libraries[path] = Identifier(
                 library, case_sensitive=FileType.fromPath(path) != FileType.vhdl
             )
+
+        # TODO: Parse on a process pool
+        self._parseSource(path)
+
+    def removeSource(self, path):
+        # type: (Path) -> None
+        """
+        Removes a path from the database. No error is raised if the path wasn't
+        added previously. In this case, avoid clearning LRU caches
+        """
+        _logger.debug("Removing %s from database", path)
+        clear_lru_caches = False
+
+        units = frozenset(self._getDesignUnitsByPath(path))
+        self._design_units -= units
+        if units:
+            clear_lru_caches = True
+
+        try:
+            self._paths.remove(path)
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        try:
+            del self._parse_timestamp[path]
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        try:
+            del self._libraries[path]
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        try:
+            del self._flags[path]
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        try:
+            del self._dependencies[path]
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        try:
+            del self._diags[path]
+            clear_lru_caches = True
+        except KeyError:
+            pass
+
+        if clear_lru_caches:
+            self._clearLruCaches()
 
     def _addDiagnostic(self, diagnostic):
         # type: (CheckerDiagnostic) -> None
@@ -185,11 +221,17 @@ class Database(HashableByKey):
         Adds a diagnostic to the diagnostic map. Diagnostics can then be read
         to report processing internals and might make it to the user interface
         """
+        _logger.debug("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
         if diagnostic.filename not in self._diags:
             self._diags[diagnostic.filename] = set()
 
         self._diags[diagnostic.filename].add(diagnostic)
+
+    def getDiagnosticsForPath(self, path):
+        # type: (Path) -> Iterable[CheckerDiagnostic]
+        self._parseSourceIfNeeded(path)
+        return self._diags.get(path, ())
 
     def __jsonEncode__(self):
         """
@@ -198,16 +240,19 @@ class Database(HashableByKey):
         state = {"sources": []}
 
         for path in self._paths:
-            state["sources"].append(
-                {
-                    "path": path,
-                    "mtime": self._paths[path],
-                    "library": self._libraries[path],
-                    "flags": self._flags[path],
-                    "dependencies": tuple(self._dependencies[path]),
-                    "diags": tuple(self._diags.get(path, ())),
-                }
-            )
+            source_info = {
+                "path": path,
+                "mtime": self._parse_timestamp[path],
+                "flags": tuple(self._flags.get(path, ())),
+                "dependencies": tuple(self._dependencies.get(path, ())),
+                "diags": tuple(),
+            }
+
+            library = self._libraries.get(path, None)
+            if library is not None:
+                source_info["library"] = library
+
+            state["sources"].append(source_info)
 
         state["inferred_libraries"] = tuple(self._inferred_libraries)
         state["design_units"] = tuple(self._design_units)
@@ -217,18 +262,17 @@ class Database(HashableByKey):
     @classmethod
     def __jsonDecode__(cls, state):
         # pylint: disable=protected-access
-        obj = super(Database, cls).__new__(cls)
+        obj = cls()
         obj._design_units = {x for x in state.pop("design_units")}
         obj._inferred_libraries = {x for x in state.pop("inferred_libraries")}
-        obj._paths = {}  # type: Dict[Path, float]
-        obj._libraries = {}  # type: Dict[Path, Identifier]
-        obj._flags = {}  # type: Dict[Path, BuildFlags]
-        obj._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
-        obj._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
         for info in state.pop("sources"):
             path = info.pop("path")
-            obj._paths[path] = float(info.pop("mtime"))
-            obj._libraries[path] = info.pop("library")
+            obj._paths.add(path)
+            obj._parse_timestamp[path] = float(info.pop("mtime"))
+
+            if "library" in info:
+                obj._libraries[path] = info.pop("library")
+
             obj._flags[path] = tuple(info.pop("flags"))
             obj._dependencies[path] = {x for x in info.pop("dependencies")}
             obj._diags[path] = {x for x in info.pop("diags")}
@@ -242,13 +286,14 @@ class Database(HashableByKey):
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
+        self._parseSourceIfNeeded(path)
         return self._flags.get(path, ())
 
     @property
     def paths(self):
         # type: () -> Iterable[Path]
         "Returns a list of paths currently in the database"
-        return self._paths.keys()
+        return frozenset(self._paths)
 
     def _updatePathLibrary(self, path, library):
         # type: (Path, Identifier) -> None
@@ -267,6 +312,11 @@ class Database(HashableByKey):
             _logger.info("Setting library for '%s' to '%s'", path, library)
 
         self._libraries[path] = library
+
+        # Nothing to resolve if the dependency entry is empty
+        if not self._dependencies.get(path, None):
+            return
+
         # Extract the unresolved dependencies that will be replaced
         unresolved_dependencies = {
             x for x in self._dependencies[path] if x.library is None
@@ -290,6 +340,7 @@ class Database(HashableByKey):
     def getLibrary(self, path):
         # type: (Path) -> tUnresolvedLibrary
         "Gets a library of a given source (this is likely to be removed)"
+        self._parseSourceIfNeeded(path)
         if path not in self._paths:
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)
@@ -302,6 +353,7 @@ class Database(HashableByKey):
             library = self._inferLibraryIfNeeded(path)
             if library is not None:
                 self._updatePathLibrary(path, library)
+
         return self._libraries.get(path, None)
 
     def _parseSourceIfNeeded(self, path):
@@ -309,14 +361,22 @@ class Database(HashableByKey):
         """
         Parses a given path if needed, removing info from the database prior to that
         """
+        if not isFileReadable(path):
+            _logger.info("Won't parse file that's not readable %s", path)
+            return
+
         # Sources will get parsed on demand
         mtime = p.getmtime(path.name)
 
-        if mtime == self._paths.get(path, 0):
+        if mtime == self._parse_timestamp.get(path, 0):
             return
 
+        self._parseSource(path)
+
+    def _parseSource(self, path):
+        # type: (Path) -> None
         # Update the timestamp
-        self._paths[path] = mtime
+        self._parse_timestamp[path] = p.getmtime(str(path))
 
         # Remove all design units that referred to this path before adding new
         # ones, but use the non API method for that to avoid recursing
@@ -327,21 +387,10 @@ class Database(HashableByKey):
         self._dependencies[path] = src_parser.getDependencies()
         self._clearLruCaches()
 
-        #  # If the library was inferred and the source changed, undo that
-        #  if self._libraries[path] in self._inferred_libraries:
-        #      del self._libraries[path]
-
     def _clearLruCaches(self):
         "Clear caches from lru_caches"
         for meth in self._cached_methods:
             meth.cache_clear()
-
-    #  def _addVunitIfFound(self):  # type: () -> None
-    #      """
-    #      Tries to import files to support VUnit right out of the box
-    #      """
-    #      for library, path, flags in getVunitSources():
-    #          self._addSource(path, library, flags)
 
     def getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
         "Gets the design units for the given path (if any)"
@@ -359,7 +408,10 @@ class Database(HashableByKey):
 
     def getDependenciesByPath(self, path):
         # type: (Path) -> Set[DependencySpec]
-        return self._dependencies[path].copy()
+        self._parseSourceIfNeeded(path)
+        if path not in self._dependencies:
+            return set()
+        return self._dependencies[path]
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]
@@ -447,7 +499,7 @@ class Database(HashableByKey):
 
         if not units:
             _logger.warning(
-                "Could not find any source defining '%s' (%s)", name, library
+                "Could not find any source defining %s / %s", repr(name), repr(library)
             )
             return ()
 
@@ -476,7 +528,48 @@ class Database(HashableByKey):
             paths,
         )
 
+        if len(paths) > 1:
+            for unit in units:
+                self._addDiagnostic(
+                    DependencyNotUnique(
+                        filename=unit.owner,
+                        line_number=tuple(unit.locations)[0][0],
+                        column_number=tuple(unit.locations)[0][1],
+                        design_unit="{}.{}".format(
+                            self.getLibrary(unit.owner), unit.name
+                        ),
+                        actual=unit.owner,
+                        choices=(x.owner for x in units - {unit}),
+                    )
+                )
+
         return paths
+
+    #  def _reportDependencyNotUnique(self, non_resolved_dependency, actual, choices):
+    #      # type: (...) -> Any
+    #      """
+    #      Reports a dependency failed to be resolved due to multiple files
+    #      defining the required design unit
+    #      """
+    #      locations = non_resolved_dependency.locations or (
+    #          non_resolved_dependency.filename,
+    #          1,
+    #          None,
+    #      )
+
+    #      for filename, line_number, column_number in locations:
+    #          self._outstanding_diags.add(
+    #              DependencyNotUnique(
+    #                  filename=filename,
+    #                  line_number=line_number,
+    #                  column_number=column_number,
+    #                  design_unit="{}.{}".format(
+    #                      non_resolved_dependency.library, non_resolved_dependency.name
+    #                  ),
+    #                  actual=actual.filename,
+    #                  choices=list(choices),
+    #              )
+    #          )
 
     def getDependenciesUnits(self, path):
         # type: (Path) -> Set[tLibraryUnitTuple]
@@ -485,6 +578,23 @@ class Database(HashableByKey):
         path but only within the project file set. If a design unit can't be
         found in any source, it will be silently ignored.
         """
+        # These paths define the dependencies that the original path has. In
+        # the ideal case, each dependency is defined once and the config file
+        # specifies the correct library, in which case we don't add any extra
+        # warning.
+        #
+        # If a dependency is defined multiple times, issue a warning indicating
+        # which one is going to actually be used and which are the other
+        # options, just like what has been already implemented.
+        #
+        # If the library is not set for the a given path, try to guess it by
+        # (1) given every design unit defined in this file, (2) search for
+        # every file that also depends on it and (3) identify which library is
+        # used. If all of them converge on the same library name, just use
+        # that. If there's no agreement, use the library that satisfies the
+        # path in question but warn the user that something is not right
+        self._parseSourceIfNeeded(path)
+
         units = set()  # type: Set[tLibraryUnitTuple]
 
         search_paths = set((path,))
@@ -563,7 +673,7 @@ class Database(HashableByKey):
         # Limit the number of iterations to the worst case of every pass
         # compiling only a single source and all of them having a chain of
         # dependencies on the previous one
-        iteration_limit = len(paths_to_build)
+        iteration_limit = len(paths_to_build) + 1
 
         for i in range(iteration_limit):
             paths_built = set()  # type: Set[Path]
@@ -588,7 +698,7 @@ class Database(HashableByKey):
                 else:
                     yield self.getLibrary(
                         current_path
-                    ) or _default_library_name, current_path
+                    ) or _DEFAULT_LIBRARY_NAME, current_path
                     paths_built.add(current_path)
                     units_compiled |= own
 

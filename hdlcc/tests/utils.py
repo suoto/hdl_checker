@@ -33,12 +33,12 @@ import six
 from parameterized import parameterized_class  # type: ignore
 
 from hdlcc import exceptions
-from hdlcc.types import FileType
 from hdlcc.builders.base_builder import BaseBuilder
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
+from hdlcc.types import FileType
 from hdlcc.utils import getCachePath, onWindows, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
@@ -161,6 +161,11 @@ class SourceMock(object):
         for i, line in enumerate(lines, 1):
             self._logger.debug("%2d | %s", i, line)
 
+        try:
+            os.makedirs(p.dirname(self.filename.name))
+        except OSError:
+            pass
+
         with open(self.filename.name, "w") as fd:
             fd.write("\n".join(lines))
 
@@ -192,14 +197,33 @@ class SourceMock(object):
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("MockBuilder")
     builder_name = "msim_mock"
-    file_types = ("vhdl",)
+    file_types = (FileType.vhdl,)
 
-    def __init__(self, target_folder):
-        self._target_folder = target_folder
-        if not p.exists(self._target_folder):
-            os.mkdir(self._target_folder)
+    def __init__(self, target_folder, *args, **kwargs):
+        # type: (...) -> None
+        self._target_folder = target_folder  # type: Path
+        if not p.exists(self._target_folder.name):
+            os.makedirs(self._target_folder.name)
 
-        super(MockBuilder, self).__init__(target_folder)
+        super(MockBuilder, self).__init__(target_folder, *args, **kwargs)
+
+        #  mock.patch.object(self, "_buildAndParse", spec=BaseBuilder._buildAndParse).start()
+
+    #  def __jsonEncode__(self):
+    #      state = super(MockBuilder, self).__jsonEncode__()
+    #      del state["_buildAndParse"]
+    #      return state
+
+    #  @classmethod
+    #  def __jsonDecode__(cls, state):
+    #      # type: (...) -> Any
+    #      """
+    #      Returns an object of cls based on a given state
+    #      """
+    #      # pylint: disable=protected-access
+    #      obj = super(MockBuilder, cls).__jsonDecode__(state)
+    #      mock.patch.object(obj, "_buildAndParse", spec=BaseBuilder._buildAndParse).start()
+    #      return obj
 
     def _makeRecords(self, _):  # pragma: no cover
         return []
@@ -267,6 +291,7 @@ def assertSameFile(it):  # pylint: disable=invalid-name
 
     return wrapper
 
+
 def assertCountEqual(it):  # pylint: disable=invalid-name
 
     assert six.PY2, "Only needed on Python2"
@@ -296,7 +321,6 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
             it.fail("\n".join([str(x) for x in error_details]))
 
     return wrapper
-
 
 
 def writeListToFile(filename, _list):  # pragma: no cover
@@ -358,6 +382,13 @@ def getTestTempPath(name):
     # type: (str) -> str
     name = name.replace(".", "_")
     path = p.abspath(p.join(os.environ["TOX_ENV_DIR"], "tmp", name))
+
+    # Create a path for each test to allow running multiple tests concurrently
+    i = 0
+    while p.exists(path):
+        path = p.abspath(p.join(os.environ["TOX_ENV_DIR"], "tmp", "%s_%d" % (name, i)))
+        i += 1
+
     if not p.exists(path):
         os.makedirs(path)
     return path

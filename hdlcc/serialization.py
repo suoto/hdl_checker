@@ -77,7 +77,7 @@ class StateEncoder(json.JSONEncoder):
                     o.__class__.__name__,
                 )
             dct["__class__"] = o.__class__.__name__
-            _logger.debug("object: %s, result:\n%s", repr(o), pformat(dct))
+            #  _logger.debug("object: %s, result:\n%s", repr(o), pformat(dct))
             return dct
         # Let the base class default method raise the TypeError
         try:

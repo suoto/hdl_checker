@@ -21,41 +21,27 @@ import json
 import logging
 import os
 import os.path as p
+import tempfile
 import traceback
 from multiprocessing.pool import ThreadPool
-from threading import RLock
-from typing import Any, AnyStr, Dict, Generator, List, Optional, Set, Tuple
+from typing import Any, AnyStr, Iterable, Set
 
-from hdlcc import builders, exceptions
-from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.builder_utils import getBuilderByName
 from hdlcc.builders.fallback import Fallback
 from hdlcc.database import Database
-from hdlcc.diagnostics import (
-    CheckerDiagnostic,
-    DependencyNotUnique,
-    DiagType,
-    PathNotInProjectFile,
-)
-from hdlcc.parser_utils import tSourceFile
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.parser_utils import getIncludedConfigs
 from hdlcc.parsers.config_parser import ConfigParser
-from hdlcc.parsers.elements.dependency_spec import DependencySpec
-from hdlcc.parsers.verilog_parser import VerilogParser
-from hdlcc.parsers.vhdl_parser import VhdlParser
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.utils import (
-    getCachePath,
-    getFileType,
-    removeDirIfExists,
-    removeDuplicates,
-    removeIfExists,
-    samefile,
-)
+from hdlcc.types import RebuildInfo, RebuildLibraryUnit, RebuildPath, RebuildUnit
+from hdlcc.utils import removeDirIfExists, toBytes
 
 CACHE_NAME = "cache.json"
 
-_logger = logging.getLogger("build messages")
+_logger = logging.getLogger(__name__)
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -68,67 +54,65 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self):  # type: () -> None
-        self._start_dir = p.abspath(os.curdir)
-        self._logger = logging.getLogger(__name__)
-        self._build_sequence_cache = {}  # type: Dict[str, Any]
-        self._outstanding_diags = set()  # type: Set[CheckerDiagnostic]
-        self._setup_lock = RLock()
-
-        self.config_file = None  # type: Optional[Path]
+    def __init__(self, root_dir):  # type: (Path) -> None
+        self.root_dir = root_dir
 
         self.database = Database()
-        self.builder = Fallback(self._getWorkingPath())
+        self.builder = Fallback(self.root_dir, self.database)
 
         self._recoverCacheIfPossible()
-        self._setupEnvIfNeeded()
         self._saveCache()
 
-    def setConfigFile(self, path):  # type: (Path) -> None
-        """
-        Setting the configuration file will trigger parsing if the path is
-        different than the one already set.
-        """
-        if self.config_file is not None and samefile(self.config_file, path):
-            self._logger.info("Seeting the same file, won't do anything")
-            return
+    def accept(self, parser):
+        # type: (ConfigParser) -> None
+        "Updates the database from a configuration parser"
+        base_config = parser.parse()
+        _logger.info("Updating with base config: %s", base_config)
 
-        self.config_file = path
-        self.database.accept(ConfigParser(path))
+        builder_cls = getBuilderByName(base_config.pop("builder_name", None))
+        self.builder = builder_cls(self.root_dir, self.database)
 
-    def _getWorkingPath(self):  # type: () -> Path
-        """
-        The working path will depend on the configuration file but it's
-        guaranteed not to be None
-        """
-        cache = p.abspath(self.config_file or ".")
-        return Path(p.join(getCachePath(), cache.replace(p.sep, "_")))
+        config_root_path = p.dirname(str(parser.filename))
+        self.database.addSources(base_config.pop("sources", ()), config_root_path)
+
+        for config_path, config in getIncludedConfigs(base_config, config_root_path):
+            _logger.debug("Processing additional config: %s", config)
+            # FIXME: Relative paths here must be made absolute using the path
+            # to the included config
+            self.database.addSources(config.pop("sources", ()), config_path)
 
     def _getCacheFilename(self):
+        # type: () -> Path
         """
         The cache file name will always be inside the path returned by self._getWorkingPath
         and defaults to cache.json
         """
-        cache_dir = self._getWorkingPath()
-        return p.join(cache_dir, CACHE_NAME)
+        return Path(p.join(self.root_dir.name, CACHE_NAME))
 
     def _saveCache(self):
+        # type: (...) -> Any
         """
         Dumps project object to a file to recover its state later
         """
         cache_fname = self._getCacheFilename()
 
-        state = {
-            "_logger": {"name": self._logger.name, "level": self._logger.level},
-            "builder": self.builder,
-        }
+        state = {"builder": self.builder, "database": self.database}
 
-        self._logger.debug("Saving state to '%s'", cache_fname)
-        if not p.exists(p.dirname(cache_fname)):
-            os.makedirs(p.dirname(cache_fname))
-        json.dump(state, open(cache_fname, "w"), indent=True, cls=StateEncoder)
+        _logger.debug("Saving state to '%s'", cache_fname)
+        if not p.exists(p.dirname(cache_fname.name)):
+            os.makedirs(p.dirname(cache_fname.name))
+        json.dump(state, open(cache_fname.name, "w"), indent=True, cls=StateEncoder)
+
+    def _setState(self, state):
+        # type: (...) -> Any
+        """
+        Serializer load implementation
+        """
+        self.database = state.pop("database")
+        self.builder = state.pop("builder", Fallback)
 
     def _recoverCacheIfPossible(self):
+        # type: (...) -> Any
         """
         Tries to recover cached info for the given config_file. If
         something goes wrong, assume the cache is invalid and return
@@ -137,12 +121,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         cache_fname = self._getCacheFilename()
 
         try:
-            cache = json.load(open(cache_fname, "r"), object_hook=jsonObjectHook)
+            cache = json.load(open(cache_fname.name, "r"), object_hook=jsonObjectHook)
             self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
         except IOError:
-            self._logger.debug(
-                "Couldn't read cache file %s, skipping recovery", cache_fname
-            )
+            _logger.debug("Couldn't read cache file %s, skipping recovery", cache_fname)
             return
         except ValueError as exception:
             self._handleUiWarning(
@@ -151,7 +133,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 )
             )
 
-            self._logger.warning(
+            _logger.warning(
                 "Unable to recover cache from '%s': %s",
                 cache_fname,
                 traceback.format_exc(),
@@ -161,77 +143,19 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._setState(cache)
         self.builder.checkEnvironment()
 
-    def isSetupRunning(self):
-        locked = not self._setup_lock.acquire(False)
-        if not locked:
-            self._setup_lock.release()
-        return locked
-
-    def _setupEnvIfNeeded(self):
-        """
-        Updates or creates the environment, which includes checking
-        if the configuration file should be parsed and creating the
-        appropriate builder objects
-        """
-        try:
-            builder_name = self.database.builder_name
-        except AssertionError:
-            return
-
-        try:
-            with self._setup_lock:
-                # If still using Fallback builder, check if the config has a
-                # different one
-                if isinstance(self.builder, Fallback):
-                    builder_name = self.database.builder_name
-                    builder_class = builders.getBuilderByName(builder_name)
-                    if builder_class is Fallback:
-                        return
-
-                    cache_dir = self._getWorkingPath()
-                    try:
-                        os.makedirs(cache_dir)
-                    except OSError:
-                        pass
-
-                    self.builder = builder_class(cache_dir)
-
-                    self._logger.info(
-                        "Selected builder is '%s'", self.builder.builder_name
-                    )
-        except exceptions.SanityCheckError as exc:
-            self._handleUiError("Failed to create builder '%s'" % exc.builder)
-            self.builder = Fallback(self._getWorkingPath())
-
-        assert self.builder is not None
-
     def clean(self):
+        # type: (...) -> Any
         """
         Clean up generated files
         """
-        self._logger.debug("Cleaning up project")
-        removeIfExists(self._getCacheFilename())
-        removeDirIfExists(self._getWorkingPath())
+        _logger.debug("Cleaning up project")
+        removeDirIfExists(str(self.root_dir))
 
         del self.builder
+        del self.database
+
         self.database = Database()
-        self.builder = Fallback(self._getWorkingPath())
-
-    def _setState(self, state):
-        """
-        Serializer load implementation
-        """
-        self._logger = logging.getLogger(state["_logger"]["name"])
-        self._logger.setLevel(state["_logger"]["level"])
-        del state["_logger"]
-
-        self.database = state["database"]
-
-        builder_name = self.database.builder_name
-        self._logger.debug("Recovered builder is '%s'", builder_name)
-        #  builder_class = hdlcc.builders.getBuilderByName(builder_name)
-        #  self.builder = builder_class.recoverFromState(state['builder'])
-        self.builder = state["builder"]
+        self.builder = Fallback(self.root_dir, self.database)
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
@@ -254,384 +178,162 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         from HDL Code Checker to the user
         """
 
-    #  def getSourceByPath(self, path):
-    #      # type: (Path) -> Tuple[tSourceFile, List[CheckerDiagnostic]]
-    #      """
-    #      Get the source object, flags and any additional info to be displayed
-    #      """
-    #      try:
-    #          return self.database.getSourceByPath(path), []
-    #      except KeyError:
-    #          pass
-
-    #      remarks = [] # type: List[CheckerDiagnostic]
-
-    #      # If the source file was not found on the configuration file, add this
-    #      # as a remark.
-    #      # Also, create a source parser object with some library so the user can
-    #      # at least have some info on the source
-    #      if not isinstance(self.builder, Fallback):
-    #          remarks = [PathNotInProjectFile(p.abspath(path)), ]
-
-    #      self._logger.info("Path %s not found in the project file",
-    #                        p.abspath(path))
-
-    #      if getFileType(path) == 'vhdl':
-    #          source = VhdlParser(path, library='undefined') # type: tSourceFile
-    #      else:
-    #          source = VerilogParser(path, library='undefined')
-
-    #      return source, remarks
-
-    def _resolveRelativeNames(self, source):
-        # type: (tSourceFile) -> Generator[DependencySpec, None, None]
+    def _getBuilderMessages(self, path):
+        # type: (Path) -> Iterable[CheckerDiagnostic]
         """
-        Translate raw dependency list parsed from a given source to the
-        project name space
-        """
-        for dependency in source.getDependencies():
-            if dependency.library in self.builder.getBuiltinLibraries():
-                continue
-            if dependency.name == "all":
-                continue
-            if dependency.library == source.library and dependency.name in [
-                x["name"] for x in source.getDesignUnits()
-            ]:
-                continue
-            yield dependency
-
-    @staticmethod
-    def _sortBuildMessages(diagnostics):
-        """
-        Sorts a given set of build records
-        """
-        return sorted(
-            diagnostics,
-            key=lambda x: (x.severity, x.line_number or 0, x.error_code or ""),
-        )
-
-    def updateBuildSequenceCache(self, source):
-        # type: (tSourceFile) -> List[Tuple[tSourceFile, t.LibraryName]]
-        """
-        Wrapper to _resolveBuildSequence passing the initial build sequence
-        list empty and caching the result
-        """
-        # Despite we renew the cache when on buffer enter, we must also
-        # check if any file has been changed by some background process
-        # that the editor is unaware of (Vivado maybe?) To cope with
-        # this, we'll check if the newest modification time of the build
-        # sequence hasn't changed since we cached the build sequence
-        key = str(source.filename)
-        if key not in self._build_sequence_cache:
-            build_sequence = self.getBuildSequence(source)
-            if build_sequence:
-                timestamp = max([x[0].getmtime() for x in build_sequence])
-            else:
-                timestamp = 0
-            self._build_sequence_cache[key] = {
-                "sequence": build_sequence,
-                "timestamp": timestamp,
-            }
-        else:
-            cached_sequence = self._build_sequence_cache[key]["sequence"]
-            cached_timestamp = self._build_sequence_cache[key]["timestamp"]
-            if cached_sequence:
-                current_timestamp = max(
-                    max({x.getmtime() for x in cached_sequence if x}),
-                    source.getmtime() or 0,
-                )
-            else:
-                current_timestamp = 0
-
-            if current_timestamp > cached_timestamp:
-                self._logger.debug("Timestamp change, rescanning build " "sequence")
-                self._build_sequence_cache[key] = {
-                    "sequence": self.getBuildSequence(source),
-                    "timestamp": current_timestamp,
-                }
-
-        return self._build_sequence_cache[key]["sequence"]
-
-    def _reportDependencyNotUnique(self, non_resolved_dependency, actual, choices):
-        """
-        Reports a dependency failed to be resolved due to multiple files
-        defining the required design unit
-        """
-        locations = non_resolved_dependency.locations or (
-            non_resolved_dependency.filename,
-            1,
-            None,
-        )
-
-        for filename, line_number, column_number in locations:
-            self._outstanding_diags.add(
-                DependencyNotUnique(
-                    filename=filename,
-                    line_number=line_number,
-                    column_number=column_number,
-                    design_unit="{}.{}".format(
-                        non_resolved_dependency.library, non_resolved_dependency.name
-                    ),
-                    actual=actual.filename,
-                    choices=list(choices),
-                )
-            )
-
-    def getBuildSequence(self, source):
-        # type: (tSourceFile) -> List[Tuple[tSourceFile, t.LibraryName]]
-        build_sequence = []  # type: List[Tuple[tSourceFile, t.LibraryName]]
-        self._resolveBuildSequence(source, build_sequence)
-        return build_sequence
-
-    def _resolveBuildSequence(self, source, build_sequence, reference=None):
-        # type: (tSourceFile, List[Tuple[tSourceFile, t.LibraryName]], Optional[tSourceFile]) -> None
-        """
-        Recursively finds out the dependencies of the given source file
-        """
-        self._logger.debug("Checking build sequence for %s", source)
-        for dependency in self._resolveRelativeNames(source):
-            # Get a list of source files that contains this design unit. At
-            # this point, all the info we have pretty much depends on parsed
-            # text. Since Verilog is case sensitive and VHDL is not, we need to
-            # make sure we've got it right when mapping dependencies on mixed
-            # language projects
-            dependencies_list = self.database.discoverSourceDependencies(
-                unit=dependency.name,
-                library=dependency.library,
-                case_sensitive=source.filetype != "vhdl",
-            )
-
-            if not dependencies_list:
-                continue
-            selected_dependency = dependencies_list.pop()
-
-            # If we found more than a single file, then multiple files have the
-            # same entity or package name and we failed to identify the real
-            # file
-            if dependencies_list:
-                _logger.warning("Dependency %s (%s)", dependency, type(dependency))
-                self._reportDependencyNotUnique(
-                    non_resolved_dependency=dependency,
-                    actual=selected_dependency[0],
-                    choices=[x[0] for x in dependencies_list],
-                )
-
-            # Check if we found out that a dependency is the same we
-            # found in the previous call to break the circular loop
-            if selected_dependency == reference:
-                build_sequence = removeDuplicates(build_sequence)
-                return
-
-            if selected_dependency not in build_sequence:
-                self._resolveBuildSequence(
-                    selected_dependency[0],
-                    reference=source,
-                    build_sequence=build_sequence,
-                )
-
-            if selected_dependency not in build_sequence:
-                build_sequence.append(selected_dependency)
-
-        build_sequence = removeDuplicates(build_sequence)
-
-    def _getBuilderMessages(self, source):
-        # type: (tSourceFile) -> List[Dict[str, str]]
-        """
-        Builds the given source taking care of recursively building its
+        Builds the given path taking care of recursively building its
         dependencies first
         """
-        try:
-            flags = self.database.getBuildFlags(source.filename)
-        except KeyError:
-            flags = []
+        _logger.debug("Building '%s'", str(path))
 
-        self._logger.info("Building '%s'", str(source.filename))
+        if not p.isabs(str(path)):
+            path = Path(p.join(str(self.root_dir), str(path)))
 
-        build_sequence = self.updateBuildSequenceCache(source)
+        sequence = list(self.database.getBuildSequence(path))
+        _logger.info("Build sequence is %s", sequence)
 
-        self._logger.debug("Compilation build_sequence is:")
-        for src, library in build_sequence:
-            self._logger.debug("library=%s, source: %s", library, src)
+        for dep_library, dep_path in sequence:
+            for record in self._buildAndHandleRebuilds(dep_path, dep_library):
+                if record.severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
+                    yield record
 
-        records = set()
-        for src, library in build_sequence:
-            _flags = self.database.getBuildFlags(src.filename)
+        _logger.info("Built dependencies, now actually building '%s'", str(path))
+        library = self.database.getLibrary(path)
+        for record in self._buildAndHandleRebuilds(
+            path, library if library is not None else Identifier("work"), forced=True
+        ):
+            yield record
 
-            old = str(src.library)
-            src.library = library
-            dep_records = self._buildAndHandleRebuilds(src, forced=False, flags=_flags)
-            src.library = old
-
-            for record in dep_records:
-                if record.filename is None:
-                    continue
-                if record.severity in (DiagType.ERROR,):
-                    records.add(record)
-
-        records.update(self._buildAndHandleRebuilds(source, forced=True, flags=flags))
-
-        return self._sortBuildMessages(records)
-
-    def _buildAndHandleRebuilds(self, source, *args, **kwargs):
+    def _buildAndHandleRebuilds(self, path, library, forced=False):
+        # type: (Path, Identifier, bool) -> Iterable[CheckerDiagnostic]
         """
-        Builds the given source and handle any files that might require
+        Builds the given path and handle any files that might require
         rebuilding until there is nothing to rebuild. The number of iteractions
         is fixed in 10.
         """
+        _logger.info("Building %s / %s", path, library)
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):
-            records, rebuilds = self.builder.build(source, *args, **kwargs)
+            records, rebuilds = self.builder.build(
+                path=path, library=library, forced=forced
+            )
+
             if rebuilds:
-                self._handleRebuilds(rebuilds, source)
+                _logger.info(
+                    "Building '%s' triggers rebuilding: %s",
+                    path,
+                    ", ".join([str(x) for x in rebuilds]),
+                )
+                self._handleRebuilds(rebuilds)
             else:
+                _logger.debug("Had no rebuilds for %s", path)
                 return records
 
         self._handleUiError(
             "Unable to build '%s' after %d attempts"
-            % (source.filename, self._MAX_REBUILD_ATTEMPTS)
+            % (path, self._MAX_REBUILD_ATTEMPTS)
         )
 
         return {}
 
-    def _handleRebuilds(self, rebuilds, source):
+    def _handleRebuilds(self, rebuilds):
+        # type: (Iterable[RebuildInfo]) -> None
         """
-        Resolves hints found in the rebuild list into source objects
+        Resolves hints found in the rebuild list into path objects
         and rebuild them
         """
-        self._logger.info(
-            "Building '%s' triggers rebuilding: %s",
-            source,
-            ", ".join([str(x) for x in rebuilds]),
-        )
         for rebuild in rebuilds:
-            self._logger.debug("Rebuild hint: '%s'", rebuild)
-            if "rebuild_path" in rebuild:
-                rebuild_sources = [self.getSourceByPath(rebuild["rebuild_path"])[0]]
-            else:
-                unit_name = rebuild.get("unit_name", None)
-                library_name = rebuild.get("library_name", None)
-                unit_type = rebuild.get("unit_type", None)
+            _logger.debug("Rebuild hint: '%s'", rebuild)
+            if isinstance(rebuild, RebuildUnit):
+                for path in self.database.getPathsDefining(name=rebuild.name):
+                    list(self._getBuilderMessages(path))
 
-                if library_name is not None:
-                    rebuild_sources = self.database.findSourcesByDesignUnit(
-                        unit_name, library_name
-                    )
-                elif unit_type is not None:
-                    library = source.getMatchingLibrary(unit_type, unit_name)
-                    rebuild_sources = self.database.findSourcesByDesignUnit(
-                        unit_name, library
-                    )
-                else:  # pragma: no cover
-                    assert False, "Don't know how to handle %s" % rebuild
+            elif isinstance(rebuild, RebuildLibraryUnit):
+                for path in self.database.getPathsDefining(
+                    name=rebuild.name, library=rebuild.library
+                ):
+                    list(self._getBuilderMessages(path))
+            elif isinstance(rebuild, RebuildPath):
+                list(self._getBuilderMessages(rebuild.path))
 
-            for rebuild_source in rebuild_sources:
-                self._getBuilderMessages(rebuild_source)
-
-    def _isBuilderCallable(self):
-        """
-        Checks if all preconditions for calling the builder have been
-        met
-        """
-        if self.config_file is None:
-            return False
-        return True
+            else:  # pragma: no cover
+                _logger.warning("Did nothing with %s", rebuild)
 
     def getMessagesByPath(self, path):
+        # type: (Path) -> Iterable[CheckerDiagnostic]
         """
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
-        self._setupEnvIfNeeded()
+        if not p.isabs(str(path)):
+            path = Path(p.join(str(self.root_dir), str(path)))
 
-        # These paths define the dependencies that the original path has. In
-        # the ideal case, each dependency is defined once and the config file
-        # specifies the correct library, in which case we don't add any extra
-        # warning.
-        #
-        # If a dependency is defined multiple times, issue a warning indicating
-        # which one is going to actually be used and which are the other
-        # options, just like what has been already implemented.
-        #
-        # If the library is not set for the a given path, try to guess it by
-        # (1) given every design unit defined in this file, (2) search for
-        # every file that also depends on it and (3) identify which library is
-        # used. If all of them converge on the same library name, just use
-        # that. If there's no agreement, use the library that satisfies the
-        # path in question but warn the user that something is not right
-        paths = self.database.discoverSourceDependencies(path)
-
-        self._outstanding_diags = set()
-
-        records = []
+        builder_diags = set()  # type: Set[CheckerDiagnostic]
 
         if self._USE_THREADS:
             pool = ThreadPool()
 
             static_check = pool.apply_async(
-                getStaticMessages, args=(source.getRawSourceContent().split("\n"),)
+                getStaticMessages, args=(tuple(open(path.name).read().split("\n")),)
             )
 
-            if self._isBuilderCallable():
-                builder_check = pool.apply_async(
-                    self._getBuilderMessages, args=[source]
-                )
-                records += builder_check.get()
+            builder_check = pool.apply_async(self._getBuilderMessages, args=[path])
+            builder_diags |= {x for x in builder_check.get()}
 
             pool.close()
             pool.join()
 
-            # Static messages don't take the path, only the text, so we need to
-            # set add that to the diagnostic
-            for record in static_check.get():
-                record.filename = source.filename
-                records += [record]
+            static_diags = {x for x in static_check.get()}
 
         else:  # pragma: no cover
-            for record in getStaticMessages(source.getRawSourceContent().split("\n")):
-                record.filename = source.filename
-                records += [record]
+            builder_diags |= set(self._getBuilderMessages(path))
+            static_diags = set(
+                getStaticMessages(tuple(open(path.name).read().split("\n")))
+            )
 
-            if self._isBuilderCallable():
-                records += self._getBuilderMessages(source)
+        # Static messages don't take the path, only the text, so we need to
+        # set add that to the diagnostic
+        for diag in static_diags:
+            diag.filename = path
+            builder_diags.add(diag)
 
         self._saveCache()
-        return records + list(self._outstanding_diags)
+        return builder_diags | set(self.database.getDiagnosticsForPath(path))
 
     def getMessagesWithText(self, path, content):
+        # type: (Path, AnyStr) -> Any
         """
-        Gets messages from a given path with a different content, for
-        the cases when the buffer content has been modified
+        Dumps content to a temprary file and replaces the temporary file name
+        for path on the diagnostics received
         """
-        self._logger.debug("Getting messages for '%s' with content", path)
+        _logger.debug("Getting messages for '%s' with content", path)
 
-        self._setupEnvIfNeeded()
+        ext = path.name.split(".")[-1]
+        with tempfile.NamedTemporaryFile(suffix="." + ext) as filename:
+            temp_path = Path(filename.name)
 
-        source, remarks = self.getSourceByPath(path)
-        with source.havingBufferContent(content):
-            messages = self.getMessagesBySource(source)
+            # If the reference path was added to the database, add the
+            # temporary file with the same attributes
+            if path in self.database.paths:
+                library = self.database.getLibrary(path)
+                self.database.addSource(
+                    temp_path,
+                    getattr(library, "display_name", None),
+                    self.database.getFlags(path),
+                )
 
-        # Some messages may not include the filename field when checking a
-        # file by content. In this case, we'll assume the empty filenames
-        # refer to the same filename we got in the first place
-        for message in messages:
-            message.filename = p.abspath(path)
+            filename.file.write(toBytes(content))  # type: ignore
+            filename.flush()
+            messages = self.getMessagesByPath(temp_path)
 
-        return messages + remarks
+            # Some messages may not include the filename field when checking a
+            # file by content. In this case, we'll assume the empty filenames
+            # refer to the same filename we got in the first place
+            for message in messages:
+                message.filename = path
+                message.text = message.text.replace(filename.name, path.name)
 
-    def getSources(self):
-        """
-        Returns a list of VhdlSourceFile objects parsed
-        """
-        self._setupEnvIfNeeded()
-        return self.getSources()
+            self.database.removeSource(temp_path)
 
-    def onBufferVisit(self, path):
-        """
-        Runs tasks whenever a buffer is being visited. Currently this
-        means caching the build sequence before the file is actually
-        checked, so the overall wait time is reduced
-        """
-        self._setupEnvIfNeeded()
-        source, _ = self.getSourceByPath(path)
-        self.updateBuildSequenceCache(source)
+        return messages

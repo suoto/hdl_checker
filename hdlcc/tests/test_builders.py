@@ -86,9 +86,12 @@ class TestBuilder(TestCase):
     builder_name = None
     builder_path = None
 
+    @classmethod
+    def setUpClass(cls):
+        setupTestSuport(TEST_TEMP_PATH)
+
     def setUp(self):
         # type: (...) -> Any
-        setupTestSuport(TEST_TEMP_PATH)
         # Add builder path to the env
         self.original_env = os.environ.copy()
 

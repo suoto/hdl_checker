@@ -345,14 +345,15 @@ class DependencyNotUnique(CheckerDiagnostic):
         line_number=None,
         column_number=None,
     ):
+        _choices = list(choices)
         text = (
             "Returning dependency '{}' for {}, but there were {} other "
             "matches:\n{}. The selected option may not be the correct "
             "one".format(
                 actual,
                 design_unit,
-                len(choices),
-                ", ".join({"'%s'" % x.filename for x in choices}),
+                len(_choices),
+                ", ".join((str(x) for x in _choices)),
             )
         )
 

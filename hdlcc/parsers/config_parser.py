@@ -23,7 +23,7 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Any, Dict, Iterator, Set, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 from hdlcc import exceptions
 from hdlcc.builder_utils import BuilderName
@@ -82,7 +82,7 @@ class ConfigParser(object):
             FileType.systemverilog: (),
         }  # type: Dict[FileType, BuildFlags]
 
-        self._sources = set()  # type: Set[Tuple[Path, str, BuildFlags]]
+        self._sources = []  # type: List[Tuple[str, str, BuildFlags]]
 
         self.filename = filename
 
@@ -124,7 +124,7 @@ class ConfigParser(object):
         """
         self._logger.info("Parsing '%s'", self.filename)
         self._updateTimestamp()
-        self._sources = set()
+        self._sources = []
         for _line in open(self.filename.name, mode="rb").readlines():
             line = _replaceCfgComments("", _line.decode(errors="ignore"))
             self._parseLine(line)
@@ -142,11 +142,13 @@ class ConfigParser(object):
                 )
             else:
                 for source_path in self._getSourcePaths(groupdict["path"]):
-                    self._sources.add(
+                    self._sources.append(
                         (
                             source_path,
-                            groupdict["library"],
-                            _extractSet(groupdict["flags"]),
+                            {
+                                "library": groupdict["library"],
+                                "flags": _extractSet(groupdict["flags"]),
+                            },
                         )
                     )
 
@@ -169,7 +171,7 @@ class ConfigParser(object):
         else:
             raise exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePaths(self, path):  # type: (str) -> Iterator[Path]
+    def _getSourcePaths(self, path):  # type: (str) -> Iterable[str]
         """
         Normalizes and handles absolute/relative paths
         """
@@ -180,8 +182,7 @@ class ConfigParser(object):
             fname_base_dir = p.dirname(self.filename.abspath)
             source_path = p.join(fname_base_dir, source_path)
 
-        # Convert paths found to Path
-        return map(Path, glob(source_path) or [source_path])
+        return glob(source_path) or [source_path]
 
     def parse(self):
         # type: (...) -> Any
@@ -192,7 +193,7 @@ class ConfigParser(object):
         self._parseIfNeeded()
         data = {
             "builder_name": self._parms["builder"],
-            "sources": set(self._sources),
+            "sources": self._sources,
         }  # type: Dict[Any, Any]
 
         for filetype, flags in self._flags.items():
