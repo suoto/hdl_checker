@@ -30,13 +30,13 @@ from threading import Thread
 import mock
 import requests
 import six
-from nose2.tools import such
 from pyls import uris
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server
 
+from nose2.tools import such
+
 import hdlcc.lsp
-from hdlcc.tests.utils import (disableVunit, getTestTempPath, removeCacheData,
-                               setupTestSuport)
+from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 such.unittest.TestCase.maxDiff = None
@@ -44,18 +44,20 @@ such.unittest.TestCase.maxDiff = None
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_LOG_PATH = p.join(os.environ['TOX_ENV_DIR'], 'log')
-SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'WARNING')
+TEST_LOG_PATH = p.join(os.environ["TOX_ENV_DIR"], "log")
+SERVER_LOG_LEVEL = os.environ.get("SERVER_LOG_LEVEL", "WARNING")
 
-HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
+HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
 
-JSONRPC_VERSION = '2.0'
+JSONRPC_VERSION = "2.0"
 CALL_TIMEOUT = 5
+
 
 def doNothing(queue):
     _logger.debug("I'm ready")
     queue.get()
     _logger.debug("Ok, done")
+
 
 def _getUnusedLocalhostPort():
     """
@@ -63,9 +65,10 @@ def _getUnusedLocalhostPort():
     See https://github.com/Valloric/YouCompleteMe
     """
     import socket
+
     sock = socket.socket()
     # This tells the OS to give us any free port in the range [1024 - 65535]
-    sock.bind(('', 0))
+    sock.bind(("", 0))
     port = sock.getsockname()[1]
     sock.close()
     return port
@@ -74,28 +77,36 @@ def _getUnusedLocalhostPort():
 def _startClient(client):
     client.start()
 
-class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-few-public-methods
+
+class _ClientServer(
+    object
+):  # pylint: disable=useless-object-inheritance,too-few-public-methods
     """ A class to setup a client/server pair """
+
     def __init__(self):
         # Client to Server pipe
         csr, csw = os.pipe()
         # Server to client pipe
         scr, scw = os.pipe()
 
-        self.server_thread = Thread(target=start_io_lang_server,
-                                    args=(os.fdopen(csr, 'rb'),
-                                          os.fdopen(scw, 'wb'),
-                                          False,
-                                          hdlcc.lsp.HdlccLanguageServer))
+        self.server_thread = Thread(
+            target=start_io_lang_server,
+            args=(
+                os.fdopen(csr, "rb"),
+                os.fdopen(scw, "wb"),
+                False,
+                hdlcc.lsp.HdlccLanguageServer,
+            ),
+        )
 
         self.server_thread.daemon = True
         self.server_thread.start()
 
         # Object being tested is the server thread. Avoid both objects
         # competing for the same cache by using the raw Python language server
-        self.client = PythonLanguageServer(os.fdopen(scr, 'rb'),
-                                           os.fdopen(csw, 'wb'),
-                                           start_io_lang_server)
+        self.client = PythonLanguageServer(
+            os.fdopen(scr, "rb"), os.fdopen(csw, "wb"), start_io_lang_server
+        )
 
         self.client_thread = Thread(target=_startClient, args=[self.client])
         self.client_thread.daemon = True
@@ -105,42 +116,55 @@ class _ClientServer(object):  # pylint: disable=useless-object-inheritance,too-f
 with such.A("hdlcc server") as it:
 
     _SERVER_BASE_CMD = [
-        'coverage', 'run', p.join(HDLCC_BASE_PATH, 'hdlcc', 'server.py'),
-        '--log-level', SERVER_LOG_LEVEL,
-        '--stdout', p.join(TEST_LOG_PATH, 'hdlcc-stdout.log'),
-        '--stderr', p.join(TEST_LOG_PATH, 'hdlcc-stderr.log'),
-        '--log-stream', p.join(TEST_LOG_PATH, 'tests.log')]
+        "coverage",
+        "run",
+        p.join(HDLCC_BASE_PATH, "hdlcc", "server.py"),
+        "--log-level",
+        SERVER_LOG_LEVEL,
+        "--stdout",
+        p.join(TEST_LOG_PATH, "hdlcc-stdout.log"),
+        "--stderr",
+        p.join(TEST_LOG_PATH, "hdlcc-stderr.log"),
+        "--log-stream",
+        p.join(TEST_LOG_PATH, "tests.log"),
+    ]
 
-    with it.having('http server'):
+    with it.having("http server"):
+
         def startCodeCheckerServer():
-            it._host = '127.0.0.1'
+            it._host = "127.0.0.1"
             it._port = str(_getUnusedLocalhostPort())
-            it._url = 'http://{0}:{1}'.format(it._host, it._port)
+            it._url = "http://{0}:{1}".format(it._host, it._port)
 
-            cmd = list(_SERVER_BASE_CMD) + \
-                    ['--host', it._host,
-                     '--port', str(it._port)]
+            cmd = list(_SERVER_BASE_CMD) + ["--host", it._host, "--port", str(it._port)]
 
             _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
             stdout_r, stdout_w = os.pipe()
             stderr_r, stderr_w = os.pipe()
 
-            it.stdout = os.fdopen(stdout_r, 'rb')
-            it.stderr = os.fdopen(stderr_r, 'rb')
+            it.stdout = os.fdopen(stdout_r, "rb")
+            it.stderr = os.fdopen(stderr_r, "rb")
 
-            it._server = subp.Popen(cmd, env=os.environ.copy(),
-                                    stdout=os.fdopen(stdout_w, 'wb'),
-                                    stderr=os.fdopen(stderr_w, 'wb'))
+            it._server = subp.Popen(
+                cmd,
+                env=os.environ.copy(),
+                stdout=os.fdopen(stdout_w, "wb"),
+                stderr=os.fdopen(stderr_w, "wb"),
+            )
             waitForServer()
 
         def startCodeCheckerServerAttachedToPid(pid):
-            it._url = 'http://{0}:{1}'.format(it._host, it._port)
+            it._url = "http://{0}:{1}".format(it._host, it._port)
 
-            cmd = list(_SERVER_BASE_CMD) + \
-                    ['--host', it._host,
-                     '--port', str(it._port),
-                     '--attach-to-pid', str(pid)]
+            cmd = list(_SERVER_BASE_CMD) + [
+                "--host",
+                it._host,
+                "--port",
+                str(it._port),
+                "--attach-to-pid",
+                str(pid),
+            ]
 
             _logger.info("Starting hdlcc server with '%s'", " ".join(cmd))
 
@@ -151,7 +175,7 @@ with such.A("hdlcc server") as it:
             # Wait until the server is up and replying
             for i in range(30):
                 try:
-                    reply = requests.post(it._url + '/get_diagnose_info')
+                    reply = requests.post(it._url + "/get_diagnose_info")
                     if reply.ok:
                         _logger.info("Server replied OK after %d attempts", i)
                         return
@@ -170,10 +194,10 @@ with such.A("hdlcc server") as it:
             for i in range(30):
                 #  time.sleep(1)
                 _logger.info("Elapsed %ds", i)
-                _ = requests.post(it._url + '/get_messages_by_path', data)
-                ui_messages = requests.post(it._url + '/get_ui_messages', data)
+                _ = requests.post(it._url + "/get_messages_by_path", data)
+                ui_messages = requests.post(it._url + "/get_ui_messages", data)
                 _logger.debug("==> %s", ui_messages.json)
-                if ui_messages.json['ui_messages'] == []:
+                if ui_messages.json["ui_messages"] == []:
                     _logger.info("Ok, done")
                     return
 
@@ -189,8 +213,9 @@ with such.A("hdlcc server") as it:
         def test():
             startCodeCheckerServer()
             # Ensure the server is active
-            reply = requests.post(it._url + '/get_diagnose_info',
-                                  data={'project_file' : 'some_project'})
+            reply = requests.post(
+                it._url + "/get_diagnose_info", data={"project_file": "some_project"}
+            )
             it.assertTrue(reply.ok)
 
         @it.should("shutdown the server when requested")
@@ -198,7 +223,7 @@ with such.A("hdlcc server") as it:
         def test():
             # Send a request to the shutdown addr
             with it.assertRaises(requests.ConnectionError):
-                reply = requests.post(it._url + '/shutdown')
+                reply = requests.post(it._url + "/shutdown")
                 it.assertFalse(reply.ok)
 
             it._server.terminate()
@@ -209,7 +234,7 @@ with such.A("hdlcc server") as it:
 
             queue = Queue()
 
-            proc = Process(target=doNothing, args=(queue, ))
+            proc = Process(target=doNothing, args=(queue,))
             proc.start()
 
             _logger.info("Started dummy process with PID %d", proc.pid)
@@ -223,78 +248,94 @@ with such.A("hdlcc server") as it:
                 _logger.warning("Dummy process %d was still running", proc.pid)
                 proc.terminate()
                 time.sleep(1)
-                it.assertFalse(isProcessRunning(proc.pid),
-                               "Process %d is still running after terminating "
-                               "it!" % proc.pid)
+                it.assertFalse(
+                    isProcessRunning(proc.pid),
+                    "Process %d is still running after terminating " "it!" % proc.pid,
+                )
 
             time.sleep(1)
             _logger.info("Server should have died by now")
 
             with it.assertRaises(requests.ConnectionError):
-                requests.post(it._url + '/get_diagnose_info')
+                requests.post(it._url + "/get_diagnose_info")
 
-    with it.having('LSP server'):
+    with it.having("LSP server"):
+
         @it.should("initialize with no project file")
         @disableVunit
         def test():
             client_server = _ClientServer()
             response = client_server.client._endpoint.request(
-                'initialize',
-                {'rootPath': uris.from_fs_path(TEST_TEMP_PATH),
-                 'initializationOptions': {}}).result(timeout=CALL_TIMEOUT)
+                "initialize",
+                {
+                    "rootPath": uris.from_fs_path(TEST_TEMP_PATH),
+                    "initializationOptions": {},
+                },
+            ).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)
-            it.assertEqual(response, {'capabilities': {'textDocumentSync': 1}})
+            it.assertEqual(response, {"capabilities": {"textDocumentSync": 1}})
 
         @it.should("show message with reason for failing to start")
         @disableVunit
         def test():
-
             def start_io_lang_server(*_):
-                assert False, 'Expected fail to trigger the test'
+                assert False, "Expected fail to trigger the test"
 
-            args = type('args', (object, ),
-                        {'lsp': True,
-                         'log_level': SERVER_LOG_LEVEL,
-                         'stderr': p.join(TEST_LOG_PATH, 'hdlcc-stderr.log'),
-                         'log_stream': p.join(TEST_LOG_PATH, 'tests.log'),
-                         'color': None,
-                         'attach_to_pid': None})
+            args = type(
+                "args",
+                (object,),
+                {
+                    "lsp": True,
+                    "log_level": SERVER_LOG_LEVEL,
+                    "stderr": p.join(TEST_LOG_PATH, "hdlcc-stderr.log"),
+                    "log_stream": p.join(TEST_LOG_PATH, "tests.log"),
+                    "color": None,
+                    "attach_to_pid": None,
+                },
+            )
 
             # Python 2 won't allow to mock sys.stdout.write directly
             import sys
+
             stdout = mock.MagicMock(spec=sys.stdout)
             stdout.write = mock.MagicMock(spec=sys.stdout.write)
 
-            with mock.patch('hdlcc.server.start_io_lang_server', start_io_lang_server):
-                with mock.patch('hdlcc.server.sys.stdout', stdout):
+            with mock.patch("hdlcc.server.start_io_lang_server", start_io_lang_server):
+                with mock.patch("hdlcc.server.sys.stdout", stdout):
                     with it.assertRaises(AssertionError):
                         hdlcc.server.run(args)
 
-            assertion_msg = "\'Expected fail to trigger the test\'"
+            assertion_msg = "'Expected fail to trigger the test'"
 
             # Don't know why Python 2 adds an extra comma to the msg
             if six.PY2:
                 assertion_msg += ","
 
             # Build up the expected response
-            body = json.dumps({
-                "method": "window/showMessage",
-                "jsonrpc": JSONRPC_VERSION,
-                "params": {
-                    "message":
-                        "Unable to start HDLCC LSP server: "
-                        "\'AssertionError(" + assertion_msg + ")\'! "
+            body = json.dumps(
+                {
+                    "method": "window/showMessage",
+                    "jsonrpc": JSONRPC_VERSION,
+                    "params": {
+                        "message": "Unable to start HDLCC LSP server: "
+                        "'AssertionError(" + assertion_msg + ")'! "
                         "Check " + p.abspath(args.stderr) + " for more info",
-                    "type": 1}})
+                        "type": 1,
+                    },
+                }
+            )
 
-            response = ("Content-Length: {}\r\n"
-                        "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-                        "{}".format(len(body), body))
+            response = (
+                "Content-Length: {}\r\n"
+                "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
+                "{}".format(len(body), body)
+            )
 
             stdout.write.assert_called_once_with(response)
 
-    with it.having('LSP server executable'):
+    with it.having("LSP server executable"):
+
         def assertCommandPrints(cmd, stdout, **kwargs):
             _logger.debug("Running command: %s", cmd)
             output = subp.check_output(cmd, **kwargs).decode().strip()
@@ -302,37 +343,42 @@ with such.A("hdlcc server") as it:
 
         @it.should("report version correctly")
         def test():
-            assertCommandPrints(['hdlcc', '--version'], hdlcc.__version__)
+            assertCommandPrints(["hdlcc", "--version"], hdlcc.__version__)
 
         def startServerWrapper(cmd):
             log_file = tempfile.mktemp()
 
-            actual_cmd = cmd + ['--nocolor', '--log-stream', log_file]
+            actual_cmd = cmd + ["--nocolor", "--log-stream", log_file]
 
             _logger.info("Actual command: %s", actual_cmd)
 
-            server = subp.Popen(actual_cmd, stdin=subp.PIPE, stdout=subp.PIPE,
-                                stderr=subp.PIPE)
+            server = subp.Popen(
+                actual_cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE
+            )
 
             # Close stdin so the server exits
-            stdout, stderr = server.communicate('')
+            stdout, stderr = server.communicate("")
 
-            it.assertEqual(stdout, b'',
-                           "stdout should be empty but got\n{}".format(stdout))
+            it.assertEqual(
+                stdout, b"", "stdout should be empty but got\n{}".format(stdout)
+            )
 
-            it.assertEqual(stderr, b'',
-                           "stderr should be empty but got\n{}".format(stdout))
+            it.assertEqual(
+                stderr, b"", "stderr should be empty but got\n{}".format(stdout)
+            )
 
             # On Windows the Popen PID and the *actual* PID don't always match
             # for some reason. Since we're not testing this, just skip the
             # first line
-            log_content = open(log_file, 'rb').read().decode().split('\n')
+            log_content = open(log_file, "rb").read().decode().split("\n")
 
             expected = [
                 "Starting server. Our PID is {}, no parent PID to attach to. "
                 "Version string for hdlcc is '{}'".format(
-                    server.pid, hdlcc.__version__),
-                "Starting HdlccLanguageServer IO language server",]
+                    server.pid, hdlcc.__version__
+                ),
+                "Starting HdlccLanguageServer IO language server",
+            ]
 
             _logger.info("Log content: %s", log_content)
 
@@ -340,18 +386,24 @@ with such.A("hdlcc server") as it:
                 log_content = log_content[1:]
                 expected = expected[1:]
 
-            it.assertEqual(log_content[:len(expected)], expected)
+            it.assertEqual(log_content[: len(expected)], expected)
 
             os.remove(log_file)
 
-
         @it.should("start server given the --lsp flag and setting stderr")
         def test():
-            startServerWrapper(['hdlcc', '--lsp',
-                                '--stderr', p.join(TEST_LOG_PATH, 'hdlcc_stderr.log')])
+            startServerWrapper(
+                [
+                    "hdlcc",
+                    "--lsp",
+                    "--stderr",
+                    p.join(TEST_LOG_PATH, "hdlcc_stderr.log"),
+                ]
+            )
 
         @it.should("start server given the --lsp flag")
         def test():
-            startServerWrapper(['hdlcc', '--lsp', ])
+            startServerWrapper(["hdlcc", "--lsp"])
+
 
 it.createTests(globals())
