@@ -490,7 +490,9 @@ class Database(HashableByKey):
 
         if not units:
             _logger.warning(
-                "Could not find any source defining %s / %s", repr(name), repr(library)
+                "Could not find any source defining name=%s, library=%s",
+                repr(name),
+                repr(library),
             )
             return ()
 
@@ -660,6 +662,7 @@ class Database(HashableByKey):
             chain.from_iterable(
                 self.getPathsDefining(name=name, library=library)
                 for library, name in units_to_build
+                if library not in builtin_libraries
             )
         )
 
@@ -686,12 +689,25 @@ class Database(HashableByKey):
 
                 # Units still needed are the ones we haven't seen before
                 still_needed = deps - units_compiled - own
+                new_units = own - units_compiled
 
                 if still_needed:
                     if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
                         _msg = [(library, name.name) for library, name in still_needed]
                         _logger.debug("%s still needs %s", current_path, _msg)
+                elif not new_units:
+                    # If the current path only defines units that have been
+                    # already compiled, skip it
+                    _logger.debug(
+                        "Path %s has nothing to add, skipping", current_path
+                    )
                 else:
+                    _logger.debug(
+                        "Compiling %s adds %d new units: %s",
+                        current_path,
+                        len(new_units),
+                        new_units,
+                    )
                     yield self.getLibrary(
                         current_path
                     ) or _DEFAULT_LIBRARY_NAME, current_path

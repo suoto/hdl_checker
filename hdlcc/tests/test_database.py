@@ -802,6 +802,12 @@ class TestDirectDependencies(TestCase):
         # If conditions above are respected, direct_dep_b can be anywhere
         self.assertIn(direct_dep_b, sequence)
 
+    def test_build_sequence_units_are_unique(self):
+        # type: (...) -> Any
+        # If a design unit is defined in multiple places, we should not include
+        # all of them
+        self.fail("TODO")
+
     def test_get_correct_dependencies_of_indirect_dep(self):
         # type: (...) -> Any
         self.assertCountEqual(
