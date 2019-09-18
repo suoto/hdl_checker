@@ -30,10 +30,10 @@ from threading import Thread
 import mock
 import requests
 import six
-from pyls import uris
-from pyls.python_ls import PythonLanguageServer, start_io_lang_server
+from pyls import uris  # type: ignore
+from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
 
-from nose2.tools import such
+from nose2.tools import such  # type: ignore
 
 import hdlcc.lsp
 from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
@@ -154,7 +154,7 @@ with such.A("hdlcc server") as it:
             )
             waitForServer()
 
-        def startCodeCheckerServerAttachedToPid(pid):
+        def startServerAttachedToPid(pid):
             it._url = "http://{0}:{1}".format(it._host, it._port)
 
             cmd = list(_SERVER_BASE_CMD) + [
@@ -218,7 +218,7 @@ with such.A("hdlcc server") as it:
             )
             it.assertTrue(reply.ok)
 
-        @it.should("shutdown the server when requested")
+        @it.should("shutdown the server when requested")  # type: ignore
         @disableVunit
         def test():
             # Send a request to the shutdown addr
@@ -229,7 +229,9 @@ with such.A("hdlcc server") as it:
             it._server.terminate()
             terminateProcess(it._server.pid)
 
-        @it.should("terminate when the parent PID is not running anymore")
+        @it.should(  # type: ignore
+            "terminate when the parent PID is not running anymore"
+        )
         def test():
 
             queue = Queue()
@@ -238,7 +240,7 @@ with such.A("hdlcc server") as it:
             proc.start()
 
             _logger.info("Started dummy process with PID %d", proc.pid)
-            startCodeCheckerServerAttachedToPid(proc.pid)
+            startServerAttachedToPid(proc.pid)
             time.sleep(3)
             _logger.info("Allowing the dummy process to finish")
             queue.put(1)
@@ -261,7 +263,7 @@ with such.A("hdlcc server") as it:
 
     with it.having("LSP server"):
 
-        @it.should("initialize with no project file")
+        @it.should("initialize with no project file")  # type: ignore
         @disableVunit
         def test():
             client_server = _ClientServer()
@@ -276,10 +278,10 @@ with such.A("hdlcc server") as it:
             _logger.debug("Response: %s", response)
             it.assertEqual(response, {"capabilities": {"textDocumentSync": 1}})
 
-        @it.should("show message with reason for failing to start")
+        @it.should("show message with reason for failing to start")  # type: ignore
         @disableVunit
         def test():
-            def start_io_lang_server(*_):
+            def _start_io_lang_server(*_): # pylint: disable=invalid-name
                 assert False, "Expected fail to trigger the test"
 
             args = type(
@@ -301,7 +303,7 @@ with such.A("hdlcc server") as it:
             stdout = mock.MagicMock(spec=sys.stdout)
             stdout.write = mock.MagicMock(spec=sys.stdout.write)
 
-            with mock.patch("hdlcc.server.start_io_lang_server", start_io_lang_server):
+            with mock.patch("hdlcc.server.start_io_lang_server", _start_io_lang_server):
                 with mock.patch("hdlcc.server.sys.stdout", stdout):
                     with it.assertRaises(AssertionError):
                         hdlcc.server.run(args)
@@ -341,7 +343,7 @@ with such.A("hdlcc server") as it:
             output = subp.check_output(cmd, **kwargs).decode().strip()
             it.assertEqual(output, stdout)
 
-        @it.should("report version correctly")
+        @it.should("report version correctly")  # type: ignore
         def test():
             assertCommandPrints(["hdlcc", "--version"], hdlcc.__version__)
 
@@ -390,7 +392,9 @@ with such.A("hdlcc server") as it:
 
             os.remove(log_file)
 
-        @it.should("start server given the --lsp flag and setting stderr")
+        @it.should(  # type: ignore
+            "start server given the --lsp flag and setting stderr"
+        )
         def test():
             startServerWrapper(
                 [
@@ -401,7 +405,7 @@ with such.A("hdlcc server") as it:
                 ]
             )
 
-        @it.should("start server given the --lsp flag")
+        @it.should("start server given the --lsp flag")  # type: ignore
         def test():
             startServerWrapper(["hdlcc", "--lsp"])
 

@@ -56,8 +56,8 @@ except ImportError:
 _logger = logging.getLogger(__name__)
 _DEFAULT_LIBRARY_NAME = Identifier("library")
 
-tUnresolvedLibrary = Union[Identifier, None]
-tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
+UnresolvedLibrary = Union[Identifier, None]
+LibraryUnitTuple = Tuple[UnresolvedLibrary, Identifier]
 
 
 class Database(HashableByKey):
@@ -72,7 +72,8 @@ class Database(HashableByKey):
         self._inferred_libraries = set()  # type: Set[Path]
         self._flags = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
-        self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
+        self._path_dependencies_map = {}  # type: Dict[Path, Set[DependencySpec]]
+        self._dependencies = set()  # type: Set[DependencySpec]
         self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
 
         # Use this to know which methods should be cache
@@ -93,6 +94,10 @@ class Database(HashableByKey):
 
     def refresh(self):
         # type: (...) -> Any
+        """
+        Clears caches, inferred libraries and parses and checks if any source
+        should be parsed
+        """
         self._clearLruCaches()
 
         while self._inferred_libraries:
@@ -108,6 +113,9 @@ class Database(HashableByKey):
 
     def configure(self, root_config, root_path):
         # type: (Dict[str, Any], str) -> None
+        """
+        Handles adding sources, libraries and flags from a dict
+        """
         for entry in flattenConfig(root_config, root_path):
             self.addSource(
                 path=entry.path,
@@ -146,7 +154,11 @@ class Database(HashableByKey):
 
         units = frozenset(self._getDesignUnitsByPath(path))
         self._design_units -= units
-        if units:
+
+        dependencies = frozenset(self._getDependenciesByPath(path))
+        self._dependencies -= dependencies
+
+        if units or dependencies:
             clear_lru_caches = True
 
         try:
@@ -174,13 +186,14 @@ class Database(HashableByKey):
             pass
 
         try:
-            del self._dependencies[path]
+            del self._path_dependencies_map[path]
             clear_lru_caches = True
         except KeyError:
             pass
 
         try:
             del self._diags[path]
+            _logger.fatal("Removed diags for %s", p.basename(str(path)))
             clear_lru_caches = True
         except KeyError:
             pass
@@ -194,16 +207,22 @@ class Database(HashableByKey):
         Adds a diagnostic to the diagnostic map. Diagnostics can then be read
         to report processing internals and might make it to the user interface
         """
-        _logger.debug("Adding diagnostic %s", diagnostic)
+        _logger.warning("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
         if diagnostic.filename not in self._diags:
+            _logger.fatal(
+                "Initialized diags for %s", p.basename(str(diagnostic.filename))
+            )
             self._diags[diagnostic.filename] = set()
 
         self._diags[diagnostic.filename].add(diagnostic)
 
     def getDiagnosticsForPath(self, path):
         # type: (Path) -> Iterable[CheckerDiagnostic]
-        self._parseSourceIfNeeded(path)
+        """
+        Returns diagnostics generated a path. It does not trigger any
+        processing or analysis though
+        """
         return self._diags.get(path, ())
 
     def __jsonEncode__(self):
@@ -229,7 +248,7 @@ class Database(HashableByKey):
                         BuildFlagScope.dependencies, ()
                     ),
                 },
-                "dependencies": tuple(self._dependencies.get(path, ())),
+                "dependencies": tuple(self._path_dependencies_map.get(path, ())),
                 "diags": tuple(),
             }
 
@@ -250,6 +269,7 @@ class Database(HashableByKey):
         obj = cls()
         obj._design_units = {x for x in state.pop("design_units")}
         obj._inferred_libraries = {x for x in state.pop("inferred_libraries")}
+        obj._dependencies = set()
         for info in state.pop("sources"):
             path = info.pop("path")
             obj._paths.add(path)
@@ -265,7 +285,8 @@ class Database(HashableByKey):
             obj._flags[path][BuildFlagScope.dependencies] = tuple(
                 info.pop("flags", {}).pop(BuildFlagScope.dependencies.value, ())
             )
-            obj._dependencies[path] = {x for x in info.pop("dependencies")}
+            obj._path_dependencies_map[path] = {x for x in info.pop("dependencies")}
+            obj._dependencies |= obj._path_dependencies_map[path]
             obj._diags[path] = {x for x in info.pop("diags")}
         # pylint: enable=protected-access
 
@@ -305,17 +326,17 @@ class Database(HashableByKey):
         self._libraries[path] = library
 
         # Nothing to resolve if the dependency entry is empty
-        if not self._dependencies.get(path, None):
+        if not self._path_dependencies_map.get(path, None):
             return
 
         # Extract the unresolved dependencies that will be replaced
         unresolved_dependencies = {
-            x for x in self._dependencies[path] if x.library is None
+            x for x in self._path_dependencies_map[path] if x.library is None
         }
 
         # DependencySpec is not mutable, so we actually need to replace the objects
         for dependency in unresolved_dependencies:
-            self._dependencies[path].add(
+            self._path_dependencies_map[path].add(
                 DependencySpec(
                     owner=dependency.owner,
                     name=dependency.name,
@@ -325,11 +346,13 @@ class Database(HashableByKey):
             )
 
         # Safe to remove the unresolved ones
-        self._dependencies[path] -= unresolved_dependencies
+        self._path_dependencies_map[path] -= unresolved_dependencies
+        self._dependencies -= unresolved_dependencies
+        self._dependencies |= set(self._path_dependencies_map[path])
 
     @lru_cache()
     def getLibrary(self, path):
-        # type: (Path) -> tUnresolvedLibrary
+        # type: (Path) -> UnresolvedLibrary
         "Gets a library of a given source (this is likely to be removed)"
         self._parseSourceIfNeeded(path)
         if path not in self._paths:
@@ -366,6 +389,10 @@ class Database(HashableByKey):
 
     def _parseSource(self, path):
         # type: (Path) -> None
+        """
+        Extracts info from a source, taking care of removing previously defined
+        items before
+        """
         # Update the timestamp
         self._parse_timestamp[path] = p.getmtime(str(path))
 
@@ -375,7 +402,8 @@ class Database(HashableByKey):
 
         src_parser = getSourceParserFromPath(path)
         self._design_units |= src_parser.getDesignUnits()
-        self._dependencies[path] = src_parser.getDependencies()
+        self._path_dependencies_map[path] = src_parser.getDependencies()
+        self._dependencies |= set(self._path_dependencies_map[path])
         self._clearLruCaches()
 
     def _clearLruCaches(self):
@@ -397,12 +425,24 @@ class Database(HashableByKey):
         """
         return {x for x in self.design_units if x.owner == path}
 
+    @lru_cache(maxsize=128, typed=False)
+    def _getDependenciesByPath(self, path):  # type: (Path) -> Set[DependencySpec]
+        """
+        Gets the design units for the given path (if any). Differs from the
+        public method in that changes to the file are not checked before
+        running.
+        """
+        return {x for x in self._dependencies if x.owner == path}
+
     def getDependenciesByPath(self, path):
-        # type: (Path) -> Set[DependencySpec]
+        # type: (Path) -> FrozenSet[DependencySpec]
+        """
+        Returns parsed dependencies for the given path
+        """
         self._parseSourceIfNeeded(path)
-        if path not in self._dependencies:
-            return set()
-        return self._dependencies[path]
+        if path not in self._path_dependencies_map:
+            return frozenset()
+        return frozenset(self._path_dependencies_map[path])
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]
@@ -415,7 +455,7 @@ class Database(HashableByKey):
                 yield design_unit.owner
 
     def _inferLibraryIfNeeded(self, path):
-        # type: (Path) -> tUnresolvedLibrary
+        # type: (Path) -> UnresolvedLibrary
         """
         Tries to infer which library the given path should be compiled on by
         looking at where and how the design units it defines are used
@@ -434,7 +474,7 @@ class Database(HashableByKey):
         libraries = set(all_libraries)
 
         if not libraries:
-            _logger.warning("Couldn't work out a library for path %s", path)
+            _logger.info("Couldn't work out a library for path %s", path)
             #  self._diags[path].add(PathNotInProjectFile(path))
             library = None
         elif len(libraries) == 1:
@@ -444,7 +484,7 @@ class Database(HashableByKey):
             _msg = []
             for lib in libraries:
                 _msg.append("%s (x%d)" % (lib, all_libraries.count(lib)))
-            _logger.warning(
+            _logger.info(
                 "Path %s is in %d libraries: %s, using %s",
                 path,
                 len(libraries),
@@ -457,13 +497,13 @@ class Database(HashableByKey):
 
     @lru_cache()
     def getLibrariesReferredByUnit(self, name, library=None):
-        # type: (Identifier, tUnresolvedLibrary) -> List[Identifier]
+        # type: (Identifier, UnresolvedLibrary) -> List[Identifier]
         """
         Gets libraries that the (library, name) pair is used throughout the
         project
         """
         result = []  # List[Identifier]
-        for path, dependencies in self._dependencies.items():
+        for path, dependencies in self._path_dependencies_map.items():
             for dependency in dependencies:
                 library = dependency.library
                 if library is None or name != dependency.name:
@@ -480,7 +520,7 @@ class Database(HashableByKey):
 
     @lru_cache()
     def getPathsDefining(self, name, library=None):
-        # type: (Identifier, tUnresolvedLibrary) -> Iterable[Path]
+        # type: (Identifier, UnresolvedLibrary) -> Iterable[Path]
         """
         Search for paths that define a given name optionally inside a library.
         """
@@ -521,51 +561,54 @@ class Database(HashableByKey):
             paths,
         )
 
-        if len(paths) > 1:
-            for unit in units:
-                self._addDiagnostic(
-                    DependencyNotUnique(
-                        filename=unit.owner,
-                        line_number=tuple(unit.locations)[0][0],
-                        column_number=tuple(unit.locations)[0][1],
-                        design_unit="{}.{}".format(
-                            self.getLibrary(unit.owner), unit.name
-                        ),
-                        actual=unit.owner,
-                        choices=(x.owner for x in units - {unit}),
-                    )
-                )
+        #  if len(paths) > 1:
+        #      for unit in units:
+        #          self._addDiagnostic(
+        #              DependencyNotUnique(
+        #                  filename=unit.owner,
+        #                  line_number=tuple(unit.locations)[0][0],
+        #                  column_number=tuple(unit.locations)[0][1],
+        #                  design_unit="{}.{}".format(
+        #                      self.getLibrary(unit.owner), unit.name
+        #                  ),
+        #                  actual=unit.owner,
+        #                  choices=(x.owner for x in units - {unit}),
+        #              )
+        #          )
 
         return paths
 
-    #  def _reportDependencyNotUnique(self, non_resolved_dependency, actual, choices):
-    #      # type: (...) -> Any
-    #      """
-    #      Reports a dependency failed to be resolved due to multiple files
-    #      defining the required design unit
-    #      """
-    #      locations = non_resolved_dependency.locations or (
-    #          non_resolved_dependency.filename,
-    #          1,
-    #          None,
-    #      )
+    def _reportDependencyNotUnique(self, library, name, choices):
+        # type: (Optional[Identifier], Identifier, Iterable[Path]) -> None
+        """
+        Reports a dependency failed to be resolved due to multiple files
+        defining the required design unit
+        """
+        # Reverse dependency search
+        #  for path, dependencies in self._path_dependencies_map.items():
+        #      # A bit of overkill really. There's going to be one object
+        #      matches =
 
-    #      for filename, line_number, column_number in locations:
-    #          self._outstanding_diags.add(
-    #              DependencyNotUnique(
-    #                  filename=filename,
-    #                  line_number=line_number,
-    #                  column_number=column_number,
-    #                  design_unit="{}.{}".format(
-    #                      non_resolved_dependency.library, non_resolved_dependency.name
-    #                  ),
-    #                  actual=actual.filename,
-    #                  choices=list(choices),
-    #              )
-    #          )
+        for dependency in (
+            dependency
+            for dependency in self._dependencies
+            if (library, name) == (dependency.library, dependency.name)
+        ):
+
+            for location in dependency.locations:
+                _logger.fatal("locations: %s", dependency.locations)
+                self._addDiagnostic(
+                    DependencyNotUnique(
+                        filename=dependency.owner,
+                        line_number=location[0],
+                        column_number=location[1],
+                        design_unit=dependency,
+                        choices=choices,
+                    )
+                )
 
     def getDependenciesUnits(self, path):
-        # type: (Path) -> Set[tLibraryUnitTuple]
+        # type: (Path) -> Set[LibraryUnitTuple]
         """
         Returns design units that should be compiled before compiling the given
         path but only within the project file set. If a design unit can't be
@@ -588,7 +631,7 @@ class Database(HashableByKey):
         # path in question but warn the user that something is not right
         self._parseSourceIfNeeded(path)
 
-        units = set()  # type: Set[tLibraryUnitTuple]
+        units = set()  # type: Set[LibraryUnitTuple]
 
         search_paths = set((path,))
         own_units = {
@@ -604,7 +647,7 @@ class Database(HashableByKey):
                     dependency.name,
                 )
                 for search_path in search_paths
-                for dependency in self._dependencies[search_path]
+                for dependency in self._path_dependencies_map[search_path]
             } - units
 
             _logger.debug(
@@ -621,6 +664,8 @@ class Database(HashableByKey):
 
             for library, name in new_deps:
                 new_paths = set(self.getPathsDefining(name=name, library=library))
+                search_paths |= new_paths
+
                 if not new_paths:
                     _logger.warning(
                         "Couldn't find where %s/%s is defined", library, name
@@ -632,15 +677,10 @@ class Database(HashableByKey):
                         name,
                         new_paths,
                     )
-                    #  self._diags[path].add(DependencyNotUnique(
-                    #      filename=path,
-                    #      design_unit='%s.%s' % (library, name),
-                    #      actual=
-                    #      choices=
-                    #      line_number=
-                    #      column_number=))
 
-                search_paths |= new_paths
+                    self._reportDependencyNotUnique(
+                        library=library, name=name, choices=new_paths
+                    )
 
             _logger.debug("Search paths: %s", search_paths)
 
@@ -654,7 +694,7 @@ class Database(HashableByKey):
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
-        units_compiled = set()  # type: Set[tLibraryUnitTuple]
+        units_compiled = set()  # type: Set[LibraryUnitTuple]
         builtin_libraries = frozenset(builtin_libraries or [])
 
         units_to_build = self.getDependenciesUnits(path)
@@ -683,7 +723,7 @@ class Database(HashableByKey):
 
                 deps = {
                     (x.library or self.getLibrary(x.owner), x.name)
-                    for x in self._dependencies[current_path]
+                    for x in self._path_dependencies_map[current_path]
                     if x.library not in builtin_libraries
                 }
 
@@ -698,9 +738,8 @@ class Database(HashableByKey):
                 elif not new_units:
                     # If the current path only defines units that have been
                     # already compiled, skip it
-                    _logger.debug(
-                        "Path %s has nothing to add, skipping", current_path
-                    )
+                    _logger.debug("Path %s has nothing to add, skipping", current_path)
+                    paths_built.add(current_path)
                 else:
                     _logger.debug(
                         "Compiling %s adds %d new units: %s",

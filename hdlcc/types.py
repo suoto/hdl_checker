@@ -81,6 +81,7 @@ class BuildFlagScope(Enum):
     Scopes of a given set of flags. Values of the items control the actual
     fields extracted from the JSON config
     """
+
     single = "single"
     dependencies = "dependencies"
     all = "global"

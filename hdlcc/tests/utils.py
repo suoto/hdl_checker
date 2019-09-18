@@ -100,7 +100,7 @@ class SourceMock(object):
         self.flags = []  # type: ignore
 
         self.library = library
-        self._dependencies = set()  # type: Set[DependencySpec]
+        self._dependencies = [] # type: List[DependencySpec]
         for dep_spec in dependencies or []:
             _name = dep_spec[0]
             _library = "work"
@@ -110,7 +110,7 @@ class SourceMock(object):
             except ValueError:
                 pass
 
-            self._dependencies.add(
+            self._dependencies.append(
                 DependencySpec(
                     self._filename,
                     Identifier(_name, False),

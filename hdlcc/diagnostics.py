@@ -138,7 +138,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
         """
         return {
             "checker": self.checker,
-            "filename": self.filename,
+            "filename": str(self.filename),
             "error_code": self.error_code,
             "text": self.text,
             "line_number": self.line_number,
@@ -337,23 +337,16 @@ class DependencyNotUnique(CheckerDiagnostic):
     """
 
     def __init__(
-        self,
-        filename,
-        design_unit,
-        actual,
-        choices,
-        line_number=None,
-        column_number=None,
+        self, filename, design_unit, choices, line_number=None, column_number=None
     ):
         _choices = list(choices)
         text = (
-            "Returning dependency '{}' for {}, but there were {} other "
-            "matches:\n{}. The selected option may not be the correct "
-            "one".format(
-                actual,
-                design_unit,
+            "Dependency '{}' (library={}) has {} definitions (files are {}). "
+            "The selected option may not be the correct one".format(
+                design_unit.name,
+                design_unit.library,
                 len(_choices),
-                ", ".join((str(x) for x in _choices)),
+                ", ".join(('"%s"' % x for x in _choices)),
             )
         )
 

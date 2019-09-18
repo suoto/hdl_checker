@@ -29,7 +29,7 @@ from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple, Union
 
 from hdlcc.database import Database
-from hdlcc.diagnostics import PathNotInProjectFile
+from hdlcc.diagnostics import DependencyNotUnique, PathNotInProjectFile
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
@@ -62,11 +62,11 @@ class _Database(Database):
         with disableVunit:
             super(_Database, self).__init__(*args, **kwargs)
 
-    def configure(self, config, reference_path):
+    def configure(self, root_config, root_path):
         # type: (Dict[str, Any], str) -> None
-        # type (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
-        _logger.info("Updating config from\n%s", pformat(config))
-        super(_Database, self).configure(config, reference_path)
+        _logger.info("Updating config from\n%s", pformat(root_config))
+        super(_Database, self).configure(root_config, root_path)
+
         _logger.debug("State after updating:")
 
         _logger.debug("- %d design units:", len(self.design_units))
@@ -76,7 +76,7 @@ class _Database(Database):
         _logger.debug("- %d paths:", len(self._paths))
         for path in self._paths:
             timestamp = self._parse_timestamp[path]
-            dependencies = self._dependencies.get(
+            dependencies = self._path_dependencies_map.get(
                 path, set()
             )  # type: Set[DependencySpec]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
@@ -85,6 +85,30 @@ class _Database(Database):
             _logger.debug("    - %d dependencies:", len(dependencies))
             for dependency in dependencies:
                 _logger.debug("      - %s", dependency)
+
+    def __jsonEncode__(self):
+        state = super(_Database, self).__jsonEncode__()
+        state['__class__'] = 'Database' #super(_Database, self).__class__.__name__
+        return state
+
+    def _configFromSources(self, sources, root_path):
+        "Creates the dict describing the sources and calls self.configure on it"
+        config = []
+        for source in sources:
+            info = {}
+            if source.library:
+                info["library"] = source.library
+            if source.flags:
+                info["flags"] = source.flags
+
+            # Yield a string only or a (str, dict) tuple to test both conversions
+            # (this mimics the supported JSON scheme)
+            if info:
+                config.append((source.filename.name, info))
+            else:
+                config.append(source.filename.name)
+
+        self.configure({"sources": config}, root_path)
 
     def test_getDependenciesUnits(self, path):
         # type: (Path) -> Iterable[Tuple[Identifier, Identifier]]
@@ -122,8 +146,6 @@ class _Database(Database):
         else:
             _logger.info("No cache info for %s", self)
 
-    #  def __jsonEncode__(self):
-
 
 def _path(*args):
     # type: (str) -> str
@@ -134,25 +156,6 @@ def _path(*args):
 def _Path(*args):
     # type: (str) -> Path
     return Path(_path(*args))
-
-
-def _configFromSources(sources):
-    config = []
-    for source in sources:
-        info = {}
-        if source.library:
-            info["library"] = source.library
-        if source.flags:
-            info["flags"] = source.flags
-
-        # Yield a string only or a (str, dict) tuple to test both conversions
-        # (this mimics the supported JSON scheme)
-        if info:
-            config.append((source.filename.name, info))
-        else:
-            config.append(source.filename.name)
-
-    return {"sources": config}
 
 
 class TestDatabase(TestCase):
@@ -256,7 +259,7 @@ class TestDatabase(TestCase):
             ("vhdl", "all", "vhdl", "single", "baz", "flag"),
         )
 
-        self.assertEqual(self.database.getFlags(oof_path), ("oofflag0", "oofflag1"))
+        #  self.assertEqual(self.database.getFlags(oof_path), ("oofflag0", "oofflag1"))
 
         logIterable(
             "Design units:", self.database.getDesignUnitsByPath(foo_path), _logger.info
@@ -359,7 +362,7 @@ class TestDatabase(TestCase):
             ),
         }
 
-        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
 
         # Check libraries before actually testing
         self.assertCountEqual(
@@ -389,40 +392,38 @@ class TestDatabase(TestCase):
     def test_infers_uses_most_common_library_if_needed(self):
         # type: (...) -> Any
         # Given a design unit used in multiple ways, use the most common one
-        self.database.configure(
-            _configFromSources(
-                {
-                    _SourceMock(
-                        filename=_path("file_0.vhd"),
-                        library=None,
-                        design_units=[{"name": "package_0", "type": "package"}],
-                        dependencies=(("lib_a", "some_dependency"),),
-                    ),
-                    _SourceMock(
-                        filename=_path("file_1.vhd"),
-                        library=None,
-                        design_units=[{"name": "package_1", "type": "package"}],
-                        dependencies=(("lib_b", "some_dependency"),),
-                    ),
-                    _SourceMock(
-                        filename=_path("file_2.vhd"),
-                        library=None,
-                        design_units=[{"name": "package_2", "type": "package"}],
-                        dependencies=(("lib_c", "some_dependency"),),
-                    ),
-                    _SourceMock(
-                        filename=_path("file_3.vhd"),
-                        library=None,
-                        design_units=[{"name": "package_2", "type": "package"}],
-                        dependencies=(("lib_a", "some_dependency"),),
-                    ),
-                    _SourceMock(
-                        filename=_path("some_dependency.vhd"),
-                        library=None,
-                        design_units=[{"name": "some_dependency", "type": "package"}],
-                    ),
-                }
-            ),
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_0", "type": "package"}],
+                    dependencies=(("lib_a", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_1.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_1", "type": "package"}],
+                    dependencies=(("lib_b", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_2.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_2", "type": "package"}],
+                    dependencies=(("lib_c", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_3.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_2", "type": "package"}],
+                    dependencies=(("lib_a", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("some_dependency.vhd"),
+                    library=None,
+                    design_units=[{"name": "some_dependency", "type": "package"}],
+                ),
+            },
             TEST_TEMP_PATH,
         )
 
@@ -450,30 +451,26 @@ class TestDatabase(TestCase):
         )
 
     def test_json_encoding_and_decoding(self):
-        database = Database()
+        database = _Database()
 
-        database.configure(
-            _configFromSources(
-                {
-                    _SourceMock(
-                        filename=_path("file_0.vhd"),
-                        library="some_library",
-                        design_units=[{"name": "some_package", "type": "package"}],
-                        dependencies=(
-                            ("work", "relative_dependency"),
-                            ("lib", "direct_dependency"),
-                        ),
+        database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library="some_library",
+                    design_units=[{"name": "some_package", "type": "package"}],
+                    dependencies=(
+                        ("work", "relative_dependency"),
+                        ("lib", "direct_dependency"),
                     ),
-                    _SourceMock(
-                        filename=_path("collateral.vhd"),
-                        library="another_library",
-                        design_units=[
-                            {"name": "collateral_package", "type": "package"}
-                        ],
-                        dependencies=(("work", "foo"), ("lib", "bar")),
-                    ),
-                }
-            ),
+                ),
+                _SourceMock(
+                    filename=_path("collateral.vhd"),
+                    library="another_library",
+                    design_units=[{"name": "collateral_package", "type": "package"}],
+                    dependencies=(("work", "foo"), ("lib", "bar")),
+                ),
+            },
             TEST_TEMP_PATH,
         )
 
@@ -490,38 +487,30 @@ class TestDatabase(TestCase):
         self.assertCountEqual(
             database._inferred_libraries, recovered._inferred_libraries
         )
+        self.assertDictEqual(database._flags, recovered._flags)
         self.assertDictEqual(
-            database._flags,
-            recovered._flags,
-            #  "\n### First: ### \n\n{}\n### Second: ###\n\n{}".format(
-            #      pformat(database._flags), pformat(recovered._flags)
-            #  ),
+            database._path_dependencies_map, recovered._path_dependencies_map
         )
-        self.assertDictEqual(database._dependencies, recovered._dependencies)
 
     def test_removing_a_path_that_was_added(self):
-        self.database.configure(
-            _configFromSources(
-                {
-                    _SourceMock(
-                        filename=_path("file_0.vhd"),
-                        library="some_library",
-                        design_units=[{"name": "some_package", "type": "package"}],
-                        dependencies=(
-                            ("work", "relative_dependency"),
-                            ("lib", "direct_dependency"),
-                        ),
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library="some_library",
+                    design_units=[{"name": "some_package", "type": "package"}],
+                    dependencies=(
+                        ("work", "relative_dependency"),
+                        ("lib", "direct_dependency"),
                     ),
-                    _SourceMock(
-                        filename=_path("collateral.vhd"),
-                        library="another_library",
-                        design_units=[
-                            {"name": "collateral_package", "type": "package"}
-                        ],
-                        dependencies=(("work", "foo"), ("lib", "bar")),
-                    ),
-                }
-            ),
+                ),
+                _SourceMock(
+                    filename=_path("collateral.vhd"),
+                    library="another_library",
+                    design_units=[{"name": "collateral_package", "type": "package"}],
+                    dependencies=(("work", "foo"), ("lib", "bar")),
+                ),
+            },
             TEST_TEMP_PATH,
         )
 
@@ -548,19 +537,15 @@ class TestDatabase(TestCase):
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
     def test_removing_an_existing_path_that_was_not_added(self):
-        self.database.configure(
-            _configFromSources(
-                {
-                    _SourceMock(
-                        filename=_path("collateral.vhd"),
-                        library="another_library",
-                        design_units=[
-                            {"name": "collateral_package", "type": "package"}
-                        ],
-                        dependencies=(("work", "foo"), ("lib", "bar")),
-                    )
-                }
-            ),
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("collateral.vhd"),
+                    library="another_library",
+                    design_units=[{"name": "collateral_package", "type": "package"}],
+                    dependencies=(("work", "foo"), ("lib", "bar")),
+                )
+            },
             TEST_TEMP_PATH,
         )
 
@@ -589,19 +574,15 @@ class TestDatabase(TestCase):
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
     def test_removing_a_non_existing_path_that_was_not_added(self):
-        self.database.configure(
-            _configFromSources(
-                {
-                    _SourceMock(
-                        filename=_path("collateral.vhd"),
-                        library="another_library",
-                        design_units=[
-                            {"name": "collateral_package", "type": "package"}
-                        ],
-                        dependencies=(("work", "foo"), ("lib", "bar")),
-                    )
-                }
-            ),
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("collateral.vhd"),
+                    library="another_library",
+                    design_units=[{"name": "collateral_package", "type": "package"}],
+                    dependencies=(("work", "foo"), ("lib", "bar")),
+                )
+            },
             TEST_TEMP_PATH,
         )
 
@@ -641,43 +622,6 @@ class TestDatabase(TestCase):
         self.assertCountEqual(
             self.database.getDiagnosticsForPath(path), [PathNotInProjectFile(path)]
         )
-
-
-#  class TestIncludesVunit(TestCase):
-#      def setUp(self):
-#          # type: (...) -> Any
-#          _logger.info("Setting up %s", self)
-#          self.database = Database()
-
-#      def tearDown(self):
-#          # type: (...) -> Any
-#          _logger.info("Tearing down %s", self)
-#          del self.database
-
-#      def test_has_vunit_context(self):
-#          # type: (...) -> Any
-#          expected = p.join(
-#              os.environ["TOX_ENV_DIR"],
-#              "lib",
-#              "python%d.%d" % (sys.version_info.major, sys.version_info.minor),
-#              "site-packages",
-#              "vunit",
-#              "vhdl",
-#              "vunit_context.vhd",
-#          )
-
-#          logIterable("Design units:", self.database.design_units, _logger.fatal)
-
-#          self.assertCountEqual(
-#              self.database.getPathsDefining(Identifier("vunit_context")),
-#              {Path(expected)},
-#          )
-#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg
-#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg/
-#          #  _logger.fatal(
-#          #      "context: %s", set(self.database.getPathsDefining(Identifier("vunit_context")))
-#          #  )
-#          #  self.fail("stop")
 
 
 class TestDirectDependencies(TestCase):
@@ -739,24 +683,13 @@ class TestDirectDependencies(TestCase):
             ),
         }
 
-        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
-
-    #  @it.should("find paths defining dependencies")  # type: ignore
-    #  def test():
-    #      # type: (...) -> Any
-    #      paths = it.database.getPathsDefining(
-    #          name=Identifier("common_dep", False), library=Identifier("work", False)
-    #      )
-
-    #      logIterable("paths:", paths, _logger.fatal)
-
-    #      it.fail("stop")
 
     def test_get_correct_dependencies_of_entity_a(self):
         # type: (...) -> Any
@@ -802,18 +735,6 @@ class TestDirectDependencies(TestCase):
         # If conditions above are respected, direct_dep_b can be anywhere
         self.assertIn(direct_dep_b, sequence)
 
-    def test_build_sequence_units_are_unique(self):
-        # type: (...) -> Any
-        # If a design unit is defined in multiple places, we should not include
-        # all of them
-        self.fail("TODO")
-
-    def test_non_unique_units_are_reported(self):
-        # type: (...) -> Any
-        # Design units defined in multiple places should trigger
-        # DependencyNotUnique in the path's diagnostics
-        self.fail("TODO")
-
     def test_get_correct_dependencies_of_indirect_dep(self):
         # type: (...) -> Any
         self.assertCountEqual(
@@ -843,7 +764,7 @@ class TestDirectCircularDependencies(TestCase):
             ),
         }
 
-        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -903,7 +824,7 @@ class TestMultilevelCircularDependencies(TestCase):
             ),
         }
 
-        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -991,8 +912,7 @@ class TestMultilevelCircularDependencies(TestCase):
 #              ),
 #          }
 
-#          self.database.configure(_configFromSources(sources),
-#          TEST_TEMP_PATH)
+#          self.database._configFromSources(sources, TEST_TEMP_PATH)
 
 #      def tearDown(self):
 #          # type: (...) -> Any
@@ -1044,7 +964,7 @@ class TestIndirectLibraryInference(TestCase):
             ),
         }
 
-        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -1069,3 +989,115 @@ class TestIndirectLibraryInference(TestCase):
         )
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
+
+
+class TestUnitsDefinedInMultipleSources(TestCase):
+    def setUp(self):
+        # type: (...) -> Any
+        _logger.info("Setting up %s", self)
+        self.database = _Database()
+
+        sources = {
+            _SourceMock(
+                filename=_path("no_lib_target.vhd"),
+                library=None,
+                design_units=[{"name": "no_lib_target", "type": "entity"}],
+                dependencies=[
+                    ("work", "no_lib_package"),
+                    ("work", "dependency"),
+                    ("work", "no_lib_package"),
+                ],
+            ),
+            _SourceMock(
+                filename=_path("dependency.vhd"),
+                library=None,
+                design_units=[{"name": "dependency", "type": "package"}],
+            ),
+            _SourceMock(
+                filename=_path("no_lib_package_1.vhd"),
+                library=None,
+                design_units=[{"name": "no_lib_package", "type": "package"}],
+            ),
+            _SourceMock(
+                filename=_path("no_lib_package_2.vhd"),
+                library=None,
+                design_units=[{"name": "no_lib_package", "type": "package"}],
+            ),
+            _SourceMock(
+                filename=_path("collateral.vhd"),
+                library=None,
+                design_units=[{"name": "collateral", "type": "package"}],
+            ),
+        }
+
+        self.database._configFromSources(sources, TEST_TEMP_PATH)
+
+    def tearDown(self):
+        # type: (...) -> Any
+        _logger.info("Tearing down %s", self)
+        self.database.test_reportCacheInfo()
+        del self.database
+
+    def test_build_sequence_units_are_unique(self):
+        # type: (...) -> Any
+        # If a design unit is defined in multiple places, we should not include
+        # all of them
+
+        # The exact one picked is not fixed (but it has to be constant
+        # throughout a session to avoid bouncing)
+        self.assertIn(
+            set(self.database.test_getBuildSequence(_Path("no_lib_target.vhd"))),
+            (
+                {
+                    (Identifier("library"), _Path("dependency.vhd")),
+                    (Identifier("library"), _Path("no_lib_package_1.vhd")),
+                },
+                {
+                    (Identifier("library"), _Path("dependency.vhd")),
+                    (Identifier("library"), _Path("no_lib_package_2.vhd")),
+                },
+            ),
+        )
+
+    def test_non_unique_units_are_reported(self):
+        # type: (...) -> Any
+
+        # Design units defined in multiple places should trigger
+        # DependencyNotUnique in the path's diagnostics
+
+        # Need to get the build sequence before this diag is populated
+        list(self.database.test_getBuildSequence(_Path("no_lib_target.vhd")))
+
+        logIterable("all diags", self.database._diags.items(), _logger.info)
+
+        self.assertCountEqual(
+            {
+                DependencyNotUnique(
+                    filename=_Path("no_lib_target.vhd"),
+                    design_unit=DependencySpec(
+                        owner=_Path("no_lib_target.vhd"),
+                        name=Identifier("no_lib_package", False),
+                    ),
+                    choices={
+                        _Path("no_lib_package_1.vhd"),
+                        _Path("no_lib_package_2.vhd"),
+                    },
+                    line_number=2,
+                    column_number=5,
+                ),
+                DependencyNotUnique(
+                    filename=_Path("no_lib_target.vhd"),
+                    design_unit=DependencySpec(
+                        owner=_Path("no_lib_target.vhd"),
+                        name=Identifier("no_lib_package", False),
+                    ),
+                    choices={
+                        _Path("no_lib_package_1.vhd"),
+                        _Path("no_lib_package_2.vhd"),
+                    },
+                    line_number=4,
+                    column_number=5,
+                ),
+            },
+            self.database.getDiagnosticsForPath(_Path("no_lib_target.vhd")),
+        )

@@ -111,7 +111,7 @@ class TestBuilder(TestCase):
         self.builder = builder_class(
             _temp("_%s" % self.builder_name), mock.MagicMock()
         )  # type: AnyBuilder
-        self.builder_class = builder_class  # type: ignore
+        self.builder_class = builder_class
 
     def tearDown(self):
         # type: (...) -> Any
