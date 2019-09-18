@@ -19,8 +19,6 @@ from collections import namedtuple
 from enum import Enum
 from typing import Tuple, Union
 
-import six
-
 from hdlcc.path import Path
 
 BuildFlags = Tuple[str, ...]
@@ -78,26 +76,11 @@ class FileType(Enum):
         return cls(state["value"])
 
 
-class SourceEntry(namedtuple("SourceEntry", ("path", "library", "flags"))):
-    """
-    Placeholder for a source definintion that will get added to the database
-    """
-
-    @classmethod
-    def _make(cls, iterable):  # pylint: disable=arguments-differ
-        path = iterable
-        info = {}
-
-        if not isinstance(path, six.string_types):
-            path = iterable[0]
-            info = iterable[1]
-
-        library = info.get("library", None)
-        flags = info.get("flags", tuple())
-
-        return super(SourceEntry, cls)._make([path, library, flags])
-
 class BuildFlagScope(Enum):
-    single = 'single'
-    dependencies = 'dependencies'
-    all = 'all'
+    """
+    Scopes of a given set of flags. Values of the items control the actual
+    fields extracted from the JSON config
+    """
+    single = "single"
+    dependencies = "dependencies"
+    all = "global"

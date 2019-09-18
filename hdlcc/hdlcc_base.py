@@ -43,7 +43,6 @@ from hdlcc.types import (
     RebuildLibraryUnit,
     RebuildPath,
     RebuildUnit,
-    SourceEntry,
 )
 from hdlcc.utils import removeDirIfExists, toBytes
 
@@ -91,8 +90,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         #  if config
         if base_config:
             _logger.warning(
-                "Some configuration elements weren't used:\n%s",
-                pformat(base_config),
+                "Some configuration elements weren't used:\n%s", pformat(base_config)
             )
             assert False
 

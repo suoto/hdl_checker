@@ -21,20 +21,26 @@
 import json
 import logging
 import os.path as p
-#  import os.path as p
+from collections import namedtuple
 from multiprocessing.pool import ThreadPool as Pool
-from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple, Type, Union
+
+import six
 
 from .parsers.verilog_parser import VerilogParser
 from .parsers.vhdl_parser import VhdlParser
 
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags, BuildFlagScope, FileType, SourceEntry
+from hdlcc.types import BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
 
 tSourceFile = Union[VhdlParser, VerilogParser]
+
+if six.PY3:
+    JSONDecodeError = json.decoder.JSONDecodeError
+else:
+    JSONDecodeError = ValueError
 
 
 def _isVhdl(path):  # pragma: no cover
@@ -126,7 +132,7 @@ def getIncludedConfigs(search_paths, root_dir="."):
         # Load the config from the file
         try:
             config = json.load(open(path, "r"))
-        except json.decoder.JSONDecodeError:
+        except JSONDecodeError:
             _logger.warning("Failed to decode file %s", path)
             continue
 
@@ -139,8 +145,34 @@ def getIncludedConfigs(search_paths, root_dir="."):
         yield p.dirname(path), config
 
 
+class JsonSourceEntry(namedtuple("JsonSourceEntry", ("path", "library", "flags"))):
+    """
+    Converts different methods of representing a source on the JSON file to a
+    saner named tuple
+    """
+
+    @classmethod
+    def _make(cls, iterable):  # pylint: disable=arguments-differ
+        path = iterable
+        info = {}
+
+        if not isinstance(path, six.string_types):
+            path = iterable[0]
+            info = iterable[1]
+
+        library = info.get("library", None)
+        flags = info.get("flags", tuple())
+
+        return super(JsonSourceEntry, cls)._make([path, library, flags])
+
+
+SourceEntry = namedtuple(
+    "SourceEntry", ("path", "library", "single_flags", "dependencies_flags")
+)
+
+
 def flattenConfig(root_config, root_path):
-    # type: (Dict[str, Any], str) -> Iterable[Tuple[Path, str, BuildFlags, BuildFlags]]
+    # type: (Dict[str, Any], str) -> Iterable[SourceEntry]
     """
     Expands the given root config and also recursively expands included JSON
     files as well
@@ -148,17 +180,17 @@ def flattenConfig(root_config, root_path):
     # Extract included paths and yield those results first
     include_paths = root_config.pop("include", ())
     for config_path, config in getIncludedConfigs(include_paths, root_path):
-        for source in _expand(config, config_path):
-            yield source
+        for entry in _expand(config, config_path):
+            yield entry
 
     # Extract sources form the root config last so these are the values that
     # might eventually prevail
-    for source in _expand(root_config, root_path):
-        yield source
+    for entry in _expand(root_config, root_path):
+        yield entry
 
 
 def _expand(config, ref_path):
-    # type: (Dict[str, Any], str) -> Iterable[Tuple[Path, str, BuildFlags, BuildFlags]]
+    # type: (Dict[str, Any], str) -> Iterable[SourceEntry]
     """
     Expands the sources defined in the config dict into a list of tuples
     """
@@ -174,18 +206,18 @@ def _expand(config, ref_path):
         )
 
     for entry in config.pop("sources", ()):
-        source = SourceEntry._make(entry)
+        source = JsonSourceEntry._make(entry)
         path = Path(source.path, ref_path)
 
         filetype = FileType.fromPath(path)
 
         single_flags = flags[filetype][0]
         dependencies_flags = flags[filetype][1]
-        glob = flags[filetype][2]
+        global_flags = flags[filetype][2]
 
-        yield (
+        yield SourceEntry(
             path,
             source.library,
-            tuple(glob) + tuple(single_flags) + tuple(source.flags),
-            tuple(glob) + tuple(dependencies_flags),
+            tuple(global_flags) + tuple(single_flags) + tuple(source.flags),
+            tuple(global_flags) + tuple(dependencies_flags),
         )

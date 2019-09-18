@@ -330,6 +330,8 @@ class TestDatabase(TestCase):
             (),
         )
 
+        oof_path = _Path("oof.vhd")
+
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_B")
@@ -491,9 +493,9 @@ class TestDatabase(TestCase):
         self.assertDictEqual(
             database._flags,
             recovered._flags,
-            "\n### First: ### \n\n{}\n### Second: ###\n\n{}".format(
-                pformat(database._flags), pformat(recovered._flags)
-            ),
+            #  "\n### First: ### \n\n{}\n### Second: ###\n\n{}".format(
+            #      pformat(database._flags), pformat(recovered._flags)
+            #  ),
         )
         self.assertDictEqual(database._dependencies, recovered._dependencies)
 

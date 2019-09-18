@@ -39,7 +39,7 @@ from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import FileType
-from hdlcc.utils import getCachePath, onWindows, removeDuplicates, samefile
+from hdlcc.utils import onWindows, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -371,13 +371,6 @@ def parametrizeClassWithBuilders(cls):
         values += [(name, path)]
 
     return parameterized_class(keys, values)(cls)
-
-
-def removeCacheData():
-    cache_path = getCachePath()
-    if p.exists(cache_path):
-        shutil.rmtree(cache_path)
-        _logger.info("Removed %s", cache_path)
 
 
 def getTestTempPath(name):

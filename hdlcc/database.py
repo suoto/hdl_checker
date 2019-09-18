@@ -45,7 +45,7 @@ from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags, BuildFlagScope, FileType, SourceEntry
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 from hdlcc.utils import HashableByKey, getMostCommonItem, isFileReadable
 
 try:
@@ -108,14 +108,12 @@ class Database(HashableByKey):
 
     def configure(self, root_config, root_path):
         # type: (Dict[str, Any], str) -> None
-        for path, library, single_flags, dependencies_flags in flattenConfig(
-            root_config, root_path
-        ):
+        for entry in flattenConfig(root_config, root_path):
             self.addSource(
-                path=path,
-                library=library,
-                single_flags=single_flags,
-                dependencies_flags=dependencies_flags,
+                path=entry.path,
+                library=entry.library,
+                single_flags=entry.single_flags,
+                dependencies_flags=entry.dependencies_flags,
             )
 
     def addSource(self, path, library, single_flags=None, dependencies_flags=None):
