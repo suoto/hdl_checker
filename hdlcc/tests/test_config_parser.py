@@ -39,6 +39,7 @@ from hdlcc.exceptions import UnknownParameterError
 from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.path import Path
 from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport
+from hdlcc.types import BuildFlagScope
 
 _logger = logging.getLogger(__name__)
 
@@ -95,8 +96,17 @@ with such.A("config parser object") as it:
             it.path = Path(tempfile.mktemp())
 
             contents = b"""
-single_build_flags[vhdl] = -single_build_flag_0 -singlebuildflag
-global_build_flags[vhdl] = -global -global-build-flag
+single_build_flags[vhdl] = -single_build_flag_0
+dependencies_build_flags[vhdl] = --vhdl-batch
+global_build_flags[vhdl] = -globalvhdl -global-vhdl-flag
+
+single_build_flags[verilog] = -single_build_flag_0
+dependencies_build_flags[verilog] = --verilog-batch
+global_build_flags[verilog] = -globalverilog -global-verilog-flag
+
+single_build_flags[systemverilog] = -single_build_flag_0
+dependencies_build_flags[systemverilog] = --systemverilog-batch
+global_build_flags[systemverilog] = -globalsystemverilog -global-systemverilog-flag
 
 builder = msim
 target_dir = .build
@@ -129,9 +139,38 @@ systemverilog work bar.sv some sv flag
                 config,
                 {
                     "builder_name": BuilderName.msim.name,
-                    "vhdl": {"flags": ("-global", "-global-build-flag")},
-                    "verilog": {"flags": ()},
-                    "systemverilog": {"flags": ()},
+                    "vhdl": {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalvhdl",
+                                "-global-vhdl-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--vhdl-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    "verilog": {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalverilog",
+                                "-global-verilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--verilog-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    "systemverilog": {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalsystemverilog",
+                                "-global-systemverilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: (
+                                "--systemverilog-batch",
+                            ),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
                 },
             )
 

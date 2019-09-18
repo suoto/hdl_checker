@@ -167,7 +167,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             try:
                 self._dependencies = set(self._getDependencies())
             except:  # pragma: no cover
-                print("failed to parse %s" % self.filename)
+                print("Failed to parse %s" % self.filename)
                 _logger.exception("Failed to parse %s", self.filename)
                 raise
 

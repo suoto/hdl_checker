@@ -25,6 +25,7 @@ import json
 import logging
 import os.path as p
 import time
+from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple, Union
 
 from hdlcc.database import Database
@@ -42,7 +43,7 @@ from hdlcc.tests.utils import (
     logIterable,
     setupTestSuport,
 )
-from hdlcc.types import BuildFlags
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
 
@@ -61,9 +62,11 @@ class _Database(Database):
         with disableVunit:
             super(_Database, self).__init__(*args, **kwargs)
 
-    def addSources(self, entries, root_dir):
-        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
-        super(_Database, self).addSources(entries, root_dir)
+    def configure(self, config, reference_path):
+        # type: (Dict[str, Any], str) -> None
+        # type (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
+        _logger.info("Updating config from\n%s", pformat(config))
+        super(_Database, self).configure(config, reference_path)
         _logger.debug("State after updating:")
 
         _logger.debug("- %d design units:", len(self.design_units))
@@ -134,6 +137,7 @@ def _Path(*args):
 
 
 def _configFromSources(sources):
+    config = []
     for source in sources:
         info = {}
         if source.library:
@@ -144,9 +148,11 @@ def _configFromSources(sources):
         # Yield a string only or a (str, dict) tuple to test both conversions
         # (this mimics the supported JSON scheme)
         if info:
-            yield source.filename.name, info
+            config.append((source.filename.name, info))
         else:
-            yield source.filename.name
+            config.append(source.filename.name)
+
+    return {"sources": config}
 
 
 class TestDatabase(TestCase):
@@ -160,7 +166,7 @@ class TestDatabase(TestCase):
 
     def test_accepts_empty_sources_list(self):
         # type: (...) -> Any
-        self.database.addSources([], TEST_TEMP_PATH)
+        self.database.configure(dict(), TEST_TEMP_PATH)
 
         #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
@@ -174,7 +180,7 @@ class TestDatabase(TestCase):
 
     def test_accepts_empty_dict(self):
         # type: (...) -> Any
-        self.database.addSources({}, TEST_TEMP_PATH)
+        self.database.configure({}, TEST_TEMP_PATH)
 
         #  self.assertEqual(self.database.builder_name, None)
         self.assertCountEqual(self.database.paths, ())
@@ -195,41 +201,72 @@ class TestDatabase(TestCase):
             dependencies={("some_entity",)},
         )
 
-        self.database.addSources(
-            [
-                (_path("foo.vhd"), {"library": "bar", "flags": ("baz", "flag")}),
-                (
-                    _path("oof.vhd"),
-                    {"library": "ooflib", "flags": ("oofflag0", "oofflag1")},
-                ),
-            ],
+        self.database.configure(
+            {
+                "sources": [
+                    (_path("foo.vhd"), {"library": "bar", "flags": ("baz", "flag")}),
+                    (
+                        _path("oof.vhd"),
+                        {"library": "ooflib", "flags": ("oofflag0", "oofflag1")},
+                    ),
+                ],
+                FileType.vhdl.value: {
+                    "flags": {
+                        BuildFlagScope.single.value: ("vhdl", "single"),
+                        BuildFlagScope.dependencies.value: ("vhdl", "dependencies"),
+                        BuildFlagScope.all.value: ("vhdl", "all"),
+                    }
+                },
+                FileType.verilog.value: {
+                    "flags": {
+                        BuildFlagScope.single.value: ("verilog", "single"),
+                        BuildFlagScope.dependencies.value: ("verilog", "dependencies"),
+                        BuildFlagScope.all.value: ("verilog", "all"),
+                    }
+                },
+                FileType.systemverilog.value: {
+                    "flags": {
+                        BuildFlagScope.single.value: ("systemverilog", "single"),
+                        BuildFlagScope.dependencies.value: (
+                            "systemverilog",
+                            "dependencies",
+                        ),
+                        BuildFlagScope.all.value: ("systemverilog", "all"),
+                    }
+                },
+            },
             TEST_TEMP_PATH,
         )
 
-        #  self.assertEqual(self.database.builder_name, BuilderName.fallback)
-        self.assertCountEqual(self.database.paths, (_Path("foo.vhd"), _Path("oof.vhd")))
+        foo_path = _Path("foo.vhd")
+        oof_path = _Path("oof.vhd")
+
+        self.assertCountEqual(self.database.paths, (foo_path, oof_path))
+        self.assertEqual(self.database.getLibrary(foo_path), Identifier("bar", False))
         self.assertEqual(
-            self.database.getLibrary(_Path("foo.vhd")), Identifier("bar", False)
-        )
-        self.assertEqual(
-            self.database.getLibrary(_Path("oof.vhd")), Identifier("ooflib", False)
-        )
-        self.assertEqual(self.database.getFlags(_Path("foo.vhd")), ("baz", "flag"))
-        self.assertEqual(
-            self.database.getFlags(_Path("oof.vhd")), ("oofflag0", "oofflag1")
+            self.database.getLibrary(oof_path), Identifier("ooflib", False)
         )
 
+        self.assertEqual(
+            self.database.getFlags(foo_path, BuildFlagScope.single),
+            ("vhdl", "all", "vhdl", "single", "baz", "flag"),
+        )
+        self.assertEqual(
+            self.database.getFlags(foo_path),
+            ("vhdl", "all", "vhdl", "single", "baz", "flag"),
+        )
+
+        self.assertEqual(self.database.getFlags(oof_path), ("oofflag0", "oofflag1"))
+
         logIterable(
-            "Design units:",
-            self.database.getDesignUnitsByPath(_Path("foo.vhd")),
-            _logger.info,
+            "Design units:", self.database.getDesignUnitsByPath(foo_path), _logger.info
         )
 
         self.assertCountEqual(
-            self.database.getDesignUnitsByPath(_Path("foo.vhd")),
+            self.database.getDesignUnitsByPath(foo_path),
             {
                 VhdlDesignUnit(
-                    owner=_Path("foo.vhd"),
+                    owner=foo_path,
                     name="entity_a",
                     type_=DesignUnitType.entity,
                     locations={(3, None)},
@@ -242,14 +279,14 @@ class TestDatabase(TestCase):
             self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_a")
             ),
-            {_Path("foo.vhd")},
+            {foo_path},
         )
 
         self.assertCountEqual(
             self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(Path(""), DesignUnitType.entity, "ENTITY_A")
             ),
-            {_Path("foo.vhd")},
+            {foo_path},
         )
 
     def test_update_info_if_source_changed(self):
@@ -297,7 +334,7 @@ class TestDatabase(TestCase):
             self.database.getPathsByDesignUnit(
                 VhdlDesignUnit(Path(""), DesignUnitType.entity, "entity_B")
             ),
-            [_Path("foo.vhd"), _Path("oof.vhd")],
+            [_Path("foo.vhd"), oof_path],
         )
 
     def test_update_path_library(self):
@@ -320,7 +357,7 @@ class TestDatabase(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
 
         # Check libraries before actually testing
         self.assertCountEqual(
@@ -350,7 +387,7 @@ class TestDatabase(TestCase):
     def test_infers_uses_most_common_library_if_needed(self):
         # type: (...) -> Any
         # Given a design unit used in multiple ways, use the most common one
-        self.database.addSources(
+        self.database.configure(
             _configFromSources(
                 {
                     _SourceMock(
@@ -413,7 +450,7 @@ class TestDatabase(TestCase):
     def test_json_encoding_and_decoding(self):
         database = Database()
 
-        database.addSources(
+        database.configure(
             _configFromSources(
                 {
                     _SourceMock(
@@ -451,11 +488,17 @@ class TestDatabase(TestCase):
         self.assertCountEqual(
             database._inferred_libraries, recovered._inferred_libraries
         )
-        self.assertDictEqual(database._flags, recovered._flags)
+        self.assertDictEqual(
+            database._flags,
+            recovered._flags,
+            "\n### First: ### \n\n{}\n### Second: ###\n\n{}".format(
+                pformat(database._flags), pformat(recovered._flags)
+            ),
+        )
         self.assertDictEqual(database._dependencies, recovered._dependencies)
 
     def test_removing_a_path_that_was_added(self):
-        self.database.addSources(
+        self.database.configure(
             _configFromSources(
                 {
                     _SourceMock(
@@ -503,7 +546,7 @@ class TestDatabase(TestCase):
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
     def test_removing_an_existing_path_that_was_not_added(self):
-        self.database.addSources(
+        self.database.configure(
             _configFromSources(
                 {
                     _SourceMock(
@@ -544,7 +587,7 @@ class TestDatabase(TestCase):
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
     def test_removing_a_non_existing_path_that_was_not_added(self):
-        self.database.addSources(
+        self.database.configure(
             _configFromSources(
                 {
                     _SourceMock(
@@ -694,7 +737,7 @@ class TestDirectDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -786,7 +829,7 @@ class TestDirectCircularDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -846,7 +889,7 @@ class TestMultilevelCircularDependencies(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any
@@ -934,7 +977,7 @@ class TestMultilevelCircularDependencies(TestCase):
 #              ),
 #          }
 
-#          self.database.addSources(_configFromSources(sources),
+#          self.database.configure(_configFromSources(sources),
 #          TEST_TEMP_PATH)
 
 #      def tearDown(self):
@@ -987,7 +1030,7 @@ class TestIndirectLibraryInference(TestCase):
             ),
         }
 
-        self.database.addSources(_configFromSources(sources), TEST_TEMP_PATH)
+        self.database.configure(_configFromSources(sources), TEST_TEMP_PATH)
 
     def tearDown(self):
         # type: (...) -> Any

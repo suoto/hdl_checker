@@ -59,7 +59,13 @@ from hdlcc.tests.utils import (
     setupTestSuport,
     writeListToFile,
 )
-from hdlcc.types import RebuildLibraryUnit, RebuildPath, RebuildUnit
+from hdlcc.types import (
+    BuildFlagScope,
+    FileType,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+)
 from hdlcc.utils import removeIfExists
 
 _logger = logging.getLogger(__name__)
@@ -180,7 +186,43 @@ with such.A("hdlcc project") as it:
             def getBuilderByName(*args):
                 return MockBuilder
 
-            it.parser = _configWithDict({"builder_name": MockBuilder.builder_name})
+            it.parser = _configWithDict(
+                {
+                    "builder_name": MockBuilder.builder_name,
+                    FileType.vhdl.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalvhdl",
+                                "-global-vhdl-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--vhdl-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    FileType.verilog.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalverilog",
+                                "-global-verilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--verilog-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    FileType.systemverilog.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalsystemverilog",
+                                "-global-systemverilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: (
+                                "--systemverilog-batch",
+                            ),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                }
+            )
 
             with mock.patch("hdlcc.hdlcc_base.getBuilderByName", getBuilderByName):
                 it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
@@ -827,5 +869,6 @@ with such.A("hdlcc project") as it:
                 ui_msgs,
                 [("error", "Unable to build '{}' after 20 attempts".format(filename))],
             )
+
 
 it.createTests(globals())

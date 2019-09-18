@@ -24,7 +24,7 @@ import os.path as p
 import tempfile
 import traceback
 from multiprocessing.pool import ThreadPool
-from typing import Any, AnyStr, Iterable, Set
+from typing import Any, AnyStr, Dict, Iterable, Set
 
 from hdlcc.builder_utils import getBuilderByName
 from hdlcc.builders.fallback import Fallback
@@ -36,7 +36,15 @@ from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
-from hdlcc.types import RebuildInfo, RebuildLibraryUnit, RebuildPath, RebuildUnit
+from hdlcc.types import (
+    BuildFlagScope,
+    FileType,
+    RebuildInfo,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+    SourceEntry,
+)
 from hdlcc.utils import removeDirIfExists, toBytes
 
 CACHE_NAME = "cache.json"
@@ -67,19 +75,26 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # type: (ConfigParser) -> None
         "Updates the database from a configuration parser"
         base_config = parser.parse()
-        _logger.info("Updating with base config: %s", base_config)
+        from pprint import pformat
+
+        _logger.info("Updating with base config:\n%s", pformat(base_config))
 
         builder_cls = getBuilderByName(base_config.pop("builder_name", None))
         self.builder = builder_cls(self.root_dir, self.database)
 
         config_root_path = p.dirname(str(parser.filename))
-        self.database.addSources(base_config.pop("sources", ()), config_root_path)
+        self.database.configure(base_config, config_root_path)
 
-        for config_path, config in getIncludedConfigs(base_config, config_root_path):
-            _logger.debug("Processing additional config: %s", config)
-            # FIXME: Relative paths here must be made absolute using the path
-            # to the included config
-            self.database.addSources(config.pop("sources", ()), config_path)
+        # Add the flags from the root config file last, it should overwrite
+        # values set by the included files
+        #  self.database.addSources(base_config.pop("sources", ()), config_root_path)
+        #  if config
+        if base_config:
+            _logger.warning(
+                "Some configuration elements weren't used:\n%s",
+                pformat(base_config),
+            )
+            assert False
 
     def _getCacheFilename(self):
         # type: () -> Path
@@ -319,7 +334,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 self.database.addSource(
                     temp_path,
                     getattr(library, "display_name", None),
-                    self.database.getFlags(path),
+                    self.database.getFlags(path, BuildFlagScope.single),
+                    self.database.getFlags(path, BuildFlagScope.dependencies),
                 )
 
             filename.file.write(toBytes(content))  # type: ignore

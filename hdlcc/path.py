@@ -21,22 +21,28 @@
 import logging
 import os.path as p
 from os import stat
-from typing import AnyStr
+from typing import AnyStr, Optional
 
 import six
 
 _logger = logging.getLogger(__name__)
 
+if six.PY2:
+    FileNotFoundError = OSError
 
 class Path(object):
     "Path helper class to speed up comparing different paths"
 
-    def __init__(self, name):
-        # type: (str) -> None
+    def __init__(self, name, base_path=None):
+        # type: (str, Optional[str]) -> None
         assert isinstance(
             name, six.string_types
         ), "Invalid type for path: {} ({})".format(name, type(name))
-        self._name = name
+
+        if p.isabs(name) or base_path is None:
+            self._name = name
+        else:
+            self._name = p.join(base_path, name)
         self._stat = None
 
     @property
@@ -82,7 +88,7 @@ class Path(object):
         """Overrides the default implementation"""
         try:
             return p.samestat(self.stat, other.stat)
-        except OSError:
+        except FileNotFoundError:
             # One of the files doesn't exist, so we'll compare the strings only
             return self.abspath == other.abspath
         except AttributeError:

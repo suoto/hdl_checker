@@ -20,7 +20,6 @@ import abc
 import logging
 import os
 import os.path as p
-from collections import namedtuple
 from threading import Lock
 from typing import Any, Dict, Iterable, Optional, Set, Tuple
 
@@ -38,10 +37,6 @@ from hdlcc.types import (
     RebuildUnit,
 )
 
-ParsedRebuilds = namedtuple(
-    "ParsedElement", ["unit_type", "library_name", "unit_name", "rebuild_path"]
-)
-
 
 class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """
@@ -51,11 +46,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     # Set an empty container for the default flags
-    default_flags = {
-        "batch_build_flags": {},
-        "single_build_flags": {},
-        "global_build_flags": {},
-    }  # type: Dict
+    default_flags = {"batch": {}, "single": {}, "global": {}}  # type: Dict
 
     _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
@@ -266,17 +257,23 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Callback called to actually build the source
         """
 
-    def _getFlags(self, path):
-        # type: (Path) -> BuildFlags
+    def _getFlags(self, path, forced=False):
+        # type: (Path, bool) -> BuildFlags
+        """
+        Gets flags to build the path, both builder based and from the database.
+        If a build is forced, assume we're building a single file (not its
+        dependencies)
+        """
         return tuple(self._database.getFlags(path)) + tuple(
-            self.default_flags.get("single_build_flags", {}).get(
+            self.default_flags.get("single" if forced else "batch", {}).get(
                 FileType.fromPath(path), ()
             )
+            + self.default_flags.get("global", {}).get(FileType.fromPath(path), ())
         )
 
     def _buildAndParse(
-        self, path, library
-    ):  # type: (Path, Identifier) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
+        self, path, library, flags
+    ):  # type: (Path, Identifier, BuildFlags) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
         """
         Runs _buildSource method and parses the output to find message
         records and units that should be rebuilt
@@ -292,7 +289,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         diagnostics = set()  # type: Set[CheckerDiagnostic]
         rebuilds = set()  # type: Set[RebuildInfo]
 
-        for line in self._buildSource(path, library, flags=self._getFlags(path)):
+        for line in self._buildSource(path, library, flags=flags):
             if self._shouldIgnoreLine(line):
                 continue
 
@@ -396,7 +393,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         if build:
             with self._lock:
-                diagnostics, rebuilds = self._buildAndParse(path, library)
+                diagnostics, rebuilds = self._buildAndParse(
+                    path, library, self._getFlags(path, forced=forced)
+                )
 
             cached_info["diagnostics"] = diagnostics
             cached_info["rebuilds"] = rebuilds

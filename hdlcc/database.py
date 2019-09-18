@@ -20,7 +20,6 @@
 
 import logging
 import os.path as p
-from collections import namedtuple
 from itertools import chain
 from threading import RLock
 from typing import (
@@ -36,19 +35,17 @@ from typing import (
     Union,
 )
 
-import six
-
 from hdlcc.diagnostics import (
     CheckerDiagnostic,
     DependencyNotUnique,
     PathNotInProjectFile,
 )
-from hdlcc.parser_utils import getSourceParserFromPath
+from hdlcc.parser_utils import flattenConfig, getSourceParserFromPath
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.design_unit import tAnyDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags, FileType
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType, SourceEntry
 from hdlcc.utils import HashableByKey, getMostCommonItem, isFileReadable
 
 try:
@@ -63,26 +60,6 @@ tUnresolvedLibrary = Union[Identifier, None]
 tLibraryUnitTuple = Tuple[tUnresolvedLibrary, Identifier]
 
 
-class SourceEntry(namedtuple("SourceEntry", ("path", "library", "flags"))):
-    """
-    Placeholder for a source definintion that will get added to the database
-    """
-
-    @classmethod
-    def _make(cls, iterable):  # pylint: disable=arguments-differ
-        path = iterable
-        info = {}
-
-        if not isinstance(path, six.string_types):
-            path = iterable[0]
-            info = iterable[1]
-
-        library = info.get("library", None)
-        flags = info.get("flags", tuple())
-
-        return super(SourceEntry, cls)._make([path, library, flags])
-
-
 class Database(HashableByKey):
     "Stores info on and provides operations for a project file set"
 
@@ -93,7 +70,7 @@ class Database(HashableByKey):
         self._parse_timestamp = {}  # type: Dict[Path, float]
         self._libraries = {}  # type: Dict[Path, Identifier]
         self._inferred_libraries = set()  # type: Set[Path]
-        self._flags = {}  # type: Dict[Path, BuildFlags]
+        self._flags = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
         self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
         self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
@@ -129,31 +106,29 @@ class Database(HashableByKey):
         for path in self.paths:
             self._parseSourceIfNeeded(path)
 
-    def addSources(self, entries, root_dir):
-        # type: (Iterable[Tuple[str, Dict[str, Union[str, BuildFlags, None]]]], str) -> None
-        """
-        Updates the database from a iterable containing tuples in the format
-        (path, {"library": library_name, "flags": path_specific_flags})
-        """
-        for entry in entries:
-            try:
-                source = SourceEntry._make(entry)
-                path = source.path
-                if not p.abspath(path):
-                    path = p.join(root_dir, path)
-                self.addSource(Path(path), source.library, source.flags)
-            except:  # pragma: no cover
-                _logger.exception("Failed to convert %s", entry)
-                raise
+    def configure(self, root_config, root_path):
+        # type: (Dict[str, Any], str) -> None
+        for path, library, single_flags, dependencies_flags in flattenConfig(
+            root_config, root_path
+        ):
+            self.addSource(
+                path=path,
+                library=library,
+                single_flags=single_flags,
+                dependencies_flags=dependencies_flags,
+            )
 
-    def addSource(self, path, library, flags):
-        # type: (Path, Optional[str], BuildFlags) -> None
+    def addSource(self, path, library, single_flags=None, dependencies_flags=None):
+        # type: (Path, Optional[str], Optional[BuildFlags], Optional[BuildFlags]) -> None
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
         """
         self._paths.add(path)
-        self._flags[path] = tuple(flags)
+        self._flags[path] = {
+            BuildFlagScope.single: tuple(single_flags or ()),
+            BuildFlagScope.dependencies: tuple(dependencies_flags or ()),
+        }
         if library is not None:
             self._libraries[path] = Identifier(
                 library, case_sensitive=FileType.fromPath(path) != FileType.vhdl
@@ -239,11 +214,23 @@ class Database(HashableByKey):
         """
         state = {"sources": []}
 
+        #  _logger.fatal(
+        #      "flags %s", list((str(key), value) for key, value in self._flags.items())
+        #  )
+
         for path in self._paths:
             source_info = {
                 "path": path,
                 "mtime": self._parse_timestamp[path],
-                "flags": tuple(self._flags.get(path, ())),
+                #  "flags": list((key, value) for key, value in self._flags.items()),
+                "flags": {
+                    BuildFlagScope.single.value: self._flags[path].get(
+                        BuildFlagScope.single, ()
+                    ),
+                    BuildFlagScope.dependencies.value: self._flags[path].get(
+                        BuildFlagScope.dependencies, ()
+                    ),
+                },
                 "dependencies": tuple(self._dependencies.get(path, ())),
                 "diags": tuple(),
             }
@@ -273,21 +260,27 @@ class Database(HashableByKey):
             if "library" in info:
                 obj._libraries[path] = info.pop("library")
 
-            obj._flags[path] = tuple(info.pop("flags"))
+            obj._flags[path] = {}
+            obj._flags[path][BuildFlagScope.single] = tuple(
+                info.get("flags", {}).pop(BuildFlagScope.single.value, ())
+            )
+            obj._flags[path][BuildFlagScope.dependencies] = tuple(
+                info.pop("flags", {}).pop(BuildFlagScope.dependencies.value, ())
+            )
             obj._dependencies[path] = {x for x in info.pop("dependencies")}
             obj._diags[path] = {x for x in info.pop("diags")}
         # pylint: enable=protected-access
 
         return obj
 
-    def getFlags(self, path):
-        # type: (Path) -> BuildFlags
+    def getFlags(self, path, build_mode=None):
+        # type: (Path, Optional[BuildFlagScope]) -> BuildFlags
         """
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
         self._parseSourceIfNeeded(path)
-        return self._flags.get(path, ())
+        return self._flags.get(path, {}).get(build_mode or BuildFlagScope.single, ())
 
     @property
     def paths(self):

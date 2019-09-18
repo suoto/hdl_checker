@@ -83,12 +83,12 @@ class MSim(BaseBuilder):
 
     # Default build flags
     default_flags = {
-        "batch_build_flags": {
+        "batch": {
             FileType.vhdl: ("-defercheck", "-nocheck", "-permissive"),
-            FileType.verilog: ("-permissive"),
-            FileType.systemverilog: ("-permissive"),
+            FileType.verilog: ("-permissive",),
+            FileType.systemverilog: ("-permissive",),
         },
-        "single_build_flags": {
+        "single": {
             FileType.vhdl: (
                 "-check_synthesis",
                 "-lint",
@@ -98,8 +98,8 @@ class MSim(BaseBuilder):
             FileType.verilog: ("-lint", "-hazards", "-pedanticerrors"),
             FileType.systemverilog: ("-lint", "-hazards", "-pedanticerrors"),
         },
-        "global_build_flags": {
-            FileType.vhdl: ("-explicit"),
+        "global": {
+            FileType.vhdl: ("-explicit",),
             FileType.verilog: (),
             FileType.systemverilog: (),
         },
@@ -220,7 +220,7 @@ class MSim(BaseBuilder):
         Gets extra flags configured for the specific language
         """
         libs = []  # type: List[str]
-        for library in self._added_libraries.union(self._external_libraries[lang]):
+        for library in self._added_libraries | self._external_libraries[lang]:
             libs = ["-L", library.name]
         for path in self._include_paths[lang]:
             libs += ["+incdir+" + str(path)]
