@@ -406,4 +406,4 @@ with such.A("hdlcc server") as it:
             startServerWrapper(["hdlcc", "--lsp"])
 
 
-it.createTests(globals())
+#  it.createTests(globals())

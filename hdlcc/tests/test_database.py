@@ -808,6 +808,12 @@ class TestDirectDependencies(TestCase):
         # all of them
         self.fail("TODO")
 
+    def test_non_unique_units_are_reported(self):
+        # type: (...) -> Any
+        # Design units defined in multiple places should trigger
+        # DependencyNotUnique in the path's diagnostics
+        self.fail("TODO")
+
     def test_get_correct_dependencies_of_indirect_dep(self):
         # type: (...) -> Any
         self.assertCountEqual(
