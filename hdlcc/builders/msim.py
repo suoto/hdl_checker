@@ -22,13 +22,13 @@ import re
 from shutil import copyfile
 from typing import Any, Iterable, List, Optional
 
-from .base_builder import BaseBuilder
-
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.types import BuildFlags, FileType
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 from hdlcc.utils import runShellCommand
+
+from .base_builder import BaseBuilder
 
 
 class MSim(BaseBuilder):
@@ -83,12 +83,12 @@ class MSim(BaseBuilder):
 
     # Default build flags
     default_flags = {
-        "batch": {
+        BuildFlagScope.dependencies: {
             FileType.vhdl: ("-defercheck", "-nocheck", "-permissive"),
             FileType.verilog: ("-permissive",),
             FileType.systemverilog: ("-permissive",),
         },
-        "single": {
+        BuildFlagScope.single: {
             FileType.vhdl: (
                 "-check_synthesis",
                 "-lint",
@@ -98,7 +98,7 @@ class MSim(BaseBuilder):
             FileType.verilog: ("-lint", "-hazards", "-pedanticerrors"),
             FileType.systemverilog: ("-lint", "-hazards", "-pedanticerrors"),
         },
-        "global": {
+        BuildFlagScope.all: {
             FileType.vhdl: ("-explicit",),
             FileType.verilog: (),
             FileType.systemverilog: (),

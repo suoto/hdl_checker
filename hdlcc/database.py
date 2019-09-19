@@ -292,14 +292,13 @@ class Database(HashableByKey):
 
         return obj
 
-    def getFlags(self, path, build_mode=None):
+    def getFlags(self, path, scope=None):
         # type: (Path, Optional[BuildFlagScope]) -> BuildFlags
         """
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
-        self._parseSourceIfNeeded(path)
-        return self._flags.get(path, {}).get(build_mode or BuildFlagScope.single, ())
+        return self._flags.get(path, {}).get(scope or BuildFlagScope.single, ())
 
     @property
     def paths(self):

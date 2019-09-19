@@ -207,24 +207,6 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
         super(MockBuilder, self).__init__(target_folder, *args, **kwargs)
 
-        #  mock.patch.object(self, "_buildAndParse", spec=BaseBuilder._buildAndParse).start()
-
-    #  def __jsonEncode__(self):
-    #      state = super(MockBuilder, self).__jsonEncode__()
-    #      del state["_buildAndParse"]
-    #      return state
-
-    #  @classmethod
-    #  def __jsonDecode__(cls, state):
-    #      # type: (...) -> Any
-    #      """
-    #      Returns an object of cls based on a given state
-    #      """
-    #      # pylint: disable=protected-access
-    #      obj = super(MockBuilder, cls).__jsonDecode__(state)
-    #      mock.patch.object(obj, "_buildAndParse", spec=BaseBuilder._buildAndParse).start()
-    #      return obj
-
     def _makeRecords(self, _):  # pragma: no cover
         return []
 

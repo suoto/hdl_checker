@@ -28,8 +28,6 @@ from typing import Any, List
 import mock
 import parameterized  # type: ignore
 import unittest2  # type: ignore
-
-from hdlcc import types as t
 from hdlcc.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
@@ -54,6 +52,7 @@ from hdlcc.tests.utils import (
     parametrizeClassWithBuilders,
     setupTestSuport,
 )
+from hdlcc.types import BuildFlagScope, FileType, LibraryAndUnit
 
 _logger = logging.getLogger(__name__)
 
@@ -400,7 +399,7 @@ class TestBuilder(TestCase):
 
     def test_vhdl_compilation(self):
         # type: (...) -> Any
-        if t.FileType.vhdl not in self.builder_class.file_types:  # type: ignore
+        if FileType.vhdl not in self.builder_class.file_types:  # type: ignore
             raise unittest2.SkipTest(
                 "Builder {} doesn't support VHDL".format(self.builder_name)
             )
@@ -409,7 +408,9 @@ class TestBuilder(TestCase):
         with mock.patch.object(
             self.builder._database, "getLibrary", return_value=Identifier("work")
         ):
-            records, rebuilds = self.builder.build(source, Identifier("work"))
+            records, rebuilds = self.builder.build(
+                source, Identifier("work"), BuildFlagScope.single
+            )
         self.assertNotIn(
             DiagType.ERROR,
             [x.severity for x in records],
@@ -419,7 +420,7 @@ class TestBuilder(TestCase):
 
     def test_verilog_compilation(self):
         # type: (...) -> Any
-        if t.FileType.verilog not in self.builder_class.file_types:  # type: ignore
+        if FileType.verilog not in self.builder_class.file_types:  # type: ignore
             raise unittest2.SkipTest(
                 "Builder {} doesn't support Verilog".format(self.builder_name)
             )
@@ -428,7 +429,9 @@ class TestBuilder(TestCase):
         with mock.patch.object(
             self.builder._database, "getLibrary", return_value=Identifier("work")
         ):
-            records, rebuilds = self.builder.build(source, Identifier("work"))
+            records, rebuilds = self.builder.build(
+                source, Identifier("work"), BuildFlagScope.single
+            )
         self.assertNotIn(
             DiagType.ERROR,
             [x.severity for x in records],
@@ -438,7 +441,7 @@ class TestBuilder(TestCase):
 
     def test_systemverilog_compilation(self):
         # type: (...) -> Any
-        if t.FileType.systemverilog not in self.builder_class.file_types:
+        if FileType.systemverilog not in self.builder_class.file_types:
             raise unittest2.SkipTest(
                 "Builder {} doesn't support SystemVerilog".format(self.builder_name)
             )
@@ -448,7 +451,9 @@ class TestBuilder(TestCase):
         with mock.patch.object(
             self.builder._database, "getLibrary", return_value=Identifier("work")
         ):
-            records, rebuilds = self.builder.build(source, Identifier("work"))
+            records, rebuilds = self.builder.build(
+                source, Identifier("work"), BuildFlagScope.single
+            )
 
         self.assertNotIn(
             DiagType.ERROR,
@@ -463,11 +468,13 @@ class TestBuilder(TestCase):
         source = _source("source_with_error.vhd")
         self.builder._database.getDependenciesByPath = mock.MagicMock(
             return_value=[
-                t.LibraryAndUnit(Identifier("ieee"), Identifier("std_logic_1164"))
+                LibraryAndUnit(Identifier("ieee"), Identifier("std_logic_1164"))
             ]
         )
 
-        records, rebuilds = self.builder.build(source, Identifier("lib"), forced=True)
+        records, rebuilds = self.builder.build(
+            source, Identifier("lib"), forced=True, scope=BuildFlagScope.single
+        )
 
         for record in records:
             _logger.info(record)

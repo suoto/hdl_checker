@@ -30,6 +30,7 @@ from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import (
     BuildFlags,
+    BuildFlagScope,
     FileType,
     RebuildInfo,
     RebuildLibraryUnit,
@@ -46,7 +47,11 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     # Set an empty container for the default flags
-    default_flags = {"batch": {}, "single": {}, "global": {}}  # type: Dict
+    default_flags = {
+        BuildFlagScope.dependencies: {},
+        BuildFlagScope.single: {},
+        BuildFlagScope.all: {},
+    }  # type: Dict[BuildFlagScope, Dict[FileType, BuildFlags]]
 
     _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
@@ -257,18 +262,18 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Callback called to actually build the source
         """
 
-    def _getFlags(self, path, forced=False):
-        # type: (Path, bool) -> BuildFlags
+    def _getFlags(self, path, scope):
+        # type: (Path, BuildFlagScope) -> BuildFlags
         """
         Gets flags to build the path, both builder based and from the database.
         If a build is forced, assume we're building a single file (not its
         dependencies)
         """
-        return tuple(self._database.getFlags(path)) + tuple(
-            self.default_flags.get("single" if forced else "batch", {}).get(
+        return tuple(self._database.getFlags(path, scope)) + tuple(
+            self.default_flags.get(scope, {}).get(FileType.fromPath(path), ())
+            + self.default_flags.get(BuildFlagScope.all, {}).get(
                 FileType.fromPath(path), ()
             )
-            + self.default_flags.get("global", {}).get(FileType.fromPath(path), ())
         )
 
     def _buildAndParse(
@@ -359,8 +364,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         return FileType.fromPath(path) in self.file_types
 
-    def build(self, path, library, forced=False):
-        # type: (Path, Identifier, bool) -> Tuple[Set[CheckerDiagnostic], Set[RebuildInfo]]
+    def build(self, path, library, scope, forced=False):
+        # type: (Path, Identifier, BuildFlagScope, bool) -> Tuple[Set[CheckerDiagnostic], Set[RebuildInfo]]
         """
         Method that interfaces with parents and implements the building
         chain
@@ -394,7 +399,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         if build:
             with self._lock:
                 diagnostics, rebuilds = self._buildAndParse(
-                    path, library, self._getFlags(path, forced=forced)
+                    path, library, self._getFlags(path, scope)
                 )
 
             cached_info["diagnostics"] = diagnostics

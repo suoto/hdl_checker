@@ -363,7 +363,7 @@ with such.A("hdlcc project") as it:
                 ],
             }
 
-            def build(path, library, forced=False):
+            def build(path, library, scope, forced=False):
                 _logger.debug("Building library=%s, path=%s", library, path)
                 path_diags = diags.get(str(path), [])
                 if path_diags:

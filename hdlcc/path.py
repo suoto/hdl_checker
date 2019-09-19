@@ -40,9 +40,10 @@ class Path(object):
         ), "Invalid type for path: {} ({})".format(name, type(name))
 
         if p.isabs(name) or base_path is None:
-            self._name = name
+            _name = name
         else:
-            self._name = p.join(base_path, name)
+            _name = p.join(base_path, name)
+        self._name = p.normpath(_name)
         self._stat = None
 
     @property

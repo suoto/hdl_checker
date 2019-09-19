@@ -205,19 +205,24 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         for dep_library, dep_path in self.database.getBuildSequence(
             path, self.builder.builtin_libraries
         ):
-            for record in self._buildAndHandleRebuilds(dep_path, dep_library):
+            for record in self._buildAndHandleRebuilds(
+                dep_path, dep_library, scope=BuildFlagScope.dependencies
+            ):
                 if record.severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
                     yield record
 
         _logger.info("Built dependencies, now actually building '%s'", str(path))
         library = self.database.getLibrary(path)
         for record in self._buildAndHandleRebuilds(
-            path, library if library is not None else Identifier("work"), forced=True
+            path,
+            library if library is not None else Identifier("work"),
+            scope=BuildFlagScope.single,
+            forced=True,
         ):
             yield record
 
-    def _buildAndHandleRebuilds(self, path, library, forced=False):
-        # type: (Path, Identifier, bool) -> Iterable[CheckerDiagnostic]
+    def _buildAndHandleRebuilds(self, path, library, scope, forced=False):
+        # type: (Path, Identifier, BuildFlagScope, bool) -> Iterable[CheckerDiagnostic]
         """
         Builds the given path and handle any files that might require
         rebuilding until there is nothing to rebuild. The number of iteractions
@@ -228,7 +233,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):
             records, rebuilds = self.builder.build(
-                path=path, library=library, forced=forced
+                path=path, library=library, scope=scope, forced=forced
             )
 
             if rebuilds:
