@@ -28,7 +28,7 @@ from typing import Any, AnyStr, Dict, Iterable, Set
 
 import six
 
-from hdlcc.builder_utils import getBuilderByName, getVunitSources
+from hdlcc.builder_utils import getBuilderByName, getVunitSources, getWorkingBuilders
 from hdlcc.builders.fallback import Fallback
 from hdlcc.database import Database
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
@@ -112,7 +112,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         _logger.info("Updating with base config:\n%s", pformat(config))
 
-        builder_cls = getBuilderByName(config.pop("builder_name", None))
+        builder_name = config.pop("builder_name", None)
+        if builder_name is not None:
+            builder_cls = getBuilderByName(builder_name)
+        else:
+            try:
+                builder_cls = list(getWorkingBuilders()).pop()
+            except IndexError:
+                builder_cls = Fallback
+
         self.builder = builder_cls(self.root_dir, self.database)
 
         self.database.configure(config, str(self.root_dir))

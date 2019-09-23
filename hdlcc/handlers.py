@@ -16,7 +16,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
-import json
 import logging
 import os
 import os.path as p
@@ -30,7 +29,6 @@ import bottle  # type: ignore
 from hdlcc import __version__ as version
 from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders.fallback import Fallback
-from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.path import Path
 from hdlcc.utils import terminateProcess

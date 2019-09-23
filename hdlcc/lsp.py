@@ -49,6 +49,8 @@ PY2 = sys.version_info[0] == 2
 
 URI = str
 
+WORK_PATH = ".hdlcc"
+
 if six.PY2:
     JSONDecodeError = ValueError
     FileNotFoundError = IOError  # pylint: disable=redefined-builtin
@@ -110,33 +112,10 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         self._workspace = workspace
         if root_path is None:
             root_path = tempfile.mkdtemp(prefix="hdlcc_")
+        else:
+            root_path = p.join(root_path, WORK_PATH)
 
         super(HdlCodeCheckerServer, self).__init__(Path(root_path))
-
-    #  def _shouldRecreateTargetDir(self):
-    #      if p.exists(self._getCacheFilename()):
-    #          return False
-
-    #      return self.config_parser.getBuilderName() != 'fallback'
-
-    #  def _setupEnvIfNeeded(self):
-    #      # On LSP, user can't force a fresh rebuild, we'll force a full clean if
-    #      # - Project file is valid and has been modified
-    #      # - Target directory doesn't exist (and NOT using fallback builder)
-    #      #  if self.isSetupRunning() or self.config_parser.isParsing():
-    #      #      _logger.info("Setup already running, jsut chill")
-    #      #      return
-
-    #      should_parse = self._shouldParseProjectFile()
-
-    #      if should_parse or self._shouldRecreateTargetDir():
-    #          if should_parse:
-    #              self._handleUiInfo("Project file has changed, rebuilding project")
-    #          else:
-    #              self._handleUiInfo("Output dir not found, rebuilding project")
-    #          self.clean()
-
-    #      super(HdlCodeCheckerServer, self)._setupEnvIfNeeded()
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
