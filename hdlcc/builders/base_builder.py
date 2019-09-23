@@ -89,25 +89,34 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Returns the file types supported by the builder
         """
 
-    def __init__(self, target_folder, database):
+    def __init__(self, work_folder, database):
         # type: (Path, Database) -> None
         # Shell accesses must be atomic
         self._lock = Lock()
 
         self._logger = logging.getLogger(__package__ + "." + self.builder_name)
         self._database = database
-        self._target_folder = p.abspath(p.expanduser(target_folder.name))
+        self._work_folder = p.abspath(p.expanduser(work_folder.name))
         self._build_info_cache = {}  # type: Dict[Path, Dict[str, Any]]
         self._builtin_libraries = set()  # type: Set[Identifier]
         self._added_libraries = set()  # type: Set[Identifier]
 
-        # Skip creating a folder for the fallback builder
-        if self.builder_name != "fallback":
-            if not p.exists(self._target_folder):
-                self._logger.info("Target folder '%s' was created", self._target_folder)
-                os.makedirs(self._target_folder)
-            else:
-                self._logger.info("%s already exists", self._target_folder)
+        self.setup()
+
+    def setup(self):
+        # type: (...) -> Any
+        """
+        Creates directories and parses builtins libraries
+        """
+        # Fallback builder has no setup
+        if self.builder_name == 'fallback':
+            return
+
+        if not p.exists(self._work_folder):
+            self._logger.info("Target folder '%s' was created", self._work_folder)
+            os.makedirs(self._work_folder)
+        else:
+            self._logger.info("%s already exists", self._work_folder)
 
         self.checkEnvironment()
 
@@ -238,6 +247,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Discovers libraries that exist regardless before we do anything
         """
         raise NotImplementedError
+
+    @property
+    def work_folder(self):
+        # type: (...) -> str
+        """
+        Returns the path to the work folder this builder is using
+        """
+        return self._work_folder
 
     @property
     def builtin_libraries(self):

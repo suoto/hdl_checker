@@ -38,14 +38,9 @@ AnyBuilder = Union[AnyValidBuilder, Fallback]
 
 
 class BuilderName(Enum):
-    @staticmethod
-    def fromString(name):
-        """
-        Returns the enum type from a string. The conversion is case
-        insensitive
-        """
-        name = str(name).lower()
-        return getattr(BuilderName, str(name).lower())
+    """
+    Supported tools
+    """
 
     msim = MSim.builder_name
     xvhdl = XVHDL.builder_name
@@ -108,8 +103,8 @@ _VUNIT_FLAGS = {
 }  # type: Dict[BuilderName, Dict[str, BuildFlags]]
 
 
-def getVunitSources(builder_name):
-    # type: (BuilderName) -> Iterable[Tuple[str, Path, BuildFlags]]
+def getVunitSources(builder):
+    # type: (AnyValidBuilder) -> Iterable[Tuple[Path, str, BuildFlags]]
     "Foo bar"
     if not foundVunit():  # or self._builder_name == BuilderName.fallback:
         return
@@ -120,25 +115,21 @@ def getVunitSources(builder_name):
 
     _logger.info("VUnit installation found")
 
-    builder_class = getBuilderByName(builder_name)
-
     # Prefer VHDL VUnit
-    if FileType.vhdl in builder_class.file_types:
+    if FileType.vhdl in builder.file_types:
         from vunit import VUnit  # pylint: disable=import-error
-    elif FileType.systemverilog in builder_class.file_types:
+    elif FileType.systemverilog in builder.file_types:
         from vunit.verilog import (  # type: ignore # pylint: disable=import-error
             VUnit,
         )
 
         _logger.debug("Builder supports Verilog, using vunit.verilog.VUnit")
-        builder_class.addExternalLibrary("verilog", "vunit_lib")
-        builder_class.addIncludePath(
+        builder.addExternalLibrary("verilog", "vunit_lib")
+        builder.addIncludePath(
             "verilog", p.join(p.dirname(vunit.__file__), "verilog", "include")
         )
     else:  # pragma: no cover
-        _logger.warning(
-            "Vunit found but no file types are supported by %s", builder_name
-        )
+        _logger.warning("Vunit found but no file types are supported by %s", builder)
         return
 
     output_path = mkdtemp()
@@ -149,7 +140,9 @@ def getVunitSources(builder_name):
     flags = tuple()  # type: BuildFlags
     # Get extra flags for building VUnit sources
     try:
-        flags = _VUNIT_FLAGS[builder_name][vunit_project.vhdl_standard]
+        flags = _VUNIT_FLAGS[BuilderName(builder.builder_name)][
+            vunit_project.vhdl_standard
+        ]
     except KeyError:
         pass
 
@@ -164,7 +157,7 @@ def getVunitSources(builder_name):
     for vunit_source_obj in vunit_project.get_compile_order():
         path = p.abspath(vunit_source_obj.name)
         library = vunit_source_obj.library.name
-        yield library, Path(path), flags
+        yield Path(path), library, flags
 
     removeDirIfExists(output_path)
 

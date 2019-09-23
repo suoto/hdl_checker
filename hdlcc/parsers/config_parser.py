@@ -203,7 +203,7 @@ class ConfigParser(object):
         return glob(source_path) or [source_path]
 
     def parse(self):
-        # type: (...) -> Any
+        # type: (...) -> Dict[Any, Any]
         """
         Parses the file if it hasn't been parsed before or if the config file
         has been changed

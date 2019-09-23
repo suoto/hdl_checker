@@ -22,13 +22,14 @@ import re
 from shutil import copyfile
 from typing import Any, Iterable, List, Optional
 
+from .base_builder import BaseBuilder
+
+from hdlcc.database import Database
 from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 from hdlcc.utils import runShellCommand
-
-from .base_builder import BaseBuilder
 
 
 class MSim(BaseBuilder):
@@ -108,11 +109,17 @@ class MSim(BaseBuilder):
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
 
-    def __init__(self, target_folder, *args, **kwargs):
-        # type: (...) -> None
+    def __init__(self, work_folder, database):
+        # type: (Path, Database) -> None
         self._version = ""
-        self._modelsim_ini = Path(p.join(target_folder.name, "modelsim.ini"))
-        super(MSim, self).__init__(target_folder, *args, **kwargs)
+        self._modelsim_ini = Path(p.join(work_folder.name, "modelsim.ini"))
+        super(MSim, self).__init__(work_folder, database)
+
+    def setup(self):
+        # type: (...) -> Any
+        super(MSim, self).setup()
+        if not self._iniFileExists():
+            self._createIniFile()
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -236,7 +243,7 @@ class MSim(BaseBuilder):
             self._modelsim_ini.name,
             "-quiet",
             "-work",
-            p.join(self._target_folder, library.name),
+            p.join(self._work_folder, library.name),
         ]
         if flags:  # pragma: no cover
             cmd += flags
@@ -253,7 +260,7 @@ class MSim(BaseBuilder):
             self._modelsim_ini.name,
             "-quiet",
             "-work",
-            p.join(self._target_folder, library.name),
+            p.join(self._work_folder, library.name),
         ]
 
         if FileType.fromPath(path) == FileType.systemverilog:
@@ -277,7 +284,7 @@ class MSim(BaseBuilder):
             return
 
         self._added_libraries.add(library)
-        if p.exists(p.join(self._target_folder, library.name)):
+        if p.exists(p.join(self._work_folder, library.name)):
             self._logger.debug("Path for library '%s' already exists", library)
             return
         self._mapLibrary(library)
@@ -295,8 +302,8 @@ class MSim(BaseBuilder):
         """
         Adds a library to a non-existent ModelSim init file
         """
-        if not p.exists(self._target_folder):  # pragma: no cover
-            os.makedirs(self._target_folder)
+        if not p.exists(self._work_folder):  # pragma: no cover
+            os.makedirs(self._work_folder)
 
         self._logger.debug("Creating modelsim.ini at '%s'", self._modelsim_ini)
 
@@ -311,11 +318,11 @@ class MSim(BaseBuilder):
             # variable
             copyfile(modelsim_env, self._modelsim_ini.abspath)
         else:
-            runShellCommand(["vmap", "-c"], cwd=self._target_folder)
+            runShellCommand(["vmap", "-c"], cwd=self._work_folder)
 
     def deleteLibrary(self, library):
         "Deletes a library from ModelSim init file"
-        if not p.exists(p.join(self._target_folder, library)):
+        if not p.exists(p.join(self._work_folder, library)):
             self._logger.warning("Library %s doesn't exists", library)
             return None
         return runShellCommand(
@@ -327,7 +334,7 @@ class MSim(BaseBuilder):
         """
         Adds a library to an existing ModelSim init file
         """
-        runShellCommand(["vlib", p.join(self._target_folder, library.name)])
+        runShellCommand(["vlib", p.join(self._work_folder, library.name)])
 
         runShellCommand(
             [
@@ -335,6 +342,6 @@ class MSim(BaseBuilder):
                 "-modelsimini",
                 self._modelsim_ini.name,
                 library.name,
-                p.join(self._target_folder, library.name),
+                p.join(self._work_folder, library.name),
             ]
         )

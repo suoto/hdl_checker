@@ -100,16 +100,10 @@ def patchClassMap(**kwargs):
 
 
 def _configWithDict(dict_):
-    class _ConfigParser(object):
-        _dict = dict_.copy()
-
-        filename = p.join(TEST_TEMP_PATH, "mock.prj")
-
-        def parse(self):
-            return self._dict
-
-    return _ConfigParser()
-
+    # type: (...) -> str
+    filename = p.join(TEST_TEMP_PATH, "mock.prj")
+    json.dump(dict_, open(filename, "w"))
+    return filename
 
 such.unittest.TestCase.maxDiff = None
 
@@ -141,9 +135,9 @@ with such.A("hdlcc project") as it:
 
         @it.should("raise exception when trying to instantiate")
         def test():
-            parser = ConfigParser(it.project_file)
+            project = StandaloneProjectBuilder(_Path("nonexisting"))
             with it.assertRaises((OSError, IOError)):
-                StandaloneProjectBuilder(_Path("nonexisting")).accept(parser)
+                project.readConfig(str(it.project_file))
 
     with it.having("no project file at all"):
 
@@ -151,12 +145,15 @@ with such.A("hdlcc project") as it:
         def setup():
             it.project = StandaloneProjectBuilder(Path(TEST_PROJECT))
 
-        @it.should("use fallback to Fallback builder")
+        @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
             it.assertTrue(isinstance(it.project.builder, Fallback))
 
-        @it.should("still report static messages")
+        @it.should("still report static messages")  # type: ignore
         def test():
+
+            _logger.info("Files: %s", it.project.database._paths)
+
             source = _SourceMock(
                 filename=_path("some_lib_target.vhd"),
                 library="some_lib",
@@ -172,8 +169,7 @@ with such.A("hdlcc project") as it:
                         filename=_Path("some_lib_target.vhd"),
                         line_number=1,
                         column_number=9,
-                    ),
-                    PathNotInProjectFile(source.filename),
+                    )
                 },
             )
 
@@ -183,7 +179,7 @@ with such.A("hdlcc project") as it:
         def setup():
             setupTestSuport(TEST_TEMP_PATH)
 
-            def getBuilderByName(*args):
+            def getBuilderByName(*args):  # pylint: disable=unused-argument
                 return MockBuilder
 
             it.parser = _configWithDict(
@@ -226,13 +222,13 @@ with such.A("hdlcc project") as it:
 
             with mock.patch("hdlcc.hdlcc_base.getBuilderByName", getBuilderByName):
                 it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
-                it.project.accept(it.parser)
+                it.project.readConfig(it.parser)
 
-        @it.should("use fallback to Fallback builder")
+        @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
             it.assertTrue(isinstance(it.project.builder, MockBuilder))
 
-        @it.should("save cache after checking a source")
+        @it.should("save cache after checking a source")  # type: ignore
         def test():
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
@@ -242,7 +238,7 @@ with such.A("hdlcc project") as it:
                 it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
-        @it.should("recover from cache")
+        @it.should("recover from cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
             source = _SourceMock(
@@ -260,7 +256,7 @@ with such.A("hdlcc project") as it:
                 list(it.project.getUiMessages()),
             )
 
-        @it.should("clean up root dir")
+        @it.should("clean up root dir")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
             it.assertMsgQueueIsEmpty(it.project)
@@ -273,7 +269,7 @@ with such.A("hdlcc project") as it:
             # Reset the project to the previous state
             setup()
 
-        @it.should("warn when failing to recover from cache")
+        @it.should("warn when failing to recover from cache")  # type: ignore
         def test():
             # Save contents before destroying the object
             root_dir = it.project.root_dir
@@ -315,7 +311,7 @@ with such.A("hdlcc project") as it:
                 ),
             )
 
-        @it.should("get builder messages by path")
+        @it.should("get builder messages by path")  # type: ignore
         def test():
             entity_a = _SourceMock(
                 filename=_path("entity_a.vhd"),
@@ -363,7 +359,9 @@ with such.A("hdlcc project") as it:
                 ],
             }
 
-            def build(path, library, scope, forced=False):
+            def build(  # pylint: disable=unused-argument
+                path, library, scope, forced=False
+            ):
                 _logger.debug("Building library=%s, path=%s", library, path)
                 path_diags = diags.get(str(path), [])
                 if path_diags:
@@ -405,7 +403,9 @@ with such.A("hdlcc project") as it:
                         ],
                     )
 
-        @it.should("warn when unable to recreate a builder described in cache")
+        @it.should(  # type: ignore
+            "warn when unable to recreate a builder described in cache"
+        )
         @mock.patch(
             "hdlcc.hdlcc_base.getBuilderByName", new=lambda name: FailingBuilder
         )
@@ -448,7 +448,7 @@ with such.A("hdlcc project") as it:
             #  with disableVunit:
             with mock.patch("hdlcc.hdlcc_base.getBuilderByName", lambda _: MockBuilder):
                 it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
-                it.project.accept(ConfigParser(it.project_file))
+                it.project.readConfig(str(it.project_file))
 
             from pprint import pformat
 
@@ -456,7 +456,7 @@ with such.A("hdlcc project") as it:
                 "Database state:\n%s", pformat(it.project.database.__jsonEncode__())
             )
 
-        @it.should("use mock builder")
+        @it.should("use mock builder")  # type: ignore
         def test():
             it.assertTrue(
                 isinstance(it.project.builder, MockBuilder),
@@ -465,7 +465,7 @@ with such.A("hdlcc project") as it:
                 ),
             )
 
-        @it.should("get messages for an absolute path")
+        @it.should("get messages for an absolute path")  # type: ignore
         def test():
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
@@ -486,7 +486,7 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages for relative path")
+        @it.should("get messages for relative path")  # type: ignore
         def test():
             filename = p.relpath(
                 p.join(TEST_PROJECT, "another_library", "foo.vhd"),
@@ -512,7 +512,7 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages with text")
+        @it.should("get messages with text")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
             original_content = open(filename.name, "r").read().split("\n")
@@ -558,7 +558,9 @@ with such.A("hdlcc project") as it:
             it.assertCountEqual(expected, diagnostics)
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages with text for file outside the project file")
+        @it.should(  # type: ignore
+            "get messages with text for file outside the project file"
+        )
         def test():
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["entity some_entity is end;"])
@@ -593,7 +595,7 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get updated messages")
+        @it.should("get updated messages")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
@@ -624,7 +626,7 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages by path of a different source")
+        @it.should("get messages by path of a different source")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
 
@@ -645,7 +647,9 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages from a source outside the project file")
+        @it.should(  # type: ignore
+            "get messages from a source outside the project file"
+        )
         def test():
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["library some_lib;"])
@@ -698,7 +702,9 @@ with such.A("hdlcc project") as it:
                 name=Identifier(name), library=Identifier(library)
             )
 
-        @it.should("rebuild sources when needed within the same library")
+        @it.should(  # type: ignore
+            "rebuild sources when needed within the same library"
+        )
         def test():
             it.project.database._clearLruCaches()
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
@@ -722,7 +728,9 @@ with such.A("hdlcc project") as it:
                 ],
             )
 
-        @it.should("rebuild sources when changing a package on different libraries")
+        @it.should(  # type: ignore
+            "rebuild sources when changing a package on different libraries"
+        )
         def test():
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [[_RebuildLibraryUnit(library="another_library", name="foo")]]
@@ -778,7 +786,7 @@ with such.A("hdlcc project") as it:
         def _RebuildUnit(name, type_):
             return RebuildUnit(name=Identifier(name), type_=Identifier(type_))
 
-        @it.should("rebuild package if needed")
+        @it.should("rebuild package if needed")  # type: ignore
         def test():
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
@@ -800,7 +808,7 @@ with such.A("hdlcc project") as it:
                 ],
             )
 
-        @it.should("rebuild a combination of all")
+        @it.should("rebuild a combination of all")  # type: ignore
         def test():
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
@@ -834,7 +842,7 @@ with such.A("hdlcc project") as it:
                 ],
             )
 
-        @it.should("give up trying to rebuild after 20 attempts")
+        @it.should("give up trying to rebuild after 20 attempts")  # type: ignore
         def test():
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
@@ -908,5 +916,3 @@ it.createTests(globals())
 #          #      "context: %s", set(self.database.getPathsDefining(Identifier("vunit_context")))
 #          #  )
 #          #  self.fail("stop")
-
-

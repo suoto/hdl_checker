@@ -23,7 +23,7 @@ import os.path as p
 import signal
 import tempfile
 from multiprocessing import Queue
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import bottle  # type: ignore
 
@@ -32,7 +32,6 @@ from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.builders.fallback import Fallback
 from hdlcc.config_generators import getGeneratorByName
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
-from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.path import Path
 from hdlcc.utils import terminateProcess
 
@@ -92,7 +91,7 @@ def _getServerByProjectFile(project_file):
         try:
             project = HdlCodeCheckerServer(root_dir=root_dir)
             if project_file is not None:
-                project.accept(ConfigParser(Path(project_file)))
+                project.readConfig(project_file)
             _logger.debug("Created new project server for '%s'", project_file)
         except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")
@@ -326,8 +325,8 @@ def getBuildSequence():
 
     return {
         "sequence": tuple(
-            str(x)
-            for x, _ in server.database.getBuildSequence(
+            "%s (library: %s)" % (path, library)
+            for library, path in server.database.getBuildSequence(
                 path, server.builder.builtin_libraries
             )
         )

@@ -28,6 +28,7 @@ from typing import Any, List
 import mock
 import parameterized  # type: ignore
 import unittest2  # type: ignore
+
 from hdlcc.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
@@ -41,18 +42,15 @@ from hdlcc.diagnostics import BuilderDiag, DiagType
 from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
-from hdlcc.parsers.vhdl_parser import VhdlParser
 from hdlcc.path import Path
 from hdlcc.tests.utils import (
     SourceMock,
     TestCase,
-    assertSameFile,
     getTestTempPath,
-    logIterable,
     parametrizeClassWithBuilders,
     setupTestSuport,
 )
-from hdlcc.types import BuildFlagScope, FileType, LibraryAndUnit
+from hdlcc.types import BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
 
@@ -106,24 +104,13 @@ class TestBuilder(TestCase):
         assert self.builder_name is not None  # To make mypy happy
 
         builder_class = BUILDER_CLASS_MAP[self.builder_name]
-        _logger.info("Builder class: %s", builder_class)
-        self.builder = builder_class(
-            _temp("_%s" % self.builder_name), mock.MagicMock()
-        )  # type: AnyBuilder
+        work_folder = _temp("_%s" % self.builder_name)
+        _logger.info("Builder class: %s, work folder is %s", builder_class, work_folder)
+        self.builder = builder_class(work_folder, mock.MagicMock())  # type: AnyBuilder
         self.builder_class = builder_class
 
     def tearDown(self):
         # type: (...) -> Any
-        if self.builder_name == "xvhdl":
-            try:
-                os.remove(".xvhdl.init")
-            except OSError:
-                pass
-            try:
-                os.remove("xvhdl.pb")
-            except OSError:
-                pass
-
         if self.builder_path:
             self.patch.stop()
         if p.exists("._%s" % self.builder_name):
@@ -154,10 +141,10 @@ class TestBuilder(TestCase):
         # type: (...) -> Any
         expected = []  # type: List[str]
 
-        if self.builder_name != "fallback":
+        if not isinstance(self.builder, Fallback):
             expected += ["ieee", "std"]
 
-        if self.builder_name == "msim":
+        if isinstance(self.builder, MSim):
             expected += ["modelsim_lib"]
 
         for lib in map(Identifier, expected):
@@ -173,7 +160,7 @@ class TestBuilder(TestCase):
     )
     def test_parse_msim_result(self, path):
         # type: (...) -> Any
-        if self.builder_name != "msim":
+        if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
 
         self.assertEqual(
@@ -337,7 +324,7 @@ class TestBuilder(TestCase):
     )
     def test_parse_ghdl_result(self, path):
         # type: (...) -> Any
-        if self.builder_name != "ghdl":
+        if not isinstance(self.builder, GHDL):
             raise unittest2.SkipTest("GHDL only test")
 
         records = list(
@@ -357,14 +344,6 @@ class TestBuilder(TestCase):
             )
         ]
 
-        _logger.warning("records: %s", records)
-        _logger.warning("records:  %s", list(map(hash, records)))
-        _logger.warning("records:  %s", list(map(type, records)))
-        _logger.warning("expected: %s", list(map(hash, expected)))
-        _logger.warning("expected: %s", list(map(type, expected)))
-
-        #  _logger.warning(" -> %s", records.pop == expected.pop())
-
         self.assertCountEqual(records, expected)
 
     @parameterized.parameterized.expand(
@@ -376,7 +355,7 @@ class TestBuilder(TestCase):
     )
     def test_parse_xvhdl_result(self, path):
         # type: (...) -> Any
-        if self.builder_name != "XVHDL":
+        if not isinstance(self.builder, XVHDL):
             raise unittest2.SkipTest("XVHDL only test")
 
         self.assertEqual(
@@ -389,7 +368,7 @@ class TestBuilder(TestCase):
                 BuilderDiag(
                     builder_name=self.builder_name,
                     text="syntax error near )",
-                    filename=path,
+                    filename=Path(path),
                     line_number=12,
                     error_code="VRFC 10-1412",
                     severity=DiagType.ERROR,
@@ -399,7 +378,7 @@ class TestBuilder(TestCase):
 
     def test_vhdl_compilation(self):
         # type: (...) -> Any
-        if FileType.vhdl not in self.builder_class.file_types:  # type: ignore
+        if FileType.vhdl not in self.builder.file_types:
             raise unittest2.SkipTest(
                 "Builder {} doesn't support VHDL".format(self.builder_name)
             )
@@ -420,7 +399,7 @@ class TestBuilder(TestCase):
 
     def test_verilog_compilation(self):
         # type: (...) -> Any
-        if FileType.verilog not in self.builder_class.file_types:  # type: ignore
+        if FileType.verilog not in self.builder.file_types:
             raise unittest2.SkipTest(
                 "Builder {} doesn't support Verilog".format(self.builder_name)
             )
@@ -441,7 +420,7 @@ class TestBuilder(TestCase):
 
     def test_systemverilog_compilation(self):
         # type: (...) -> Any
-        if FileType.systemverilog not in self.builder_class.file_types:
+        if FileType.systemverilog not in self.builder.file_types:
             raise unittest2.SkipTest(
                 "Builder {} doesn't support SystemVerilog".format(self.builder_name)
             )
@@ -464,13 +443,7 @@ class TestBuilder(TestCase):
 
     def test_catch_a_known_error(self):
         # type: (...) -> Any
-        #  source = VhdlParser(_source("source_with_error.vhd"))
         source = _source("source_with_error.vhd")
-        self.builder._database.getDependenciesByPath = mock.MagicMock(
-            return_value=[
-                LibraryAndUnit(Identifier("ieee"), Identifier("std_logic_1164"))
-            ]
-        )
 
         records, rebuilds = self.builder.build(
             source, Identifier("lib"), forced=True, scope=BuildFlagScope.single
@@ -502,6 +475,7 @@ class TestBuilder(TestCase):
                 )
             ]
         elif self.builder_name == "xvhdl":
+            # XVHDL reports different errors depending on the version
             expected = [
                 BuilderDiag(
                     filename=source,
@@ -521,30 +495,21 @@ class TestBuilder(TestCase):
                 ),
             ]
 
-        if self.builder_name != "fallback":
-            self.assertEqual(len(records), 1)
-            record = records.pop()
-            #  assertSameFile(self)(record.filename, source.abspath)
+        if not isinstance(self.builder, Fallback):
             self.assertEqual(
-                record.filename,
-                source,
-                "{} != {}".format(repr(record.filename), repr(source)),
+                len(records),
+                1,
+                "Expected only one record but got {}".format(len(records)),
             )
-
-            #  # By this time the path to the file is the same, so we'll force the
-            #  # expected record's filename to use the __eq__ operator
-            #  for expected_diag in expected:
-            #      expected_diag.filename = source.
-
-            self.assertIn(record, expected)
+            self.assertIn(records.pop(), expected)
         else:
-            self.assertEqual(records, set())
+            self.assertFalse(records)
 
         self.assertFalse(rebuilds)
 
     def test_msim_recompile_msg_0(self):
         # type: (...) -> Any
-        if self.builder_name != "msim":
+        if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
 
         line = (
@@ -559,7 +524,7 @@ class TestBuilder(TestCase):
 
     def test_msim_recompile_msg_1(self):
         # type: (...) -> Any
-        if self.builder_name != "msim":
+        if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
 
         line = (
@@ -574,7 +539,7 @@ class TestBuilder(TestCase):
 
     def test_ghdl_recompile_msg(self):
         # type: (...) -> Any
-        if self.builder_name != "ghdl":
+        if not isinstance(self.builder, GHDL):
             raise unittest2.SkipTest("GHDL only test")
 
         line = 'somefile.vhd:12:13: package "leon3" is obsoleted by package "amba"'
@@ -607,6 +572,7 @@ class TestBuilder(TestCase):
             ({"rebuild_path": "some_path"}, RebuildPath("some_path")),
         ]
     )
+
     def test_get_rebuilds(self, rebuild_info, expected):
         # type: (...) -> Any
         _logger.info("Rebuild info is %s", rebuild_info)

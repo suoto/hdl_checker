@@ -37,6 +37,7 @@ from hdlcc.diagnostics import (
     ObjectIsNeverUsed,
     StaticCheckerDiag,
 )
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.tests.utils import (
     assertCountEqual,
@@ -81,7 +82,6 @@ with such.A("hdlcc bottle app") as it:
 
     @it.has_teardown
     def teardown():
-        _logger.fatal("Tearing down")
         build_folder = p.join(TEST_PROJECT, ".build")
         it.assertFalse(p.exists(build_folder))
 
@@ -263,18 +263,34 @@ with such.A("hdlcc bottle app") as it:
             "path": p.join(TEST_PROJECT, "another_library", "foo.vhd"),
         }
 
-        reply = it.app.post("/get_build_sequence", data)
+        @property
+        def builtin_libraries(*args, **kwargs):
+            return {Identifier("ieee")}
 
-        sequence = reply.json["sequence"]
+        such.unittest.TestCase.maxDiff = None
+        with mock.patch.object(
+            hdlcc.builders.base_builder.BaseBuilder,
+            "builtin_libraries",
+            builtin_libraries,
+        ):
+            reply = it.app.post("/get_build_sequence", data)
+            #  reply = it.app.post("/shutdown")
+            sequence = reply.json["sequence"]
 
         _logger.info("Sequence: %s", sequence)
 
-        it.assertCountEqual(
+        very_common_pkg = p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
+        package_with_constants = p.join(
+            TEST_PROJECT, "basic_library", "package_with_constants.vhd"
+        )
+        clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+
+        it.assertEqual(
             sequence,
             [
-                p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd"),
-                p.join(TEST_PROJECT, "basic_library", "package_with_constants.vhd"),
-                p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"),
+                "%s (library: basic_library)" % very_common_pkg,
+                "%s (library: basic_library)" % package_with_constants,
+                "%s (library: basic_library)" % clock_divider,
             ],
         )
 

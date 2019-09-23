@@ -24,7 +24,7 @@ import os.path as p
 import subprocess as subp
 import tempfile
 import time
-from multiprocessing import Process, Queue
+from multiprocessing import Event, Process, Queue
 from threading import Thread
 
 import mock
@@ -39,8 +39,6 @@ import hdlcc.lsp
 from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
-such.unittest.TestCase.maxDiff = None
-
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
@@ -51,6 +49,12 @@ HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
 
 JSONRPC_VERSION = "2.0"
 CALL_TIMEOUT = 5
+
+
+def _path(*args):
+    # type: (str) -> str
+    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
+    return p.join(TEST_TEMP_PATH, *args)
 
 
 def doNothing(queue):
@@ -113,6 +117,8 @@ class _ClientServer(
         self.client_thread.start()
 
 
+such.unittest.TestCase.maxDiff = None
+
 with such.A("hdlcc server") as it:
 
     _SERVER_BASE_CMD = [
@@ -172,22 +178,50 @@ with such.A("hdlcc server") as it:
             waitForServer()
 
         def waitForServer():
-            # Wait until the server is up and replying
-            for i in range(30):
-                try:
-                    reply = requests.post(it._url + "/get_diagnose_info")
-                    if reply.ok:
-                        _logger.info("Server replied OK after %d attempts", i)
-                        return
-                except requests.ConnectionError:
-                    pass
-                time.sleep(0.1)
+            event = Event()
+
+            def wait():
+                # Wait until the server is up and replying
+                start = time.time()
+                while not event.is_set():
+                    try:
+                        reply = requests.post(it._url + "/get_diagnose_info")
+                        if reply.ok:
+                            _logger.info(
+                                "Server replied OK after %.1fs", time.time() - start
+                            )
+                            event.set()
+                            return
+                    except requests.ConnectionError:
+                        pass
+                    except:
+                        _logger.exception(
+                            "Exception while waiting for server to respond"
+                        )
+                        raise
+
+                    time.sleep(0.5)
+
+                _logger.info("Exiting wait thread")
+
+            Thread(target=wait).start()
+            # Wait 10s for the server to start responding
+            event.wait(timeout=10)
+
+            if event.is_set():
+                return
+
+            # Set the event from here to force the wait thread to exit
+            event.set()
 
             _logger.error("Server is not replying")
-            _logger.error("stderr: %s", it.stderr.read())
+
             it._server.terminate()
             terminateProcess(it._server.pid)
-            assert False, "Server is not replying"
+
+            _logger.error("stderr: %s", it.stderr.read())
+
+            it.fail("Server is not responding")
 
         def waitUntilBuildFinishes(data):
             _logger.info("Waiting for 30s until build is finished")
@@ -212,11 +246,13 @@ with such.A("hdlcc server") as it:
         @disableVunit
         def test():
             startCodeCheckerServer()
+            some_project = _path("some_project")
+            open(some_project, "w").write("")
             # Ensure the server is active
             reply = requests.post(
-                it._url + "/get_diagnose_info", data={"project_file": "some_project"}
+                it._url + "/get_diagnose_info", data={"project_file": some_project}
             )
-            it.assertTrue(reply.ok)
+            it.assertTrue(reply.ok, "Reply was not OK: {}".format(reply))
 
         @it.should("shutdown the server when requested")  # type: ignore
         @disableVunit
@@ -281,7 +317,7 @@ with such.A("hdlcc server") as it:
         @it.should("show message with reason for failing to start")  # type: ignore
         @disableVunit
         def test():
-            def _start_io_lang_server(*_): # pylint: disable=invalid-name
+            def _start_io_lang_server(*_):  # pylint: disable=invalid-name
                 assert False, "Expected fail to trigger the test"
 
             args = type(
@@ -388,7 +424,11 @@ with such.A("hdlcc server") as it:
                 log_content = log_content[1:]
                 expected = expected[1:]
 
-            it.assertEqual(log_content[: len(expected)], expected)
+            for line in expected:
+                it.assertIn(line, "\n".join(log_content))
+
+            #  it.assertEqual(log_content[: len(expected)], expected)
+            #  it.fail("stop")
 
             os.remove(log_file)
 
@@ -410,4 +450,4 @@ with such.A("hdlcc server") as it:
             startServerWrapper(["hdlcc", "--lsp"])
 
 
-#  it.createTests(globals())
+it.createTests(globals())

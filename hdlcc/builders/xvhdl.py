@@ -77,7 +77,7 @@ class XVHDL(BaseBuilder):
         # type: (...) -> None
         self._version = ""
         super(XVHDL, self).__init__(*args, **kwargs)
-        self._xvhdlini = p.join(self._target_folder, ".xvhdl.init")
+        self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
         # Create the ini file
         open(self._xvhdlini, "w").close()
         self._builtin_libraries = set(
@@ -126,7 +126,7 @@ class XVHDL(BaseBuilder):
 
     def _checkEnvironment(self):
         stdout = runShellCommand(
-            ["xvhdl", "--nolog", "--version"], cwd=self._target_folder
+            ["xvhdl", "--nolog", "--version"], cwd=self._work_folder
         )
         self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
         self._logger.info(
@@ -151,8 +151,8 @@ class XVHDL(BaseBuilder):
         if library in self._builtin_libraries:
             return
 
-        if not p.exists(self._target_folder):
-            os.makedirs(self._target_folder)
+        if not p.exists(self._work_folder):
+            os.makedirs(self._work_folder)
             self._added_libraries = set()
 
         if library in self._added_libraries:
@@ -163,7 +163,7 @@ class XVHDL(BaseBuilder):
         with open(self._xvhdlini, mode="w") as fd:
             content = "\n".join(
                 [
-                    "%s=%s" % (x, p.join(self._target_folder, x.name))
+                    "%s=%s" % (x, p.join(self._work_folder, x.name))
                     for x in self._added_libraries
                 ]
             )
@@ -183,7 +183,7 @@ class XVHDL(BaseBuilder):
         ]
         cmd += [str(x) for x in (flags or [])]
         cmd += [path.name]
-        return runShellCommand(cmd, cwd=self._target_folder)
+        return runShellCommand(cmd, cwd=self._work_folder)
 
     def _searchForRebuilds(self, line):
         rebuilds = []

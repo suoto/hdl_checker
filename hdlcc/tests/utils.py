@@ -196,16 +196,16 @@ class SourceMock(object):
 
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("MockBuilder")
-    builder_name = "msim_mock"
+    builder_name = "ghdl"
     file_types = (FileType.vhdl,)
 
-    def __init__(self, target_folder, *args, **kwargs):
+    def __init__(self, work_folder, *args, **kwargs):
         # type: (...) -> None
-        self._target_folder = target_folder  # type: Path
-        if not p.exists(self._target_folder.name):
-            os.makedirs(self._target_folder.name)
+        self._work_folder = work_folder  # type: Path
+        if not p.exists(self._work_folder.name):
+            os.makedirs(self._work_folder.name)
 
-        super(MockBuilder, self).__init__(target_folder, *args, **kwargs)
+        super(MockBuilder, self).__init__(work_folder, *args, **kwargs)
 
     def _makeRecords(self, _):  # pragma: no cover
         return []
@@ -309,8 +309,6 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
 
 def writeListToFile(filename, _list):  # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
-    _logger.debug("Writing to %s", filename)
-
     open(filename, mode="w").write("\n".join([str(x) for x in _list]))
 
     mtime = p.getmtime(filename)

@@ -324,7 +324,7 @@ class FailedToCreateProject(CheckerDiagnostic):
     """
 
     def __init__(self, exception):
-        text = "Exception while creating server: '{}'"
+        text = "Exception while creating server: {}"
 
         super(FailedToCreateProject, self).__init__(
             checker=None, severity=DiagType.ERROR, text=text.format(str(exception))

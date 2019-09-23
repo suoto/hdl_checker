@@ -76,7 +76,7 @@ class _Database(Database):
         _logger.debug("- %d paths:", len(self._paths))
         for path in self._paths:
             timestamp = self._parse_timestamp[path]
-            dependencies = self._path_dependencies_map.get(
+            dependencies = self._dependencies.get(
                 path, set()
             )  # type: Set[DependencySpec]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
@@ -88,7 +88,7 @@ class _Database(Database):
 
     def __jsonEncode__(self):
         state = super(_Database, self).__jsonEncode__()
-        state['__class__'] = 'Database' #super(_Database, self).__class__.__name__
+        state["__class__"] = "Database"  # super(_Database, self).__class__.__name__
         return state
 
     def _configFromSources(self, sources, root_path):
@@ -488,9 +488,7 @@ class TestDatabase(TestCase):
             database._inferred_libraries, recovered._inferred_libraries
         )
         self.assertDictEqual(database._flags, recovered._flags)
-        self.assertDictEqual(
-            database._path_dependencies_map, recovered._path_dependencies_map
-        )
+        self.assertDictEqual(database._dependencies, recovered._dependencies)
 
     def test_removing_a_path_that_was_added(self):
         self.database._configFromSources(

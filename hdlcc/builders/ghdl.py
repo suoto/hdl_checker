@@ -148,9 +148,9 @@ class GHDL(BaseBuilder):
         Return the GHDL arguments that are common to most calls
         """
         cmd = [
-            "-P%s" % self._target_folder,
+            "-P%s" % self._work_folder,
             "--work=%s" % library,
-            "--workdir=%s" % self._target_folder,
+            "--workdir=%s" % self._work_folder,
         ]
         if flags:
             cmd += flags
@@ -196,7 +196,7 @@ class GHDL(BaseBuilder):
         return stdout
 
     def _createLibrary(self, _):
-        workdir = p.join(self._target_folder)
+        workdir = p.join(self._work_folder)
         if not p.exists(workdir):
             os.makedirs(workdir)
 

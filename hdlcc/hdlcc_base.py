@@ -26,11 +26,13 @@ import traceback
 from multiprocessing.pool import ThreadPool
 from typing import Any, AnyStr, Dict, Iterable, Set
 
-from hdlcc.builder_utils import getBuilderByName
+import six
+
+from hdlcc.builder_utils import getBuilderByName, getVunitSources
 from hdlcc.builders.fallback import Fallback
 from hdlcc.database import Database
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.parser_utils import getIncludedConfigs
+from hdlcc.exceptions import UnknownParameterError
 from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
@@ -38,7 +40,6 @@ from hdlcc.serialization import StateEncoder, jsonObjectHook
 from hdlcc.static_check import getStaticMessages
 from hdlcc.types import (
     BuildFlagScope,
-    FileType,
     RebuildInfo,
     RebuildLibraryUnit,
     RebuildPath,
@@ -49,6 +50,12 @@ from hdlcc.utils import removeDirIfExists, toBytes
 CACHE_NAME = "cache.json"
 
 _logger = logging.getLogger(__name__)
+
+if six.PY2:
+    JSONDecodeError = ValueError
+    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
+else:
+    JSONDecodeError = json.decoder.JSONDecodeError
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -67,30 +74,60 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.database = Database()
         self.builder = Fallback(self.root_dir, self.database)
 
+        if not p.exists(str(self.root_dir)):
+            os.makedirs(str(self.root_dir))
+
         self._recoverCacheIfPossible()
         self._saveCache()
 
-    def accept(self, parser):
-        # type: (ConfigParser) -> None
-        "Updates the database from a configuration parser"
-        base_config = parser.parse()
+    def readConfig(self, filename):
+        # type: (str) -> None
+        """
+        Updates the database from a configuration file. Extracting form JSON
+        has priority, then ConfigParser is attempted.
+        """
+        try:
+            config = json.load(open(filename))
+        except FileNotFoundError as exc:
+            self._handleUiError(
+                "Failed to parse '{}': No such file".format(exc.filename)
+            )
+            raise
+        except JSONDecodeError:
+            try:
+                config = ConfigParser(Path(filename)).parse()
+            except UnknownParameterError as exc:
+                self._handleUiError(
+                    "Failed to parse '{}': {}".format(filename, str(exc))
+                )
+                raise
+
+        self.configure(config)
+
+    def configure(self, config):
+        # type: (Dict[Any, Any]) -> None
+        "Updates configuration from a dictionary"
+
         from pprint import pformat
 
-        _logger.info("Updating with base config:\n%s", pformat(base_config))
+        _logger.info("Updating with base config:\n%s", pformat(config))
 
-        builder_cls = getBuilderByName(base_config.pop("builder_name", None))
+        builder_cls = getBuilderByName(config.pop("builder_name", None))
         self.builder = builder_cls(self.root_dir, self.database)
 
-        config_root_path = p.dirname(str(parser.filename))
-        self.database.configure(base_config, config_root_path)
+        self.database.configure(config, str(self.root_dir))
+        # Add VUnit
+        if not isinstance(self.builder, Fallback):
+            for path, library, flags in getVunitSources(self.builder):
+                self.database.addSource(path, library, flags, flags)
 
         # Add the flags from the root config file last, it should overwrite
         # values set by the included files
-        #  self.database.addSources(base_config.pop("sources", ()), config_root_path)
+        #  self.database.addSources(config.pop("sources", ()), config_root_path)
         #  if config
-        if base_config:
+        if config:
             _logger.warning(
-                "Some configuration elements weren't used:\n%s", pformat(base_config)
+                "Some configuration elements weren't used:\n%s", pformat(config)
             )
             assert False
 
@@ -154,7 +191,17 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return
 
         self._setState(cache)
-        self.builder.checkEnvironment()
+        self.builder.setup()
+
+    def _cleanIfNeeded(self):
+        # type: (...) -> Any
+        """
+        Sanity checks to make sure the environment is sane
+        """
+        if not p.exists(self.builder.work_folder):
+            _logger.info("Builder work folder not found, cleaning up")
+            self.clean()
+            self.builder.setup()
 
     def clean(self):
         # type: (...) -> Any
@@ -229,6 +276,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         is fixed in 10.
         """
         _logger.info("Building %s / %s", path, library)
+        self._cleanIfNeeded()
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):
