@@ -25,13 +25,14 @@ import sys
 import tempfile
 from typing import Any, Iterable, Optional, Set
 
-import pyls.lsp as defines  # type: ignore
 import six
+from pyls import lsp as defines  # type: ignore
 from pyls._utils import debounce  # type: ignore
 from pyls.python_ls import PythonLanguageServer  # type: ignore
 from pyls.uris import to_fs_path  # type: ignore
 from pyls.workspace import Workspace  # type: ignore
 
+from hdlcc.config_generators.simple_finder import SimpleFinder
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.path import Path
@@ -223,13 +224,16 @@ class HdlccLanguageServer(PythonLanguageServer):
         self._global_diags = set()
 
         path = self._getProjectFilePath(options)
-        if path is None:
-            return
 
-        try:
-            self._checker.readConfig(path)
-        except (FileNotFoundError, JSONDecodeError) as exc:
-            _logger.warning("Failed to read config from %s: %s", path, exc)
+        if path is None and self.workspace.root_uri:
+            # Having no project file but with root URI triggers searching for
+            # sources automatically
+            self._checker.configure(SimpleFinder([self.workspace.root_path]).generate())
+        elif path is not None:
+            try:
+                self._checker.readConfig(path)
+            except (FileNotFoundError, JSONDecodeError) as exc:
+                _logger.warning("Failed to read config from %s: %s", path, exc)
 
     def _getProjectFilePath(self, options=None):
         # type: (...) -> Optional[str]
@@ -237,10 +241,10 @@ class HdlccLanguageServer(PythonLanguageServer):
         Tries to get 'project_file' from the options dict and combine it with
         the root URI as provided by the workspace
         """
-        path = (options or {}).get("project_file", DEFAULT_PROJECT_FILENAME)
+        path = (options or {}).get("project_file", None)
 
         # Path has been explicitly set to none
-        if "project_file" in options and path is None:
+        if path is None:
             return None
 
         # Project file will be related to the root path

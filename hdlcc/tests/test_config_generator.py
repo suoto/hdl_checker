@@ -20,21 +20,21 @@
 # pylint: disable=protected-access
 # pylint: disable=invalid-name
 
-import json
 import logging
 import os
 import os.path as p
 import shutil
 
-import unittest2
-from webtest import TestApp
+import unittest2  # type: ignore
+from webtest import TestApp  # type: ignore
 
 import hdlcc.handlers as handlers
 from hdlcc.builders.fallback import Fallback
 from hdlcc.builders.ghdl import GHDL
 from hdlcc.builders.msim import MSim
 from hdlcc.builders.xvhdl import XVHDL
-from hdlcc.tests.utils import getTestTempPath, setupTestSuport
+from hdlcc.config_generators.simple_finder import SimpleFinder
+from hdlcc.tests.utils import getTestTempPath, setupTestSuport, TestCase
 
 try:  # Python 3.x
     import unittest.mock as mock
@@ -53,8 +53,9 @@ HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
 BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fallback}
 
 
-class TestConfigGenerator(unittest2.TestCase):
+class TestConfigGenerator(TestCase):
     maxDiff = None
+
     @classmethod
     def setUpClass(cls):
         setupTestSuport(TEST_TEMP_PATH)
@@ -107,40 +108,44 @@ class TestConfigGenerator(unittest2.TestCase):
         lambda path: "nonreadable" not in path.name,
     )
     def test_run_simple_config_gen(self):
-        data = {
-            "generator": "SimpleFinder",
-            "kwargs": json.dumps({"paths": [self.dummy_test_path]}),
-        }
+        # type: (...) -> None
+        finder = SimpleFinder([self.dummy_test_path])
 
-        reply = self.app.post("/run_config_generator", data)
+        config = finder.generate()
 
-        content = reply.json["content"].split("\n")
+        self.assertCountEqual(
+            config.pop("sources"),
+            {
+                p.join(self.dummy_test_path, "path_a", "some_source.vhd"),
+                p.join(self.dummy_test_path, "path_b", "a_systemverilog_source.sv"),
+                p.join(self.dummy_test_path, "path_a", "source_tb.vhd"),
+                p.join(self.dummy_test_path, "path_b", "some_source.vhd"),
+                p.join(self.dummy_test_path, "path_b", "a_verilog_source.v"),
+            },
+        )
 
-        intro = [
-            "# Files found: 5",
-            "include_paths[verilog] = %s %s"
-            % (
-                p.join(self.dummy_test_path, "path_a"),
-                p.join(self.dummy_test_path, "v_includes"),
-            ),
-            "include_paths[systemverilog] = "
-            + p.join(self.dummy_test_path, "sv_includes"),
-            "",
-        ]
+        self.assertCountEqual(
+            config.pop("systemverilog"),
+            {
+                "flags": {"dependencies": [], "global": [], "single": []},
+                "include_paths": {p.join(self.dummy_test_path, "sv_includes")},
+            },
+        )
 
-        files = [
-            "vhdl work %s" % p.join(self.dummy_test_path, "path_a", "some_source.vhd"),
-            "vhdl work %s" % p.join(self.dummy_test_path, "path_a", "source_tb.vhd"),
-            "systemverilog work %s"
-            % p.join(self.dummy_test_path, "path_b", "a_systemverilog_source.sv"),
-            "verilog work %s"
-            % p.join(self.dummy_test_path, "path_b", "a_verilog_source.v"),
-            "vhdl work %s" % p.join(self.dummy_test_path, "path_b", "some_source.vhd"),
-        ]
+        self.assertCountEqual(
+            config.pop("verilog"),
+            {
+                "flags": {"dependencies": [], "global": [], "single": []},
+                "include_paths": {
+                    p.join(self.dummy_test_path, "path_a"),
+                    p.join(self.dummy_test_path, "v_includes"),
+                },
+            },
+        )
 
-        _logger.info("Resulting file:")
-        for i, line in enumerate(content):
-            _logger.info("%2d | %s", i + 1, line)
+        self.assertCountEqual(
+            config.pop("vhdl"),
+            {"flags": {"dependencies": [], "global": [], "single": []}},
+        )
 
-        self.assertEqual(content[: len(intro)], intro)
-        self.assertEqual(content[len(intro) :], files)
+        self.assertFalse(config)

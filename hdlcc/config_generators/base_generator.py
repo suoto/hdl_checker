@@ -22,15 +22,14 @@ from typing import Dict, Optional, Set, Tuple
 
 from hdlcc.builder_utils import AnyValidBuilder
 from hdlcc.path import Path
-from hdlcc.types import FileType
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
 _HEADER_EXTENSIONS = "vh", "svh"
 
 _DEFAULT_LIBRARY_NAME = {"vhdl": "lib", "verilog": "lib", "systemverilog": "lib"}
 
-Flags = str
-SourceSpec = Tuple[Path, Flags, str]
+SourceSpec = Tuple[Path, BuildFlags, Optional[str]]
 
 
 class BaseGenerator:
@@ -51,7 +50,7 @@ class BaseGenerator:
         }  # type: Dict[FileType, Set[str]]
 
     def _addSource(self, path, flags=None, library=None):
-        # type: (Path, Optional[Flags], Optional[str]) -> None
+        # type: (Path, BuildFlags, Optional[str]) -> None
         """
         Add a source to project. 'flags' and 'library' are only used for
         regular sources and not for header files (files ending in .vh or .svh)
@@ -65,13 +64,7 @@ class BaseGenerator:
             if file_type in (FileType.verilog, FileType.systemverilog):
                 self._include_paths[file_type].add(path.dirname)
         else:
-            self._sources.add(
-                (
-                    path,
-                    " ".join([str(x) for x in flags or []]),
-                    library or "<undefined>",
-                )
-            )
+            self._sources.add((path, flags or (), library))
 
     @abc.abstractmethod
     def _populate(self):  # type: () -> None
@@ -95,40 +88,40 @@ class BaseGenerator:
 
         self._populate()
 
-        contents = ["# Files found: %s" % len(self._sources)]
+        project = {"sources": []}
+
+        for lang in FileType:
+            project[lang.value] = {"flags": {}}
+            for scope in BuildFlagScope:
+                project[lang.value]["flags"][scope.value] = []
 
         builder = self._getPreferredBuilder()
         if builder is not NotImplemented:
-            contents += ["builder = %s" % builder]
+            project["builder"] = builder
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
         for lang in (FileType.verilog, FileType.systemverilog):
             paths = self._include_paths[lang]
             if paths:
-                contents += [
-                    "include_paths[%s] = %s" % (lang.name, " ".join(sorted(paths)))
-                ]
-
-        if self._include_paths:
-            contents += [""]
-
-        # Add sources
-        sources = []
+                project[lang.value]["include_paths"] = tuple(paths)
 
         for path, flags, library in self._sources:
-            file_type = FileType.fromPath(path)
-            sources.append((file_type, library, path, flags))
+            info = {}
+            if library:
+                info["library"] = library
+            if flags:
+                info["flags"] = flags
 
-        sources.sort(key=lambda x: x[2].abspath)
-
-        for file_type, library, path, flags in sources:
-            contents += [
-                "{0} {1} {2}{3}".format(
-                    file_type.name, library, path, " %s" % flags if flags else ""
+            if info:
+                project["sources"].append(
+                    (str(path), {"library": library, "flags": tuple(flags)})
                 )
-            ]
+            else:
+                project["sources"].append(str(path))
 
-        self._logger.info("Resulting file has %d lines", len(contents))
+        from pprint import pformat
 
-        return "\n".join(contents)
+        self._logger.info("Resulting project:\n%s", pformat(project))
+
+        return project

@@ -81,5 +81,5 @@ class SimpleFinder(BaseGenerator):
         for path in self._findSources():
             library = self._getLibrary(path)
             self._addSource(
-                path, library="work" if library is NotImplemented else library
+                path, library=None if library is NotImplemented else library
             )

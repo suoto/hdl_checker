@@ -225,7 +225,7 @@ with such.A("LSP server") as it:
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
 
-    with it.having("no project file"):
+    with it.having("root URI set but no project file"):
 
         @it.has_setup
         def setup():
@@ -235,11 +235,21 @@ with such.A("LSP server") as it:
         def teardown():
             stopLspServer()
 
-        @it.should("respond capabilities upon initialization")
+        @it.should("search for files on initialization")
         def test():
-            _initializeServer(
-                it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-            )
+            import hdlcc
+
+            with mock.patch.object(
+                hdlcc.hdlcc_base.HdlCodeCheckerBase, "configure"
+            ) as configure:
+                with mock.patch.object(
+                    hdlcc.config_generators.base_generator.BaseGenerator, "generate"
+                ) as generate:
+                    _initializeServer(
+                        it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
+                    )
+                    configure.assert_called_once()
+                    generate.assert_called_once()
 
         @it.should("lint file when opening it")  # type: ignore
         def test():
@@ -432,7 +442,7 @@ with such.A("LSP server") as it:
                         },
                         "message": "Signal 'neat_signal' is never used",
                         "severity": defines.DiagnosticSeverity.Information,
-                    },
+                    }
                 ],
             )
 

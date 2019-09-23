@@ -170,37 +170,6 @@ def getDiagnoseInfo():
     return {"info": response}
 
 
-@app.post("/run_config_generator")
-@_exceptionWrapper
-def runConfigGenerator():
-    # type: (...) -> Any
-    """
-    Runs the config generator
-    request should have
-        - 'generator': generator's class name
-        - 'args', 'kwargs': arguments to be passed to the generator constructor
-    """
-    name = bottle.request.forms.get("generator", None)  # pylint: disable=no-member
-    req_args = bottle.request.forms.get("args", None)  # pylint: disable=no-member
-    args = []  # type: List[str]
-    if req_args is not None:
-        args = json.loads(req_args)
-
-    req_kwargs = bottle.request.forms.get("kwargs", None)  # pylint: disable=no-member
-    kwargs = []  # type: List[str]
-    if req_kwargs is not None:
-        kwargs = json.loads(req_kwargs)
-
-    _logger.info(
-        "Running config generator %s(%s, %s)", repr(name), repr(args), repr(kwargs)
-    )
-
-    generator = getGeneratorByName(name)(*args, **kwargs)
-    content = generator.generate()
-
-    return {"content": content}
-
-
 @app.post("/get_messages_by_path")
 @_exceptionWrapper
 def getMessagesByPath():
