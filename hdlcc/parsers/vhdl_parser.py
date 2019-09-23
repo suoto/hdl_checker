@@ -39,15 +39,17 @@ _DESIGN_UNIT_SCANNER = re.compile(
             r"\bcontext\s+(?P<context_name>\w+)\s+is\b",
         ]
     ),
-    flags=re.MULTILINE | re.IGNORECASE
+    flags=re.MULTILINE | re.IGNORECASE,
 )
 
 _LIBRARY_SCANNER = re.compile(
-    r"library\s+([a-z]\w*(?:\s*,\s*[a-z]\w*){0,})\s*;", flags=re.MULTILINE | re.IGNORECASE
+    r"library\s+([a-z]\w*(?:\s*,\s*[a-z]\w*){0,})\s*;",
+    flags=re.MULTILINE | re.IGNORECASE,
 )
 
 _ADDITIONAL_DEPS_SCANNER = re.compile(
-    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b", flags=re.MULTILINE | re.IGNORECASE
+    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
+    flags=re.MULTILINE | re.IGNORECASE,
 )
 
 IncompleteDependency = Dict[str, Union[str, Set[Any]]]
@@ -111,9 +113,7 @@ class VhdlParser(BaseSourceFile):
                 }
 
             dependency = dependencies[key]
-            dependency["locations"].add(
-                (line_number + 1, column_number + 1)
-            )  # type: ignore
+            dependency["locations"].add((line_number + 1, column_number + 1))
 
         # Done parsing, won't add any more locations, so generate the specs
         for dep in dependencies.values():
@@ -124,7 +124,7 @@ class VhdlParser(BaseSourceFile):
             else:
                 dep_library = VhdlIdentifier(dep["library"])
             yield DependencySpec(
-                owner=self.filename,  # type: ignore
+                owner=self.filename,
                 name=VhdlIdentifier(dep["name"]),
                 library=dep_library,
                 locations=dep["locations"],
