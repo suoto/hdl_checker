@@ -45,7 +45,7 @@ from hdlcc.types import (
     RebuildPath,
     RebuildUnit,
 )
-from hdlcc.utils import removeDirIfExists, toBytes
+from hdlcc.utils import removeDirIfExists, toBytes, removeIfExists
 
 CACHE_NAME = "cache.json"
 
@@ -375,31 +375,33 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         _logger.debug("Getting messages for '%s' with content", path)
 
         ext = path.name.split(".")[-1]
-        with tempfile.NamedTemporaryFile(suffix="." + ext) as filename:
-            temp_path = Path(filename.name)
+        temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
 
-            # If the reference path was added to the database, add the
-            # temporary file with the same attributes
-            if path in self.database.paths:
-                library = self.database.getLibrary(path)
-                self.database.addSource(
-                    temp_path,
-                    getattr(library, "display_name", None),
-                    self.database.getFlags(path, BuildFlagScope.single),
-                    self.database.getFlags(path, BuildFlagScope.dependencies),
-                )
+        temp_path = Path(temporary_file.name)
 
-            filename.file.write(toBytes(content))  # type: ignore
-            filename.flush()
-            messages = self.getMessagesByPath(temp_path)
+        # If the reference path was added to the database, add the
+        # temporary file with the same attributes
+        if path in self.database.paths:
+            library = self.database.getLibrary(path)
+            self.database.addSource(
+                temp_path,
+                getattr(library, "display_name", None),
+                self.database.getFlags(path, BuildFlagScope.single),
+                self.database.getFlags(path, BuildFlagScope.dependencies),
+            )
 
-            # Some messages may not include the filename field when checking a
-            # file by content. In this case, we'll assume the empty filenames
-            # refer to the same filename we got in the first place
-            for message in messages:
-                message.filename = path
-                message.text = message.text.replace(filename.name, path.name)
+        temporary_file.file.write(toBytes(content))  # type: ignore
+        temporary_file.close()
+        messages = self.getMessagesByPath(temp_path)
 
-            self.database.removeSource(temp_path)
+        # Some messages may not include the filename field when checking a
+        # file by content. In this case, we'll assume the empty filenames
+        # refer to the same filename we got in the first place
+        for message in messages:
+            message.filename = path
+            message.text = message.text.replace(temporary_file.name, path.name)
+
+        self.database.removeSource(temp_path)
+        removeIfExists(temporary_file.name)
 
         return messages
