@@ -266,7 +266,7 @@ with such.A("LSP server") as it:
             with it.assertRaises(AssertionError):
                 checkLintFileOnSave(source)
 
-    with it.having("an existing and valid project file"):
+    with it.having("an existing and valid old style project file"):
 
         @it.has_setup
         def setup():
@@ -290,6 +290,32 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
+            it.assertCountEqual(checkLintFileOnOpen(source), [])
+
+    with it.having("an existing and valid JSON config file"):
+
+        @it.has_setup
+        def setup():
+            startLspServer()
+
+        @it.has_teardown
+        def teardown():
+            stopLspServer()
+
+        @it.should("respond capabilities upon initialization")  # type: ignore
+        def test():
+            _initializeServer(
+                it.server,
+                params={
+                    "rootUri": uris.from_fs_path(TEST_PROJECT),
+                    "initializationOptions": {"project_file": "config.json"},
+                },
+            )
+            it.assertTrue(it.server._checker.database._paths)
+
+        @it.should("lint file when opening it")  # type: ignore
+        def test():
+            source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             it.assertCountEqual(checkLintFileOnOpen(source), [])
 
         #  @it.should("clean up if the project file has been modified") # type: ignore
@@ -407,16 +433,6 @@ with such.A("LSP server") as it:
                         "message": "Signal 'neat_signal' is never used",
                         "severity": defines.DiagnosticSeverity.Information,
                     },
-                    #  {
-                    #      "source": "HDL Code Checker",
-                    #      "range": {
-                    #          "start": {"line": 0, "character": 0},
-                    #          "end": {"line": 0, "character": 0},
-                    #      },
-                    #      "message": "Exception while creating server: No such "
-                    #      "file {}".format(repr(p.join(TEST_PROJECT, it.project_file))),
-                    #      "severity": defines.DiagnosticSeverity.Error,
-                    #  },
                 ],
             )
 

@@ -21,14 +21,14 @@
 import logging
 import os.path as p
 from os import stat
-from typing import AnyStr, Optional
+from typing import Optional
 
 import six
 
 _logger = logging.getLogger(__name__)
 
 if six.PY2:
-    FileNotFoundError = OSError
+    FileNotFoundError = OSError  # pylint: disable=redefined-builtin
 
 class Path(object):
     "Path helper class to speed up comparing different paths"

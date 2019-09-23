@@ -238,7 +238,6 @@ class Database(HashableByKey):
             source_info = {
                 "path": path,
                 "mtime": self._parse_timestamp[path],
-                #  "flags": list((key, value) for key, value in self._flags.items()),
                 "flags": {
                     BuildFlagScope.single.value: self._flags[path].get(
                         BuildFlagScope.single, ()
@@ -390,6 +389,7 @@ class Database(HashableByKey):
         Extracts info from a source, taking care of removing previously defined
         items before
         """
+        _logger.debug("Parsing %s", path)
         # Update the timestamp
         self._parse_timestamp[path] = p.getmtime(str(path))
 
