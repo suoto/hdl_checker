@@ -126,15 +126,15 @@ class TestBuilder(TestCase):
 
     def test_create_library_multiple_times(self):  # pylint: disable=invalid-name
         # type: (...) -> Any
-        self.builder._createLibrary(Identifier("random_lib"))
-        self.builder._createLibrary(Identifier("random_lib"))
+        self.builder._createLibraryIfNeeded(Identifier("random_lib"))
+        self.builder._createLibraryIfNeeded(Identifier("random_lib"))
 
     def test_builder_does_nothing_when_creating_builtin_libraries(
         self
     ):  # pylint: disable=invalid-name
         # type: (...) -> Any
         #  pre = open(self.builder._xvhdlini).read()
-        self.builder._createLibrary(Identifier("ieee"))
+        self.builder._createLibraryIfNeeded(Identifier("ieee"))
         #  post = open(self.builder._xvhdlini).read()
 
     def test_finds_builtin_libraries(self):

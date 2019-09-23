@@ -80,21 +80,6 @@ class XVHDL(BaseBuilder):
         self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
         # Create the ini file
         open(self._xvhdlini, "w").close()
-        self._builtin_libraries = set(
-            map(
-                Identifier,
-                {
-                    "ieee",
-                    "std",
-                    "unisim",
-                    "xilinxcorelib",
-                    "synplify",
-                    "synopsis",
-                    "maxii",
-                    "family_support",
-                },
-            )
-        )
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -123,6 +108,19 @@ class XVHDL(BaseBuilder):
 
     def _parseBuiltinLibraries(self):
         "(Not used by XVHDL)"
+        return (
+            Identifier(x, case_sensitive=False)
+            for x in (
+                "ieee",
+                "std",
+                "unisim",
+                "xilinxcorelib",
+                "synplify",
+                "synopsis",
+                "maxii",
+                "family_support",
+            )
+        )
 
     def _checkEnvironment(self):
         stdout = runShellCommand(
@@ -148,17 +146,8 @@ class XVHDL(BaseBuilder):
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None
-        if library in self._builtin_libraries:
-            return
-
         if not p.exists(self._work_folder):
             os.makedirs(self._work_folder)
-            self._added_libraries = set()
-
-        if library in self._added_libraries:
-            return
-
-        self._added_libraries.add(library)
 
         with open(self._xvhdlini, mode="w") as fd:
             content = "\n".join(

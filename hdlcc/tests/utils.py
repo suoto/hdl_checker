@@ -100,7 +100,7 @@ class SourceMock(object):
         self.flags = []  # type: ignore
 
         self.library = library
-        self._dependencies = [] # type: List[DependencySpec]
+        self._dependencies = []  # type: List[DependencySpec]
         for dep_spec in dependencies or []:
             _name = dep_spec[0]
             _library = "work"
@@ -231,8 +231,10 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
     def _parseBuiltinLibraries(self):
         # type: (...) -> Any
-        self._builtin_libraries = {Identifier("ieee"), Identifier("std")}
-
+        return (
+            Identifier("ieee", case_sensitive=False),
+            Identifier("std", case_sensitive=False),
+        )
 
 
 class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method

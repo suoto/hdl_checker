@@ -71,7 +71,6 @@ class GHDL(BaseBuilder):
     def __init__(self, *args, **kwargs):
         self._version = ""
         super(GHDL, self).__init__(*args, **kwargs)
-        self._parseBuiltinLibraries()
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -140,7 +139,7 @@ class GHDL(BaseBuilder):
 
                 for path in filter(p.isdir, libraries_paths):
                     name = path.split(p.sep)[-1]
-                    self._builtin_libraries.add(Identifier(name.strip().lower()))
+                    yield Identifier(name.strip(), case_sensitive=False)
 
     def _getGhdlArgs(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]

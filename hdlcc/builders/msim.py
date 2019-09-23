@@ -186,9 +186,7 @@ class MSim(BaseBuilder):
             self._createIniFile()
         for line in runShellCommand(["vmap"]):
             for match in self._BuilderLibraryScanner.finditer(line):
-                self._builtin_libraries.add(
-                    Identifier(match.groupdict()["library_name"], False)
-                )
+                yield Identifier(match.groupdict()["library_name"], False)
 
     def _searchForRebuilds(self, line):
         rebuilds = []
@@ -274,16 +272,6 @@ class MSim(BaseBuilder):
         return runShellCommand(cmd)
 
     def _createLibrary(self, library):
-        # type: (Identifier) -> None
-        if library in self._builtin_libraries:
-            self._logger.debug("Library '%s' is built in", library)
-            return
-
-        if not self._iniFileExists() and library in self._added_libraries:
-            self._logger.debug("Library '%s' not added", library)
-            return
-
-        self._added_libraries.add(library)
         if p.exists(p.join(self._work_folder, library.name)):
             self._logger.debug("Path for library '%s' already exists", library)
             return

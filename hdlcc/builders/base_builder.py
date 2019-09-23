@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 from threading import Lock
-from typing import Any, Dict, Iterable, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, Optional, Set, Tuple
 
 from hdlcc.database import Database  # pylint: disable=unused-import
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
@@ -98,7 +98,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         self._database = database
         self._work_folder = p.abspath(p.expanduser(work_folder.name))
         self._build_info_cache = {}  # type: Dict[Path, Dict[str, Any]]
-        self._builtin_libraries = set()  # type: Set[Identifier]
+        self._builtin_libraries = None  # type: Optional[Set[Identifier]]
         self._added_libraries = set()  # type: Set[Identifier]
 
         self.setup()
@@ -109,7 +109,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Creates directories and parses builtins libraries
         """
         # Fallback builder has no setup
-        if self.builder_name == 'fallback':
+        if self.builder_name == "fallback":
             return
 
         if not p.exists(self._work_folder):
@@ -119,18 +119,6 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             self._logger.info("%s already exists", self._work_folder)
 
         self.checkEnvironment()
-
-        try:
-            self._parseBuiltinLibraries()
-            if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                if self._builtin_libraries:  # pragma: no cover
-                    self._logger.debug(
-                        "Builtin libraries: %s", tuple(self._builtin_libraries)
-                    )
-                else:  # pragma: no cover
-                    self._logger.debug("No builtin libraries found")
-        except NotImplementedError:
-            pass
 
     @classmethod
     def __jsonDecode__(cls, state):
@@ -158,7 +146,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
         state = self.__dict__.copy()
         state["_logger"] = self._logger.name
-        state["_builtin_libraries"] = list(self._builtin_libraries)
+        state["_builtin_libraries"] = list(self.builtin_libraries)
         state["_added_libraries"] = list(self._added_libraries)
         del state["_build_info_cache"]
         del state["_lock"]
@@ -242,7 +230,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         raise NotImplementedError
 
     def _parseBuiltinLibraries(self):
-        # type: (...) -> Any
+        # type: (...) -> Iterable[Identifier]
         """
         Discovers libraries that exist regardless before we do anything
         """
@@ -258,10 +246,23 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     @property
     def builtin_libraries(self):
-        # type: (...) -> Any
+        # type: (...) -> FrozenSet[Identifier]
         """
-        Return a list with the libraries this compiler currently knows
+        Return a list of precompiled libraries this builder is aware of
         """
+        if self._builtin_libraries is None:
+            try:
+                self._builtin_libraries = set(self._parseBuiltinLibraries())
+                if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                    if self._builtin_libraries:  # pragma: no cover
+                        self._logger.debug(
+                            "Builtin libraries: %s", tuple(self._builtin_libraries)
+                        )
+                    else:  # pragma: no cover
+                        self._logger.debug("No builtin libraries found")
+            except NotImplementedError:
+                self._builtin_libraries = set()
+
         return frozenset(self._builtin_libraries)
 
     @abc.abstractmethod
@@ -363,8 +364,15 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     def _createLibraryIfNeeded(self, library):
         # type: (Identifier) -> None
-        if library in self._added_libraries | self._builtin_libraries:
+        """
+        Proxy for only creating libraries once and avoid overwriting builtin
+        libraries
+        """
+        if library in self._added_libraries:
             return
+        if library in self.builtin_libraries:
+            return
+        self._added_libraries.add(library)
         self._createLibrary(library)
 
     @abc.abstractmethod
