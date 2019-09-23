@@ -24,47 +24,54 @@ import os
 import os.path as p
 import sys
 
-import coverage
-import nose2
+import coverage  # type: ignore
+
+import nose2  # type: ignore
 
 try:  # Python 3.x
-    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+    import unittest.mock as mock  # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
     import mock  # type: ignore
 
 try:
-    import argcomplete
+    import argcomplete  # type: ignore
+
     _HAS_ARGCOMPLETE = True
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     _HAS_ARGCOMPLETE = False
 
 _CI = os.environ.get("CI", None) is not None
 _APPVEYOR = os.environ.get("APPVEYOR", None) is not None
 _TRAVIS = os.environ.get("TRAVIS", None) is not None
-_ON_WINDOWS = sys.platform == 'win32'
+_ON_WINDOWS = sys.platform == "win32"
 BASE_PATH = p.abspath(p.join(p.dirname(__file__)))
 
 _logger = logging.getLogger(__name__)
 
+
 def _shell(cmd):
     _logger.info("$ %s", cmd)
-    for line in os.popen(cmd).read().split('\n'):
+    for line in os.popen(cmd).read().split("\n"):
         if line and not line.isspace():
             _logger.info("> %s", line)
 
+
 def _clear():
     "Clears the current repo and submodules"
-    for cmd in ('git clean -fdx',
-                'git submodule foreach --recursive git clean -fdx'):
+    for cmd in ("git clean -fdx", "git submodule foreach --recursive git clean -fdx"):
         _shell(cmd)
 
-def _setupLogging(stream, level): # pragma: no cover
+
+def _setupLogging(stream, level):  # pragma: no cover
     "Setup logging according to the command line parameters"
     color = False
 
-    if getattr(stream, 'isatty', False):
+    if getattr(stream, "isatty", False):
         try:
-            from rainbow_logging_handler import RainbowLoggingHandler  # pylint: disable=import-error
+            from rainbow_logging_handler import (  # type: ignore
+                RainbowLoggingHandler,
+            )  # pylint: disable=import-error
+
             color = True
         except ImportError:
             pass
@@ -77,36 +84,45 @@ def _setupLogging(stream, level): # pragma: no cover
     else:
         handler = logging.StreamHandler(stream)
         handler.formatter = logging.Formatter(
-            '%(levelname)-7s | %(asctime)s | ' +
-            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
-            '|\t%(message)s', datefmt='%H:%M:%S')
+            "%(levelname)-7s | %(asctime)s | "
+            + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
+            + "|\t%(message)s",
+            datefmt="%H:%M:%S",
+        )
 
         logging.root.addHandler(handler)
         logging.root.setLevel(level)
+
 
 def _parseArguments():
     parser = argparse.ArgumentParser()
 
     # Options
-    parser.add_argument('tests', action='append', nargs='*',
-                        help="Test names or files to be run")
-    parser.add_argument('--fail-fast', '-F', action='store_true')
+    parser.add_argument(
+        "tests", action="append", nargs="*", help="Test names or files to be run"
+    )
+    parser.add_argument("--fail-fast", "-F", action="store_true")
 
-    parser.add_argument('--debugger', '-D', action='store_true')
+    parser.add_argument("--debugger", "-D", action="store_true")
 
-    parser.add_argument('--verbose', '-v', action='store_true')
+    parser.add_argument("--verbose", "-v", action="store_true")
 
-    parser.add_argument('--log-file', action='store',
-                        default=p.join(os.environ['TOX_ENV_DIR'], 'log',
-                                       'tests.log'))
+    parser.add_argument(
+        "--log-file",
+        action="store",
+        default=p.join(os.environ["TOX_ENV_DIR"], "log", "tests.log"),
+    )
 
-    parser.add_argument('--log-level', action='store', default='INFO',
-                        choices=('CRITICAL', 'DEBUG', 'ERROR', 'INFO',
-                                 'WARNING',))
+    parser.add_argument(
+        "--log-level",
+        action="store",
+        default="INFO",
+        choices=("CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"),
+    )
 
-    parser.add_argument('--log-to-stdout', action='store_true')
+    parser.add_argument("--log-to-stdout", action="store_true")
 
-    if _HAS_ARGCOMPLETE: # pragma: no cover
+    if _HAS_ARGCOMPLETE:  # pragma: no cover
         argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
@@ -119,10 +135,9 @@ def _parseArguments():
 
     for test_name_or_file in test_list:
         if p.exists(test_name_or_file):
-            test_name = str(test_name_or_file).replace('/', '.')
-            test_name = str(test_name).replace('.py', '')
-            print("Argument '%s' converted to '%s'" % (test_name_or_file,
-                                                       test_name))
+            test_name = str(test_name_or_file).replace("/", ".")
+            test_name = str(test_name).replace(".py", "")
+            print("Argument '%s' converted to '%s'" % (test_name_or_file, test_name))
         else:
             test_name = test_name_or_file
 
@@ -130,19 +145,21 @@ def _parseArguments():
 
     return args
 
+
 def _getNoseCommandLineArgs(args):
     argv = []
 
     if args.verbose:
-        argv += ['--verbose', '--verbose', ] # wtf?
+        argv += ["--verbose", "--verbose"]  # wtf?
     if args.debugger:
-        argv += ['--debugger']
+        argv += ["--debugger"]
     if args.fail_fast:
-        argv += ['--fail-fast']
+        argv += ["--fail-fast"]
     if not args.log_to_stdout:
-        argv += ['--log-capture', ]
+        argv += ["--log-capture"]
 
     return argv
+
 
 def runTestsForEnv(args):
     nose_base_args = _getNoseCommandLineArgs(args)
@@ -153,23 +170,23 @@ def runTestsForEnv(args):
 
     test_env = os.environ.copy()
 
-    test_env.update({'SERVER_LOG_LEVEL' : args.log_level})
+    test_env.update({"SERVER_LOG_LEVEL": args.log_level})
 
-    home = p.join(os.environ['TOX_ENV_DIR'], 'tmp', 'home')
+    home = p.join(os.environ["TOX_ENV_DIR"], "tmp", "home")
     os.makedirs(home)
 
     if not _ON_WINDOWS:
-        test_env.update({'HOME' : home})
+        test_env.update({"HOME": home})
     else:
-        test_env.update({'LOCALAPPDATA' : home})
+        test_env.update({"LOCALAPPDATA": home})
 
     _logger.info("nose2 args: %s", nose_args)
 
-    with mock.patch.dict('os.environ', test_env):
-        successful = nose2.discover(exit=False,
-                                    argv=nose_args).result.wasSuccessful()
+    with mock.patch.dict("os.environ", test_env):
+        successful = nose2.discover(exit=False, argv=nose_args).result.wasSuccessful()
 
     return successful
+
 
 def main():
     args = _parseArguments()
@@ -178,19 +195,21 @@ def main():
 
     _logger.info("Arguments: %s", args)
 
-    logging.getLogger('nose2').setLevel(logging.FATAL)
-    logging.getLogger('vunit').setLevel(logging.ERROR)
-    logging.getLogger('requests').setLevel(logging.WARNING)
+    logging.getLogger("nose2").setLevel(logging.FATAL)
+    logging.getLogger("vunit").setLevel(logging.ERROR)
+    logging.getLogger("requests").setLevel(logging.WARNING)
     file_handler = logging.FileHandler(args.log_file)
-    log_format = '%(levelname)-7s | %(asctime)s | ' + \
-        '%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s'
-    file_handler.formatter = logging.Formatter(log_format, datefmt='%H:%M:%S')
+    log_format = (
+        "%(levelname)-7s | %(asctime)s | "
+        + "%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s"
+    )
+    file_handler.formatter = logging.Formatter(log_format, datefmt="%H:%M:%S")
     logging.root.addHandler(file_handler)
     logging.root.setLevel(args.log_level)
 
     print(" - Log file: " + args.log_file)
 
-    cov = coverage.Coverage(config_file='.coveragerc')
+    cov = coverage.Coverage(config_file=".coveragerc")
     cov.start()
 
     passed = runTestsForEnv(args)
@@ -207,5 +226,6 @@ def main():
 
     return 0 if passed else 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())
