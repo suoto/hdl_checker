@@ -43,7 +43,6 @@ from hdlcc.diagnostics import (
     PathNotInProjectFile,
 )
 from hdlcc.hdlcc_base import CACHE_NAME
-from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.tests.utils import (
@@ -126,7 +125,7 @@ with such.A("hdlcc project") as it:
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
 
-    with it.having("non existing project file"):
+    with it.having("non existing root dir"):
 
         @it.has_setup
         def setup():

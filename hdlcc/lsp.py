@@ -108,9 +108,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         # type: (Workspace, Optional[str]) -> None
         self._workspace = workspace
         if root_path is None:
-            root_path = tempfile.mkdtemp(
-                prefix="hdlcc{}".format(p.abspath(".").replace(p.sep, "_"))
-            )
+            root_path = tempfile.mkdtemp(prefix="hdlcc_")
 
         super(HdlCodeCheckerServer, self).__init__(Path(root_path))
 

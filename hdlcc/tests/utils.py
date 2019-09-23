@@ -25,8 +25,7 @@ import shutil
 import subprocess as subp
 import time
 from multiprocessing import Queue
-from typing import Optional  # pylint: disable=unused-import
-from typing import Any, Callable, Dict, Iterable, Set, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import mock
 import six
