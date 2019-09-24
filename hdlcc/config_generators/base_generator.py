@@ -90,11 +90,6 @@ class BaseGenerator:
 
         project = {"sources": []}
 
-        for lang in FileType:
-            project[lang.value] = {"flags": {}}
-            for scope in BuildFlagScope:
-                project[lang.value]["flags"][scope.value] = []
-
         builder = self._getPreferredBuilder()
         if builder is not NotImplemented:
             project["builder"] = builder
@@ -104,6 +99,8 @@ class BaseGenerator:
         for lang in (FileType.verilog, FileType.systemverilog):
             paths = self._include_paths[lang]
             if paths:
+                if lang.value not in project:
+                    project[lang.value] = {}
                 project[lang.value]["include_paths"] = tuple(paths)
 
         for path, flags, library in self._sources:

@@ -266,17 +266,17 @@ class HdlccLanguageServer(PythonLanguageServer):
         # will involve dumping the modified contents into a temporary file
         path = Path(to_fs_path(doc_uri))
 
-        # LSP diagnostics are only valid for the scope of the resource and
-        # hdlcc may return a tree of issues, so need to filter those out
-        filter_func = lambda diag: diag.filename in (None, path)
-
         _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
 
         if is_saved:
-            return filter(filter_func, self._checker.getMessagesByPath(path))
+            diags = self._checker.getMessagesByPath(path)
+        else:
+            text = self.workspace.get_document(doc_uri).source
+            diags = self._checker.getMessagesWithText(path, text)
 
-        text = self.workspace.get_document(doc_uri).source
-        return filter(filter_func, self._checker.getMessagesWithText(path, text))
+        # LSP diagnostics are only valid for the scope of the resource and
+        # hdlcc may return a tree of issues, so need to filter those out
+        return (diag for diag in diags if diag.filename in (path, None))
 
     @logCalls
     def m_workspace__did_change_configuration(self, settings=None):

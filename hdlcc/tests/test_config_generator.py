@@ -127,7 +127,6 @@ class TestConfigGenerator(TestCase):
         self.assertCountEqual(
             config.pop("systemverilog"),
             {
-                "flags": {"dependencies": [], "global": [], "single": []},
                 "include_paths": {p.join(self.dummy_test_path, "sv_includes")},
             },
         )
@@ -135,17 +134,11 @@ class TestConfigGenerator(TestCase):
         self.assertCountEqual(
             config.pop("verilog"),
             {
-                "flags": {"dependencies": [], "global": [], "single": []},
                 "include_paths": {
                     p.join(self.dummy_test_path, "path_a"),
                     p.join(self.dummy_test_path, "v_includes"),
                 },
             },
-        )
-
-        self.assertCountEqual(
-            config.pop("vhdl"),
-            {"flags": {"dependencies": [], "global": [], "single": []}},
         )
 
         self.assertFalse(config)
