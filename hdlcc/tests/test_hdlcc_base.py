@@ -409,7 +409,7 @@ with such.A("hdlcc project") as it:
             "hdlcc.hdlcc_base.getBuilderByName", new=lambda name: FailingBuilder
         )
         def test():
-            cache_content = {"builder": FailingBuilder}
+            cache_content = {"builder": FailingBuilder.builder_name}
 
             cache_path = it.project._getCacheFilename()
             if p.exists(p.dirname(cache_path.name)):

@@ -30,6 +30,8 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import six
+
 from hdlcc.path import Path
 from hdlcc.types import FileType
 
@@ -41,14 +43,7 @@ _logger = logging.getLogger(__name__)
 def setupLogging(stream, level, color=True):  # pragma: no cover
     "Setup logging according to the command line parameters"
 
-    # Copied from six source
-
-    if sys.version_info[0] == 3:
-        string_types = (str,)
-    else:
-        string_types = (basestring,)  # pylint: disable=undefined-variable
-
-    if isinstance(stream, string_types):
+    if isinstance(stream, six.string_types):
 
         class Stream(object):  # pylint: disable=useless-object-inheritance
             """
