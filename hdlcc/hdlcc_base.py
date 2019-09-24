@@ -45,7 +45,7 @@ from hdlcc.types import (
     RebuildPath,
     RebuildUnit,
 )
-from hdlcc.utils import removeDirIfExists, toBytes, removeIfExists
+from hdlcc.utils import removeDirIfExists, removeIfExists, toBytes
 
 CACHE_NAME = "cache.json"
 
@@ -56,6 +56,8 @@ if six.PY2:
     FileNotFoundError = IOError  # pylint: disable=redefined-builtin
 else:
     JSONDecodeError = json.decoder.JSONDecodeError
+
+WORK_PATH = ".hdlcc"
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -70,12 +72,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     def __init__(self, root_dir):  # type: (Path) -> None
         self.root_dir = root_dir
+        self.work_dir = Path(p.join(str(self.root_dir), WORK_PATH))
 
         self.database = Database()
-        self.builder = Fallback(self.root_dir, self.database)
+        self.builder = Fallback(self.work_dir, self.database)
 
-        if not p.exists(str(self.root_dir)):
-            os.makedirs(str(self.root_dir))
+        if not p.exists(str(self.work_dir)):
+            os.makedirs(str(self.work_dir))
 
         self._recoverCacheIfPossible()
         self._saveCache()
@@ -121,7 +124,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             except IndexError:
                 builder_cls = Fallback
 
-        self.builder = builder_cls(self.root_dir, self.database)
+        self.builder = builder_cls(self.work_dir, self.database)
 
         self.database.configure(config, str(self.root_dir))
         # Add VUnit
@@ -145,7 +148,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         The cache file name will always be inside the path returned by self._getWorkingPath
         and defaults to cache.json
         """
-        return Path(p.join(self.root_dir.name, CACHE_NAME))
+        return Path(p.join(self.work_dir.name, CACHE_NAME))
 
     def _saveCache(self):
         # type: (...) -> Any
@@ -217,13 +220,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Clean up generated files
         """
         _logger.debug("Cleaning up project")
-        removeDirIfExists(str(self.root_dir))
+        removeDirIfExists(str(self.work_dir))
 
         del self.builder
         del self.database
 
         self.database = Database()
-        self.builder = Fallback(self.root_dir, self.database)
+        self.builder = Fallback(self.work_dir, self.database)
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
@@ -254,8 +257,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         _logger.debug("Building '%s'", str(path))
 
-        if not p.isabs(str(path)):
-            path = Path(p.join(str(self.root_dir), str(path)))
+        path = Path(str(path), str(self.root_dir))
 
         for dep_library, dep_path in self.database.getBuildSequence(
             path, self.builder.builtin_libraries
@@ -339,8 +341,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
-        if not p.isabs(str(path)):
-            path = Path(p.join(str(self.root_dir), str(path)))
+        path = Path(str(path), str(self.root_dir))
 
         builder_diags = set()  # type: Set[CheckerDiagnostic]
 
@@ -375,7 +376,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         return builder_diags | set(self.database.getDiagnosticsForPath(path))
 
     def getMessagesWithText(self, path, content):
-        # type: (Path, AnyStr) -> Any
+        # type: (Path, AnyStr) -> Iterable[CheckerDiagnostic]
         """
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
@@ -412,4 +413,4 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.database.removeSource(temp_path)
         removeIfExists(temporary_file.name)
 
-        return messages
+        return set(messages) | set(self.database.getDiagnosticsForPath(path))

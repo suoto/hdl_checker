@@ -442,7 +442,7 @@ with such.A("hdlcc project") as it:
             setupTestSuport(TEST_TEMP_PATH)
 
             it.parser = _configWithDict({"builder_name": MockBuilder.builder_name})
-            removeIfExists(p.join(TEST_TEMP_PATH, CACHE_NAME))
+            removeIfExists(p.join(TEST_TEMP_PATH, '.hdlcc', CACHE_NAME))
 
             #  with disableVunit:
             with mock.patch("hdlcc.hdlcc_base.getBuilderByName", lambda _: MockBuilder):

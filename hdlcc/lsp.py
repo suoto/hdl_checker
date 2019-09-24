@@ -49,8 +49,6 @@ PY2 = sys.version_info[0] == 2
 
 URI = str
 
-WORK_PATH = ".hdlcc"
-
 if six.PY2:
     JSONDecodeError = ValueError
     FileNotFoundError = IOError  # pylint: disable=redefined-builtin
@@ -112,8 +110,6 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
         self._workspace = workspace
         if root_path is None:
             root_path = tempfile.mkdtemp(prefix="hdlcc_")
-        else:
-            root_path = p.join(root_path, WORK_PATH)
 
         super(HdlCodeCheckerServer, self).__init__(Path(root_path))
 
