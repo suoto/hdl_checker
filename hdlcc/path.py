@@ -44,7 +44,6 @@ class Path(object):
         else:
             _name = p.join(base_path, name)
         self._name = p.normpath(_name)
-        self._stat = None
 
     @property
     def mtime(self):
@@ -78,9 +77,7 @@ class Path(object):
 
     @property
     def stat(self):
-        if self._stat is None:
-            self._stat = stat(self.name)
-        return self._stat
+        return stat(self.name)
 
     def __hash__(self):
         return hash(self.name)
@@ -88,12 +85,13 @@ class Path(object):
     def __eq__(self, other):
         """Overrides the default implementation"""
         try:
-            return p.samestat(self.stat, other.stat)
-        except FileNotFoundError:
-            # One of the files doesn't exist, so we'll compare the strings only
-            return self.abspath == other.abspath
-        except AttributeError:
-            # One of the objects doesn't have a 'stat' attribute
+            # Same absolute paths mean the point to the same file. Prefer this
+            # to avoid calling os.stat all the time
+            if self.abspath == other.abspath:
+                return True
+            else:
+                return p.samestat(self.stat, other.stat)
+        except (AttributeError, FileNotFoundError):
             return False
 
         return NotImplemented  # pragma: no cover
@@ -119,6 +117,5 @@ class Path(object):
 
         obj = super(Path, cls).__new__(cls)
         obj._name = state["name"]
-        obj._stat = None
 
         return obj
