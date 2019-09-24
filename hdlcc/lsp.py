@@ -207,7 +207,14 @@ class HdlccLanguageServer(PythonLanguageServer):
         if path is None and self.workspace.root_uri:
             # Having no project file but with root URI triggers searching for
             # sources automatically
-            self._checker.configure(SimpleFinder([self.workspace.root_path]).generate())
+            config = SimpleFinder([self.workspace.root_path]).generate()
+            self.workspace.show_message(
+                "Added {} files from {}".format(
+                    len(config["sources"]), self.workspace.root_path
+                ),
+                defines.MessageType.Info,
+            )
+            self._checker.configure(config)
         elif path is not None:
             try:
                 self._checker.readConfig(path)

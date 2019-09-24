@@ -213,7 +213,7 @@ class Database(HashableByKey):
         _logger.warning("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
         if diagnostic.filename not in self._diags:
-            _logger.fatal(
+            _logger.debug(
                 "Initialized diags for %s", p.basename(str(diagnostic.filename))
             )
             self._diags[diagnostic.filename] = set()
@@ -308,15 +308,21 @@ class Database(HashableByKey):
         Updates dependencies of the given path so they reflect the change in
         their owner's path
         """
-        if self._libraries.get(path, None):
+
+        if path not in self._libraries:
+            _logger.info("Setting library for '%s' to '%s'", path, library)
+        else:
+            current_library = self._libraries.get(path)
+            # No change, avoid manipulating the database
+            if current_library == library:
+                return
+
             _logger.info(
                 "Replacing old library '%s' for '%s' with '%s'",
-                self._libraries[path],
+                current_library,
                 path,
                 library,
             )
-        else:
-            _logger.info("Setting library for '%s' to '%s'", path, library)
 
         self._libraries[path] = library
 
@@ -348,13 +354,13 @@ class Database(HashableByKey):
         # type: (Path) -> UnresolvedLibrary
         "Gets a library of a given source (this is likely to be removed)"
         self._parseSourceIfNeeded(path)
-        if path not in self._paths:
+        if path not in self.paths:
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)
             self._updatePathLibrary(path, Identifier("not_in_project", True))
             # If no paths were ever added there's no need to report this path
             # as not used really
-            if self._paths:
+            if self.paths:
                 self._addDiagnostic(PathNotInProjectFile(path))
 
         elif path not in self._libraries:
