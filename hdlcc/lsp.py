@@ -21,7 +21,6 @@
 import json
 import logging
 import os.path as p
-import sys
 import tempfile
 from typing import Any, Iterable, Optional, Set
 
@@ -34,18 +33,14 @@ from pyls.workspace import Workspace  # type: ignore
 
 from hdlcc.config_generators.simple_finder import SimpleFinder
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
+from hdlcc.exceptions import UnknownParameterError
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
 from hdlcc.path import Path
 from hdlcc.utils import logCalls
 
-MONITORED_FILES = (".vhd", ".vhdl", ".sv", ".svh", ".v", ".vh")
-CONFIG_FILES = ()
-
 _logger = logging.getLogger(__name__)
 
 LINT_DEBOUNCE_S = 0.5  # 500 ms
-DEFAULT_PROJECT_FILENAME = "vimhdl.prj"
-PY2 = sys.version_info[0] == 2
 
 URI = str
 
@@ -115,19 +110,19 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
-        _logger.debug("UI info: %s", message)
+        _logger.debug("UI info: %s (workspace=%s)", message, self._workspace)
         if self._workspace:
             self._workspace.show_message(message, defines.MessageType.Info)
 
     def _handleUiWarning(self, message):
         # type: (...) -> Any
-        _logger.debug("UI warning: %s", message)
+        _logger.debug("UI warning: %s (workspace=%s)", message, self._workspace)
         if self._workspace:
             self._workspace.show_message(message, defines.MessageType.Warning)
 
     def _handleUiError(self, message):
         # type: (...) -> Any
-        _logger.debug("UI error: %s", message)
+        _logger.debug("UI error: %s (workspace=%s)", message, self._workspace)
         if self._workspace:
             self._workspace.show_message(message, defines.MessageType.Error)
 
@@ -188,8 +183,14 @@ class HdlccLanguageServer(PythonLanguageServer):
         # type: (...) -> Any
         """
         Updates the checker server from options if the 'project_file' key is
-        present
+        present. Because this can take a long time, it should be changed to run
+        on a thread if possible, as long as points where this is called don't
+        depend on this being successful or not.
+
         """
+        # FIXME(suoto): Notifications sent from this method might not be shown,
+        # since the client might not be initialized properly at this point.
+
         if self._checker is None:
             return
 
@@ -200,22 +201,32 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         path = self._getProjectFilePath(options)
 
-        if path is None and self.workspace.root_uri:
-            # Having no project file but with root URI triggers searching for
-            # sources automatically
-            config = SimpleFinder([self.workspace.root_path]).generate()
-            self.workspace.show_message(
-                "Added {} files from {}".format(
-                    len(config["sources"]), self.workspace.root_path
-                ),
-                defines.MessageType.Info,
-            )
-            self._checker.configure(config)
-        elif path is not None:
+        if path is not None:
             try:
                 self._checker.readConfig(path)
-            except (FileNotFoundError, JSONDecodeError) as exc:
-                _logger.warning("Failed to read config from %s: %s", path, exc)
+                return
+            except UnknownParameterError as exc:
+                _logger.info("Failed to read config from %s: %s", path, exc)
+                return
+            except FileNotFoundError:
+                # If the file couldn't be found, proceed to searching the root
+                # URI (if it has been set)
+                pass
+
+        if not self.workspace or not self.workspace.root_path:
+            _logger.debug("No workspace or root path not set, can't search files")
+            return
+
+        # Having no project file but with root URI triggers searching for
+        # sources automatically
+        config = SimpleFinder([self.workspace.root_path]).generate()
+        self.workspace.show_message(
+            "Added {} files from {}".format(
+                len(config["sources"]), self.workspace.root_path
+            ),
+            defines.MessageType.Info,
+        )
+        self._checker.configure(config)
 
     def _getProjectFilePath(self, options=None):
         # type: (...) -> Optional[str]
@@ -238,11 +249,7 @@ class HdlccLanguageServer(PythonLanguageServer):
     @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
     def lint(self, doc_uri, is_saved):
         # type: (...) -> Any
-        diagnostics = list(self._getDiags(doc_uri, is_saved))
-        _logger.info("Diagnostics: %s", diagnostics)
-
-        if self._global_diags:
-            diagnostics += list(self._global_diags)
+        diagnostics = set(self._getDiags(doc_uri, is_saved)) | self._global_diags
 
         # Since we're debounced, the document may no longer be open
         if doc_uri in self.workspace.documents:

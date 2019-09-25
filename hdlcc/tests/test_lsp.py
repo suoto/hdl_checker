@@ -29,9 +29,10 @@ from threading import Event, Timer
 
 import mock
 import parameterized  # type: ignore
-import pyls  # type: ignore
 import six
 import unittest2  # type: ignore
+
+import pyls  # type: ignore
 from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace  # type: ignore
