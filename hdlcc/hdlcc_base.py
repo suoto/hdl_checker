@@ -100,7 +100,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             try:
                 config = ConfigParser(Path(filename)).parse()
             except UnknownParameterError as exc:
-                self._handleUiError(
+                self._handleUiWarning(
                     "Failed to parse '{}': {}".format(filename, str(exc))
                 )
                 raise
