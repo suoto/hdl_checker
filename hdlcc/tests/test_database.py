@@ -26,7 +26,16 @@ import logging
 import os.path as p
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterable, Set, Tuple, Union
+from typing import Any, Dict, Iterable, Set, Tuple
+
+from hdlcc.tests import (
+    SourceMock,
+    TestCase,
+    disableVunit,
+    getTestTempPath,
+    logIterable,
+    setupTestSuport,
+)
 
 from hdlcc.database import Database
 from hdlcc.diagnostics import DependencyNotUnique, PathNotInProjectFile
@@ -35,15 +44,7 @@ from hdlcc.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import (
-    SourceMock,
-    TestCase,
-    disableVunit,
-    getTestTempPath,
-    logIterable,
-    setupTestSuport,
-)
-from hdlcc.types import BuildFlags, BuildFlagScope, FileType
+from hdlcc.types import BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
 

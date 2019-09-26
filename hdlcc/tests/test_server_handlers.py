@@ -29,6 +29,8 @@ from webtest import TestApp  # type: ignore
 
 from nose2.tools import such  # type: ignore
 
+from hdlcc.tests import assertCountEqual, disableVunit, getTestTempPath, setupTestSuport
+
 import hdlcc
 import hdlcc.handlers as handlers
 from hdlcc.diagnostics import (
@@ -39,12 +41,6 @@ from hdlcc.diagnostics import (
 )
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.tests.utils import (
-    assertCountEqual,
-    disableVunit,
-    getTestTempPath,
-    setupTestSuport,
-)
 from hdlcc.utils import removeIfExists
 
 try:  # Python 3.x
@@ -266,7 +262,7 @@ with such.A("hdlcc bottle app") as it:
         }
 
         @property
-        def builtin_libraries(*args, **kwargs):
+        def builtin_libraries(_):
             return {Identifier("ieee")}
 
         such.unittest.TestCase.maxDiff = None

@@ -25,11 +25,12 @@ import six
 
 from nose2.tools import such  # type: ignore
 
+from hdlcc.tests import assertCountEqual, writeListToFile
+
 from hdlcc.parsers.elements.design_unit import DesignUnitType
 from hdlcc.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
 from hdlcc.path import Path
 from hdlcc.serialization import StateEncoder, jsonObjectHook
-from hdlcc.tests.utils import assertCountEqual, writeListToFile
 
 _logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ module clock_divider
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
-        @it.should("parse a file without errors")  # type: ignore
+        @it.should("parse a file without errors")
         def test():
             it.source = VerilogParser(Path(_FILENAME))
 

@@ -34,11 +34,12 @@ import six
 
 from nose2.tools import such  # type: ignore
 
+from hdlcc.tests import assertCountEqual, getTestTempPath, setupTestSuport
+
 from hdlcc.builder_utils import BuilderName
 from hdlcc.exceptions import UnknownParameterError
 from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.path import Path
-from hdlcc.tests.utils import assertCountEqual, getTestTempPath, setupTestSuport
 from hdlcc.types import BuildFlagScope
 
 _logger = logging.getLogger(__name__)

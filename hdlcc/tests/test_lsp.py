@@ -40,11 +40,7 @@ from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
 
 from nose2.tools import such  # type: ignore
 
-from hdlcc.tests.utils import (  # isort:skip
-    assertCountEqual,
-    getTestTempPath,
-    setupTestSuport,
-)
+from hdlcc.tests import assertCountEqual, getTestTempPath, setupTestSuport  # isort:skip
 
 
 # Debouncing will hurt testing since it won't actually call the debounced

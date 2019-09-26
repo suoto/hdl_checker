@@ -35,8 +35,9 @@ from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: i
 
 from nose2.tools import such  # type: ignore
 
+from hdlcc.tests import disableVunit, getTestTempPath
+
 import hdlcc.lsp
-from hdlcc.tests.utils import disableVunit, getTestTempPath, setupTestSuport
 from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
 
 _logger = logging.getLogger(__name__)

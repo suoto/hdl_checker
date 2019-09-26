@@ -24,13 +24,12 @@
 import json
 import logging
 import os.path as p
-import time
 from pprint import pformat
-from typing import Any, Dict, Iterable, Set, Tuple, Union
+
+from hdlcc.tests import TestCase, getTestTempPath
 
 from hdlcc.parser_utils import flattenConfig, getIncludedConfigs
 from hdlcc.path import Path
-from hdlcc.tests.utils import TestCase, getTestTempPath
 from hdlcc.types import BuildFlagScope, FileType
 from hdlcc.utils import removeIfExists
 

@@ -34,18 +34,7 @@ import six
 #  from mock import patch
 from nose2.tools import such  # type: ignore
 
-from hdlcc.builders.fallback import Fallback
-from hdlcc.diagnostics import (
-    CheckerDiagnostic,
-    DiagType,
-    LibraryShouldBeOmited,
-    ObjectIsNeverUsed,
-    PathNotInProjectFile,
-)
-from hdlcc.hdlcc_base import CACHE_NAME
-from hdlcc.parsers.elements.identifier import Identifier
-from hdlcc.path import Path
-from hdlcc.tests.utils import (
+from hdlcc.tests import (
     FailingBuilder,
     MockBuilder,
     SourceMock,
@@ -58,6 +47,18 @@ from hdlcc.tests.utils import (
     setupTestSuport,
     writeListToFile,
 )
+
+from hdlcc.builders.fallback import Fallback
+from hdlcc.diagnostics import (
+    CheckerDiagnostic,
+    DiagType,
+    LibraryShouldBeOmited,
+    ObjectIsNeverUsed,
+    PathNotInProjectFile,
+)
+from hdlcc.hdlcc_base import CACHE_NAME
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.path import Path
 from hdlcc.types import (
     BuildFlagScope,
     FileType,
@@ -103,6 +104,7 @@ def _configWithDict(dict_):
     filename = p.join(TEST_TEMP_PATH, "mock.prj")
     json.dump(dict_, open(filename, "w"))
     return filename
+
 
 such.unittest.TestCase.maxDiff = None
 
@@ -442,7 +444,7 @@ with such.A("hdlcc project") as it:
             setupTestSuport(TEST_TEMP_PATH)
 
             it.parser = _configWithDict({"builder_name": MockBuilder.builder_name})
-            removeIfExists(p.join(TEST_TEMP_PATH, '.hdlcc', CACHE_NAME))
+            removeIfExists(p.join(TEST_TEMP_PATH, ".hdlcc", CACHE_NAME))
 
             #  with disableVunit:
             with mock.patch("hdlcc.hdlcc_base.getBuilderByName", lambda _: MockBuilder):
@@ -680,7 +682,7 @@ with such.A("hdlcc project") as it:
             # - {unit_type: '', 'unit_name': }
             # - {library_name: '', 'unit_name': }
             # - {rebuild_path: ''}
-            def _buildAndParse(self, path, library, forced=False):
+            def _buildAndParse(_, path, library, forced=False):
                 _logger.warning("%s, %s, %s", path, library, forced)
                 calls.append(str(path))
                 if ret_list:

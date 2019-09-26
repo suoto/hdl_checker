@@ -29,6 +29,14 @@ import mock
 import parameterized  # type: ignore
 import unittest2  # type: ignore
 
+from hdlcc.tests import (
+    SourceMock,
+    TestCase,
+    getTestTempPath,
+    parametrizeClassWithBuilders,
+    setupTestSuport,
+)
+
 from hdlcc.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
@@ -43,13 +51,6 @@ from hdlcc.exceptions import SanityCheckError
 from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.tests.utils import (
-    SourceMock,
-    TestCase,
-    getTestTempPath,
-    parametrizeClassWithBuilders,
-    setupTestSuport,
-)
 from hdlcc.types import BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
@@ -572,7 +573,6 @@ class TestBuilder(TestCase):
             ({"rebuild_path": "some_path"}, RebuildPath("some_path")),
         ]
     )
-
     def test_get_rebuilds(self, rebuild_info, expected):
         # type: (...) -> Any
         _logger.info("Rebuild info is %s", rebuild_info)

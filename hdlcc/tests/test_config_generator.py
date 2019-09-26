@@ -25,8 +25,9 @@ import os
 import os.path as p
 import shutil
 
-import unittest2  # type: ignore
 from webtest import TestApp  # type: ignore
+
+from hdlcc.tests import TestCase, getTestTempPath, setupTestSuport
 
 import hdlcc.handlers as handlers
 from hdlcc.builders.fallback import Fallback
@@ -34,7 +35,6 @@ from hdlcc.builders.ghdl import GHDL
 from hdlcc.builders.msim import MSim
 from hdlcc.builders.xvhdl import XVHDL
 from hdlcc.config_generators.simple_finder import SimpleFinder
-from hdlcc.tests.utils import getTestTempPath, setupTestSuport, TestCase
 
 try:  # Python 3.x
     import unittest.mock as mock
@@ -126,9 +126,7 @@ class TestConfigGenerator(TestCase):
 
         self.assertCountEqual(
             config.pop("systemverilog"),
-            {
-                "include_paths": {p.join(self.dummy_test_path, "sv_includes")},
-            },
+            {"include_paths": {p.join(self.dummy_test_path, "sv_includes")}},
         )
 
         self.assertCountEqual(
@@ -137,7 +135,7 @@ class TestConfigGenerator(TestCase):
                 "include_paths": {
                     p.join(self.dummy_test_path, "path_a"),
                     p.join(self.dummy_test_path, "v_includes"),
-                },
+                }
             },
         )
 
