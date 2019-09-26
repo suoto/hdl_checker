@@ -105,7 +105,9 @@ def _parseArguments():
 
     parser.add_argument("--debugger", "-D", action="store_true")
 
-    parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument(
+        "--verbose", "-v", action="append_const", const="-v", default=[]
+    )
 
     parser.add_argument(
         "--log-file",
@@ -149,8 +151,7 @@ def _parseArguments():
 def _getNoseCommandLineArgs(args):
     argv = []
 
-    if args.verbose:
-        argv += ["--verbose", "--verbose"]  # wtf?
+    argv += args.verbose
     if args.debugger:
         argv += ["--debugger"]
     if args.fail_fast:
