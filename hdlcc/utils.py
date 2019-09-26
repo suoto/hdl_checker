@@ -28,14 +28,11 @@ import sys
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Lock
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
 
 import six
 
 from hdlcc.path import Path
-from hdlcc.types import FileType
-
-PY2 = sys.version_info[0] == 2
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +58,6 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
                 """
                 Tells if this stream accepts control chars
                 """
-
                 return self._color
 
             def write(self, text):
@@ -79,24 +75,7 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
         # This is mostly for debugging when doing stuff directly from a
         # terminal
         from rainbow_logging_handler import RainbowLoggingHandler  # type: ignore
-
-        handler = RainbowLoggingHandler(
-            _stream,
-            #  Customizing each column's color
-            # pylint: disable=bad-whitespace
-            color_asctime=("dim white", "black"),
-            color_name=("dim white", "black"),
-            color_funcName=("green", "black"),
-            color_lineno=("dim white", "black"),
-            color_pathname=("black", "red"),
-            color_module=("yellow", None),
-            color_message_debug=("color_59", None),
-            color_message_info=(None, None),
-            color_message_warning=("color_226", None),
-            color_message_error=("red", None),
-            color_message_critical=("bold white", "red"),
-        )
-        # pylint: enable=bad-whitespace
+        handler = RainbowLoggingHandler(_stream)
     except ImportError:  # pragma: no cover
         handler = logging.StreamHandler(_stream)
         handler.formatter = logging.Formatter(
@@ -205,7 +184,7 @@ if not hasattr(p, "samefile"):
 else:
     _samefile = p.samefile  # pylint: disable=invalid-name
 
-samefile = _samefile
+samefile = _samefile  # pylint: disable=invalid-name
 
 
 def removeDuplicates(seq):
@@ -256,7 +235,7 @@ def toBytes(value):  # pragma: no cover
         # py2 that *sometimes* returns the built-in str type instead of the newbytes
         # type from python-future.
 
-        if PY2:
+        if six.PY2:
             return bytes(value.encode("utf8"), encoding="utf8")
 
         return bytes(value, encoding="utf8")
@@ -327,20 +306,29 @@ def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
 
 
 def removeIfExists(filename):
+    # type: (str) -> bool
+    "Removes filename using os.remove and catches the exception if that fails"
     try:
         os.remove(filename)
+        return True
     except OSError:
-        pass
+        return False
 
 
 def removeDirIfExists(dirname):
+    # type: (str) -> bool
+    """
+    Removes the directory dirname using shutil.rmtree and catches the exception
+    if that fails
+    """
     try:
         shutil.rmtree(dirname)
+        return True
     except OSError:
-        pass
+        return False
 
 
-class HashableByKey(object):
+class HashableByKey(object):  # pylint: disable=useless-object-inheritance
     """
     Implements hash and comparison operators properly across Python 2 and 3
     """
@@ -398,6 +386,13 @@ def logCalls(func):  # pragma: no cover
     return wrapper
 
 
+T = TypeVar("T")  # pylint: disable=invalid-name
+
+
 def getMostCommonItem(items):
+    # type: (Iterable[T]) -> T
+    """
+    Gets the most common item on an interable of items
+    """
     data = Counter(items)
     return max(items, key=data.get)
