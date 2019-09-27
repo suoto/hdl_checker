@@ -261,6 +261,18 @@ with such.A("hdlcc project") as it:
                 list(it.project.getUiMessages()),
             )
 
+            # Setting the config file should not trigger reparsing
+            with patch.object(it.project, "_readConfig") as readConfig:
+                with patch(
+                    "hdlcc.hdlcc_base.WatchedFile.__init__", side_effect=[None]
+                ) as WatchedFile:
+                    old = it.project.config_file
+                    it.project.setConfig(it.config_file)
+                    it.project._updateConfigIfNeeded()
+                    it.assertEqual(it.project.config_file, old)
+                    readConfig.assert_not_called()
+                    WatchedFile.assert_not_called()
+
         @it.should("clean up root dir")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():

@@ -56,13 +56,6 @@ if six.PY2:
 else:
     JSONDecodeError = json.decoder.JSONDecodeError
 
-
-#  class WatchedFile(object):
-#      def __init__(self, path, last_read):
-#          # type: (Path, float) -> None
-#          self.path = path
-#          self.last_read = last_read
-
 WatchedFile = namedtuple("WatchedFile", ("path", "last_read"))
 
 
@@ -97,44 +90,49 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
     @property
     def builder(self):
+        """
+        Parses the config file if it has been set and returns the builder in
+        use
+        """
         self._updateConfigIfNeeded()
         return self._builder
 
     def setConfig(self, filename):
         # type: (Union[Path, str]) -> None
+        """
+        Sets the configuration file. Calling this method will only trigger a
+        configuration update if the given filename is different what was
+        configured previously (that includes no value previously set)
+        """
         path = Path(filename, self.root_dir)
         mtime = path.mtime
 
         # If the config file has been set previously, avoid refreshing if
         # possible
-        if self.config_file is not None and self.config_file.path != path:
-            _logger.info("Replacing %s with %s", self.config_file.path, path)
-        else:
+        if self.config_file is None or self.config_file.path != path:
+            _logger.info("Replacing %s with %s", self.config_file, path)
             mtime = 0.0
+        else:
+            return
 
         self.config_file = WatchedFile(path, mtime)
         _logger.debug("Set config to %s", self.config_file)
-        #  self._updateConfigIfNeeded()
-        #  self._readConfig()
 
     def _updateConfigIfNeeded(self):
         # type: (...) -> Any
         """
-        If a configuration file has been passed, check if it's been modified.
+        Checks if self.config_file has changed; if it has, cleans up and
+        re-reads the file
         """
         # No config file set
-        _logger.debug("config_file: %s", self.config_file)
-
         if self.config_file is None:
             return
 
         file_mtime = self.config_file.path.mtime
         # Check if values we have are up to date
         if self.config_file.last_read >= file_mtime:
-            _logger.debug("Config file is up to date")
             return
 
-        _logger.debug("Updating config from file")
         self.clean()
         self._readConfig()
 
@@ -226,9 +224,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         self.database = state.pop("database")
         self._builder = state.pop("builder", Fallback)
-        state.pop("config_file")
-        self.config_file = None
-        #  self.config_file = WatchedFile._make(state.pop("config_file", None))
+        config_file = state.pop("config_file", None)
+        if config_file is None:
+            self.config_file = None
+        else:
+            WatchedFile._make(config_file)
 
     def _recoverCacheIfPossible(self):
         # type: (...) -> Any

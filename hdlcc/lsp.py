@@ -16,8 +16,6 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Language server protocol implementation"
 
-# pylint: disable=useless-object-inheritance
-
 import logging
 import os.path as p
 import tempfile
@@ -45,7 +43,10 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 URI = str
 
 if six.PY2:
-    FileNotFoundError = (IOError, OSError)  # pylint: disable=redefined-builtin
+    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
+        IOError,
+        OSError,
+    )
 
 
 def checkerDiagToLspDict(diag):
