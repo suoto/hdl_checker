@@ -87,6 +87,10 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
 
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("pynvim").setLevel(logging.WARNING)
+    logging.getLogger("pyls").setLevel(logging.INFO)
+    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
+    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.INFO)
     logging.getLogger("pyls_jsonrpc.endpoint").setLevel(logging.INFO)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
@@ -96,7 +100,7 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
 def terminateProcess(pid):
     "Terminate a process given its PID"
 
-    if onWindows():
+    if ON_WINDOWS:
         import ctypes
 
         process_terminate = 1
@@ -110,7 +114,7 @@ def terminateProcess(pid):
 def isProcessRunning(pid):
     "Checks if a process is running given its PID"
 
-    if onWindows():
+    if ON_WINDOWS:
         return _isProcessRunningOnWindows(pid)
 
     return _isProcessRunningOnPosix(pid)
@@ -162,8 +166,7 @@ def _isProcessRunningOnWindows(pid):
     return int(pid) in pid_list
 
 
-def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
-    return os.name == "nt"
+ON_WINDOWS = os.name == "nt"
 
 
 def onMac():  # pragma: no cover # pylint: disable=missing-docstring
@@ -252,7 +255,7 @@ def getTemporaryFilename(name):
     """
     basename = "hdlcc_" + name + "_pid{}".format(os.getpid())
 
-    if onWindows():
+    if ON_WINDOWS:
         return NamedTemporaryFile(
             prefix=basename + "_", suffix=".log", delete=False
         ).name
@@ -310,8 +313,10 @@ def removeIfExists(filename):
     "Removes filename using os.remove and catches the exception if that fails"
     try:
         os.remove(filename)
+        _logger.debug("Removed %s", filename)
         return True
     except OSError:
+        _logger.debug("Failed to remove %s", filename)
         return False
 
 

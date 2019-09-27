@@ -38,7 +38,7 @@ from nose2.tools import such  # type: ignore
 from hdlcc.tests import disableVunit, getTestTempPath
 
 import hdlcc.lsp
-from hdlcc.utils import isProcessRunning, onWindows, terminateProcess
+from hdlcc.utils import isProcessRunning, ON_WINDOWS, terminateProcess
 
 _logger = logging.getLogger(__name__)
 
@@ -421,7 +421,7 @@ with such.A("hdlcc server") as it:
 
             _logger.info("Log content: %s", log_content)
 
-            if onWindows():
+            if ON_WINDOWS:
                 log_content = log_content[1:]
                 expected = expected[1:]
 

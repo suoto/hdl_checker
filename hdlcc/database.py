@@ -196,7 +196,6 @@ class Database(HashableByKey):
 
         try:
             del self._diags[path]
-            _logger.fatal("Removed diags for %s", p.basename(str(path)))
             clear_lru_caches = True
         except KeyError:
             pass
@@ -210,7 +209,7 @@ class Database(HashableByKey):
         Adds a diagnostic to the diagnostic map. Diagnostics can then be read
         to report processing internals and might make it to the user interface
         """
-        _logger.warning("Adding diagnostic %s", diagnostic)
+        _logger.info("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
         if diagnostic.filename not in self._diags:
             _logger.debug(
@@ -358,10 +357,9 @@ class Database(HashableByKey):
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)
             self._updatePathLibrary(path, Identifier("not_in_project", True))
-            # If no paths were ever added there's no need to report this path
-            # as not used really
-            if self.paths:
-                self._addDiagnostic(PathNotInProjectFile(path))
+            # If path is not on the list of paths added, report this. If the
+            # config is valid
+            self._addDiagnostic(PathNotInProjectFile(path))
 
         elif path not in self._libraries:
             # Library is not defined, try to infer
@@ -574,7 +572,6 @@ class Database(HashableByKey):
 
             # Fill in a report for every occurence found
             for location in dependency.locations:
-                _logger.fatal("locations: %s", dependency.locations)
                 self._addDiagnostic(
                     DependencyNotUnique(
                         filename=dependency.owner,
@@ -656,6 +653,8 @@ class Database(HashableByKey):
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
+        self._diags[path] = set()
+
         units_compiled = set()  # type: Set[LibraryUnitTuple]
         builtin_libraries = frozenset(builtin_libraries or [])
 

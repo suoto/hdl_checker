@@ -24,6 +24,7 @@ import os.path as p
 import shutil
 import subprocess as subp
 import time
+from contextlib import contextmanager
 from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -38,7 +39,7 @@ from hdlcc.parsers.elements.dependency_spec import DependencySpec
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import FileType
-from hdlcc.utils import onWindows, removeDuplicates, samefile
+from hdlcc.utils import ON_WINDOWS, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ class SourceMock(object):
 
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("MockBuilder")
-    builder_name = "ghdl"
+    builder_name = "mock_builder"
     file_types = (FileType.vhdl,)
 
     def __init__(self, work_folder, *args, **kwargs):
@@ -245,6 +246,74 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
 
 
 disableVunit = mock.patch("hdlcc.builder_utils.foundVunit", lambda: False)
+
+
+@contextmanager
+def patchBuilder():
+    with mock.patch(
+        "hdlcc.hdlcc_base.getWorkingBuilders", side_effect=[iter((MockBuilder,))]
+    ):
+        with mock.patch("hdlcc.hdlcc_base.getBuilderByName", side_effect=[MockBuilder]):
+            with disableVunit:
+                yield
+
+
+class PatchBuilder(object):
+    def __init__(self, meth=None):
+        def getBuilderByName(name):
+            "Returns the builder class given a string name"
+            from hdlcc.builders.msim import MSim
+            from hdlcc.builders.ghdl import GHDL
+            from hdlcc.builders.xvhdl import XVHDL
+            from hdlcc.builders.fallback import Fallback
+
+            # Check if the builder selected is implemented and create the
+            # builder attribute
+            _logger.info("Getting builder class for %s", name)
+            if name == MockBuilder.builder_name:
+                return MockBuilder
+            if name == "msim":
+                return MSim
+            if name == "xvhdl":
+                return XVHDL
+            if name == "ghdl":
+                return GHDL
+
+            return Fallback
+
+        self.meth = meth
+        self.patches = (
+            mock.patch(
+                "hdlcc.hdlcc_base.getWorkingBuilders",
+                side_effect=[iter((MockBuilder,))],
+            ),
+            mock.patch("hdlcc.hdlcc_base.getBuilderByName", getBuilderByName),
+            disableVunit,
+        )
+
+    #  def __name__(self):
+    #      return str("PatchBuilder")
+
+    def __enter__(self):
+        _logger.info("Starting patches")
+        list(x.start() for x in self.patches)
+
+    def __exit__(self, *args, **kwargs):
+        _logger.info("Stopping patches")
+        list(x.stop() for x in self.patches)
+
+    def __call__(self, *args, **kwargs):
+        self.__enter__()
+        try:
+            if self.meth is not None:
+                yield self.meth()
+            else:
+                yield None
+        except:
+            _logger.exception("Failed to run %s", self.meth)
+            raise
+        finally:
+            self.__exit__()
 
 
 def sanitizePath(*args):
@@ -318,7 +387,7 @@ def writeListToFile(filename, _list):  # pragma: no cover
     for i, line in enumerate(_list):
         _logger.debug("%2d | %s", i + 1, line)
 
-    if onWindows():
+    if ON_WINDOWS:
         cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
         _logger.debug(cmd)
         subp.check_call(cmd, shell=True)
@@ -332,7 +401,7 @@ def writeListToFile(filename, _list):  # pragma: no cover
         time.sleep(0.1)
 
 
-if not onWindows():
+if not ON_WINDOWS:
     TEST_ENVS = {
         "ghdl": os.environ["GHDL_PATH"],
         "msim": os.environ["MODELSIM_PATH"],
@@ -414,4 +483,4 @@ if six.PY2:
 
 
 else:
-    from unittest2 import TestCase # type: ignore
+    from unittest2 import TestCase  # type: ignore

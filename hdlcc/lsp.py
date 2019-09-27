@@ -18,7 +18,6 @@
 
 # pylint: disable=useless-object-inheritance
 
-import json
 import logging
 import os.path as p
 import tempfile
@@ -31,6 +30,7 @@ from pyls.python_ls import PythonLanguageServer  # type: ignore
 from pyls.uris import to_fs_path  # type: ignore
 from pyls.workspace import Workspace  # type: ignore
 
+from hdlcc import DEFAULT_PROJECT_FILE
 from hdlcc.config_generators.simple_finder import SimpleFinder
 from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 from hdlcc.exceptions import UnknownParameterError
@@ -45,10 +45,7 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 URI = str
 
 if six.PY2:
-    JSONDecodeError = ValueError
-    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
-else:
-    JSONDecodeError = json.decoder.JSONDecodeError
+    FileNotFoundError = (IOError, OSError)  # pylint: disable=redefined-builtin
 
 
 def checkerDiagToLspDict(diag):
@@ -203,7 +200,7 @@ class HdlccLanguageServer(PythonLanguageServer):
 
         if path is not None:
             try:
-                self._checker.readConfig(path)
+                self._checker.setConfig(path)
                 return
             except UnknownParameterError as exc:
                 _logger.info("Failed to read config from %s: %s", path, exc)
@@ -234,7 +231,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         Tries to get 'project_file' from the options dict and combine it with
         the root URI as provided by the workspace
         """
-        path = (options or {}).get("project_file", None)
+        path = (options or {}).get("project_file", DEFAULT_PROJECT_FILE)
 
         # Path has been explicitly set to none
         if path is None:

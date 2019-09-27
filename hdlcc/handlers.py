@@ -89,7 +89,7 @@ def _getServerByProjectFile(project_file):
         try:
             project = HdlCodeCheckerServer(root_dir=root_dir)
             if project_file is not None:
-                project.readConfig(project_file)
+                project.setConfig(project_file)
             _logger.debug("Created new project server for '%s'", project_file)
         except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")
@@ -289,6 +289,7 @@ def getBuildSequence():
     _logger.debug("Getting build sequence for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
+    server._updateConfigIfNeeded()
 
     return {
         "sequence": tuple(

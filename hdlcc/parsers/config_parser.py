@@ -23,7 +23,7 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 from hdlcc import exceptions
 from hdlcc.builder_utils import BuilderName
@@ -78,7 +78,7 @@ class ConfigParser(object):
     def __init__(self, filename):  # type: (Path) -> None
         self._logger.debug("Creating config parser for filename '%s'", filename)
 
-        self._parms = {"builder": BuilderName.fallback.name}
+        self._parms = {"builder": None}  # type: Dict[str, Union[str, None]]
 
         self._flags = {
             FileType.vhdl: {
@@ -209,10 +209,11 @@ class ConfigParser(object):
         has been changed
         """
         self._parseIfNeeded()
-        data = {
-            "builder_name": self._parms["builder"],
-            "sources": self._sources,
-        }  # type: Dict[Any, Any]
+        data = {"sources": self._sources}  # type: Dict[Any, Any]
+
+        builder_name = self._parms.get("builder", None)
+        if builder_name is not None:
+            data["builder_name"] = builder_name
 
         for filetype, flags in self._flags.items():
             flags_dict = {}

@@ -21,11 +21,22 @@ be used to populate syntax checkers and linters of text editors. It
 takes into account the sources dependencies when building so you don't
 need to provide a source list ordered by hand.
 """
+import os
+
 from ._version import get_versions
+
+from hdlcc.utils import ON_WINDOWS
 
 __author__ = "Andre Souto (andre820@gmail.com)"
 __license__ = "GPLv3"
 __status__ = "Development"
 
-__version__ = get_versions()['version']
+__version__ = get_versions()["version"]
 del get_versions
+
+DEFAULT_PROJECT_FILE = os.environ.get(
+    "HDLCC_DEFAULT_PROJECT_FILE", ".hdlcc.config" if not ON_WINDOWS else "_hdlcc.config"
+)
+
+CACHE_NAME = os.environ.get("HDLCC_CACHE_NAME", "cache.json")
+WORK_PATH = os.environ.get("HDLCC_WORK_PATH", ".hdlcc")

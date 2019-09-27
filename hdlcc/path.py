@@ -21,7 +21,7 @@
 import logging
 import os.path as p
 from os import stat
-from typing import Optional
+from typing import Union
 
 import six
 
@@ -30,20 +30,21 @@ _logger = logging.getLogger(__name__)
 if six.PY2:
     FileNotFoundError = OSError  # pylint: disable=redefined-builtin
 
+
 class Path(object):
     "Path helper class to speed up comparing different paths"
 
     def __init__(self, name, base_path=None):
-        # type: (str, Optional[str]) -> None
+        # type: (Union[Path, str], Union[Path, str, None]) -> None
         assert isinstance(
-            name, six.string_types
+            name, (Path, six.string_types)
         ), "Invalid type for path: {} ({})".format(name, type(name))
 
-        if p.isabs(name) or base_path is None:
+        if p.isabs(str(name)) or base_path is None:
             _name = name
         else:
-            _name = p.join(base_path, name)
-        self._name = p.normpath(_name)
+            _name = p.join(str(base_path), str(name))
+        self._name = p.normpath(str(_name))
 
     @property
     def mtime(self):

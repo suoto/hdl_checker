@@ -29,6 +29,7 @@ import time
 
 import mock
 import six
+from mock import patch
 
 #  import unittest2
 #  from mock import patch
@@ -37,6 +38,7 @@ from nose2.tools import such  # type: ignore
 from hdlcc.tests import (
     FailingBuilder,
     MockBuilder,
+    PatchBuilder,
     SourceMock,
     StandaloneProjectBuilder,
     assertCountEqual,
@@ -44,10 +46,12 @@ from hdlcc.tests import (
     disableVunit,
     getTestTempPath,
     logIterable,
+    patchBuilder,
     setupTestSuport,
     writeListToFile,
 )
 
+from hdlcc import CACHE_NAME, WORK_PATH
 from hdlcc.builders.fallback import Fallback
 from hdlcc.diagnostics import (
     CheckerDiagnostic,
@@ -56,7 +60,6 @@ from hdlcc.diagnostics import (
     ObjectIsNeverUsed,
     PathNotInProjectFile,
 )
-from hdlcc.hdlcc_base import CACHE_NAME
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
 from hdlcc.types import (
@@ -72,6 +75,9 @@ _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+
+if six.PY2:
+    FileNotFoundError = (IOError, OSError)  # pylint: disable=redefined-builtin
 
 
 class _SourceMock(SourceMock):
@@ -96,10 +102,10 @@ def patchClassMap(**kwargs):
     for name, value in kwargs.items():
         class_map.update({name: value})
 
-    return mock.patch("hdlcc.serialization.CLASS_MAP", class_map)
+    return patch("hdlcc.serialization.CLASS_MAP", class_map)
 
 
-def _configWithDict(dict_):
+def _makeConfigFromDict(dict_):
     # type: (...) -> str
     filename = p.join(TEST_TEMP_PATH, "mock.prj")
     json.dump(dict_, open(filename, "w"))
@@ -137,8 +143,8 @@ with such.A("hdlcc project") as it:
         @it.should("raise exception when trying to instantiate")
         def test():
             project = StandaloneProjectBuilder(_Path("nonexisting"))
-            with it.assertRaises((OSError, IOError)):
-                project.readConfig(str(it.project_file))
+            with it.assertRaises(FileNotFoundError):
+                project.setConfig(str(it.project_file))
 
     with it.having("no project file at all"):
 
@@ -148,7 +154,7 @@ with such.A("hdlcc project") as it:
 
         @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
-            it.assertTrue(isinstance(it.project.builder, Fallback))
+            it.assertIsInstance(it.project.builder, Fallback)
 
         @it.should("still report static messages")  # type: ignore
         def test():
@@ -180,12 +186,11 @@ with such.A("hdlcc project") as it:
         def setup():
             setupTestSuport(TEST_TEMP_PATH)
 
-            def getBuilderByName(*args):  # pylint: disable=unused-argument
-                return MockBuilder
+            it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
 
-            it.parser = _configWithDict(
+            it.config_file = _makeConfigFromDict(
                 {
-                    "builder_name": MockBuilder.builder_name,
+                    "builder": MockBuilder.builder_name,
                     FileType.vhdl.value: {
                         "flags": {
                             BuildFlagScope.all.value: (
@@ -221,13 +226,12 @@ with such.A("hdlcc project") as it:
                 }
             )
 
-            with mock.patch("hdlcc.hdlcc_base.getBuilderByName", getBuilderByName):
-                it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
-                it.project.readConfig(it.parser)
+            it.project.setConfig(it.config_file)
 
-        @it.should("use fallback to Fallback builder")  # type: ignore
+        @it.should("use MockBuilder builder")  # type: ignore
         def test():
-            it.assertTrue(isinstance(it.project.builder, MockBuilder))
+            with PatchBuilder():
+                it.assertIsInstance(it.project.builder, MockBuilder)
 
         @it.should("save cache after checking a source")  # type: ignore
         def test():
@@ -235,7 +239,7 @@ with such.A("hdlcc project") as it:
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
 
-            with mock.patch("hdlcc.hdlcc_base.json.dump", spec=json.dump) as func:
+            with patch("hdlcc.hdlcc_base.json.dump", spec=json.dump) as func:
                 it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
@@ -272,11 +276,12 @@ with such.A("hdlcc project") as it:
 
         @it.should("warn when failing to recover from cache")  # type: ignore
         def test():
-            # Save contents before destroying the object
+            it.project._saveCache()
+            # Copy parameters of the object we're checking against
             root_dir = it.project.root_dir
             cache_filename = it.project._getCacheFilename()
 
-            it.assertFalse(isinstance(it.project.builder, Fallback))
+            #  it.assertIsInstance(it.project.builder, Fallback)
 
             # Corrupt the cache file
             open(cache_filename.name, "w").write("corrupted cache contents")
@@ -305,15 +310,17 @@ with such.A("hdlcc project") as it:
                     list(project.getUiMessages()),
                 )
 
-            it.assertTrue(
-                isinstance(project.builder, Fallback),
-                "Builder should be MockBuilderbut it's {} instead".format(
-                    type(project.builder)
-                ),
-            )
+            it.assertIsInstance(project.builder, Fallback)
 
         @it.should("get builder messages by path")  # type: ignore
-        def test():
+        # Avoid saving to cache because the patched method is not JSON
+        # serializable
+        @patch("hdlcc.hdlcc_base.json.dump")
+        def test(*args, **kwargs):
+            with PatchBuilder():
+                it.project.setConfig(it.config_file)
+                it.project._readConfig()
+
             entity_a = _SourceMock(
                 filename=_path("entity_a.vhd"),
                 library="some_lib",
@@ -369,47 +376,42 @@ with such.A("hdlcc project") as it:
                     return path_diags.pop(), []
                 return [], []
 
-            with mock.patch("hdlcc.hdlcc_base.json.dump"):
-                with mock.patch.object(it.project.builder, "build", build):
-                    _logger.info("Project paths: %s", it.project.database._paths)
-                    messages = list(it.project.getMessagesByPath(entity_a.filename))
-                    logIterable("Messages", messages, _logger.info)
-                    it.assertCountEqual(
-                        messages,
-                        [
-                            LibraryShouldBeOmited(
-                                library="work",
-                                filename=entity_a.filename,
-                                column_number=9,
-                                line_number=1,
-                            ),
-                            PathNotInProjectFile(entity_a.filename),
-                            CheckerDiagnostic(
-                                filename=entity_a.filename,
-                                checker=None,
-                                text="some text",
-                            ),
-                            CheckerDiagnostic(
-                                filename=path_to_foo,
-                                checker=None,
-                                text="style error should be included",
-                                severity=DiagType.STYLE_ERROR,
-                            ),
-                            CheckerDiagnostic(
-                                filename=path_to_foo,
-                                checker=None,
-                                text="should be included",
-                                severity=DiagType.ERROR,
-                            ),
-                        ],
-                    )
+            with patch.object(it.project.builder, "build", build):
+                _logger.info("Project paths: %s", it.project.database._paths)
+                messages = list(it.project.getMessagesByPath(entity_a.filename))
+                logIterable("Messages", messages, _logger.info)
+                it.assertCountEqual(
+                    messages,
+                    [
+                        LibraryShouldBeOmited(
+                            library="work",
+                            filename=entity_a.filename,
+                            column_number=9,
+                            line_number=1,
+                        ),
+                        PathNotInProjectFile(entity_a.filename),
+                        CheckerDiagnostic(
+                            filename=entity_a.filename, checker=None, text="some text"
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="style error should be included",
+                            severity=DiagType.STYLE_ERROR,
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="should be included",
+                            severity=DiagType.ERROR,
+                        ),
+                    ],
+                )
 
         @it.should(  # type: ignore
             "warn when unable to recreate a builder described in cache"
         )
-        @mock.patch(
-            "hdlcc.hdlcc_base.getBuilderByName", new=lambda name: FailingBuilder
-        )
+        @patch("hdlcc.hdlcc_base.getBuilderByName", new=lambda name: FailingBuilder)
         def test():
             cache_content = {"builder": FailingBuilder.builder_name}
 
@@ -439,17 +441,16 @@ with such.A("hdlcc project") as it:
     with it.having("test_project as reference and a valid project file"):
 
         @it.has_setup
-        def setup():
-            it.project_file = Path(p.join(TEST_PROJECT, "vimhdl.prj"))
+        def setup(*args, **kwargs):
+            _logger.fatal("######### Setting up test #########")
             setupTestSuport(TEST_TEMP_PATH)
 
-            it.parser = _configWithDict({"builder_name": MockBuilder.builder_name})
-            removeIfExists(p.join(TEST_TEMP_PATH, ".hdlcc", CACHE_NAME))
+            removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
 
-            #  with disableVunit:
-            with mock.patch("hdlcc.hdlcc_base.getBuilderByName", lambda _: MockBuilder):
+            with PatchBuilder():
                 it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
-                it.project.readConfig(str(it.project_file))
+                it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
+                it.project._updateConfigIfNeeded()
 
             from pprint import pformat
 
@@ -457,17 +458,16 @@ with such.A("hdlcc project") as it:
                 "Database state:\n%s", pformat(it.project.database.__jsonEncode__())
             )
 
+            it.assertTrue(it.project.database.paths)
+            it.assertIsInstance(it.project.builder, MockBuilder)
+
         @it.should("use mock builder")  # type: ignore
         def test():
-            it.assertTrue(
-                isinstance(it.project.builder, MockBuilder),
-                "Builder should be {} but got {} instead".format(
-                    MockBuilder, it.project.builder
-                ),
-            )
+            it.assertIsInstance(it.project.builder, MockBuilder)
 
         @it.should("get messages for an absolute path")  # type: ignore
-        def test():
+        def test(name):
+            _logger.fatal("############### Starting %s ######", name)
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
             it.assertMsgQueueIsEmpty(it.project)
@@ -486,6 +486,7 @@ with such.A("hdlcc project") as it:
             )
 
             it.assertMsgQueueIsEmpty(it.project)
+            it.assertTrue(it.project.database.paths)
 
         @it.should("get messages for relative path")  # type: ignore
         def test():
@@ -514,7 +515,10 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")  # type: ignore
-        def test():
+        def test(name):
+            _logger.fatal("############### Starting %s ######", name)
+            it.assertTrue(it.project.database.paths)
+
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
             original_content = open(filename.name, "r").read().split("\n")
 
@@ -530,14 +534,11 @@ with such.A("hdlcc project") as it:
 
             it.assertMsgQueueIsEmpty(it.project)
 
-            diagnostics = it.project.getMessagesWithText(filename, content)
+            diagnostics = set(it.project.getMessagesWithText(filename, content))
 
-            if diagnostics:
-                _logger.debug("Records received:")
-                for diagnostic in diagnostics:
-                    _logger.debug("- %s", diagnostic)
-            else:
-                _logger.warning("No diagnostics found")
+            logIterable("Diagnostics", diagnostics, _logger.info)
+
+            it.assertTrue(it.project.config_file)
 
             expected = [
                 ObjectIsNeverUsed(
@@ -556,7 +557,7 @@ with such.A("hdlcc project") as it:
                 ),
             ]
 
-            it.assertCountEqual(expected, diagnostics)
+            it.assertCountEqual(diagnostics, expected)
             it.assertMsgQueueIsEmpty(it.project)
 
         @it.should(  # type: ignore
@@ -675,6 +676,8 @@ with such.A("hdlcc project") as it:
             it.assertMsgQueueIsEmpty(it.project)
 
         def basicRebuildTest(test_filename, rebuilds):
+            _logger.fatal("Using builder %s", it.project.builder)
+
             calls = []
             ret_list = list(reversed(rebuilds))
 
@@ -689,7 +692,7 @@ with such.A("hdlcc project") as it:
                     return [], ret_list.pop()
                 return [], []
 
-            with mock.patch.object(MockBuilder, "_buildAndParse", _buildAndParse):
+            with patch.object(MockBuilder, "_buildAndParse", _buildAndParse):
                 it.assertFalse(
                     list(it.project._getBuilderMessages(Path(test_filename)))
                 )

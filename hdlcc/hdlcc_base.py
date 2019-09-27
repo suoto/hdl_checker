@@ -23,16 +23,18 @@ import os
 import os.path as p
 import tempfile
 import traceback
+from collections import namedtuple
 from multiprocessing.pool import ThreadPool
-from typing import Any, AnyStr, Dict, Iterable, Set
+from pprint import pformat
+from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Union
 
 import six
 
+from hdlcc import CACHE_NAME, WORK_PATH
 from hdlcc.builder_utils import getBuilderByName, getVunitSources, getWorkingBuilders
 from hdlcc.builders.fallback import Fallback
 from hdlcc.database import Database
-from hdlcc.diagnostics import CheckerDiagnostic, DiagType
-from hdlcc.exceptions import UnknownParameterError
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType, PathNotInProjectFile
 from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
@@ -47,17 +49,21 @@ from hdlcc.types import (
 )
 from hdlcc.utils import removeDirIfExists, removeIfExists, toBytes
 
-CACHE_NAME = "cache.json"
-
 _logger = logging.getLogger(__name__)
 
 if six.PY2:
     JSONDecodeError = ValueError
-    FileNotFoundError = IOError  # pylint: disable=redefined-builtin
 else:
     JSONDecodeError = json.decoder.JSONDecodeError
 
-WORK_PATH = ".hdlcc"
+
+#  class WatchedFile(object):
+#      def __init__(self, path, last_read):
+#          # type: (Path, float) -> None
+#          self.path = path
+#          self.last_read = last_read
+
+WatchedFile = namedtuple("WatchedFile", ("path", "last_read"))
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -71,11 +77,17 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, root_dir):  # type: (Path) -> None
+        # Root dir is the absolute path to use when any path passed on is
+        # relative
         self.root_dir = root_dir
+        # Work dir is the the directory that HDL Code Checker uses as a scratch
+        # pad, everything within it may be deleted or changed
         self.work_dir = Path(p.join(str(self.root_dir), WORK_PATH))
 
+        self.config_file = None  # type: Optional[WatchedFile]
+
         self.database = Database()
-        self.builder = Fallback(self.work_dir, self.database)
+        self._builder = Fallback(self.work_dir, self.database)
 
         if not p.exists(str(self.work_dir)):
             os.makedirs(str(self.work_dir))
@@ -83,64 +95,103 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._recoverCacheIfPossible()
         self._saveCache()
 
-    def readConfig(self, filename):
-        # type: (str) -> None
+    @property
+    def builder(self):
+        self._updateConfigIfNeeded()
+        return self._builder
+
+    def setConfig(self, filename):
+        # type: (Union[Path, str]) -> None
+        path = Path(filename, self.root_dir)
+        mtime = path.mtime
+
+        # If the config file has been set previously, avoid refreshing if
+        # possible
+        if self.config_file is not None and self.config_file.path != path:
+            _logger.info("Replacing %s with %s", self.config_file.path, path)
+        else:
+            mtime = 0.0
+
+        self.config_file = WatchedFile(path, mtime)
+        _logger.debug("Set config to %s", self.config_file)
+        #  self._updateConfigIfNeeded()
+        #  self._readConfig()
+
+    def _updateConfigIfNeeded(self):
+        # type: (...) -> Any
+        """
+        If a configuration file has been passed, check if it's been modified.
+        """
+        # No config file set
+        _logger.debug("config_file: %s", self.config_file)
+
+        if self.config_file is None:
+            return
+
+        file_mtime = self.config_file.path.mtime
+        # Check if values we have are up to date
+        if self.config_file.last_read >= file_mtime:
+            _logger.debug("Config file is up to date")
+            return
+
+        _logger.debug("Updating config from file")
+        self.clean()
+        self._readConfig()
+
+    def _readConfig(self):
+        # type: (...) -> None
         """
         Updates the database from a configuration file. Extracting form JSON
         has priority, then ConfigParser is attempted.
         """
-        try:
-            config = json.load(open(filename))
-        except FileNotFoundError as exc:
-            self._handleUiError(
-                "Failed to parse '{}': No such file".format(exc.filename)
-            )
-            raise
-        except JSONDecodeError:
-            try:
-                config = ConfigParser(Path(filename)).parse()
-            except UnknownParameterError as exc:
-                self._handleUiWarning(
-                    "Failed to parse '{}': {}".format(filename, str(exc))
-                )
-                raise
+        if self.config_file is None:
+            _logger.warning("Can't read config when config file is not set")
+            return
 
+        try:
+            config = json.load(open(str(self.config_file.path)))
+        except JSONDecodeError:
+            config = ConfigParser(self.config_file.path).parse()
+
+        self.config_file = WatchedFile(
+            self.config_file.path, self.config_file.path.mtime
+        )
+        _logger.debug("Updating config file to %s", self.config_file)
         self.configure(config)
 
     def configure(self, config):
         # type: (Dict[Any, Any]) -> None
         "Updates configuration from a dictionary"
 
-        from pprint import pformat
+        _logger.debug("Updating with base config:\n%s", pformat(config))
 
-        _logger.info("Updating with base config:\n%s", pformat(config))
-
-        builder_name = config.pop("builder_name", None)
+        builder_name = config.pop("builder", None)
         if builder_name is not None:
             builder_cls = getBuilderByName(builder_name)
+            _logger.info("Builder class: %s", builder_cls)
         else:
             try:
                 builder_cls = list(getWorkingBuilders()).pop()
+                _logger.info("Builder class: %s", builder_cls)
             except IndexError:
                 builder_cls = Fallback
+                _logger.info("Builder class: %s", builder_cls)
 
-        self.builder = builder_cls(self.work_dir, self.database)
+        self._builder = builder_cls(self.work_dir, self.database)
 
         self.database.configure(config, str(self.root_dir))
         # Add VUnit
-        if not isinstance(self.builder, Fallback):
-            for path, library, flags in getVunitSources(self.builder):
+        if not isinstance(self._builder, Fallback):
+            for path, library, flags in getVunitSources(self._builder):
                 self.database.addSource(path, library, flags, flags)
 
         # Add the flags from the root config file last, it should overwrite
         # values set by the included files
         #  self.database.addSources(config.pop("sources", ()), config_root_path)
         #  if config
-        if config:
-            _logger.warning(
-                "Some configuration elements weren't used:\n%s", pformat(config)
-            )
-            assert False
+        assert not config, "Some configuration elements weren't used:\n{}".format(
+            pformat(config)
+        )
 
     def _getCacheFilename(self):
         # type: () -> Path
@@ -148,7 +199,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         The cache file name will always be inside the path returned by self._getWorkingPath
         and defaults to cache.json
         """
-        return Path(p.join(self.work_dir.name, CACHE_NAME))
+        return Path(CACHE_NAME, self.work_dir)
 
     def _saveCache(self):
         # type: (...) -> Any
@@ -157,7 +208,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         cache_fname = self._getCacheFilename()
 
-        state = {"builder": self.builder, "database": self.database}
+        state = {
+            "builder": self.builder,
+            "config_file": self.config_file,
+            "database": self.database,
+        }
 
         _logger.debug("Saving state to '%s'", cache_fname)
         if not p.exists(p.dirname(cache_fname.name)):
@@ -170,7 +225,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Serializer load implementation
         """
         self.database = state.pop("database")
-        self.builder = state.pop("builder", Fallback)
+        self._builder = state.pop("builder", Fallback)
+        state.pop("config_file")
+        self.config_file = None
+        #  self.config_file = WatchedFile._make(state.pop("config_file", None))
 
     def _recoverCacheIfPossible(self):
         # type: (...) -> Any
@@ -202,17 +260,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             return
 
         self._setState(cache)
-        self.builder.setup()
+        self._builder.setup()
 
     def _cleanIfNeeded(self):
         # type: (...) -> Any
         """
         Sanity checks to make sure the environment is sane
         """
-        if not p.exists(self.builder.work_folder):
-            _logger.info("Builder work folder not found, cleaning up")
-            self.clean()
-            self.builder.setup()
+        if not p.exists(self._builder.work_folder):
+            self._builder.setup()
 
     def clean(self):
         # type: (...) -> Any
@@ -222,11 +278,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         _logger.debug("Cleaning up project")
         removeDirIfExists(str(self.work_dir))
 
-        del self.builder
+        del self._builder
         del self.database
 
         self.database = Database()
-        self.builder = Fallback(self.work_dir, self.database)
+        self._builder = Fallback(self.work_dir, self.database)
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
@@ -257,7 +313,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         _logger.debug("Building '%s'", str(path))
 
-        path = Path(str(path), str(self.root_dir))
+        path = Path(path, self.root_dir)
 
         for dep_library, dep_path in self.database.getBuildSequence(
             path, self.builder.builtin_libraries
@@ -341,7 +397,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
-        path = Path(str(path), str(self.root_dir))
+        self._updateConfigIfNeeded()
+
+        path = Path(path, self.root_dir)
 
         builder_diags = set()  # type: Set[CheckerDiagnostic]
 
@@ -373,7 +431,15 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             builder_diags.add(diag)
 
         self._saveCache()
-        return builder_diags | set(self.database.getDiagnosticsForPath(path))
+
+        diags = builder_diags | set(self.database.getDiagnosticsForPath(path))
+
+        # If we're working off of a project file, no need to filter out
+        # diags about path not being found
+        if self.config_file is not None:
+            return diags
+
+        return {diag for diag in diags if not isinstance(diag, PathNotInProjectFile)}
 
     def getMessagesWithText(self, path, content):
         # type: (Path, AnyStr) -> Iterable[CheckerDiagnostic]
@@ -382,6 +448,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         for path on the diagnostics received
         """
         _logger.debug("Getting messages for '%s' with content", path)
+        self._updateConfigIfNeeded()
 
         ext = path.name.split(".")[-1]
         temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
@@ -401,16 +468,26 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         temporary_file.file.write(toBytes(content))  # type: ignore
         temporary_file.close()
-        messages = self.getMessagesByPath(temp_path)
+
+        diags = set()  # type: Set[CheckerDiagnostic]
 
         # Some messages may not include the filename field when checking a
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
-        for message in messages:
-            message.filename = path
-            message.text = message.text.replace(temporary_file.name, path.name)
+        for diag in self.getMessagesByPath(temp_path):
+            if isinstance(diag, PathNotInProjectFile):
+                continue
+            diag.filename = path
+            diag.text = diag.text.replace(temporary_file.name, path.name)
+            diags.add(diag)
 
         self.database.removeSource(temp_path)
         removeIfExists(temporary_file.name)
 
-        return set(messages) | set(self.database.getDiagnosticsForPath(path))
+        diags |= set(self.database.getDiagnosticsForPath(path))
+
+        if self.config_file and path not in self.database.paths:
+            _logger.info("Adding PathNotInProjectFile(%s)", path)
+            diags.add(PathNotInProjectFile(path))
+
+        return diags
