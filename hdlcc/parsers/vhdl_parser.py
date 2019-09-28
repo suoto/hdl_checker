@@ -24,8 +24,8 @@ from .elements.dependency_spec import DependencySpec
 from .elements.design_unit import DesignUnitType, VhdlDesignUnit
 from .elements.identifier import VhdlIdentifier
 
-from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
+from hdlcc.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class VhdlParser(BaseSourceFile):
         """
         Replace everything from comment ('--') until a line break
         """
-        content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
+        content = readFile(str(self.filename))
 
         return self._comment.sub("", content)
 

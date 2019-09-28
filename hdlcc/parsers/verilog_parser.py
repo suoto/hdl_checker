@@ -22,8 +22,8 @@ from typing import Any, Generator
 
 from .elements.design_unit import DesignUnitType, VerilogDesignUnit
 
-from hdlcc import types as t  # pylint: disable=unused-import
 from hdlcc.parsers.base_parser import BaseSourceFile
+from hdlcc.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class VerilogParser(BaseSourceFile):
     def _getSourceContent(self):
         # type: (...) -> Any
         # Remove multiline comments
-        content = open(self.filename.name, mode="rb").read().decode(errors="ignore")
+        content = readFile(str(self.filename))
         lines = self._comment.sub("", content)
         return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 

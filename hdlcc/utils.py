@@ -75,6 +75,7 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
         # This is mostly for debugging when doing stuff directly from a
         # terminal
         from rainbow_logging_handler import RainbowLoggingHandler  # type: ignore
+
         handler = RainbowLoggingHandler(_stream)
     except ImportError:  # pragma: no cover
         handler = logging.StreamHandler(_stream)
@@ -401,3 +402,17 @@ def getMostCommonItem(items):
     """
     data = Counter(items)
     return max(items, key=data.get)
+
+
+if six.PY2:
+
+    def readFile(path):
+        "Wrapper around open().read() that return \n for new lines"
+        return open(path, mode="rU").read()
+
+
+else:
+
+    def readFile(path):
+        "Wrapper around open().read() that return \n for new lines"
+        return open(path, mode="r", newline="\n").read()

@@ -31,6 +31,7 @@ from hdlcc.builders.fallback import Fallback
 from hdlcc.builders.ghdl import GHDL
 from hdlcc.builders.msim import MSim
 from hdlcc.builders.xvhdl import XVHDL
+from hdlcc.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def _getRelevantFiles():
 
 
 def checkFile(filename):
-    lines = open(filename, mode="rb").read().decode(errors="replace")
+    lines = readFile(filename)
 
     match = _HEADER.search(lines)
     return match is not None

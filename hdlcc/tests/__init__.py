@@ -379,26 +379,15 @@ def assertCountEqual(it):  # pylint: disable=invalid-name
 
 def writeListToFile(filename, _list):  # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
+    # Wait a little bit to force the timestamp rad via os.path.getmtime to
+    # change
+    time.sleep(0.1)
     open(filename, mode="w").write("\n".join([str(x) for x in _list]))
 
-    mtime = p.getmtime(filename)
-    time.sleep(0.01)
 
     for i, line in enumerate(_list):
         _logger.debug("%2d | %s", i + 1, line)
 
-    if ON_WINDOWS:
-        cmd = 'copy /Y "{0}" +,,{0}'.format(filename)
-        _logger.debug(cmd)
-        subp.check_call(cmd, shell=True)
-    else:
-        subp.check_call(["touch", filename])
-
-    for i in range(10):
-        if p.getmtime(filename) != mtime:
-            break
-        _logger.debug("Waiting...[%d]", i)
-        time.sleep(0.1)
 
 
 if not ON_WINDOWS:
