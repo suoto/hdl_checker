@@ -27,11 +27,10 @@ import os.path as p
 import time
 from threading import Event, Timer
 
-import mock
 import parameterized  # type: ignore
 import six
 import unittest2  # type: ignore
-
+from mock import MagicMock, patch
 import pyls  # type: ignore
 from pyls import lsp as defines
 from pyls import uris
@@ -120,7 +119,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         )
 
     def test_workspace_notify(self):
-        workspace = mock.MagicMock(spec=Workspace)
+        workspace = MagicMock(spec=Workspace)
 
         server = lsp.HdlCodeCheckerServer(workspace, root_path=None)
 
@@ -159,7 +158,7 @@ with such.A("LSP server") as it:
         tx_r, tx_w = os.pipe()
         it.tx = JsonRpcStreamReader(os.fdopen(tx_r, "rb"))
 
-        it.rx = mock.MagicMock()
+        it.rx = MagicMock()
         it.rx.closed = False
 
         it.server = lsp.HdlccLanguageServer(it.rx, os.fdopen(tx_w, "wb"))
@@ -204,7 +203,7 @@ with such.A("LSP server") as it:
         return checkLintFileOnMethod(source, "m_text_document__did_save")
 
     def checkLintFileOnMethod(source, method):
-        with mock.patch.object(it.server.workspace, "publish_diagnostics"):
+        with patch.object(it.server.workspace, "publish_diagnostics"):
             _logger.info("Sending %s request", method)
             getattr(it.server, method)(
                 textDocument={"uri": uris.from_fs_path(source), "text": None}
@@ -232,21 +231,17 @@ with such.A("LSP server") as it:
         def teardown():
             stopLspServer()
 
-        @it.should("search for files on initialization")
-        def test():
-            import hdlcc
+        import hdlcc
 
-            with mock.patch.object(
-                hdlcc.hdlcc_base.HdlCodeCheckerBase, "configure"
-            ) as configure:
-                with mock.patch.object(
-                    hdlcc.config_generators.base_generator.BaseGenerator, "generate"
-                ) as generate:
-                    _initializeServer(
-                        it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-                    )
-                    configure.assert_called_once()
-                    generate.assert_called_once()
+        @it.should("search for files on initialization")
+        @patch.object(hdlcc.hdlcc_base.HdlCodeCheckerBase, "configure")
+        @patch.object(hdlcc.config_generators.base_generator.BaseGenerator, "generate")
+        def test(configure, generate):
+            _initializeServer(
+                it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
+            )
+            configure.assert_called_once()
+            generate.assert_called_once()
 
         @it.should("lint file when opening it")  # type: ignore
         def test():
@@ -341,8 +336,8 @@ with such.A("LSP server") as it:
 
         #      it.assertNotEqual(og_timestamp, curr_ts, "Timestamps are still equal??")
 
-        #      with mock.patch.object(it.server.workspace, "publish_diagnostics"):
-        #          with mock.patch.object(it.server._checker, "clean") as clean:
+        #      with patch.object(it.server.workspace, "publish_diagnostics"):
+        #          with patch.object(it.server._checker, "clean") as clean:
 
         #              _logger.info("Sending m_text_document__did_save request")
         #              it.server.m_text_document__did_save(
@@ -377,9 +372,9 @@ with such.A("LSP server") as it:
         #      def getBuilderName():
         #          return "msim"
 
-        #      with mock.patch.object(it.server.workspace, "publish_diagnostics"):
-        #          with mock.patch.object(it.server._checker, "clean") as clean:
-        #          #      with mock.patch.object(
+        #      with patch.object(it.server.workspace, "publish_diagnostics"):
+        #          with patch.object(it.server._checker, "clean") as clean:
+        #          #      with patch.object(
         #          #          it.server._checker.config_parser,
         #          #          "getBuilderName",
         #          #          getBuilderName,

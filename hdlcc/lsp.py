@@ -19,7 +19,7 @@
 import logging
 import os.path as p
 import tempfile
-from typing import Any, Iterable, Optional, Set
+from typing import Any, Dict, Iterable, Optional, Set
 
 import six
 from pyls import lsp as defines  # type: ignore
@@ -109,19 +109,19 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     def _handleUiInfo(self, message):
         # type: (...) -> Any
         _logger.debug("UI info: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:
+        if self._workspace: # pragma: no cover
             self._workspace.show_message(message, defines.MessageType.Info)
 
     def _handleUiWarning(self, message):
         # type: (...) -> Any
         _logger.debug("UI warning: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:
+        if self._workspace: # pragma: no cover
             self._workspace.show_message(message, defines.MessageType.Warning)
 
     def _handleUiError(self, message):
         # type: (...) -> Any
         _logger.debug("UI error: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:
+        if self._workspace: # pragma: no cover
             self._workspace.show_message(message, defines.MessageType.Error)
 
 
@@ -139,12 +139,23 @@ class HdlccLanguageServer(PythonLanguageServer):
         # Default checker
         self._onConfigUpdate({"project_file": None})
         self._global_diags = set()  # type: Set[CheckerDiagnostic]
+        self._initialization_options = {}  # type: Dict[str, Any]
 
     @logCalls
     def capabilities(self):
         # type: (...) -> Any
         "Returns language server capabilities"
         return {"textDocumentSync": defines.TextDocumentSyncKind.FULL}
+
+    @logCalls
+    def m_initialized(self, **_kwargs):
+        """
+        Enables processing of actions that were generated upon m_initialize and
+        were delayed because the client might need further info (for example to
+        handle window/showMessage requests)
+        """
+        self._onConfigUpdate(self._initialization_options)
+        return super(HdlccLanguageServer, self).m_initialized(**_kwargs)
 
     @logCalls
     def m_initialize(
@@ -166,14 +177,7 @@ class HdlccLanguageServer(PythonLanguageServer):
             initializationOptions={},
         )
 
-        # Use arguments directly, Workspace class seems to be messing up, so
-        # root_uri returns an empty string when rootUri (the argument) is None
-        root_path = None
-        if rootUri is not None:
-            root_path = to_fs_path(rootUri)
-
-        self._checker = HdlCodeCheckerServer(self.workspace, root_path=root_path)
-        self._onConfigUpdate(initializationOptions or {})
+        self._initialization_options = initializationOptions
 
         return result
 
@@ -181,16 +185,18 @@ class HdlccLanguageServer(PythonLanguageServer):
         # type: (...) -> Any
         """
         Updates the checker server from options if the 'project_file' key is
-        present. Because this can take a long time, it should be changed to run
-        on a thread if possible, as long as points where this is called don't
-        depend on this being successful or not.
-
+        present. Please not that this is run from both initialize and
+        workspace/did_change_configuration and when ran initialize the LSP
+        client might not ready to take messages. To circumvent this, make sure
+        m_initialize returns before calling this to actually configure the
+        server.
         """
-        # FIXME(suoto): Notifications sent from this method might not be shown,
-        # since the client might not be initialized properly at this point.
+        root_path = None
 
-        if self._checker is None:
-            return
+        if self.workspace and self.workspace.root_uri is not None:
+            root_path = to_fs_path(self.workspace.root_uri)
+
+        self._checker = HdlCodeCheckerServer(self.workspace, root_path=root_path)
 
         _logger.debug("Updating from %s", options)
 
@@ -263,7 +269,7 @@ class HdlccLanguageServer(PythonLanguageServer):
         Gets diags of the URI, wether from the saved file or from its
         contents
         """
-        if self._checker is None:
+        if self._checker is None: # pragma: no cover
             _logger.debug("No checker, won't try to get diagnostics")
             return ()
 
