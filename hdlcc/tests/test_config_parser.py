@@ -41,11 +41,14 @@ from hdlcc.exceptions import UnknownParameterError
 from hdlcc.parsers.config_parser import ConfigParser
 from hdlcc.path import Path
 from hdlcc.types import BuildFlagScope
+from hdlcc.utils import ON_WINDOWS, toBytes
 
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+
+SOME_ABS_PATH = "C:\\some\\abs\\path.VHDL" if ON_WINDOWS else "/some/abs/path.VHDL"
 
 
 @contextmanager
@@ -96,7 +99,8 @@ with such.A("config parser object") as it:
             # type: (...) -> Any
             it.path = Path(tempfile.mktemp())
 
-            contents = b"""
+            contents = toBytes(
+                """
 single_build_flags[vhdl] = -single_build_flag_0
 dependencies_build_flags[vhdl] = --vhdl-batch
 global_build_flags[vhdl] = -globalvhdl -global-vhdl-flag
@@ -116,12 +120,15 @@ vhdl work sample_file.vhd -sample_file_flag
 vhdl work sample_package.vhdl -sample_package_flag
 vhdl work TESTBENCH.VHD -build-in some way
 
-vhdl lib /some/abs/path.VHDL
+vhdl lib {0}
 
 verilog work foo.v -some-flag some value
 
 systemverilog work bar.sv some sv flag
-"""
+""".format(
+                    SOME_ABS_PATH
+                )
+            )
 
             with open(it.path.name, "wb") as fd:
                 fd.write(contents)
@@ -193,7 +200,7 @@ systemverilog work bar.sv some sv flag
                         _resolve("TESTBENCH.VHD"),
                         {"library": "work", "flags": ("-build-in", "some", "way")},
                     ),
-                    ("/some/abs/path.VHDL", {"library": "lib", "flags": ()}),
+                    (SOME_ABS_PATH, {"library": "lib", "flags": ()}),
                     (
                         _resolve("foo.v"),
                         {"library": "work", "flags": ("-some-flag", "some", "value")},
