@@ -36,6 +36,10 @@ from hdlcc.path import Path
 
 _logger = logging.getLogger(__name__)
 
+ON_WINDOWS = os.name == "nt"
+ON_LINUX = sys.platform == "linux"
+ON_MAC = sys.platform == "darwin"
+
 
 def setupLogging(stream, level, color=True):  # pragma: no cover
     "Setup logging according to the command line parameters"
@@ -165,13 +169,6 @@ def _isProcessRunningOnWindows(pid):
     pid_list = [i for i in list_of_pids][:number_of_pids]
 
     return int(pid) in pid_list
-
-
-ON_WINDOWS = os.name == "nt"
-
-
-def onMac():  # pragma: no cover # pylint: disable=missing-docstring
-    return sys.platform == "darwin"
 
 
 if not hasattr(p, "samefile"):

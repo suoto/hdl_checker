@@ -35,8 +35,8 @@ __version__ = get_versions()["version"]
 del get_versions
 
 DEFAULT_PROJECT_FILE = os.environ.get(
-    "HDLCC_DEFAULT_PROJECT_FILE", ".hdlcc.config" if not ON_WINDOWS else "_hdlcc.config"
+    "HDLCC_DEFAULT_PROJECT_FILE", "_hdlcc.config" if ON_WINDOWS else ".hdlcc.config"
 )
 
 CACHE_NAME = os.environ.get("HDLCC_CACHE_NAME", "cache.json")
-WORK_PATH = os.environ.get("HDLCC_WORK_PATH", ".hdlcc")
+WORK_PATH = os.environ.get("HDLCC_WORK_PATH", "_hdlcc" if ON_WINDOWS else ".hdlcc")
