@@ -129,7 +129,7 @@ class Database(HashableByKey):
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
         """
-        _logger.debug(
+        _logger.info(
             "Adding %s, library=%s, flags=(single=%s, dependencies=%s)",
             path,
             library,

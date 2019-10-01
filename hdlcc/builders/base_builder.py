@@ -59,20 +59,21 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
-        # type: (...) -> Any
+        # type: (FileType, Identifier) -> None
         """
         Adds an external library so it may be referenced by the builder
         directly
         """
-        assert lang in cls._external_libraries, "Uknown language '%s'" & lang
+        assert lang in cls._external_libraries, "Uknown language '%s'" % lang.value
         cls._external_libraries[lang].add(library_name)
 
     @classmethod
     def addIncludePath(cls, lang, path):
-        # type: (...) -> Any
+        # type: (FileType, str) -> None
         """
         Adds an include path to be used by the builder where applicable
         """
+        assert lang in cls._include_paths, "Uknown language '%s'" % lang.value
         cls._include_paths[lang].add(path)
 
     @abc.abstractproperty
@@ -429,7 +430,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 cached_info["compile_time"] = 0
 
         else:
-            self._logger.info("Nothing to do for %s", path)
+            self._logger.debug("Nothing to do for %s", path)
             diagnostics = cached_info["diagnostics"]
             rebuilds = cached_info["rebuilds"]
 

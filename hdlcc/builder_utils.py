@@ -18,15 +18,24 @@
 
 import logging
 import os.path as p
+from contextlib import contextmanager
 from enum import Enum
 from tempfile import mkdtemp
-from typing import Dict, Iterable, Tuple, Union  # pylint: disable=unused-import
+from typing import (  # pylint: disable=unused-import
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Tuple,
+    Union,
+)
 
 from .builders.fallback import Fallback
 from .builders.ghdl import GHDL
 from .builders.msim import MSim
 from .builders.xvhdl import XVHDL
 
+from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path  # pylint: disable=unused-import
 from hdlcc.types import BuildFlags, FileType
 from hdlcc.utils import removeDirIfExists
@@ -112,51 +121,77 @@ def getVunitSources(builder):
 
     _logger.debug("VUnit installation found")
 
+    sources = []  # type: List[Any]
+
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:
         from vunit import VUnit  # pylint: disable=import-error
-    elif FileType.systemverilog in builder.file_types:
+
+        sources += _getSourcesFromVUnitModule(VUnit)
+        _logger.debug("Added VUnit VHDL files")
+
+    if FileType.systemverilog in builder.file_types:
         from vunit.verilog import (  # type: ignore # pylint: disable=import-error
             VUnit,
         )
 
-        _logger.debug("Builder supports Verilog, using vunit.verilog.VUnit")
-        builder.addExternalLibrary("verilog", "vunit_lib")
+        _logger.debug("Builder supports Verilog, adding VUnit Verilog files")
+        builder.addExternalLibrary(FileType.verilog, Identifier("vunit_lib", False))
         builder.addIncludePath(
-            "verilog", p.join(p.dirname(vunit.__file__), "verilog", "include")
+            FileType.verilog, p.join(p.dirname(vunit.__file__), "verilog", "include")
         )
-    else:  # pragma: no cover
+        sources += _getSourcesFromVUnitModule(VUnit)
+
+    if not sources:
         _logger.info("Vunit found but no file types are supported by %s", builder)
         return
 
-    output_path = mkdtemp()
+    for source in sources:
+        _logger.info("Source: %s", source)
+        path = p.abspath(source.name)
+        library = source.library.name
 
-    # Create a dummy VUnit project to get info on its sources
-    vunit_project = VUnit.from_argv(["--output-path", output_path])
+        # Get extra flags for building VUnit sources
+        try:
+            flags = _VUNIT_FLAGS[BuilderName(builder.builder_name)][
+                source.vhdl_standard
+            ]
+        except KeyError:
+            flags = tuple()
 
-    flags = tuple()  # type: BuildFlags
-    # Get extra flags for building VUnit sources
-    try:
-        flags = _VUNIT_FLAGS[BuilderName(builder.builder_name)][
-            vunit_project.vhdl_standard
-        ]
-    except KeyError:
-        pass
-
-    # OSVVM is always avilable
-    vunit_project.add_osvvm()
-    # Communication library and array utility library are only
-    # available on VHDL 2008
-    if vunit_project.vhdl_standard == "2008":
-        vunit_project.add_com()
-        vunit_project.add_array_util()
-
-    for vunit_source_obj in vunit_project.get_compile_order():
-        path = p.abspath(vunit_source_obj.name)
-        library = vunit_source_obj.library.name
         yield Path(path), library, flags
 
-    removeDirIfExists(output_path)
+
+@contextmanager
+def _makeTemporaryDir(*args, **kwargs):
+    """
+    Context manager that wraps tempfile.mkdtemp but deletes the directory
+    afterwards
+    """
+    path = mkdtemp(*args, **kwargs)
+    yield path
+    removeDirIfExists(path)
+
+
+def _getSourcesFromVUnitModule(vunit):
+    """
+    Creates a temporary VUnit project given a VUnit module and return a list of
+    its files
+    """
+    with _makeTemporaryDir() as output_path:
+
+        # Create a dummy VUnit project to get info on its sources
+        vunit_project = vunit.from_argv(["--output-path", output_path])
+
+        # OSVVM is always avilable
+        vunit_project.add_osvvm()
+        # Communication library and array utility library are only
+        # available on VHDL 2008
+        if vunit_project.vhdl_standard == "2008":
+            vunit_project.add_com()
+            vunit_project.add_array_util()
+
+        return list(vunit_project.get_source_files())
 
 
 __all__ = ["MSim", "XVHDL", "GHDL", "Fallback"]
