@@ -329,7 +329,7 @@ with such.A("hdlcc project") as it:
         # Avoid saving to cache because the patched method is not JSON
         # serializable
         @patch("hdlcc.hdlcc_base.json.dump")
-        def test(*args, **kwargs):
+        def test(_):
             with PatchBuilder():
                 it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
                 it.project._readConfig()
@@ -457,7 +457,7 @@ with such.A("hdlcc project") as it:
     with it.having("test_project as reference and a valid project file"):
 
         @it.has_setup
-        def setup(*args, **kwargs):
+        def setup():
             setupTestSuport(TEST_TEMP_PATH)
 
             removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
@@ -910,39 +910,3 @@ with such.A("hdlcc project") as it:
 
 
 it.createTests(globals())
-
-#  class TestIncludesVunit(TestCase):
-#      def setUp(self):
-#          # type: (...) -> Any
-#          _logger.info("Setting up %s", self)
-#          self.database = Database()
-
-#      def tearDown(self):
-#          # type: (...) -> Any
-#          _logger.info("Tearing down %s", self)
-#          del self.database
-
-#      def test_has_vunit_context(self):
-#          # type: (...) -> Any
-#          expected = p.join(
-#              os.environ["TOX_ENV_DIR"],
-#              "lib",
-#              "python%d.%d" % (sys.version_info.major, sys.version_info.minor),
-#              "site-packages",
-#              "vunit",
-#              "vhdl",
-#              "vunit_context.vhd",
-#          )
-
-#          logIterable("Design units:", self.database.design_units, _logger.fatal)
-
-#          self.assertCountEqual(
-#              self.database.getPathsDefining(Identifier("vunit_context")),
-#              {Path(expected)},
-#          )
-#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg
-#          #  /home/souto/dev/hdlcc/.tox/py37-linux-ff-dbg/
-#          #  _logger.fatal(
-#          #      "context: %s", set(self.database.getPathsDefining(Identifier("vunit_context")))
-#          #  )
-#          #  self.fail("stop")
