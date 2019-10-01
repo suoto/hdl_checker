@@ -31,7 +31,7 @@ artifacts:
 image: Visual Studio 2017
 
 # clone directory
-clone_folder: c:\projects\hdlcc
+clone_folder: c:\projects\hdl_checker
 
 # fetch repository as zip archive
 shallow_clone: false

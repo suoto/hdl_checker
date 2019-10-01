@@ -1,9 +1,9 @@
 [run]
-source = hdlcc
+source = hdl_checker
 omit =
-    hdlcc/__main__.py
-    hdlcc/_version.py
-    hdlcc/tests/*
+    hdl_checker/__main__.py
+    hdl_checker/_version.py
+    hdl_checker/tests/*
 
 branch = True
 parallel = True

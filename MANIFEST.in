@@ -1,2 +1,2 @@
 include versioneer.py
-include hdlcc/_version.py
+include hdl_checker/_version.py

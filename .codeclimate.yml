@@ -1,4 +1,4 @@
----
+  ---
 engines:
   duplication:
     enabled: true
@@ -23,7 +23,7 @@ ratings:
   paths:
     - "**.py"
 exclude_paths:
-  - hdlcc/tests/*
-  - hdlcc/_version.py
+  - hdl_checker/tests/*
+  - hdl_checker/_version.py
   - versioneer.py
   - run_tests.py

@@ -1,17 +1,18 @@
-# HDL Code Checker
+# HDL Checker
 
-[![PyPI version](https://img.shields.io/pypi/v/hdlcc.svg)](https://pypi.org/project/hdlcc/)
-[![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)
-[![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master)
-[![codecov](https://codecov.io/gh/suoto/hdlcc/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdlcc)
-[![Code Climate](https://codeclimate.com/github/suoto/hdlcc/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdlcc)
-[![Join the chat at https://gitter.im/suoto/hdlcc](https://badges.gitter.im/suoto/hdlcc.svg)](https://gitter.im/suoto/hdlcc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdlcc)
+[![PyPI version](https://img.shields.io/pypi/v/hdl_checker.svg)](https://pypi.org/project/hdl_checker/)
+[![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)
+[![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdl_checker/branch/master)
+[![codecov](https://codecov.io/gh/suoto/hdl_checker/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdl_checker)
+[![Code Climate](https://codeclimate.com/github/suoto/hdl_checker/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdl_checker)
+[![Join the chat at https://gitter.im/suoto/hdl_checker](https://badges.gitter.im/suoto/hdl_checker.svg)](https://gitter.im/suoto/hdl_checker?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdl_checker)
 
-HDL Code Checker provides a Python API that uses HDL compilers to build a project
-and return info that can be used to populate syntax checkers. It works out mixed
-language dependencies and compile ordering, interprets some compilers messages
-and provides some (limited) static checks.
+HDL Checker provides a Python API that uses HDL compilers to build a project and
+return info that can be used to populate syntax checkers. It can infer library
+VHDL files likely belong to, besides working out mixed language dependencies,
+compilation order, interpreting some compilers messages and providing some
+(limited) static checks.
 
 ---
 
@@ -31,17 +32,17 @@ and provides some (limited) static checks.
 ## Installation
 
 ```sh
-pip install hdlcc
+pip install hdl_checker
 ```
 
 ## Usage
 
-HDL Code Checker server can be started via `hdlcc` command. Use `hdlcc --help`
+HDL Checker server can be started via `hdl_checker` command. Use `hdl_checker --help`
 for more info on how to use it.
 
 ```bash
-$ hdlcc -h
-usage: hdlcc [-h] [--host HOST] [--port PORT] [--lsp]
+$ hdl_checker -h
+usage: hdl_checker [-h] [--host HOST] [--port PORT] [--lsp]
              [--attach-to-pid ATTACH_TO_PID] [--log-level LOG_LEVEL]
              [--log-stream LOG_STREAM] [--nocolor] [--stdout STDOUT]
              [--stderr STDERR] [--version]
@@ -58,33 +59,85 @@ optional arguments:
                         [HTTP, LSP] Logging level
   --log-stream LOG_STREAM
                         [HTTP, LSP] Log file, defaults to stdout when in HTTP
-                        or a temporary file named hdlcc_log_pid<PID>.log when
+                        or a temporary file named hdl_checker_log_pid<PID>.log when
                         in LSP mode
   --nocolor             [HTTP, LSP] Enables colored logging (defaults to
                         false)
   --stdout STDOUT       [HTTP] File to redirect stdout to. Defaults to a
-                        temporary file named hdlcc_stdout_pid<PID>.log
+                        temporary file named hdl_checker_stdout_pid<PID>.log
   --stderr STDERR       [HTTP] File to redirect stdout to. Defaults to a
-                        temporary file named hdlcc_stderr_pid<PID>.log
-  --version, -V         Prints hdlcc version and exit
+                        temporary file named hdl_checker_stderr_pid<PID>.log
+  --version, -V         Prints hdl_checker version and exit
 ```
 
 ### Third-party tools
 
-HDL Code Checker supports
+HDL Checker supports
 
 * [Mentor ModelSim][Mentor_msim]
 * [ModelSim Intel FPGA Edition][Intel_msim]
 * [GHDL][GHDL]
-* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx
-  Vivado][Xilinx_Vivado])
+* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx Vivado][Xilinx_Vivado])
 
-### Configuration file
+### Configuring HDL Checker
 
-HDL Code Checker requires a configuration file listing libraries, source files,
-build flags, etc.
+HDL Checker can work with or without a configuration file. When not using a
+configuration file and LSP mode, HDL Checker will search for files on the root of
+the workspace and try to work out libraries.
 
-Basic syntax is
+Because automatic library discovery might be incorrect, one can use a JSON
+configuration file to list files or to hint those which libraries were guessed
+incorrectly.
+
+#### Using JSON file
+
+JSON format is as show below:
+
+```json
+{
+    "include": [ "/path/to/another/json/file" ],
+    "sources": [
+        "/path/to/file_0",
+        "/path/to/file_1",
+        [ "/path/with/library/and/flags", { "library": "foo", "flags": "-2008" } ],
+        [ "/path/with/library",           { "library": "foo" } ],
+        [ "/path/with/flags",             { "flags": "-2008" } ]
+    ],
+
+    "vhdl": {
+      "flags": {
+        "single": [],
+        "dependencies": [],
+        "global": []
+      }
+    },
+
+    "verilog": {
+      "flags": {
+        "single": [],
+        "dependencies": [],
+        "global": []
+      }
+    },
+    "systemverilog": {
+      "flags": {
+        "single": [],
+        "dependencies": [],
+        "global": []
+      }
+    }
+}
+```
+
+Compilation flags can be specified per language and per scope. The scopes can be
+
+* `single`: flags used to build the file being checked
+* `dependencies`: flags used to build the dependencies of the file being checked
+* `global`: flags used on both target and its dependencies
+
+#### Using legacy `prj` file
+
+Old style project file syntax is as follows:
 
 ```bash
 # This is a comment
@@ -101,7 +154,7 @@ An example project file could be:
 
 ```bash
 # Specifying builder
-# HDL Code Checker will try to use ModelSim, GHDL and XVHDL in this order, so
+# HDL Checker will try to use ModelSim, GHDL and XVHDL in this order, so
 # only add this if you want to force to a particular one
 builder = msim
 
@@ -129,7 +182,7 @@ global_build_flags[verilog] = <flags passed to the compiler when building Verilo
 global_build_flags[systemverilog] = <flags passed to the compiler when building SystemVerilog files>
 ```
 
-When unset, HDL Code Checker sets the following default values depending on the
+When unset, HDL Checker sets the following default values depending on the
 compiler being used:
 
 * ModelSim
@@ -150,22 +203,22 @@ compiler being used:
 
 ### LSP server
 
-HDL Code Checker has beta support for [Language Server Protocol][LSP]. To start
+HDL Checker has beta support for [Language Server Protocol][LSP]. To start
 in LSP mode:
 
 ```bash
-hdlcc --lsp
+hdl_checker --lsp
 ```
 
-On a Linux system, log file will be at `/tmp/hdlcc_log_pid<PID_NUMBER>.log` and
-`/tmp/hdlcc_stderr_pid<PID_NUMBER>.log`.
+On a Linux system, log file will be at `/tmp/hdl_checker_log_pid<PID_NUMBER>.log` and
+`/tmp/hdl_checker_stderr_pid<PID_NUMBER>.log`.
 
 ### HTTP server
 
-HDL Code Checker can be used in HTTP server mode also:
+HDL Checker can be used in HTTP server mode also:
 
 ```bash
-hdlcc
+hdl_checker
 ```
 
 *Please note that this mode **does not use LSP to communicate**. Request/response
@@ -174,21 +227,21 @@ API is not yet available, but a reference implementation can be found in
 
 ## Testing
 
-HDL Code Checker uses a [docker][docker] container to run tests. If you wish to
+HDL Checker uses a [docker][docker] container to run tests. If you wish to
 run them, clone this repository and on the root folder run
 
 ```bash
 ./run_tests.sh
 ```
 
-The container used for testing is [suoto/hdlcc][hdlcc_container]
+The container used for testing is [suoto/hdl_checker][hdl_checker_container]
 
 ## Supported systems
 
 | System  | CI   | CI status                                                                                                                                                         |
 | :--:    | :--: | :--:                                                                                                                                                              |
-| Linux   | Yes  | [![Build Status](https://travis-ci.org/suoto/hdlcc.svg?branch=master)](https://travis-ci.org/suoto/hdlcc)                                                         |
-| Windows | Yes  | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdlcc/branch/master) |
+| Linux   | Yes  | [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)                                                         |
+| Windows | Yes  | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdl_checker/branch/master) |
 
 ## Editor support
 
@@ -238,15 +291,15 @@ Intel® and its logo is a trademark or registered trademark of Intel Corporation
 
 Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
 
-HDL Code Checker's author has no connection or affiliation to any of the
+HDL Checker's author has no connection or affiliation to any of the
 trademarks mentioned or used by this software.
 
 [docker]: https://www.docker.com/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
-[hdlcc_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdlcc
+[hdl_checker_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdl_checker_test
 [Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
-[issue_tracker]: https://github.com/suoto/hdlcc/issues
+[issue_tracker]: https://github.com/suoto/hdl_checker/issues
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
 [Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
 [vim-hdl]: https://github.com/suoto/vim-hdl/

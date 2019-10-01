@@ -1,20 +1,20 @@
-# This file is part of HDL Code Checker.
+# This file is part of HDL Checker.
 #
 # Copyright (c) 2015 - 2019 suoto (Andre Souto)
 #
-# HDL Code Checker is free software: you can redistribute it and/or modify
+# HDL Checker is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# HDL Code Checker is distributed in the hope that it will be useful,
+# HDL Checker is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
-"hdlcc installation script"
+# along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
+"hdl_checker installation script"
 
 import setuptools
 import versioneer
@@ -42,14 +42,14 @@ Topic :: Text Editors :: Integrated Development Environments (IDE)
 
 # pylint: disable=bad-whitespace
 setuptools.setup(
-    name                          = 'hdlcc',
+    name                          = 'hdl_checker',
     version                       = versioneer.get_version(),
     description                   = 'HDL code checker',
     long_description              = LONG_DESCRIPTION,
     long_description_content_type = "text/markdown",
     author                        = 'Andre Souto',
     author_email                  = 'andre820@gmail.com',
-    url                           = 'https://github.com/suoto/hdlcc',
+    url                           = 'https://github.com/suoto/hdl_checker',
     license                       = 'GPLv3',
     keywords                      = 'VHDL Verilog SystemVerilog linter LSP language server protocol vimhdl vim-hdl',
     platforms                     = 'any',
@@ -68,7 +68,7 @@ setuptools.setup(
                                      'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {
-        'console_scripts' : ['hdlcc=hdlcc.server:main', ]
+        'console_scripts' : ['hdl_checker=hdl_checker.server:main', ]
     },
     classifiers=CLASSIFIERS.splitlines(),
 )
