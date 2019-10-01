@@ -59,7 +59,6 @@ def getBuilderByName(name):
     elif name == "ghdl":
         builder = GHDL
     else:
-        _logger.info("Using Fallback builder")
         builder = Fallback
 
     return builder
@@ -75,8 +74,6 @@ def getWorkingBuilders():
         if builder_class.isAvailable():
             _logger.debug("Builder %s worked", builder_class.builder_name)
             yield builder_class
-        else:
-            _logger.debug("Builder %s failed", builder_class.builder_name)
 
 
 def foundVunit():  # type: () -> bool
@@ -113,7 +110,7 @@ def getVunitSources(builder):
 
     logging.getLogger("vunit").setLevel(logging.ERROR)
 
-    _logger.info("VUnit installation found")
+    _logger.debug("VUnit installation found")
 
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:
@@ -129,7 +126,7 @@ def getVunitSources(builder):
             "verilog", p.join(p.dirname(vunit.__file__), "verilog", "include")
         )
     else:  # pragma: no cover
-        _logger.warning("Vunit found but no file types are supported by %s", builder)
+        _logger.info("Vunit found but no file types are supported by %s", builder)
         return
 
     output_path = mkdtemp()

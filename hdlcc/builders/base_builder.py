@@ -113,10 +113,10 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             return
 
         if not p.exists(self._work_folder):
-            self._logger.info("Target folder '%s' was created", self._work_folder)
+            self._logger.debug("Target folder '%s' was created", self._work_folder)
             os.makedirs(self._work_folder)
         else:
-            self._logger.info("%s already exists", self._work_folder)
+            self._logger.debug("%s already exists", self._work_folder)
 
         self.checkEnvironment()
 
@@ -316,12 +316,6 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             if self._shouldIgnoreLine(line):
                 continue
 
-            #  # In case we're compiling a temporary dump, replace in the lines
-            #  # all references to the temp name with the original (shadow)
-            #  # filename
-            #  if path.shadow_filename:
-            #      line = line.replace(path.filename, path.shadow_filename)
-
             for _record in self._makeRecords(line):
                 try:
                     diagnostics |= {_record}
@@ -435,7 +429,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 cached_info["compile_time"] = 0
 
         else:
-            self._logger.debug("Nothing to do for %s", path)
+            self._logger.info("Nothing to do for %s", path)
             diagnostics = cached_info["diagnostics"]
             rebuilds = cached_info["rebuilds"]
 

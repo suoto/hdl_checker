@@ -31,7 +31,6 @@ from typing import Any, Dict, Iterable, Set, Tuple
 from hdlcc.tests import (
     SourceMock,
     TestCase,
-    disableVunit,
     getTestTempPath,
     logIterable,
     setupTestSuport,
@@ -59,10 +58,6 @@ class _SourceMock(SourceMock):
 
 
 class _Database(Database):
-    def __init__(self, *args, **kwargs):
-        with disableVunit:
-            super(_Database, self).__init__(*args, **kwargs)
-
     def configure(self, root_config, root_path):
         # type: (Dict[str, Any], str) -> None
         _logger.info("Updating config from\n%s", pformat(root_config))

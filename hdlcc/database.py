@@ -209,12 +209,9 @@ class Database(HashableByKey):
         Adds a diagnostic to the diagnostic map. Diagnostics can then be read
         to report processing internals and might make it to the user interface
         """
-        _logger.info("Adding diagnostic %s", diagnostic)
+        _logger.debug("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
         if diagnostic.filename not in self._diags:
-            _logger.debug(
-                "Initialized diags for %s", p.basename(str(diagnostic.filename))
-            )
             self._diags[diagnostic.filename] = set()
 
         self._diags[diagnostic.filename].add(diagnostic)
@@ -468,7 +465,6 @@ class Database(HashableByKey):
 
         if not libraries:
             _logger.info("Couldn't work out a library for path %s", path)
-            #  self._diags[path].add(PathNotInProjectFile(path))
             library = None
         elif len(libraries) == 1:
             library = libraries.pop()
@@ -546,7 +542,7 @@ class Database(HashableByKey):
         paths = {unit.owner for unit in units}
 
         if len(paths) > 1:
-            _logger.warning(
+            _logger.info(
                 "%s/%s is defined in %d files: %s", library, name, len(paths), paths
             )
 
@@ -728,7 +724,7 @@ class Database(HashableByKey):
                     _logger.info("Nothing more to do after %d steps", i)
                 return
 
-            _logger.info(
+            _logger.debug(
                 "Got %d units compiled: %s", len(units_compiled), units_compiled
             )
 

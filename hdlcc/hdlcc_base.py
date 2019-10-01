@@ -166,14 +166,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         builder_name = config.pop("builder", None)
         if builder_name is not None:
             builder_cls = getBuilderByName(builder_name)
-            _logger.info("Builder class: %s", builder_cls)
         else:
             try:
                 builder_cls = list(getWorkingBuilders()).pop()
-                _logger.info("Builder class: %s", builder_cls)
             except IndexError:
                 builder_cls = Fallback
-                _logger.info("Builder class: %s", builder_cls)
+
+        _logger.debug("Builder class: %s", builder_cls)
 
         self._builder = builder_cls(self.work_dir, self.database)
 
@@ -324,7 +323,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 if record.severity in (DiagType.ERROR, DiagType.STYLE_ERROR):
                     yield record
 
-        _logger.info("Built dependencies, now actually building '%s'", str(path))
+        _logger.debug("Built dependencies, now actually building '%s'", str(path))
         library = self.database.getLibrary(path)
         for record in self._buildAndHandleRebuilds(
             path,
@@ -341,7 +340,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         rebuilding until there is nothing to rebuild. The number of iteractions
         is fixed in 10.
         """
-        _logger.info("Building %s / %s", path, library)
         self._cleanIfNeeded()
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
@@ -351,7 +349,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             )
 
             if rebuilds:
-                _logger.info(
+                _logger.debug(
                     "Building '%s' triggers rebuilding: %s",
                     path,
                     ", ".join([str(x) for x in rebuilds]),
@@ -447,7 +445,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
         """
-        _logger.debug("Getting messages for '%s' with content", path)
+        _logger.info("Getting messages for '%s' with content", path)
         self._updateConfigIfNeeded()
 
         ext = path.name.split(".")[-1]
@@ -487,7 +485,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         diags |= set(self.database.getDiagnosticsForPath(path))
 
         if self.config_file and path not in self.database.paths:
-            _logger.info("Adding PathNotInProjectFile(%s)", path)
             diags.add(PathNotInProjectFile(path))
 
         return diags

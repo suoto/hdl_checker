@@ -41,7 +41,6 @@ from hdlcc.diagnostics import (
 )
 from hdlcc.parsers.elements.identifier import Identifier
 from hdlcc.path import Path
-from hdlcc.utils import removeIfExists
 
 try:  # Python 3.x
     import unittest.mock as mock  # pylint: disable=import-error, no-name-in-module
@@ -75,19 +74,6 @@ with such.A("hdlcc bottle app") as it:
 
         it.project_file = p.join(TEST_PROJECT, "vimhdl.prj")
         it.app = TestApp(handlers.app)
-
-    #  @it.has_teardown
-    #  def teardown():
-    #      build_folder = p.join(TEST_PROJECT, ".build")
-    #      it.assertFalse(p.exists(build_folder))
-
-    #      cache = p.join(TEST_PROJECT, ".hdlcc")
-    #      it.assertFalse(
-    #          p.exists(cache), "File '{}' shouldn't exist right now".format(cache)
-    #      )
-    #      it.assertFalse(p.exists(".xvhdl.init"))
-
-    #      removeIfExists("xvhdl.pb")
 
     @it.should("get diagnose info without any project")
     @disableVunit

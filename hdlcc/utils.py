@@ -326,8 +326,10 @@ def removeDirIfExists(dirname):
     """
     try:
         shutil.rmtree(dirname)
+        _logger.debug("Removed %s", dirname)
         return True
     except OSError:
+        _logger.debug("Failed to remove %s", dirname)
         return False
 
 

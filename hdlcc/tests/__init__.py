@@ -24,7 +24,6 @@ import os.path as p
 import shutil
 import subprocess as subp
 import time
-from contextlib import contextmanager
 from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -248,16 +247,6 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
 disableVunit = mock.patch("hdlcc.builder_utils.foundVunit", lambda: False)
 
 
-@contextmanager
-def patchBuilder():
-    with mock.patch(
-        "hdlcc.hdlcc_base.getWorkingBuilders", side_effect=[iter((MockBuilder,))]
-    ):
-        with mock.patch("hdlcc.hdlcc_base.getBuilderByName", side_effect=[MockBuilder]):
-            with disableVunit:
-                yield
-
-
 class PatchBuilder(object):
     def __init__(self, meth=None):
         def getBuilderByName(name):
@@ -290,9 +279,6 @@ class PatchBuilder(object):
             mock.patch("hdlcc.hdlcc_base.getBuilderByName", getBuilderByName),
             disableVunit,
         )
-
-    #  def __name__(self):
-    #      return str("PatchBuilder")
 
     def __enter__(self):
         _logger.info("Starting patches")
@@ -384,10 +370,8 @@ def writeListToFile(filename, _list):  # pragma: no cover
     time.sleep(0.1)
     open(filename, mode="w").write("\n".join([str(x) for x in _list]))
 
-
     for i, line in enumerate(_list):
         _logger.debug("%2d | %s", i + 1, line)
-
 
 
 if not ON_WINDOWS:

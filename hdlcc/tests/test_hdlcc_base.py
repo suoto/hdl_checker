@@ -40,10 +40,8 @@ from hdlcc.tests import (
     StandaloneProjectBuilder,
     assertCountEqual,
     assertSameFile,
-    disableVunit,
     getTestTempPath,
     logIterable,
-    patchBuilder,
     setupTestSuport,
     writeListToFile,
 )
@@ -74,7 +72,10 @@ TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
 
 if six.PY2:
-    FileNotFoundError = (IOError, OSError)  # pylint: disable=redefined-builtin
+    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
+        IOError,
+        OSError,
+    )
 
 
 class _SourceMock(SourceMock):
