@@ -23,11 +23,10 @@
 
 import logging
 import os.path as p
-from pprint import pformat
 
 from mock import MagicMock, patch
 
-from hdlcc.tests import TestCase, disableVunit
+from hdlcc.tests import TestCase, disableVunit, getTestTempPath
 
 from hdlcc.builder_utils import (
     foundVunit,
@@ -44,10 +43,13 @@ from hdlcc.types import FileType
 
 _logger = logging.getLogger(__name__)
 
-#  TEST_TEMP_PATH = getTestTempPath(__name__)
-#  TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+TEST_TEMP_PATH = getTestTempPath(__name__)
 
-#  TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, "test_config_parser")
+
+def _path(*args):
+    # type: (str) -> str
+    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
+    return p.join(TEST_TEMP_PATH, *args)
 
 
 class TestBuilderUtils(TestCase):
@@ -72,7 +74,7 @@ class TestBuilderUtils(TestCase):
                 self.assertCountEqual(list(getWorkingBuilders()), [MSim, GHDL])
 
 
-class Library(object):
+class Library(object):  # pylint: disable=too-few-public-methods
     def __init__(self, name):
         self._name = name
 
@@ -110,8 +112,8 @@ class TestGetVunitSources(TestCase):
     def test_vhdl_builder(self, meth):
         meth.side_effect = [
             [
-                SourceFile(name="path_0.vhd", library="libary_0"),
-                SourceFile(name="path_1.vhd", library="libary_1"),
+                SourceFile(name=_path("path_0.vhd"), library="libary_0"),
+                SourceFile(name=_path("path_1.vhd"), library="libary_1"),
             ]
         ]
 
@@ -129,8 +131,8 @@ class TestGetVunitSources(TestCase):
         self.assertCountEqual(
             sources,
             {
-                (Path("/home/souto/dev/hdlcc/path_0.vhd"), "libary_0", ("-2008",)),
-                (Path("/home/souto/dev/hdlcc/path_1.vhd"), "libary_1", ("-2008",)),
+                (Path(_path("path_0.vhd")), "libary_0", ("-2008",)),
+                (Path(_path("path_1.vhd")), "libary_1", ("-2008",)),
             },
         )
 
@@ -138,8 +140,8 @@ class TestGetVunitSources(TestCase):
     def test_systemverilog_only_builder(self, meth):
         meth.side_effect = [
             [
-                SourceFile(name="path_0.vhd", library="libary_0"),
-                SourceFile(name="path_1.vhd", library="libary_1"),
+                SourceFile(name=_path("path_0.vhd"), library="libary_0"),
+                SourceFile(name=_path("path_1.vhd"), library="libary_1"),
             ]
         ]
 
@@ -156,8 +158,8 @@ class TestGetVunitSources(TestCase):
         self.assertCountEqual(
             sources,
             {
-                (Path("/home/souto/dev/hdlcc/path_0.vhd"), "libary_0", ("-2008",)),
-                (Path("/home/souto/dev/hdlcc/path_1.vhd"), "libary_1", ("-2008",)),
+                (Path(_path("path_0.vhd")), "libary_0", ("-2008",)),
+                (Path(_path("path_1.vhd")), "libary_1", ("-2008",)),
             },
         )
 
@@ -176,15 +178,15 @@ class TestGetVunitSources(TestCase):
     def test_vhdl_and_systemverilog_only_builder(self, vhdl_method, sv_method):
         vhdl_method.side_effect = [
             [
-                SourceFile(name="path_0.vhd", library="libary_0"),
-                SourceFile(name="path_1.vhd", library="libary_1"),
+                SourceFile(name=_path("path_0.vhd"), library="libary_0"),
+                SourceFile(name=_path("path_1.vhd"), library="libary_1"),
             ]
         ]
 
         sv_method.side_effect = [
             [
-                SourceFile(name="path_2.sv", library="libary_2"),
-                SourceFile(name="path_3.sv", library="libary_3"),
+                SourceFile(name=_path("path_2.sv"), library="libary_2"),
+                SourceFile(name=_path("path_3.sv"), library="libary_3"),
             ]
         ]
 
@@ -202,9 +204,9 @@ class TestGetVunitSources(TestCase):
         self.assertCountEqual(
             sources,
             {
-                (Path("/home/souto/dev/hdlcc/path_0.vhd"), "libary_0", ()),
-                (Path("/home/souto/dev/hdlcc/path_1.vhd"), "libary_1", ()),
-                (Path("/home/souto/dev/hdlcc/path_2.sv"), "libary_2", ()),
-                (Path("/home/souto/dev/hdlcc/path_3.sv"), "libary_3", ()),
+                (Path(_path("path_0.vhd")), "libary_0", ()),
+                (Path(_path("path_1.vhd")), "libary_1", ()),
+                (Path(_path("path_2.sv")), "libary_2", ()),
+                (Path(_path("path_3.sv")), "libary_3", ()),
             },
         )
