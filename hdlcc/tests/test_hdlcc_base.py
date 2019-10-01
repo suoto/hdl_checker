@@ -15,54 +15,100 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-# pylint: disable=function-redefined, missing-docstring, protected-access
+# pylint: disable=function-redefined
+# pylint: disable=missing-docstring
+# pylint: disable=protected-access
+# pylint: disable=useless-object-inheritance
 
 import json
 import logging
 import os
 import os.path as p
 import shutil
-import tempfile
+import time
 
-import mock
 import six
-#  import unittest2
-#  from mock import patch
-from nose2.tools import such
-from nose2.tools.params import params
+from mock import patch
 
-import hdlcc
-from hdlcc.builders import Fallback
-from hdlcc.diagnostics import (DependencyNotUnique, DiagType,
-                               LibraryShouldBeOmited, ObjectIsNeverUsed,
-                               PathNotInProjectFile)
-from hdlcc.hdlcc_base import CACHE_NAME
-from hdlcc.parsers import DependencySpec, VerilogParser, VhdlParser
-from hdlcc.tests.utils import (FailingBuilder, MockBuilder, SourceMock,
-                               StandaloneProjectBuilder, assertCountEqual,
-                               assertSameFile, disableVunit, getTestTempPath,
-                               setupTestSuport, writeListToFile)
-from hdlcc.utils import onWindows
+from nose2.tools import such  # type: ignore
+
+from hdlcc.tests import (
+    FailingBuilder,
+    MockBuilder,
+    PatchBuilder,
+    SourceMock,
+    StandaloneProjectBuilder,
+    assertCountEqual,
+    assertSameFile,
+    getTestTempPath,
+    logIterable,
+    setupTestSuport,
+    writeListToFile,
+)
+
+from hdlcc import CACHE_NAME, WORK_PATH
+from hdlcc.builders.fallback import Fallback
+from hdlcc.diagnostics import (
+    CheckerDiagnostic,
+    DiagType,
+    LibraryShouldBeOmited,
+    ObjectIsNeverUsed,
+    PathNotInProjectFile,
+)
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.path import Path
+from hdlcc.types import (
+    BuildFlagScope,
+    FileType,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+)
+from hdlcc.utils import ON_WINDOWS, removeIfExists
 
 _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_PROJECT = p.join(TEST_TEMP_PATH, 'test_project')
+TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+
+if six.PY2:
+    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
+        IOError,
+        OSError,
+    )
+
 
 class _SourceMock(SourceMock):
     base_path = TEST_TEMP_PATH
 
 
+def _path(*args):
+    # type: (str) -> str
+    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
+    return p.join(TEST_TEMP_PATH, *args)
+
+
+def _Path(*args):
+    # type: (str) -> Path
+    return Path(_path(*args))
+
+
 def patchClassMap(**kwargs):
+    import hdlcc
+
     class_map = hdlcc.serialization.CLASS_MAP.copy()
     for name, value in kwargs.items():
         class_map.update({name: value})
 
-    return mock.patch('hdlcc.serialization.CLASS_MAP', class_map)
+    return patch("hdlcc.serialization.CLASS_MAP", class_map)
 
-class ConfigParserMock(hdlcc.config_parser.ConfigParser):
-    def getBuilder(self):
-        return 'MockBuilder'
+
+def _makeConfigFromDict(dict_):
+    # type: (...) -> str
+    filename = p.join(TEST_TEMP_PATH, "mock.prj")
+    json.dump(dict_, open(filename, "w"))
+    return filename
+
 
 such.unittest.TestCase.maxDiff = None
 
@@ -75,576 +121,478 @@ with such.A("hdlcc project") as it:
     def _assertMsgQueueIsEmpty(project):
         msg = []
         while not project._msg_queue.empty():
-            msg += [str(project._msg_queue.get()), ]
+            msg += [str(project._msg_queue.get())]
 
         if msg:
-            msg.insert(0, 'Message queue should be empty but has %d messages' % len(msg))
-            it.fail('\n'.join(msg))
+            msg.insert(
+                0, "Message queue should be empty but has %d messages" % len(msg)
+            )
+            it.fail("\n".join(msg))
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
 
-    with it.having('non existing project file'):
+    with it.having("non existing root dir"):
+
         @it.has_setup
         def setup():
-            it.project_file = 'non_existing_file'
-            it.assertFalse(p.exists(it.project_file))
+            it.project_file = Path("non_existing_file")
+            it.assertFalse(p.exists(it.project_file.name))
 
-        @it.should('raise exception when trying to instantiate')
+        @it.should("raise exception when trying to instantiate")
         def test():
-            with it.assertRaises((OSError, IOError)):
-                StandaloneProjectBuilder(it.project_file)
+            project = StandaloneProjectBuilder(_Path("nonexisting"))
+            with it.assertRaises(FileNotFoundError):
+                project.setConfig(str(it.project_file))
 
-    with it.having('no project file at all'):
+    with it.having("no project file at all"):
+
         @it.has_setup
         def setup():
-            it.project = StandaloneProjectBuilder(project_file=None)
+            it.project = StandaloneProjectBuilder(Path(TEST_PROJECT))
 
-        @it.should('use fallback to Fallback builder')
+        @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
-            it.assertTrue(isinstance(it.project.builder, Fallback))
+            it.assertIsInstance(it.project.builder, Fallback)
 
-        @it.should('still report static messages')
+        @it.should("still report static messages")  # type: ignore
         def test():
+
+            _logger.info("Files: %s", it.project.database._paths)
+
             source = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[
-                    DependencySpec(library='work', name='foo')])
+                filename=_path("some_lib_target.vhd"),
+                library="some_lib",
+                design_units=[{"name": "target", "type": "entity"}],
+                dependencies={("work", "foo")},
+            )
 
-            it.assertEqual(
-                it.project.getMessagesBySource(source),
-                [LibraryShouldBeOmited(
-                    library='work',
-                    filename=p.join(TEST_TEMP_PATH, "some_lib_target.vhd"),
-                    line_number=1,
-                    column_number=9)])
+            it.assertCountEqual(
+                it.project.getMessagesByPath(source.filename),
+                {
+                    LibraryShouldBeOmited(
+                        library="work",
+                        filename=_Path("some_lib_target.vhd"),
+                        line_number=1,
+                        column_number=9,
+                    )
+                },
+            )
 
-    with it.having('an existing and valid project file'):
+    with it.having("an existing and valid project file"):
+
         @it.has_setup
         def setup():
             setupTestSuport(TEST_TEMP_PATH)
 
-            it.project_file = tempfile.mktemp(prefix='project_file_', suffix='.prj', dir=TEST_TEMP_PATH)
-            open(it.project_file, 'w').close()
+            it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
 
-            it.config_parser_patch = mock.patch('hdlcc.hdlcc_base.ConfigParser', ConfigParserMock)
-            it.mock_builder_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
+            it.config_file = _makeConfigFromDict(
+                {
+                    "builder": MockBuilder.builder_name,
+                    FileType.vhdl.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalvhdl",
+                                "-global-vhdl-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--vhdl-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    FileType.verilog.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalverilog",
+                                "-global-verilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: ("--verilog-batch",),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                    FileType.systemverilog.value: {
+                        "flags": {
+                            BuildFlagScope.all.value: (
+                                "-globalsystemverilog",
+                                "-global-systemverilog-flag",
+                            ),
+                            BuildFlagScope.dependencies.value: (
+                                "--systemverilog-batch",
+                            ),
+                            BuildFlagScope.single.value: ("-single_build_flag_0",),
+                        }
+                    },
+                }
+            )
 
-            it.config_parser_patch.start()
-            it.mock_builder_patch .start()
+            it.project.setConfig(it.config_file)
 
-            it.project = StandaloneProjectBuilder(project_file=it.project_file)
-
-        @it.has_teardown
-        def teardown():
-            it.config_parser_patch.stop()
-            _logger.info("Removing project file %s", it.project_file)
-            #  os.remove(it.project_file)
-            it.mock_builder_patch .stop()
-
-        @it.should('use fallback to Fallback builder')
+        @it.should("use MockBuilder builder")  # type: ignore
         def test():
-            it.assertTrue(isinstance(it.project.builder, MockBuilder))
+            with PatchBuilder():
+                it.assertIsInstance(it.project.builder, MockBuilder)
 
-        @it.should('save cache after checking a source')
+        @it.should("save cache after checking a source")  # type: ignore
         def test():
             source = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}])
+                library="some_lib", design_units=[{"name": "target", "type": "entity"}]
+            )
 
-            with mock.patch('hdlcc.hdlcc_base.json.dump', spec=json.dump) as func:
-                it.project.getMessagesBySource(source)
+            with patch("hdlcc.hdlcc_base.json.dump", spec=json.dump) as func:
+                it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
-        @it.should('recover from cache')
-        @patchClassMap(ConfigParserMock=ConfigParserMock, MockBuilder=MockBuilder)
+        @it.should("recover from cache")  # type: ignore
+        @patchClassMap(MockBuilder=MockBuilder)
         def test():
             source = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}])
+                library="some_lib", design_units=[{"name": "target", "type": "entity"}]
+            )
 
-            it.project.getMessagesBySource(source)
+            it.project.getMessagesByPath(source.filename)
 
-            del it.project
+            project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
 
-            it.project = StandaloneProjectBuilder(project_file=it.project_file)
-
-            cache_filename = it.project._getCacheFilename()
+            cache_filename = project._getCacheFilename()
 
             it.assertIn(
-                ('info', 'Recovered cache from \'{}\''.format(cache_filename)),
-                list(it.project.getUiMessages()))
+                ("info", "Recovered cache from '{}'".format(cache_filename)),
+                list(it.project.getUiMessages()),
+            )
 
-        @it.should("warn when failing to recover from cache")
+            # Setting the config file should not trigger reparsing
+            with patch.object(it.project, "_readConfig") as readConfig:
+                with patch(
+                    "hdlcc.hdlcc_base.WatchedFile.__init__", side_effect=[None]
+                ) as WatchedFile:
+                    old = it.project.config_file
+                    it.project.setConfig(it.config_file)
+                    it.project._updateConfigIfNeeded()
+                    it.assertEqual(it.project.config_file, old)
+                    readConfig.assert_not_called()
+                    WatchedFile.assert_not_called()
+
+        @it.should("clean up root dir")  # type: ignore
+        @patchClassMap(MockBuilder=MockBuilder)
         def test():
-            # Save contents before destroying the object
-            project_file = it.project.project_file
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
+
+            it.project.clean()
+
+            project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(project)
+
+            # Reset the project to the previous state
+            setup()
+
+        @it.should("warn when failing to recover from cache")  # type: ignore
+        def test():
+            it.project._saveCache()
+            # Copy parameters of the object we're checking against
+            root_dir = it.project.root_dir
             cache_filename = it.project._getCacheFilename()
 
-            it.assertFalse(isinstance(it.project.builder, Fallback))
-
-            del it.project
+            #  it.assertIsInstance(it.project.builder, Fallback)
 
             # Corrupt the cache file
-            open(cache_filename, 'w').write("corrupted cache contents")
+            open(cache_filename.name, "w").write("corrupted cache contents")
 
             # Try to recreate
-            it.project = StandaloneProjectBuilder(project_file)
+            project = StandaloneProjectBuilder(root_dir)
 
             if six.PY2:
                 it.assertIn(
-                    ('warning', "Unable to recover cache from '{}': "
-                                "No JSON object could be decoded".format(cache_filename)),
-                    list(it.project.getUiMessages()))
+                    (
+                        "warning",
+                        "Unable to recover cache from '{}': "
+                        "No JSON object could be decoded".format(cache_filename),
+                    ),
+                    list(project.getUiMessages()),
+                )
             else:
                 it.assertIn(
-                    ('warning', "Unable to recover cache from '{}': "
-                                "Expecting value: line 1 column 1 (char 0)".format(cache_filename)),
-                    list(it.project.getUiMessages()))
+                    (
+                        "warning",
+                        "Unable to recover cache from '{}': "
+                        "Expecting value: line 1 column 1 (char 0)".format(
+                            cache_filename
+                        ),
+                    ),
+                    list(project.getUiMessages()),
+                )
 
-            it.assertTrue(isinstance(it.project.builder, MockBuilder),
-                          "Builder should be MockBuilderbut it's {} instead"
-                          .format(type(it.project.builder)))
+            it.assertIsInstance(project.builder, Fallback)
 
-        @it.should("provide a VHDL source code object given its path")
-        def test():
-            path = p.join(TEST_PROJECT, 'basic_library',
-                          'very_common_pkg.vhd')
+        @it.should("get builder messages by path")  # type: ignore
+        # Avoid saving to cache because the patched method is not JSON
+        # serializable
+        @patch("hdlcc.hdlcc_base.json.dump")
+        def test(_):
+            with PatchBuilder():
+                it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
+                it.project._readConfig()
 
-            source, remarks = it.project.getSourceByPath(path)
+            entity_a = _SourceMock(
+                filename=_path("entity_a.vhd"),
+                library="some_lib",
+                design_units=[{"name": "entity_a", "type": "entity"}],
+                dependencies={("work", "foo")},
+            )
 
-            it.assertSameFile(source.filename, path)
-            it.assertEqual(source.library, 'undefined')
-            it.assertEqual(source.filetype, 'vhdl')
+            path_to_foo = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-            it.assertEqual(remarks,
-                           [PathNotInProjectFile(p.abspath(path)), ])
+            diags = {
+                # entity_a.vhd is the path we're compiling, inject a diagnostic
+                # from the builder
+                str(entity_a.filename): [
+                    [
+                        CheckerDiagnostic(
+                            filename=entity_a.filename, checker=None, text="some text"
+                        )
+                    ]
+                ],
+                # foo.vhd is on the build sequence, check that diagnostics from
+                # the build sequence are only included when their severity is
+                # DiagType.ERROR
+                str(path_to_foo): [
+                    [
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="should not be included",
+                            severity=DiagType.WARNING,
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="style error should be included",
+                            severity=DiagType.STYLE_ERROR,
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="should be included",
+                            severity=DiagType.ERROR,
+                        ),
+                    ]
+                ],
+            }
 
-        @it.should("provide a Verilog source code object given a Verilog path")
-        @params(p.join(TEST_PROJECT, 'verilog', 'parity.v'),
-                p.join(TEST_PROJECT, 'verilog', 'parity.sv'))
-        def test(_, path):
-            source, remarks = it.project.getSourceByPath(path)
+            def build(  # pylint: disable=unused-argument
+                path, library, scope, forced=False
+            ):
+                _logger.debug("Building library=%s, path=%s", library, path)
+                path_diags = diags.get(str(path), [])
+                if path_diags:
+                    return path_diags.pop(), []
+                return [], []
 
-            it.assertSameFile(source.filename, path)
-            it.assertEqual(source.library, 'undefined')
-
-            it.assertEqual(
-                source.filetype,
-                'verilog' if path.endswith('.v') else 'systemverilog')
-
-            it.assertEqual(remarks,
-                           [PathNotInProjectFile(p.abspath(path)), ])
-
-        @it.should("resolve dependencies into a list of libraries and units")
-        def test():
-            source = mock.MagicMock()
-            source.library = 'some_lib'
-            source.getDependencies = mock.MagicMock(
-                return_value=[DependencySpec(library='some_lib',
-                                             name='some_dependency')])
-
-            it.assertEqual(list(it.project._resolveRelativeNames(source)),
-                           [DependencySpec(library='some_lib',
-                                           name='some_dependency')])
-
-        @it.should("eliminate the dependency of a source on itself")
-        def test():
-            source = mock.MagicMock()
-            source.library = 'some_lib'
-            source.getDependencies = mock.MagicMock(
-                return_value=[DependencySpec(library='some_lib',
-                                             name='some_package')])
-
-            source.getDesignUnits = mock.MagicMock(
-                return_value=[{'type' : 'package',
-                               'name' : 'some_package'}])
-
-            it.assertEqual(list(it.project._resolveRelativeNames(source)), [])
-
-        @it.should("return the correct build sequence")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[
-                    DependencySpec(library='some_lib', name='direct_dep'),
-                    DependencySpec(library='some_lib', name='common_dep')])
-
-            direct_dep = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'direct_dep',
-                               'type' : 'entity'}],
-                dependencies=[
-                    DependencySpec(library='some_lib', name='indirect_dep'),
-                    DependencySpec(library='some_lib', name='common_dep')])
-
-            indirect_dep = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'indirect_dep',
-                               'type' : 'package'}],
-                dependencies=[
-                    DependencySpec(library='some_lib', name='indirect_dep'),
-                    DependencySpec(library='some_lib', name='common_dep')])
-
-            common_dep = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'common_dep',
-                               'type' : 'package'}])
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src,
-                             direct_dep.filename :  direct_dep,
-                             indirect_dep.filename :  indirect_dep,
-                             common_dep.filename :  common_dep, }):
-
-                it.assertEqual(it.project.getBuildSequence(target_src),
-                               [common_dep, indirect_dep, direct_dep])
-
-        @it.should("not include sources that are not dependencies")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='some_lib',
-                                             name='direct_dep')])
-
-            direct_dep = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'direct_dep',
-                               'type' : 'entity'}],
-                dependencies=[])
-
-            not_a_dependency = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'not_a_dependency',
-                               'type' : 'package'}],
-                dependencies=[])
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src,
-                             direct_dep.filename :  direct_dep,
-                             not_a_dependency.filename :  not_a_dependency}):
-
-                it.assertEqual(it.project.getBuildSequence(target_src),
-                               [direct_dep])
-
-        @it.should("handle cases where the source file for a dependency is not found")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='some_lib',
-                                             name='direct_dep')])
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src}):
-
-                it.assertEqual(it.project.getBuildSequence(target_src), [])
-
-        @it.should("return empty list when the source has no dependencies")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[])
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src}):
-
-                it.assertEqual(it.project.getBuildSequence(target_src), [])
-
-        @it.should("identify ciruclar dependencies")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='some_lib',
-                                             name='direct_dep')])
-
-            direct_dep = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'direct_dep',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='some_lib',
-                                             name='target')])
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src,
-                             direct_dep.filename :  direct_dep}):
-
-                it.assertEqual(it.project.getBuildSequence(target_src),
-                               [direct_dep, ])
-
-        @it.should("resolve conflicting dependencies by using signature")
-        def test():
-            target_src = _SourceMock(
-                library='some_lib',
-                filename='target_src.vhd',
-                design_units=[{'name' : 'target',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='some_lib',
-                                             name='direct_dep',
-                                             locations=[('target_src.vhd', 1, 2), ])])
-
-            implementation_a = _SourceMock(
-                library='some_lib',
-                filename='implementation_a.vhd',
-                design_units=[{'name' : 'direct_dep',
-                               'type' : 'entity'}],
-                dependencies=[])
-
-            implementation_b = _SourceMock(
-                library='some_lib',
-                filename='implementation_b.vhd',
-                design_units=[{'name' : 'direct_dep',
-                               'type' : 'entity'}],
-                dependencies=[])
-
-            #  project = StandaloneProjectBuilder()
-            messages = []
-            it.project._handleUiWarning = mock.MagicMock(side_effect=messages.append)
-
-            #  lambda message: messages += [message]
-            it.project.config_parser._sources = {}
-            for source in (target_src, implementation_a, implementation_b):
-                it.project.config_parser._sources[source.filename] = source
-
-            with mock.patch(__name__ + '.it.project.config_parser._sources',
-                            {target_src.filename :  target_src,
-                             implementation_a.filename :  implementation_a,
-                             implementation_b.filename :  implementation_b}):
-
-                # Make sure there was no outstanding diagnostics prior to running
-                it.assertFalse(it.project._outstanding_diags,
-                               "Project should not have any outstanding diagnostics")
-
-                it.project.updateBuildSequenceCache(target_src)
-                _logger.info("processing diags: %s", it.project._outstanding_diags)
-
-                # hdlcc should flag which one it picked, although the exact one might
-                # vary
-                it.assertEqual(len(it.project._outstanding_diags), 1,
-                               "Should have exactly one outstanding diagnostics by now")
-                it.assertIn(
-                    it.project._outstanding_diags.pop(),
-                    [DependencyNotUnique(filename="target_src.vhd",
-                                         line_number=1,
-                                         column_number=2,
-                                         design_unit="some_lib.direct_dep",
-                                         actual=implementation_a.filename,
-                                         choices=[implementation_b, ]),
-                     DependencyNotUnique(filename="target_src.vhd",
-                                         line_number=1,
-                                         column_number=2,
-                                         design_unit="some_lib.direct_dep",
-                                         actual=implementation_b.filename,
-                                         choices=[implementation_a, ])])
-
-                it.assertEqual(it.project._outstanding_diags, set())
-
-        @it.should("get builder messages by path")
-        def test():
-            source = _SourceMock(
-                library='some_lib',
-                design_units=[{'name' : 'entity_a',
-                               'type' : 'entity'}],
-                dependencies=[DependencySpec(library='work', name='foo')])
-
-            with mock.patch('hdlcc.hdlcc_base.json.dump'):
-                path = p.abspath(source.filename)
-                messages = it.project.getMessagesByPath(path)
+            with patch.object(it.project.builder, "build", build):
+                _logger.info("Project paths: %s", it.project.database._paths)
+                messages = list(it.project.getMessagesByPath(entity_a.filename))
+                logIterable("Messages", messages, _logger.info)
                 it.assertCountEqual(
                     messages,
-                    [LibraryShouldBeOmited(library='work',
-                                           filename=path,
-                                           column_number=9,
-                                           line_number=1),
-                     PathNotInProjectFile(path),])
+                    [
+                        LibraryShouldBeOmited(
+                            library="work",
+                            filename=entity_a.filename,
+                            column_number=9,
+                            line_number=1,
+                        ),
+                        PathNotInProjectFile(entity_a.filename),
+                        CheckerDiagnostic(
+                            filename=entity_a.filename, checker=None, text="some text"
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="style error should be included",
+                            severity=DiagType.STYLE_ERROR,
+                        ),
+                        CheckerDiagnostic(
+                            filename=path_to_foo,
+                            checker=None,
+                            text="should be included",
+                            severity=DiagType.ERROR,
+                        ),
+                    ],
+                )
 
-        @it.should("warn when unable to recreate a builder described in cache")
-        @mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: FailingBuilder)
-        @mock.patch('hdlcc.config_parser.AVAILABLE_BUILDERS', [FailingBuilder, ])
+        @it.should(  # type: ignore
+            "warn when unable to recreate a builder described in cache"
+        )
+        @patch("hdlcc.hdlcc_base.getBuilderByName", new=lambda name: FailingBuilder)
         def test():
-            cache_content = {
-                "_logger": {
-                    "name": "hdlcc.hdlcc_base",
-                    "level": 0},
-                "builder": {
-                    "_builtin_libraries": [],
-                    "_added_libraries": [],
-                    "_logger": "hdlcc.builders.msim_mock",
-                    "_target_folder": "/home/souto/dev/vim-hdl/dependencies/hdlcc/.hdlcc",
-                    "_build_info_cache": {}},
-                "config_parser": {
-                    "_parms": {
-                        "target_dir": "/home/souto/dev/vim-hdl/dependencies/hdlcc/.hdlcc",
-                        "builder": "msim_mock",
-                        "single_build_flags": {
-                            "verilog": [],
-                            "vhdl": [],
-                            "systemverilog": []},
-                        "batch_build_flags": {
-                            "verilog": [],
-                            "vhdl": [],
-                            "systemverilog": []},
-                        "global_build_flags": {
-                            "verilog": [],
-                            "vhdl": [],
-                            "systemverilog": []}},
-                    "_timestamp": 1474839625.2375762,
-                    "_sources": {},
-                    "filename": p.join(TEST_TEMP_PATH, "/myproject.prj")}}
+            if ON_WINDOWS:
+                raise it.skipTest("Test doesn't run on Windows")
 
-            cache_path = p.join(TEST_TEMP_PATH, '.hdlcc', CACHE_NAME)
-            if p.exists(p.dirname(cache_path)):
-                shutil.rmtree(p.dirname(cache_path))
+            cache_content = {"builder": FailingBuilder.builder_name}
 
-            os.mkdir(p.join(TEST_TEMP_PATH, '.hdlcc'))
+            cache_path = it.project._getCacheFilename()
+            if p.exists(p.dirname(cache_path.name)):
+                shutil.rmtree(p.dirname(cache_path.name))
 
-            with open(cache_path, 'w') as fd:
+            os.makedirs(p.dirname(cache_path.name))
+
+            with open(cache_path.name, "w") as fd:
                 fd.write(repr(cache_content))
-
-            #  project = StandaloneProjectBuilder()
-            #  time.sleep(0.5)
 
             found = True
             while not it.project._msg_queue.empty():
                 severity, message = it.project._msg_queue.get()
                 _logger.info("Message found: [%s] %s", severity, message)
-                if message == "Failed to create builder '%s'" % FailingBuilder.builder_name:
+                if (
+                    message
+                    == "Failed to create builder '%s'" % FailingBuilder.builder_name
+                ):
                     found = True
                     break
 
             it.assertTrue(found, "Failed to warn that cache recovering has failed")
-            it.assertTrue(it.project.builder.builder_name, 'Fallback')
+            it.assertTrue(it.project.builder.builder_name, "Fallback")
 
-    with it.having('test_project as reference and a valid project file'):
+    with it.having("test_project as reference and a valid project file"):
 
         @it.has_setup
         def setup():
-            it.project_file = p.join(TEST_PROJECT, 'vimhdl.prj')
+            setupTestSuport(TEST_TEMP_PATH)
 
-            it.config_parser_patch = mock.patch('hdlcc.hdlcc_base.ConfigParser', ConfigParserMock)
-            it.mock_builder_patch = mock.patch('hdlcc.builders.getBuilderByName', new=lambda name: MockBuilder)
+            removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
 
-            it.config_parser_patch.start()
-            it.mock_builder_patch.start()
+            with PatchBuilder():
+                it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+                it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
+                it.project._updateConfigIfNeeded()
 
-            with disableVunit:
-                it.project = StandaloneProjectBuilder(it.project_file)
+            from pprint import pformat
 
-        @it.should('use mock builder')
+            _logger.info(
+                "Database state:\n%s", pformat(it.project.database.__jsonEncode__())
+            )
+
+            it.assertTrue(it.project.database.paths)
+            it.assertIsInstance(it.project.builder, MockBuilder)
+
+        @it.should("use mock builder")  # type: ignore
         def test():
-            it.assertTrue(isinstance(it.project.builder, MockBuilder),
-                          "Builder should be {} but got {} instead".format(MockBuilder, it.project.builder))
+            it.assertIsInstance(it.project.builder, MockBuilder)
 
-        @it.should('get a list of sources')
+        @it.should("get messages for an absolute path")  # type: ignore
         def test():
-            it.assertCountEqual(
-                it.project.getSources(),
-                [VerilogParser(filename=p.join(TEST_PROJECT, 'verilog', 'parity.sv'),
-                               library='verilog'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                            library='basic_library'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
-                            library='basic_library'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
-                            library='basic_library'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                            library='basic_library'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'basic_library', 'package_with_functions.vhd'),
-                            library='basic_library'),
-                 VhdlParser(filename=p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
-                            library='another_library'),
-                 VerilogParser(filename=p.join(TEST_PROJECT, 'verilog', 'parity.v'),
-                               library='verilog')])
+            filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-        @it.has_teardown
-        def teardown():
-            it.config_parser_patch.stop()
-            it.mock_builder_patch.stop()
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages by path")
-        def test():
-            filename = p.join(TEST_PROJECT, 'another_library',
-                              'foo.vhd')
-
-            it.assertMsgQueueIsEmpty(it.project)
-
-            diagnostics = it.project.getMessagesByPath(filename)
+            diagnostics = it.project.getMessagesByPath(Path(filename))
 
             it.assertIn(
                 ObjectIsNeverUsed(
-                    filename=filename,
-                    line_number=29, column_number=12,
-                    object_type='signal', object_name='neat_signal'),
-                diagnostics)
+                    filename=Path(filename),
+                    line_number=29,
+                    column_number=12,
+                    object_type="signal",
+                    object_name="neat_signal",
+                ),
+                diagnostics,
+            )
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages with text")
+            it.assertTrue(it.project.database.paths)
+
+        @it.should("get messages for relative path")  # type: ignore
         def test():
-            filename = p.join(TEST_PROJECT, 'another_library', 'foo.vhd')
+            filename = p.relpath(
+                p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+                str(it.project.root_dir),
+            )
 
-            original_content = open(filename, 'r').read().split('\n')
+            it.assertFalse(p.isabs(filename))
 
-            content = '\n'.join(original_content[:28] +
-                                ['signal another_signal : std_logic;'] +
-                                original_content[28:])
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
+
+            diagnostics = it.project.getMessagesByPath(Path(filename))
+
+            it.assertIn(
+                ObjectIsNeverUsed(
+                    filename=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
+                    line_number=29,
+                    column_number=12,
+                    object_type="signal",
+                    object_name="neat_signal",
+                ),
+                diagnostics,
+            )
+
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
+
+        @it.should("get messages with text")  # type: ignore
+        def test():
+            it.assertTrue(it.project.database.paths)
+
+            filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
+            original_content = open(filename.name, "r").read().split("\n")
+
+            content = "\n".join(
+                original_content[:28]
+                + ["signal another_signal : std_logic;"]
+                + original_content[28:]
+            )
 
             _logger.debug("File content")
-            for lnum, line in enumerate(content.split('\n')):
+            for lnum, line in enumerate(content.split("\n")):
                 _logger.debug("%2d| %s", (lnum + 1), line)
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-            diagnostics = it.project.getMessagesWithText(filename, content)
+            diagnostics = set(it.project.getMessagesWithText(filename, content))
 
-            if diagnostics:
-                _logger.debug("Records received:")
-                for diagnostic in diagnostics:
-                    _logger.debug("- %s", diagnostic)
-            else:
-                _logger.warning("No diagnostics found")
+            logIterable("Diagnostics", diagnostics, _logger.info)
 
-            # Check that all diagnostics point to the original filename and
-            # remove them from the diagnostics so it's easier to compare
-            # the remaining fields
-            for diagnostic in diagnostics:
-                if diagnostic.filename:
-                    it.assertSameFile(filename, diagnostic.filename)
+            it.assertTrue(it.project.config_file)
 
             expected = [
-                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=30,
-                                  column_number=12, object_type='signal',
-                                  object_name='neat_signal'),
-                ObjectIsNeverUsed(filename=p.abspath(filename), line_number=29,
-                                  column_number=8, object_type='signal',
-                                  object_name='another_signal'),]
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=30,
+                    column_number=12,
+                    object_type="signal",
+                    object_name="neat_signal",
+                ),
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=29,
+                    column_number=8,
+                    object_type="signal",
+                    object_name="another_signal",
+                ),
+            ]
 
+            it.assertCountEqual(diagnostics, expected)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-            it.assertCountEqual(expected, diagnostics)
-            it.assertMsgQueueIsEmpty(it.project)
-
-        @it.should("get messages with text for file outside the project file")
+        @it.should(  # type: ignore
+            "get messages with text for file outside the project file"
+        )
         def test():
-            filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
-            writeListToFile(filename, ["entity some_entity is end;", ])
+            filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
+            writeListToFile(str(filename), ["entity some_entity is end;"])
 
-            content = "\n".join(["library work;",
-                                 "use work.all;",
-                                 "entity some_entity is end;"])
+            content = "\n".join(
+                ["library work;", "use work.all;", "entity some_entity is end;"]
+            )
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesWithText(filename, content)
 
@@ -652,18 +600,12 @@ with such.A("hdlcc project") as it:
             for diagnostic in diagnostics:
                 _logger.debug("- %s", diagnostic)
 
-            # Check that all diagnostics point to the original filename and
-            # remove them from the diagnostics so it's easier to compare
-            # the remaining fields
-            for diagnostic in diagnostics:
-                it.assertSameFile(filename, diagnostic.filename)
-
             expected = [
-                LibraryShouldBeOmited(library='work',
-                                      filename=p.abspath(filename),
-                                      column_number=9,
-                                      line_number=1),
-                PathNotInProjectFile(p.abspath(filename)),]
+                LibraryShouldBeOmited(
+                    library="work", filename=filename, column_number=9, line_number=1
+                ),
+                PathNotInProjectFile(filename),
+            ]
 
             try:
                 it.assertCountEqual(expected, diagnostics)
@@ -674,65 +616,74 @@ with such.A("hdlcc project") as it:
 
                 raise
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-
-        @it.should("get updated messages")
+        @it.should("get updated messages")  # type: ignore
         def test():
-            filename = p.join(TEST_PROJECT, 'another_library',
-                              'foo.vhd')
+            filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-            code = open(filename, 'r').read().split('\n')
+            code = open(str(filename), "r").read().split("\n")
 
-            code[28] = '-- ' + code[28]
+            code[28] = "-- " + code[28]
 
-            writeListToFile(filename, code)
+            writeListToFile(str(filename), code)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
             try:
                 it.assertNotIn(
-                    ObjectIsNeverUsed(object_type='constant',
-                                      object_name='ADDR_WIDTH',
-                                      line_number=29,
-                                      column_number=14),
-                    diagnostics)
+                    ObjectIsNeverUsed(
+                        object_type="constant",
+                        object_name="ADDR_WIDTH",
+                        line_number=29,
+                        column_number=14,
+                    ),
+                    diagnostics,
+                )
             finally:
                 # Remove the comment we added
                 code[28] = code[28][3:]
-                writeListToFile(filename, code)
+                writeListToFile(str(filename), code)
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-        @it.should("get messages by path of a different source")
+        @it.should("get messages by path of a different source")  # type: ignore
         def test():
-            filename = p.join(TEST_PROJECT, 'basic_library',
-                              'clock_divider.vhd')
+            filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-            diagnostics = []
-            for diagnostic in it.project.getMessagesByPath(filename):
-                it.assertSameFile(filename, diagnostic.filename)
-                diagnostics += [diagnostic]
+            it.assertCountEqual(
+                it.project.getMessagesByPath(filename),
+                [
+                    ObjectIsNeverUsed(
+                        filename=filename,
+                        line_number=27,
+                        column_number=12,
+                        object_type="signal",
+                        object_name="clk_enable_unused",
+                    )
+                ],
+            )
 
-            it.assertEqual(
-                diagnostics,
-                [ObjectIsNeverUsed(
-                    filename=filename,
-                    line_number=27, column_number=12,
-                    object_type='signal', object_name='clk_enable_unused')])
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
-            it.assertMsgQueueIsEmpty(it.project)
-
-        @it.should("get messages from a source outside the project file")
+        @it.should(  # type: ignore
+            "get messages from a source outside the project file"
+        )
         def test():
-            filename = p.join(TEST_TEMP_PATH, 'some_file.vhd')
-            writeListToFile(filename, ['library some_lib;'])
+            filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
+            writeListToFile(str(filename), ["library some_lib;"])
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
@@ -740,16 +691,17 @@ with such.A("hdlcc project") as it:
             for diagnostic in diagnostics:
                 _logger.info(diagnostic)
 
-            it.assertIn(
-                PathNotInProjectFile(p.abspath(filename)),
-                diagnostics)
+            it.assertIn(PathNotInProjectFile(filename), diagnostics)
 
             # The builder should find other issues as well...
-            it.assertTrue(len(diagnostics) > 1,
-                          "It was expected that the builder added some "
-                          "message here indicating an error")
+            it.assertTrue(
+                len(diagnostics) > 1,
+                "It was expected that the builder added some "
+                "message here indicating an error",
+            )
 
-            it.assertMsgQueueIsEmpty(it.project)
+            if not ON_WINDOWS:
+                it.assertMsgQueueIsEmpty(it.project)
 
         def basicRebuildTest(test_filename, rebuilds):
             calls = []
@@ -759,29 +711,59 @@ with such.A("hdlcc project") as it:
             # - {unit_type: '', 'unit_name': }
             # - {library_name: '', 'unit_name': }
             # - {rebuild_path: ''}
-            def _buildAndParse(self, source, flags=None):
-                calls.append(str(source.filename))
+            def _buildAndParse(_, path, library, forced=False):
+                _logger.warning("%s, %s, %s", path, library, forced)
+                calls.append(str(path))
                 if ret_list:
                     return [], ret_list.pop()
                 return [], []
 
-            with mock.patch.object(hdlcc.tests.utils.MockBuilder,
-                                   '_buildAndParse', _buildAndParse):
+            with patch.object(MockBuilder, "_buildAndParse", _buildAndParse):
+                it.assertFalse(
+                    list(it.project._getBuilderMessages(Path(test_filename)))
+                )
 
-                it.assertEqual(it.project.getMessagesByPath(test_filename), [])
-
-            it.assertEqual(ret_list, [],
-                           'Some rebuilds were not used: {}'.format(ret_list))
-
+            it.assertFalse(ret_list, "Some rebuilds were not used: {}".format(ret_list))
 
             return calls
 
-        @it.should("rebuild sources when needed within the same library")
+        def _RebuildLibraryUnit(name, library):
+            return RebuildLibraryUnit(
+                name=Identifier(name), library=Identifier(library)
+            )
+
+        @it.should(  # type: ignore
+            "rebuild sources when needed within the same library"
+        )
         def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            it.project.database._clearLruCaches()
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [
-                [{'library_name': 'work', 'unit_name': 'clock_divider'}, ],
+                [_RebuildLibraryUnit(name="clock_divider", library="basic_library")]
             ]
+
+            logIterable("Design units", it.project.database.design_units, _logger.info)
+            calls = basicRebuildTest(filename, rebuilds)
+
+            # Calls should be
+            # - first to build the source we wanted
+            # - second to build the file we said needed to be rebuilt
+            # - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                ],
+            )
+
+        @it.should(  # type: ignore
+            "rebuild sources when changing a package on different libraries"
+        )
+        def test():
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+            rebuilds = [[_RebuildLibraryUnit(library="another_library", name="foo")]]
 
             calls = basicRebuildTest(filename, rebuilds)
 
@@ -791,40 +773,55 @@ with such.A("hdlcc project") as it:
             # - third should build the original source after handling a rebuild
             it.assertEqual(
                 calls,
-                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+                [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                ],
+            )
 
-        @it.should("rebuild sources when changing a package on different libraries")
-        def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
-            rebuilds = [
-                [{'library_name': 'another_library', 'unit_name': 'foo'},],
-            ]
-
-            calls = basicRebuildTest(filename, rebuilds)
-
-            # Calls should be
-            # - first to build the source we wanted
-            # - second to build the file we said needed to be rebuilt
-            # - third should build the original source after handling a rebuild
-            it.assertEqual(
-                calls,
-                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+        def _RebuildPath(path):
+            return RebuildPath(Path(path))
 
         @it.should("rebuild sources with path as a hint")
         def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
-            some_abs_path = p.join(p.sep, 'some', 'absolute', 'path.vhd')
-            if onWindows():
-                some_abs_path = 'C:' + some_abs_path
+            abs_path = p.join(
+                TEST_PROJECT, "basic_library", "package_with_constants.vhd"
+            )
 
-            rebuilds = [
-                [{'rebuild_path': some_abs_path,}],
-            ]
+            # Force relative path as well
+            rel_path = p.relpath(abs_path, str(it.project.root_dir))
+
+            it.assertFalse(p.isabs(rel_path))
+
+            rebuilds = [[_RebuildPath(rel_path)]]
+
+            calls = basicRebuildTest(filename, rebuilds)
+
+            #  Calls should be
+            #  - first to build the source we wanted
+            #  - second to build the file we said needed to be rebuilt
+            #  - third should build the original source after handling a rebuild
+            it.assertEqual(
+                calls,
+                [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    abs_path,
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                ],
+            )
+
+        def _RebuildUnit(name, type_):
+            return RebuildUnit(name=Identifier(name), type_=Identifier(type_))
+
+        @it.should("rebuild package if needed")  # type: ignore
+        def test():
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+
+            # - {unit_type: '', 'unit_name': }
+            rebuilds = [[_RebuildUnit(name="very_common_pkg", type_="package")]]
 
             calls = basicRebuildTest(filename, rebuilds)
 
@@ -834,17 +831,28 @@ with such.A("hdlcc project") as it:
             # - third should build the original source after handling a rebuild
             it.assertEqual(
                 calls,
-                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 some_abs_path,
-                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+                [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                ],
+            )
 
-        @it.should("rebuild package if needed")
+        @it.should("rebuild a combination of all")  # type: ignore
         def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
             rebuilds = [
-                [{'unit_type': 'package', 'unit_name': 'very_common_pkg'}, ],
+                [
+                    _RebuildUnit(name="very_common_pkg", type_="package"),
+                    _RebuildPath(
+                        p.join(
+                            TEST_PROJECT, "basic_library", "package_with_constants.vhd"
+                        )
+                    ),
+                    _RebuildLibraryUnit(name="foo", library="another_library"),
+                ]
             ]
 
             calls = basicRebuildTest(filename, rebuilds)
@@ -855,20 +863,23 @@ with such.A("hdlcc project") as it:
             # - third should build the original source after handling a rebuild
             it.assertEqual(
                 calls,
-                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+                [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "package_with_constants.vhd"),
+                    p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                ],
+            )
 
-        @it.should("rebuild a combination of all")
+        @it.should("give up trying to rebuild after 20 attempts")  # type: ignore
         def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
-            rebuilds = [
-                [{'unit_type': 'package', 'unit_name': 'very_common_pkg'},
-                 {'rebuild_path': p.join(TEST_PROJECT, 'basic_library',
-                                         'package_with_constants.vhd')},
-                 {'library_name': 'another_library', 'unit_name': 'foo'}, ],
+            rebuilds = 20 * [
+                [_RebuildLibraryUnit(name="foo", library="another_library")],
+                [],
             ]
 
             calls = basicRebuildTest(filename, rebuilds)
@@ -879,38 +890,23 @@ with such.A("hdlcc project") as it:
             # - third should build the original source after handling a rebuild
             it.assertEqual(
                 calls,
-                [p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
-                 p.join(TEST_PROJECT, 'another_library', 'foo.vhd'),
-                 p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')])
+                20
+                * [
+                    p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"),
+                    p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+                ],
+            )
 
-        @it.should("give up trying to rebuild after 20 attempts")
-        def test():
-            filename = p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd')
+            # Not sure why this is needed, might be hiding something weird
+            time.sleep(0.1)
 
-            # - {unit_type: '', 'unit_name': }
-            rebuilds = 20*[
-                 [ {'library_name': 'another_library', 'unit_name': 'foo'}, ],
-                 [],
-            ]
+            ui_msgs = list(it.project.getUiMessages())
+            logIterable("UI messages", ui_msgs, _logger.info)
 
-            calls = basicRebuildTest(filename, rebuilds)
-
-            # Calls should be
-            # - first to build the source we wanted
-            # - second to build the file we said needed to be rebuilt
-            # - third should build the original source after handling a rebuild
-            it.assertEqual(
-                calls,
-                20*[p.join(TEST_PROJECT, 'basic_library', 'clk_en_generator.vhd'),
-                    p.join(TEST_PROJECT, 'another_library', 'foo.vhd')])
-
-            it.assertEqual(
-                list(it.project.getUiMessages()),
-                [('error',
-                  'Unable to build \'{}\' after 20 attempts'.format(filename))])
-
+            it.assertIn(
+                ("error", "Unable to build '{}' after 20 attempts".format(filename)),
+                ui_msgs,
+            )
 
 
 it.createTests(globals())

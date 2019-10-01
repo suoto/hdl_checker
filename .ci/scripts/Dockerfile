@@ -23,7 +23,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
 RUN apt-get update -qq
-RUN apt-get install -qq python2 python3 python3-pip wget git
+RUN apt-get install -qq python2 python3.7 python3.8 python3-pip wget git
 RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6 libtinfo5
 
 RUN pip3 install tox

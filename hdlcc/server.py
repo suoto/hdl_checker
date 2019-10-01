@@ -25,19 +25,21 @@ import os
 import sys
 from threading import Timer
 
-from pyls.python_ls import start_io_lang_server
+from pyls.python_ls import start_io_lang_server  # type: ignore
 
-import hdlcc
-import hdlcc.lsp
-from hdlcc import handlers
-from hdlcc.utils import (getTemporaryFilename, isProcessRunning, setupLogging,
-                         terminateProcess)
+from hdlcc import __version__ as version
+from hdlcc import handlers, lsp
+from hdlcc.utils import (
+    getTemporaryFilename,
+    isProcessRunning,
+    setupLogging,
+    terminateProcess,
+)
 
 _logger = logging.getLogger(__name__)
 PY2 = sys.version_info[0] == 2
 
-_LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage",
-                           "jsonrpc": "2.0"}
+_LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage", "jsonrpc": "2.0"}
 
 
 def parseArguments():
@@ -46,53 +48,76 @@ def parseArguments():
     parser = argparse.ArgumentParser()
 
     # Options
-    parser.add_argument('--host', action='store',
-                        help='[HTTP] Host to serve')
-    parser.add_argument('--port', action='store', type=int,
-                        help='[HTTP] Port to serve')
-    parser.add_argument('--lsp', action='store_true', default=False,
-                        help='Starts the server in LSP mode. Defaults to false')
+    parser.add_argument("--host", action="store", help="[HTTP] Host to serve")
+    parser.add_argument("--port", action="store", type=int, help="[HTTP] Port to serve")
+    parser.add_argument(
+        "--lsp",
+        action="store_true",
+        default=False,
+        help="Starts the server in LSP mode. Defaults to false",
+    )
 
-    parser.add_argument('--attach-to-pid', action='store', type=int,
-                        help='[HTTP, LSP] Stops the server if given PID is not active')
-    parser.add_argument('--log-level', action='store',
-                        help='[HTTP, LSP] Logging level')
-    parser.add_argument('--log-stream', action='store',
-                        help='[HTTP, LSP] Log file, defaults to stdout when in HTTP or a temporary file named hdlcc_log_pid<PID>.log when in LSP mode')
-    parser.add_argument('--nocolor', action='store_true', default=False,
-                        help='[HTTP, LSP] Enables colored logging (defaults to false)')
+    parser.add_argument(
+        "--attach-to-pid",
+        action="store",
+        type=int,
+        help="[HTTP, LSP] Stops the server if given PID is not active",
+    )
+    parser.add_argument("--log-level", action="store", help="[HTTP, LSP] Logging level")
+    parser.add_argument(
+        "--log-stream",
+        action="store",
+        help="[HTTP, LSP] Log file, defaults to stdout when in HTTP or a "
+        "temporary file named hdlcc_log_pid<PID>.log when in LSP mode",
+    )
+    parser.add_argument(
+        "--nocolor",
+        action="store_true",
+        default=False,
+        help="[HTTP, LSP] Enables colored logging (defaults to false)",
+    )
 
-    parser.add_argument('--stdout', action='store',
-                        help='[HTTP] File to redirect stdout to. Defaults to a temporary file named hdlcc_stdout_pid<PID>.log')
-    parser.add_argument('--stderr', action='store',
-                        help='[HTTP] File to redirect stdout to. Defaults to a temporary file named hdlcc_stderr_pid<PID>.log')
+    parser.add_argument(
+        "--stdout",
+        action="store",
+        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
+        "named hdlcc_stdout_pid<PID>.log",
+    )
+    parser.add_argument(
+        "--stderr",
+        action="store",
+        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
+        "named hdlcc_stderr_pid<PID>.log",
+    )
 
-    parser.add_argument('--version', '-V', action='store_true',
-                        help='Prints hdlcc version and exit')
+    parser.add_argument(
+        "--version", "-V", action="store_true", help="Prints hdlcc version and exit"
+    )
 
     try:
-        import argcomplete
+        import argcomplete  # type: ignore
+
         argcomplete.autocomplete(parser)
-    except ImportError: # pragma: no cover
+    except ImportError:  # pragma: no cover
         pass
 
     args = parser.parse_args()
 
     if args.version:
-        print(hdlcc.__version__)
+        print(version)
         sys.exit(0)
 
     if args.lsp:
         args.host = None
         args.port = None
     else:
-        args.host = args.host or 'localhost'
+        args.host = args.host or "localhost"
         args.port = args.port or 50000
         args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
-    args.log_stream = args.log_stream or getTemporaryFilename('log')
-    args.stderr = args.stderr or getTemporaryFilename('stderr')
+    args.log_stream = args.log_stream or getTemporaryFilename("log")
+    args.stderr = args.stderr or getTemporaryFilename("stderr")
 
     args.log_level = args.log_level or logging.INFO
     args.color = not args.nocolor
@@ -100,6 +125,7 @@ def parseArguments():
     del args.nocolor
 
     return args
+
 
 # Copied from ycmd!
 def openForStdHandle(filepath):
@@ -116,15 +142,17 @@ def openForStdHandle(filepath):
     # to be delayed. This means no buffering for binary mode and line buffering
     # for text mode. See https://docs.python.org/2/library/io.html#io.open
     if PY2:
-        return open(filepath, mode='wb', buffering=0)
-    return open(filepath, mode='w', buffering=1)
+        return open(filepath, mode="wb", buffering=0)
+    return open(filepath, mode="w", buffering=1)
 
-def _setupPipeRedirection(stdout, stderr): # pragma: no cover
+
+def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
     "Redirect stdout and stderr to files"
     if stdout is not None:
         sys.stdout = openForStdHandle(stdout)
     if stderr is not None:
         sys.stderr = openForStdHandle(stderr)
+
 
 def _binaryStdio():
     """
@@ -144,13 +172,15 @@ def _binaryStdio():
             # set sys.stdin to binary mode
             # pylint: disable=no-member,import-error
             import msvcrt
+
             msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
             msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
         stdin, stdout = sys.stdin, sys.stdout
 
     return stdin, stdout
 
-def run(args): # pylint: disable=missing-docstring
+
+def run(args):  # pylint: disable=missing-docstring
     try:
         # LSP will use stdio to communicate
         _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
@@ -162,11 +192,11 @@ def run(args): # pylint: disable=missing-docstring
             if args.stderr:
                 msg += ["Check %s for more info" % args.stderr]
             else:
-                msg += ["Use --stderr to redirect the output to a file for "
-                        "more info"]
-            _reportException(' '.join(msg))
+                msg += ["Use --stderr to redirect the output to a file for more info"]
+            _reportException(" ".join(msg))
         _logger.exception("Failed to start server")
         raise
+
 
 def startServer(args):
     """
@@ -175,10 +205,11 @@ def startServer(args):
     if args.log_stream:
         setupLogging(args.log_stream, args.log_level, args.color)
 
-    _logger = logging.getLogger(__name__)
+    globals()["_logger"] = logging.getLogger(__name__)
 
     def _attachPids(source_pid, target_pid):
         "Monitors if source_pid is alive. If not, terminate target_pid"
+
         def _watchPidWrapper():
             "PID attachment monitor"
             try:
@@ -190,28 +221,28 @@ def startServer(args):
             except (TypeError, AttributeError):  # pragma: no cover
                 return
 
-        _logger.debug("Setting up PID attachment from %s to %s", source_pid,
-                      target_pid)
+        _logger.debug("Setting up PID attachment from %s to %s", source_pid, target_pid)
 
         Timer(2, _watchPidWrapper).start()
 
     _logger.info(
         "Starting server. Our PID is %s, %s. Version string for hdlcc is '%s'",
         os.getpid(),
-        "no parent PID to attach to" if args.attach_to_pid is None else \
-        "our parent is %s" % args.attach_to_pid,
-        hdlcc.__version__)
+        "no parent PID to attach to"
+        if args.attach_to_pid is None
+        else "our parent is %s" % args.attach_to_pid,
+        version,
+    )
 
     if args.lsp:
         stdin, stdout = _binaryStdio()
-        start_io_lang_server(stdin, stdout, True,
-                             hdlcc.lsp.HdlccLanguageServer)
+        start_io_lang_server(stdin, stdout, True, lsp.HdlccLanguageServer)
     else:
         if args.attach_to_pid is not None:
             _attachPids(args.attach_to_pid, os.getpid())
 
-        handlers.app.run(host=args.host, port=args.port, threads=10,
-                         server='waitress')
+        handlers.app.run(host=args.host, port=args.port, threads=10, server="waitress")
+
 
 # This is a redefinition to be used as last resort if failed to setup
 # the server
@@ -228,22 +259,26 @@ def _reportException(text):
     _logger.warning("Reporting exception with text %s", text)
 
     import json
+
     message = _LSP_ERROR_MSG_TEMPLATE.copy()
-    message['params'] = {'message': text,
-                         'type': MessageType.Error}
+    message["params"] = {"message": text, "type": MessageType.Error}
 
     body = json.dumps(message)
 
     # Ensure we get the byte length, not the character length
-    content_length = len(body) if isinstance(body, bytes) else len(body.encode('utf-8'))
-    response = ("Content-Length: {}\r\n"
-                "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-                "{}".format(content_length, body))
+    content_length = len(body) if isinstance(body, bytes) else len(body.encode("utf-8"))
+    response = (
+        "Content-Length: {}\r\n"
+        "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
+        "{}".format(content_length, body)
+    )
 
     sys.stdout.write(response)
+
 
 def main():
     return run(parseArguments())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

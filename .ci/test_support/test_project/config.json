@@ -1,0 +1,12 @@
+{
+    "sources": [
+        "another_library/foo.vhd",
+        "basic_library/clk_en_generator.vhd",
+        "basic_library/clock_divider.vhd",
+        "basic_library/package_with_constants.vhd",
+        "basic_library/package_with_functions.vhd",
+        "basic_library/very_common_pkg.vhd",
+        "verilog/parity.sv",
+        "verilog/parity.v"
+    ]
+}

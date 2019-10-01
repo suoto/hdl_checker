@@ -16,6 +16,8 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Common stuff"
 
+import abc
+import functools
 import logging
 import os
 import os.path as p
@@ -23,28 +25,33 @@ import shutil
 import signal
 import subprocess as subp
 import sys
+from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Lock
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
 
-PY2 = sys.version_info[0] == 2
+import six
+
+from hdlcc.path import Path
 
 _logger = logging.getLogger(__name__)
 
-def setupLogging(stream, level, color=True): # pragma: no cover
+ON_WINDOWS = os.name == "nt"
+ON_LINUX = sys.platform == "linux"
+ON_MAC = sys.platform == "darwin"
+
+
+def setupLogging(stream, level, color=True):  # pragma: no cover
     "Setup logging according to the command line parameters"
 
-    # Copied from six source
-    if sys.version_info[0] == 3:
-        string_types = (str,)
-    else:
-        string_types = (basestring,) # pylint: disable=undefined-variable
+    if isinstance(stream, six.string_types):
 
-    if isinstance(stream, string_types):
         class Stream(object):  # pylint: disable=useless-object-inheritance
             """
             File subclass that allows RainbowLoggingHandler to write
             with colors
             """
+
             _lock = Lock()
             _color = color
 
@@ -64,61 +71,59 @@ def setupLogging(stream, level, color=True): # pragma: no cover
                 with self._lock:
                     self._fd.write(toBytes(text))
 
-        _stream = Stream(stream, 'ab', buffering=0)
+        _stream = Stream(stream, "ab", buffering=0)
     else:
         _stream = stream
 
     try:
         # This is mostly for debugging when doing stuff directly from a
         # terminal
-        from rainbow_logging_handler import RainbowLoggingHandler # type: ignore
-        handler = RainbowLoggingHandler(
-            _stream,
-            #  Customizing each column's color
-            # pylint: disable=bad-whitespace
-            color_asctime          = ('dim white',  'black'),
-            color_name             = ('dim white',  'black'),
-            color_funcName         = ('green',      'black'),
-            color_lineno           = ('dim white',  'black'),
-            color_pathname         = ('black',      'red'),
-            color_module           = ('yellow',     None),
-            color_message_debug    = ('color_59',   None),
-            color_message_info     = (None,         None),
-            color_message_warning  = ('color_226',  None),
-            color_message_error    = ('red',        None),
-            color_message_critical = ('bold white', 'red'))
-            # pylint: enable=bad-whitespace
-    except ImportError: # pragma: no cover
+        from rainbow_logging_handler import RainbowLoggingHandler  # type: ignore
+
+        handler = RainbowLoggingHandler(_stream)
+    except ImportError:  # pragma: no cover
         handler = logging.StreamHandler(_stream)
         handler.formatter = logging.Formatter(
-            '%(levelname)-7s | %(asctime)s | ' +
-            '%(name)s @ %(funcName)s():%(lineno)d %(threadName)s ' +
-            '|\t%(message)s', datefmt='%H:%M:%S')
+            "%(levelname)-7s | %(asctime)s | "
+            + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
+            + "|\t%(message)s",
+            datefmt="%H:%M:%S",
+        )
 
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('pynvim').setLevel(logging.WARNING)
-    logging.getLogger('pyls_jsonrpc.endpoint').setLevel(logging.INFO)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("pynvim").setLevel(logging.WARNING)
+    logging.getLogger("pyls").setLevel(logging.INFO)
+    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
+    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.INFO)
+    logging.getLogger("pyls_jsonrpc.endpoint").setLevel(logging.INFO)
     logging.root.addHandler(handler)
     logging.root.setLevel(level)
+
 
 # From here: http://stackoverflow.com/a/8536476/1672783
 def terminateProcess(pid):
     "Terminate a process given its PID"
-    if onWindows():
+
+    if ON_WINDOWS:
         import ctypes
+
         process_terminate = 1
-        handle = ctypes.windll.kernel32.OpenProcess(
-            process_terminate, False, pid)
+        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)
         ctypes.windll.kernel32.TerminateProcess(handle, -1)
         ctypes.windll.kernel32.CloseHandle(handle)
     else:
         os.kill(pid, signal.SIGTERM)
 
+
 def isProcessRunning(pid):
     "Checks if a process is running given its PID"
-    if onWindows():
+
+    if ON_WINDOWS:
         return _isProcessRunningOnWindows(pid)
+
     return _isProcessRunningOnPosix(pid)
+
 
 def _isProcessRunningOnPosix(pid):
     "Checks if a given PID is runnning under POSIX OSs"
@@ -126,7 +131,9 @@ def _isProcessRunningOnPosix(pid):
         os.kill(pid, 0)
     except OSError:
         return False
+
     return True
+
 
 def _isProcessRunningOnWindows(pid):
     """
@@ -154,58 +161,31 @@ def _isProcessRunningOnWindows(pid):
     cb_needed = c_ulong()
 
     # Call Enumprocesses to get hold of process id's
-    psapi.EnumProcesses(byref(list_of_pids),
-                        cb,
-                        byref(cb_needed))
+    psapi.EnumProcesses(byref(list_of_pids), cb, byref(cb_needed))
 
     # Number of processes returned
-    number_of_pids = int(cb_needed.value/sizeof(c_ulong()))
+    number_of_pids = int(cb_needed.value / sizeof(c_ulong()))
 
     pid_list = [i for i in list_of_pids][:number_of_pids]
+
     return int(pid) in pid_list
 
 
-def onWindows():  # pragma: no cover # pylint: disable=missing-docstring
-    return os.name == 'nt'
+if not hasattr(p, "samefile"):
 
-
-def onMac():      # pragma: no cover # pylint: disable=missing-docstring
-    return sys.platform == 'darwin'
-
-
-class UnknownTypeExtension(Exception):
-    """
-    Exception thrown when trying to get the file type of an unknown extension.
-    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
-    """
-    def __init__(self, path):
-        super(UnknownTypeExtension, self).__init__()
-        self._path = path
-
-    def __str__(self):
-        return "Couldn't determine file type for path '%s'" % self._path
-
-
-def getFileType(filename):
-    "Gets the file type of a source file"
-    extension = filename[str(filename).rfind('.') + 1:].lower()
-    if extension in ('vhd', 'vhdl'):
-        return 'vhdl'
-    if extension in ('v', 'vh'):
-        return 'verilog'
-    if extension in ('sv', 'svh'):  # pragma: no cover
-        return 'systemverilog'
-    raise UnknownTypeExtension(filename)
-
-if not hasattr(p, 'samefile'):
-    def samefile(file1, file2):
+    def _samefile(file1, file2):
         """
         Emulated version of os.path.samefile. This is needed for Python
         2.7 running on Windows (at least on Appveyor CI)
         """
+
         return os.stat(file1) == os.stat(file2)
+
+
 else:
-    samefile = p.samefile # pylint: disable=invalid-name
+    _samefile = p.samefile  # pylint: disable=invalid-name
+
+samefile = _samefile  # pylint: disable=invalid-name
 
 
 def removeDuplicates(seq):
@@ -214,7 +194,9 @@ def removeDuplicates(seq):
     """
     seen = set()
     seen_add = seen.add
+
     return [x for x in seq if not (x in seen or seen_add(x))]
+
 
 # Copied from ycmd
 def toBytes(value):  # pragma: no cover
@@ -223,6 +205,7 @@ def toBytes(value):  # pragma: no cover
     Assumes incoming strings are either UTF-8 or unicode (which is
     converted to UTF-8).
     """
+
     if not value:
         return bytes()
 
@@ -233,12 +216,14 @@ def toBytes(value):  # pragma: no cover
     # But they don't behave the same in one important aspect: iterating over a
     # bytes instance yields ints, while iterating over a (raw, py2) str yields
     # chars. We want consistent behavior so we force the use of bytes().
+
     if isinstance(value, bytes):
         return value
 
     # This is meant to catch Python 2's native str type.
+
     if isinstance(value, bytes):
-        return bytes(value, encoding='utf8')
+        return bytes(value, encoding="utf8")
 
     if isinstance(value, str):
         # On py2, with `from builtins import *` imported, the following is true:
@@ -250,78 +235,183 @@ def toBytes(value):  # pragma: no cover
         # We can't just return value.encode('utf8') on both py2 & py3 because on
         # py2 that *sometimes* returns the built-in str type instead of the newbytes
         # type from python-future.
-        if PY2:
-            return bytes(value.encode('utf8'), encoding='utf8')
-        return bytes(value, encoding='utf8')
+
+        if six.PY2:
+            return bytes(value.encode("utf8"), encoding="utf8")
+
+        return bytes(value, encoding="utf8")
 
     # This is meant to catch `int` and similar non-string/bytes types.
+
     return toBytes(str(value))
+
 
 def getTemporaryFilename(name):
     """
     Gets a temporary filename following the format 'hdlcc_pid<>.log' on Linux
     and 'hdlcc_pid<>_<unique>.log' on Windows
     """
-    basename = 'hdlcc_' + name + '_pid{}'.format(os.getpid())
+    basename = "hdlcc_" + name + "_pid{}".format(os.getpid())
 
-    if onWindows():
-        return NamedTemporaryFile(prefix=basename + '_', suffix='.log',
-                                  delete=False).name
+    if ON_WINDOWS:
+        return NamedTemporaryFile(
+            prefix=basename + "_", suffix=".log", delete=False
+        ).name
 
-    return p.join(p.sep, 'tmp', basename + '.log')
+    return p.join(p.sep, "tmp", basename + ".log")
+
 
 def isFileReadable(path):
+    # type: (Path) -> bool
     """
     Checks if a given file is readable
     """
     try:
-        open(path, 'r').close()
+        open(str(path), "r").close()
+
         return True
     except IOError:
         return False
 
-def getCachePath():
-    """
-    Get the base path of a folder used to cache data. MacOS is treated as Unix
-    """
-    if onWindows():
-        return p.join(os.environ['LOCALAPPDATA'], 'Caches', 'hdlcc')
-    return p.join(os.environ['HOME'], '.cache', 'hdlcc')
 
 def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
+    # type: (Union[Tuple[str], List[str]], bool, Optional[Dict], Optional[str]) -> Iterable[str]
     """
     Runs a shell command and handles stdout catching
     """
-    if env is not None: # pragma: no cover
-        subp_env = env
-    else:
-        subp_env = os.environ
-
     _logger.debug(" ".join(cmd_with_args))
 
     try:
         stdout = list(
-            subp.check_output(cmd_with_args, stderr=subp.STDOUT,
-                              shell=shell, env=subp_env, cwd=cwd).splitlines())
+            subp.check_output(
+                cmd_with_args,
+                stderr=subp.STDOUT,
+                shell=shell,
+                env=env or os.environ,
+                cwd=cwd,
+            ).splitlines()
+        )
     except subp.CalledProcessError as exc:
         stdout = list(exc.output.splitlines())
-        _logger.debug("Command '%s' failed with error code %d.\nStdout:\n%s",
-                      cmd_with_args, exc.returncode,
-                      '\n'.join([x.decode() for x in stdout]))
+        _logger.debug(
+            "Command '%s' failed with error code %d.\nStdout:\n%s",
+            cmd_with_args,
+            exc.returncode,
+            "\n".join([x.decode() for x in stdout]),
+        )
     except OSError as exc:
         _logger.debug("Command '%s' failed with %s", cmd_with_args, exc)
         raise
 
     return [x.decode() for x in stdout]
 
+
 def removeIfExists(filename):
+    # type: (str) -> bool
+    "Removes filename using os.remove and catches the exception if that fails"
     try:
         os.remove(filename)
+        _logger.debug("Removed %s", filename)
+        return True
     except OSError:
-        pass
+        _logger.debug("Failed to remove %s", filename)
+        return False
+
 
 def removeDirIfExists(dirname):
+    # type: (str) -> bool
+    """
+    Removes the directory dirname using shutil.rmtree and catches the exception
+    if that fails
+    """
     try:
         shutil.rmtree(dirname)
+        _logger.debug("Removed %s", dirname)
+        return True
     except OSError:
-        pass
+        _logger.debug("Failed to remove %s", dirname)
+        return False
+
+
+class HashableByKey(object):  # pylint: disable=useless-object-inheritance
+    """
+    Implements hash and comparison operators properly across Python 2 and 3
+    """
+
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractproperty
+    def __hash_key__(self):
+        """ Implement this attribute to use it for hashing and comparing"""
+
+    def __hash__(self):
+        #  return hash(self.__hash_key__)
+        try:
+            return hash(self.__hash_key__)
+        except:
+            print("Couldn't hash %s" % repr(self.__hash_key__))
+            raise
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+
+        if isinstance(other, self.__class__):
+            return self.__hash_key__ == other.__hash_key__
+
+        return NotImplemented  # pragma: no cover
+
+    def __ne__(self, other):  # pragma: no cover
+        """Overrides the default implementation (unnecessary in Python 3)"""
+        result = self.__eq__(other)
+
+        if result is not NotImplemented:
+            return not result
+
+        return NotImplemented
+
+
+def logCalls(func):  # pragma: no cover
+    # type: (Callable) -> Callable
+    "Decorator to Log calls to func"
+    import pprint
+
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # type: (...) -> Callable
+        _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
+        try:
+            result = func(self, *args, **kwargs)
+            _logger.info("%s => %s", _str, repr(result))
+
+            return result
+        except:
+            _logger.exception("Failed to run %s", _str)
+            raise
+
+    return wrapper
+
+
+T = TypeVar("T")  # pylint: disable=invalid-name
+
+
+def getMostCommonItem(items):
+    # type: (Iterable[T]) -> T
+    """
+    Gets the most common item on an interable of items
+    """
+    data = Counter(items)
+    return max(items, key=data.get)
+
+
+if six.PY2:
+
+    def readFile(path):
+        "Wrapper around open().read() that return \n for new lines"
+        return open(path, mode="rU").read()
+
+
+else:
+
+    def readFile(path):
+        "Wrapper around open().read() that return \n for new lines"
+        return open(path, mode="r", newline="\n").read()

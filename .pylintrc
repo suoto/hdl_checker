@@ -55,7 +55,7 @@ extension-pkg-whitelist=
 # --disable=W"
 # FIXME: How to control message IDs for different pylint versions???
 # disable=C0326,C0103,C0111,c0303,c0325,w0142
-# disable=bad-continuation
+disable=bad-continuation
 
 
 

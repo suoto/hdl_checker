@@ -19,16 +19,19 @@
 import abc
 import logging
 import os.path as p
-import re
-import time
-from contextlib import contextmanager
-from tempfile import NamedTemporaryFile
+from typing import Any, Dict, Optional, Set
 
-from hdlcc.utils import getFileType, removeDuplicates, toBytes
+from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
+from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
+
+from hdlcc.path import Path
+from hdlcc.types import FileType
+from hdlcc.utils import HashableByKey, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
-class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,useless-object-inheritance
+
+class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attributes
     """
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
@@ -43,158 +46,91 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         used by the language
         """
 
-    def __init__(self, filename, library='work', flags=None):
-        self.filename = p.abspath(p.normpath(filename))
-        self.library = library
-        self.flags = flags if flags is not None else []
-        self._cache = {}
+    def __init__(self, filename):
+        # type: (Path, ) -> None
+        assert isinstance(filename, Path), "Invalid type: {}".format(filename)
+        self.filename = filename
+        self._cache = {}  # type: Dict[str, Any]
         self._content = None
-        self._mtime = 0
-        self.filetype = getFileType(self.filename)
-        self._dependencies = None
-        self._design_units = None
+        self._mtime = 0  # type: Optional[float]
+        self.filetype = FileType.fromPath(self.filename)
+        self._dependencies = None  # type: Optional[Set[DependencySpec]]
+        self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
         self._libraries = None
-
-        self.shadow_filename = None
-
-    @property
-    def abspath(self):
-        "Returns the absolute path of the source file"
-        return p.abspath(self.filename)
 
     def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
-        del state['_content']
-        del state['shadow_filename']
-        if 'raw_content' in state['_cache']:
-            del state['_cache']['raw_content']
+        del state["_content"]
+        del state["_design_units"]
+        del state["_dependencies"]
         return state
 
     @classmethod
     def __jsonDecode__(cls, state):
         """
-        Returns an object of cls based on a given state"""
-
+        Returns an object of cls based on a given state
+        """
         obj = super(BaseSourceFile, cls).__new__(cls)
-        obj.filename = state['filename']
-        obj.library = state['library']
-        obj.flags = state['flags']
-        obj.shadow_filename = None
-        obj.filetype = state['filetype']
-        obj._cache = state['_cache']  # pylint: disable=protected-access
+        obj.filename = state["filename"]
+        obj.filetype = state["filetype"]
+        obj._cache = state["_cache"]  # pylint: disable=protected-access
         obj._content = None  # pylint: disable=protected-access
-        obj._mtime = state['_mtime']  # pylint: disable=protected-access
-        obj._dependencies = state['_dependencies']  # pylint: disable=protected-access
-        obj._design_units = state['_design_units']  # pylint: disable=protected-access
-        obj._libraries = state['_libraries']  # pylint: disable=protected-access
+        obj._mtime = state["_mtime"]  # pylint: disable=protected-access
+        obj._dependencies = None  # pylint: disable=protected-access
+        obj._design_units = None  # pylint: disable=protected-access
+        obj._libraries = state["_libraries"]  # pylint: disable=protected-access
 
         return obj
 
     def __repr__(self):
-        return ("{}(library='{}', design_units={}, dependencies={}, "
-                "filename={})".format(self.__class__.__name__, self.library,
-                                      self._design_units, self._dependencies,
-                                      self.filename))
+        return "{}(filename={}, design_units={}, dependencies={})".format(
+            self.__class__.__name__,
+            self.filename,
+            self._design_units,
+            self._dependencies,
+        )
 
     @property
-    def __eq_key__(self):
-        return self.library, self.filename, self._content
-
-    def __hash__(self):
-        return hash((self.filename, self.library))
-
-    def __eq__(self, other):
-        """Overrides the default implementation"""
-        if isinstance(other, BaseSourceFile):
-            return self.__eq_key__ == other.__eq_key__
-        return NotImplemented
-
-    def __ne__(self, other):
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-        if result is not NotImplemented:
-            return not result
-        return NotImplemented
-
-
-    def __str__(self):
-        return "[%s] %s" % (self.library, self.filename)
+    def __hash_key__(self):
+        return (self.filename, self._content)
 
     def _changed(self):
+        # type: (...) -> Any
         """
         Checks if the file changed based on the modification time
         provided by p.getmtime
         """
-        if self.getmtime() > self._mtime:
-            return True
-        return False
+        if not p.exists(str(self.filename)):
+            return False
+        return bool(self.getmtime() > self._mtime)  # type: ignore
 
     def _clearCachesIfChanged(self):
+        # type: () -> None
         """
         Clears all the caches if the file has changed to force updating
         every parsed info
         """
         if self._changed():
-            # Since the content was set by the caller, we can't really clear
-            # this unless we're handling with a proper file
-            if not self.shadow_filename:
-                self._content = None
+            self._content = None
             self._dependencies = None
             self._design_units = None
             self._libraries = None
             self._cache = {}
 
     def getmtime(self):
+        # type: () -> Optional[float]
         """
         Gets file modification time as defined in p.getmtime
         """
-        if self.shadow_filename:
-            return 0
-        if not p.exists(self.filename):
+        if not p.exists(self.filename.name):
             return None
-        return p.getmtime(self.filename)
-
-    def _getTemporaryFile(self):
-        "Gets the temporary dump file context"
-        return NamedTemporaryFile(suffix='.' + self.filename.split('.')[-1],
-                                  prefix='temp_' + p.basename(self.filename))
-
-    @contextmanager
-    def havingBufferContent(self, content):
-        """
-        Context manager for handling a source file with a custom content
-        that is different from the file it points to. This is intended to
-        allow as-you-type checking
-        """
-        with self._getTemporaryFile() as tmp_file:
-            _logger.debug("Dumping content to %s", tmp_file.name)
-            # Save attributes that will be overwritten
-            mtime, prev_content = self._mtime, self._content
-
-            self.shadow_filename = self.filename
-
-            # Overwrite attributes
-            self.filename = tmp_file.name
-            self._content = content
-            self._mtime = time.time()
-            # Dump data to the temporary file
-            tmp_file.file.write(toBytes(self._content))
-            tmp_file.file.flush()
-
-            try:
-                yield
-            finally:
-                _logger.debug("Clearing buffer content")
-
-                # Restore previous values
-                self._mtime, self._content = mtime, prev_content
-                self.filename = self.shadow_filename
-                self.shadow_filename = None
+        return self.filename.mtime
 
     def getSourceContent(self):
+        # type: (...) -> Any
         """
         Cached version of the _getSourceContent method
         """
@@ -206,51 +142,43 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
 
         return self._content
 
-    def getRawSourceContent(self):
-        """
-        Gets the whole source content, without removing comments or
-        other preprocessing
-        """
-        self._clearCachesIfChanged()
-
-        if self.shadow_filename:
-            return self._content
-        if 'raw_content' not in self._cache or self._changed():
-            self._cache['raw_content'] = \
-                open(self.filename, mode='rb').read().decode(errors='ignore')
-
-        return self._cache['raw_content']
-
-    def getDesignUnits(self):
+    def getDesignUnits(self):  # type: () -> Set[tAnyDesignUnit]
         """
         Cached version of the _getDesignUnits method
         """
-        if not p.exists(self.filename):
-            return []
+        if not p.exists(self.filename.name):
+            return set()
         self._clearCachesIfChanged()
         if self._design_units is None:
-            self._design_units = self._getDesignUnits()
+            self._design_units = set(self._getDesignUnits())
 
         return self._design_units
 
     def getDependencies(self):
+        # type: () -> Set[DependencySpec]
         """
         Cached version of the _getDependencies method
         """
-        if not p.exists(self.filename):
-            return []
+        if not p.exists(self.filename.name):
+            return set()
 
         self._clearCachesIfChanged()
         if self._dependencies is None:
-            self._dependencies = self._getDependencies()
+            try:
+                self._dependencies = set(self._getDependencies())
+            except:  # pragma: no cover
+                print("Failed to parse %s" % self.filename)
+                _logger.exception("Failed to parse %s", self.filename)
+                raise
 
         return self._dependencies
 
     def getLibraries(self):
+        # type: (...) -> Any
         """
         Cached version of the _getLibraries method
         """
-        if not p.exists(self.filename):
+        if not p.exists(self.filename.name):
             return []
 
         self._clearCachesIfChanged()
@@ -258,25 +186,6 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
             self._libraries = removeDuplicates(self._getLibraries())
 
         return self._libraries
-
-    def getMatchingLibrary(self, unit_type, unit_name):
-        """
-        Cached version of the _getMatchingLibrary method
-        """
-        key = ','.join(['getMatchingLibrary', unit_name, unit_type])
-        self._clearCachesIfChanged()
-        if key not in self._cache:
-            self._cache[key] = self._getMatchingLibrary(
-                unit_type, unit_name)
-        return self._cache[key]
-
-    def getDesignUnitsDotted(self):
-        """
-        Returns the design units using the <library>.<design_unit>
-        representation
-        """
-        return {"%s.%s" % (self.library, x['name']) \
-                    for x in self.getDesignUnits()}
 
     @abc.abstractmethod
     def _getSourceContent(self):
@@ -307,12 +216,3 @@ class BaseSourceFile(object):  # pylint:disable=too-many-instance-attributes,use
         Parses the source and returns a list of dictionaries that
         describe its dependencies
         """
-
-    def _getMatchingLibrary(self, unit_type, unit_name):  # pylint: disable=inconsistent-return-statements
-        if unit_type == 'package':
-            match = re.search(r"use\s+(?P<library_name>\w+)\." + unit_name,
-                              self.getSourceContent(), flags=re.S)
-            if match.groupdict()['library_name'] == 'work':
-                return self.library
-            return match.groupdict()['library_name']
-        assert False, "%s, %s" % (unit_type, unit_name)

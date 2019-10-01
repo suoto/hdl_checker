@@ -16,14 +16,28 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base class that implements the base builder flow"
 
-import os
-import os.path as p
 import abc
 import logging
+import os
+import os.path as p
 from threading import Lock
+from typing import Any, Dict, FrozenSet, Iterable, Optional, Set, Tuple
 
+from hdlcc.database import Database  # pylint: disable=unused-import
+from hdlcc.diagnostics import CheckerDiagnostic, DiagType
 from hdlcc.exceptions import SanityCheckError
-from hdlcc.diagnostics import DiagType
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.path import Path
+from hdlcc.types import (
+    BuildFlags,
+    BuildFlagScope,
+    FileType,
+    RebuildInfo,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+)
+
 
 class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     """
@@ -34,87 +48,90 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     # Set an empty container for the default flags
     default_flags = {
-        'batch_build_flags' : {},
-        'single_build_flags' : {},
-        'global_build_flags' : {}} # type: dict
+        BuildFlagScope.dependencies: {},
+        BuildFlagScope.single: {},
+        BuildFlagScope.all: {},
+    }  # type: Dict[BuildFlagScope, Dict[FileType, BuildFlags]]
 
-    _external_libraries = {
-        'vhdl' : set(),
-        'verilog' : set()}  # type: dict
+    _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
-    _include_paths = {
-        'vhdl' : set(),
-        'verilog' : set()}  # type: dict
+    _include_paths = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
+        # type: (FileType, Identifier) -> None
         """
         Adds an external library so it may be referenced by the builder
         directly
         """
-        assert lang in cls._external_libraries, "Uknown language '%s'" & lang
+        assert lang in cls._external_libraries, "Uknown language '%s'" % lang.value
         cls._external_libraries[lang].add(library_name)
 
     @classmethod
     def addIncludePath(cls, lang, path):
+        # type: (FileType, str) -> None
         """
         Adds an include path to be used by the builder where applicable
         """
+        assert lang in cls._include_paths, "Uknown language '%s'" % lang.value
         cls._include_paths[lang].add(path)
 
     @abc.abstractproperty
     def builder_name(self):
+        # type: (...) -> Any
         """
         Defines the builder identification
         """
 
     @abc.abstractproperty
     def file_types(self):
+        # type: (...) -> Any
         """
         Returns the file types supported by the builder
         """
 
-    def __init__(self, target_folder):
+    def __init__(self, work_folder, database):
+        # type: (Path, Database) -> None
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__package__ + '.' + self.builder_name)
-        self._target_folder = p.abspath(p.expanduser(target_folder))
-        self._build_info_cache = {}
-        self._builtin_libraries = set()
-        self._added_libraries = set()
+        self._logger = logging.getLogger(__package__ + "." + self.builder_name)
+        self._database = database
+        self._work_folder = p.abspath(p.expanduser(work_folder.name))
+        self._build_info_cache = {}  # type: Dict[Path, Dict[str, Any]]
+        self._builtin_libraries = None  # type: Optional[Set[Identifier]]
+        self._added_libraries = set()  # type: Set[Identifier]
 
-        # Skip creating a folder for the fallback builder
-        if self.builder_name != 'fallback':
-            if not p.exists(self._target_folder):
-                self._logger.info("Target folder '%s' was created", self._target_folder)
-                os.makedirs(self._target_folder)
-            else:
-                self._logger.info("%s already exists", self._target_folder)
+        self.setup()
+
+    def setup(self):
+        # type: (...) -> Any
+        """
+        Creates directories and parses builtins libraries
+        """
+        # Fallback builder has no setup
+        if self.builder_name == "fallback":
+            return
+
+        if not p.exists(self._work_folder):
+            self._logger.debug("Target folder '%s' was created", self._work_folder)
+            os.makedirs(self._work_folder)
+        else:
+            self._logger.debug("%s already exists", self._work_folder)
 
         self.checkEnvironment()
 
-        try:
-            self._parseBuiltinLibraries()
-            if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                if self._builtin_libraries: # pragma: no cover
-                    self._logger.debug("Builtin libraries: %s",
-                                       ', '.join(self._builtin_libraries))
-                else: # pragma: no cover
-                    self._logger.info("No builtin libraries found")
-        except NotImplementedError:
-            pass
-
     @classmethod
     def __jsonDecode__(cls, state):
+        # type: (...) -> Any
         """
         Returns an object of cls based on a given state
         """
         # pylint: disable=protected-access
         obj = super(BaseBuilder, cls).__new__(cls)
-        obj._logger = logging.getLogger(state.pop('_logger'))
-        obj._builtin_libraries = set(state.pop('_builtin_libraries'))
-        obj._added_libraries = set(state.pop('_added_libraries'))
+        obj._logger = logging.getLogger(state.pop("_logger"))
+        obj._builtin_libraries = set(state.pop("_builtin_libraries"))
+        obj._added_libraries = set(state.pop("_added_libraries"))
 
         obj._lock = Lock()
         obj._build_info_cache = {}
@@ -124,19 +141,21 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         return obj
 
     def __jsonEncode__(self):
+        # type: (...) -> Any
         """
         Gets a dict that describes the current state of this object
         """
         state = self.__dict__.copy()
-        state['_logger'] = self._logger.name
-        state['_builtin_libraries'] = list(self._builtin_libraries)
-        state['_added_libraries'] = list(self._added_libraries)
-        del state['_build_info_cache']
-        del state['_lock']
+        state["_logger"] = self._logger.name
+        state["_builtin_libraries"] = list(self.builtin_libraries)
+        state["_added_libraries"] = list(self._added_libraries)
+        del state["_build_info_cache"]
+        del state["_lock"]
         return state
 
     @staticmethod
     def isAvailable():  # pragma: no cover
+        # type: (...) -> Any
         """
         Method that should be overriden by child classes and return True
         if the given builder is available on the current environment
@@ -144,6 +163,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         raise NotImplementedError
 
     def checkEnvironment(self):
+        # type: (...) -> Any
         """
         Sanity environment check for child classes. Any exception raised
         is translated to SanityCheckError exception.
@@ -168,62 +188,83 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         elements identifying its fields
         """
 
-    def _getRebuilds(self, source, line):
+    def _getRebuilds(self, path, line, library):
+        # type: (Path, str, Identifier) -> Set[RebuildInfo]
         """
         Gets info on what should be rebuilt to satisfy the builder
         """
         try:
             parse_results = self._searchForRebuilds(line)
         except NotImplementedError:  # pragma: no cover
-            return []
+            return set()
 
-        rebuilds = []
+        rebuilds = set()  # type: Set[RebuildInfo]
         for rebuild in parse_results:
-            unit_type = rebuild.get('unit_type', None)
-            library_name = rebuild.get('library_name', None)
-            unit_name = rebuild.get('unit_name', None)
-            rebuild_path = rebuild.get('rebuild_path', None)
+            unit_type = rebuild.get("unit_type", None)
+            library_name = rebuild.get("library_name", None)
+            unit_name = rebuild.get("unit_name", None)
+            rebuild_path = rebuild.get("rebuild_path", None)
 
-            rebuild_info = None
             if None not in (unit_type, unit_name):
-                for dependency in source.getDependencies():
-                    if dependency.name == rebuild['unit_name']:
-                        rebuild_info = {'unit_type' : unit_type,
-                                        'unit_name' : unit_name}
+                for dependency in self._database.getDependenciesByPath(path):
+                    if dependency.name.name == rebuild["unit_name"]:
+                        rebuilds.add(RebuildUnit(unit_name, unit_type))
                         break
             elif None not in (library_name, unit_name):
-                rebuild_info = {'library_name' : library_name,
-                                'unit_name' : unit_name}
+                if library_name == "work":
+                    library_name = library.name
+                rebuilds.add(RebuildLibraryUnit(unit_name, library_name))
             elif rebuild_path is not None:
                 # GHDL sometimes gives the full path of the file that
                 # should be recompiled
-                rebuild_info = {'rebuild_path' : rebuild_path}
+                rebuilds.add(RebuildPath(rebuild_path))
             else:  # pragma: no cover
-                self._logger.warning("Don't know what to do with %s",
-                                     rebuild)
-
-            if rebuild_info is not None and rebuild_info not in rebuilds:
-                rebuilds.append(rebuild_info)
+                self._logger.warning("Don't know what to do with %s", rebuild)
 
         return rebuilds
 
-    def _searchForRebuilds(self, line): # pragma: no cover
+    def _searchForRebuilds(self, line):  # pragma: no cover
+        # type: (...) -> Any
         """
         Finds units that the builders is telling us to rebuild
         """
         raise NotImplementedError
 
     def _parseBuiltinLibraries(self):
+        # type: (...) -> Iterable[Identifier]
         """
         Discovers libraries that exist regardless before we do anything
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def getBuiltinLibraries(self):
+    @property
+    def work_folder(self):
+        # type: (...) -> str
         """
-        Return a list with the libraries this compiler currently knows
+        Returns the path to the work folder this builder is using
         """
+        return self._work_folder
+
+    @property
+    def builtin_libraries(self):
+        # type: (...) -> FrozenSet[Identifier]
+        """
+        Return a list of precompiled libraries this builder is aware of
+        """
+        if self._builtin_libraries is None:
+            try:
+                self._builtin_libraries = set(self._parseBuiltinLibraries())
+                if self._logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                    if self._builtin_libraries:  # pragma: no cover
+                        self._logger.debug(
+                            "Builtin libraries: %s", tuple(self._builtin_libraries)
+                        )
+                    else:  # pragma: no cover
+                        self._logger.debug("No builtin libraries found")
+            except NotImplementedError:
+                self._builtin_libraries = set()
+
+        return frozenset(self._builtin_libraries)
 
     @abc.abstractmethod
     def _checkEnvironment(self):
@@ -235,46 +276,71 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     @abc.abstractmethod
     def _buildSource(self, path, library, flags=None):
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         """
         Callback called to actually build the source
         """
 
-    def _buildAndParse(self, source, flags=None):
+    def _getFlags(self, path, scope):
+        # type: (Path, BuildFlagScope) -> BuildFlags
+        """
+        Gets flags to build the path, both builder based and from the database.
+        If a build is forced, assume we're building a single file (not its
+        dependencies)
+        """
+        return tuple(self._database.getFlags(path, scope)) + tuple(
+            self.default_flags.get(scope, {}).get(FileType.fromPath(path), ())
+            + self.default_flags.get(BuildFlagScope.all, {}).get(
+                FileType.fromPath(path), ()
+            )
+        )
+
+    def _buildAndParse(
+        self, path, library, flags
+    ):  # type: (Path, Identifier, BuildFlags) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
         """
         Runs _buildSource method and parses the output to find message
         records and units that should be rebuilt
         """
-        for lib in source.getLibraries():
-            if lib not in self.getBuiltinLibraries():
-                self._createLibrary(lib)
+        if library is None:
+            library = self._database.getLibrary(path)  # or Identifier("work")
 
-        diagnostics = set()
-        rebuilds = []
+        self._createLibraryIfNeeded(library)
 
-        for line in self._buildSource(source.filename, source.library, flags):
+        for lib in (x.library for x in self._database.getDependenciesByPath(path)):
+            self._createLibraryIfNeeded(lib or Identifier("work"))
+
+        diagnostics = set()  # type: Set[CheckerDiagnostic]
+        rebuilds = set()  # type: Set[RebuildInfo]
+
+        for line in self._buildSource(path, library, flags=flags):
             if self._shouldIgnoreLine(line):
                 continue
 
-            # In case we're compiling a temporary dump, replace in the lines
-            # all references to the temp name with the original (shadow)
-            # filename
-            if source.shadow_filename:
-                line = line.replace(source.filename, source.shadow_filename)
-
-            diagnostics = diagnostics.union(set(self._makeRecords(line)))
-            rebuilds += [x for x in self._getRebuilds(source, line) if x not in
-                         rebuilds]
+            for _record in self._makeRecords(line):
+                try:
+                    diagnostics |= {_record}
+                except:
+                    self._logger.exception(
+                        " - %s hash: %s | %s",
+                        _record,
+                        _record.__hash__,
+                        type(_record).__mro__,
+                    )
+                    raise
+            rebuilds |= self._getRebuilds(path, line, library)
 
         # If no filename is set, assume it's for the current path
         for diag in diagnostics:
             if diag.filename is None:
-                diag.filename = source.filename
+                diag.filename = path
 
         self._logBuildResults(diagnostics, rebuilds)
 
         return diagnostics, rebuilds
 
-    def _logBuildResults(self, diagnostics, rebuilds): # pragma: no cover
+    def _logBuildResults(self, diagnostics, rebuilds):  # pragma: no cover
+        # type: (...) -> Any
         """
         Logs diagnostics and rebuilds only for debugging purposes
         """
@@ -291,70 +357,81 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             for rebuild in rebuilds:
                 self._logger.debug(rebuild)
 
+    def _createLibraryIfNeeded(self, library):
+        # type: (Identifier) -> None
+        """
+        Proxy for only creating libraries once and avoid overwriting builtin
+        libraries
+        """
+        if library in self._added_libraries:
+            return
+        if library in self.builtin_libraries:
+            return
+        self._added_libraries.add(library)
+        self._createLibrary(library)
+
     @abc.abstractmethod
     def _createLibrary(self, library):
+        # type: (...) -> Any
         """
         Callback called to create a library
         """
 
-    def _isFileTypeSupported(self, source):
+    def _isFileTypeSupported(self, path):
+        # type: (Path) -> bool
         """
         Checks if a given path is supported by this builder
         """
-        return source.filetype in self.file_types
+        return FileType.fromPath(path) in self.file_types
 
-    def build(self, source, forced=False, flags=None):
+    def build(self, path, library, scope, forced=False):
+        # type: (Path, Identifier, BuildFlagScope, bool) -> Tuple[Set[CheckerDiagnostic], Set[RebuildInfo]]
         """
         Method that interfaces with parents and implements the building
         chain
         """
 
-        if not self._isFileTypeSupported(source):
-            self._logger.fatal("Source '%s' with file type '%s' is not "
-                               "supported", source.filename,
-                               source.filetype)
-            return [], []
+        if not self._isFileTypeSupported(path):
+            self._logger.warning(
+                "Path '%s' with file type '%s' is not " "supported",
+                path,
+                FileType.fromPath(path),
+            )
+            return set(), set()
 
-        if source.abspath not in self._build_info_cache:
-            self._build_info_cache[source.abspath] = {
-                'compile_time' : 0,
-                'diagnostics' : [],
-                'rebuilds' : []}
+        if path not in self._build_info_cache:
+            self._build_info_cache[path] = {
+                "compile_time": 0.0,
+                "diagnostics": [],
+                "rebuilds": [],
+            }
 
-        cached_info = self._build_info_cache[source.abspath]
+        cached_info = self._build_info_cache[path]
 
         build = False
         if forced:
             build = True
-            self._logger.info("Forcing build of %s", str(source))
-        elif source.getmtime() > cached_info['compile_time']:
+            self._logger.info("Forcing build of %s", str(path))
+        elif path.mtime > cached_info["compile_time"]:
             build = True
-            self._logger.info("Building %s", str(source))
+            self._logger.info("Building %s", str(path))
 
         if build:
-            if flags is None:
-                flags = []
-            # Build a list of flags and pass it as tuple
-            build_flags = source.flags + flags
             with self._lock:
-                diagnostics, rebuilds = \
-                        self._buildAndParse(source, flags=tuple(build_flags))
+                diagnostics, rebuilds = self._buildAndParse(
+                    path, library, self._getFlags(path, scope)
+                )
 
-            for rebuild in rebuilds:
-                if 'library_name' in rebuild:
-                    if rebuild['library_name'] == 'work':
-                        rebuild['library_name'] = source.library
-
-            cached_info['diagnostics'] = diagnostics
-            cached_info['rebuilds'] = rebuilds
-            cached_info['compile_time'] = source.getmtime()
+            cached_info["diagnostics"] = diagnostics
+            cached_info["rebuilds"] = rebuilds
+            cached_info["compile_time"] = path.mtime
 
             if DiagType.ERROR in [x.severity for x in diagnostics]:
-                cached_info['compile_time'] = 0
+                cached_info["compile_time"] = 0
 
         else:
-            self._logger.debug("Nothing to do for %s", source)
-            diagnostics = cached_info['diagnostics']
-            rebuilds = cached_info['rebuilds']
+            self._logger.debug("Nothing to do for %s", path)
+            diagnostics = cached_info["diagnostics"]
+            rebuilds = cached_info["rebuilds"]
 
         return diagnostics, rebuilds

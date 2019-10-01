@@ -61,8 +61,10 @@ setuptools.setup(
                                      'prettytable>=0.7.2',
                                      'requests==2.20.0',
                                      'future>=0.14.0',
+                                     'enum34>=1.1.6; python_version<"3.3"',
                                      'futures; python_version<"3.2"',
                                      'python-language-server>=0.26.1,<=0.27.0',
+                                     'typing',
                                      'backports.functools_lru_cache; python_version<"3.2"',],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {

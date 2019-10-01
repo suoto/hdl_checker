@@ -16,18 +16,29 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "VHDL source file parser"
 
-import re
 import logging
+import re
+from typing import Any, Generator
+
+from .elements.design_unit import DesignUnitType, VerilogDesignUnit
+
 from hdlcc.parsers.base_parser import BaseSourceFile
+from hdlcc.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
 _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
 # Design unit scanner
-_DESIGN_UNIT_SCANNER = re.compile('|'.join([
-    r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
-    r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
-    ]), flags=re.S)
+_DESIGN_UNIT_SCANNER = re.compile(
+    "|".join(
+        [
+            r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
+            r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
+        ]
+    ),
+    flags=re.S,
+)
+
 
 class VerilogParser(BaseSourceFile):
     """
@@ -35,42 +46,45 @@ class VerilogParser(BaseSourceFile):
     source file
     """
 
-    _comment = re.compile(r'\/\*.*?\*\/|//[^(\r\n?|\n)]*', flags=re.DOTALL)
+    _comment = re.compile(r"\/\*.*?\*\/|//[^(\r\n?|\n)]*", flags=re.DOTALL)
 
     def _getSourceContent(self):
+        # type: (...) -> Any
         # Remove multiline comments
-        content = open(self.filename, mode='rb').read().decode(errors='ignore')
-        lines = self._comment.sub('', content)
-        return re.sub(r'\r\n?|\n', ' ', lines, flags=re.S)
+        content = readFile(str(self.filename))
+        lines = self._comment.sub("", content)
+        return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
+        # type: (...) -> Any
         """
         Iterates over the matches of _DESIGN_UNIT_SCANNER against
         source's lines
         """
+        content = self.getSourceContent()
         for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
-            yield match.groupdict()
+            start = match.start()
+            yield match.groupdict(), content[:start].count("\n")
 
     def _getDependencies(self):
         return []
 
-    def _getDesignUnits(self):
-        design_units = []
-
-        for match in self._iterDesignUnitMatches():
-            if match.get('module_name', None):
-                design_units += [{
-                    'name' : match['module_name'],
-                    'type' : 'entity'}]
-            elif match.get('package_name', None):
-                design_units += [{
-                    'name' : match['package_name'],
-                    'type' : 'package'}]
-            else:  # pragma: no cover
-                assert False
-
-        return design_units
+    def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
+        for match, line_number in self._iterDesignUnitMatches():
+            if match["module_name"] is not None:
+                yield VerilogDesignUnit(
+                    owner=self.filename,
+                    name=match["module_name"],
+                    type_=DesignUnitType.entity,
+                    locations={(line_number, None)},
+                )
+            if match["package_name"] is not None:
+                yield VerilogDesignUnit(
+                    owner=self.filename,
+                    name=match["package_name"],
+                    type_=DesignUnitType.package,
+                    locations={(line_number, None)},
+                )
 
     def _getLibraries(self):
-        return [self.library, ]
-
+        return set()

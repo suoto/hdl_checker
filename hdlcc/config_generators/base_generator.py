@@ -18,17 +18,19 @@
 
 import abc
 import logging
-import os.path as p
+from typing import Dict, Optional, Set, Tuple
 
-from hdlcc.utils import getFileType
+from hdlcc.builder_utils import AnyValidBuilder
+from hdlcc.path import Path
+from hdlcc.types import BuildFlags, BuildFlagScope, FileType
 
-_SOURCE_EXTENSIONS = 'vhdl', 'sv', 'v'
-_HEADER_EXTENSIONS = 'vh', 'svh'
+_SOURCE_EXTENSIONS = "vhdl", "sv", "v"
+_HEADER_EXTENSIONS = "vh", "svh"
 
-_DEFAULT_LIBRARY_NAME = {
-        'vhdl': 'lib',
-        'verilog': 'lib',
-        'systemverilog': 'lib'}
+_DEFAULT_LIBRARY_NAME = {"vhdl": "lib", "verilog": "lib", "systemverilog": "lib"}
+
+SourceSpec = Tuple[Path, BuildFlags, Optional[str]]
+
 
 class BaseGenerator:
     """
@@ -37,60 +39,46 @@ class BaseGenerator:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, builders):
+    def __init__(self):  # type: () -> None
         """
-        Arguments:
-            - builders: list of builder names that the server has reported as
-                        working
         """
-        self._builders = builders
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._sources = set()
-        self._include_paths = {'verilog': set(),
-                               'systemverilog': set()}
+        self._sources = set()  # type: Set[SourceSpec]
+        self._include_paths = {
+            FileType.verilog: set(),
+            FileType.systemverilog: set(),
+        }  # type: Dict[FileType, Set[str]]
 
-
-    def _addSource(self, path, flags, library=None):
+    def _addSource(self, path, flags=None, library=None):
+        # type: (Path, BuildFlags, Optional[str]) -> None
         """
         Add a source to project. 'flags' and 'library' are only used for
         regular sources and not for header files (files ending in .vh or .svh)
         """
-        self._logger.debug("Adding path %s (flags=%s, library=%s)",
-                           p.abspath(path), flags, library)
+        self._logger.debug(
+            "Adding path %s (flags=%s, library=%s)", path, flags, library
+        )
 
-        if p.basename(path).split('.')[-1].lower() in ('vh', 'svh'):
-            file_type = getFileType(path)
-            if file_type in ('verilog', 'systemverilog'):
-                self._include_paths[file_type].add(p.dirname(path))
+        if path.basename.split(".")[-1].lower() in ("vh", "svh"):
+            file_type = FileType.fromPath(path)
+            if file_type in (FileType.verilog, FileType.systemverilog):
+                self._include_paths[file_type].add(path.dirname)
         else:
-            self._sources.add((path, ' '.join([str(x) for x in flags]),
-                               library))
+            self._sources.add((path, flags or (), library))
 
     @abc.abstractmethod
-    def _populate(self):
+    def _populate(self):  # type: () -> None
         """
         Method that will be called for generating the project file contets and
         should be implemented by child classes
         """
 
-    @abc.abstractmethod
-    def _getPreferredBuilder(self):
+    def _getPreferredBuilder(self):  # type: () -> AnyValidBuilder
         """
         Method should be overridden by child classes to express the preferred
         builder
         """
-
-    def _formatIncludePaths(self, paths):
-        """
-        Format a list of paths to be used as flags by the builder. (Still needs
-        a bit of thought, ideally only the builder know how to do this)
-        """
-        builder = self._getPreferredBuilder()
-
-        if builder == 'msim':
-            return ' '.join(['+incdir+%s' % path for path in paths])
-
-        return ''
+        return NotImplemented
 
     def generate(self):
         """
@@ -100,37 +88,37 @@ class BaseGenerator:
 
         self._populate()
 
-        contents = ['# Files found: %s' % len(self._sources),
-                    '# Available builders: %s' % ', '.join(self._builders)]
+        project = {"sources": []}
 
         builder = self._getPreferredBuilder()
-        if builder in self._builders:
-            contents += ['builder = %s' % builder]
+        if builder is not NotImplemented:
+            project["builder"] = builder
 
         # Add include paths if they exists. Need to iterate sorted keys to
         # generate results always in the same order
-        for lang in sorted(self._include_paths.keys()):
-            paths = sorted(self._include_paths[lang])
-            include_paths = self._formatIncludePaths(paths)
-            if include_paths:
-                contents += ['global_build_flags[%s] = %s' % (lang, include_paths)]
-
-        if self._include_paths:
-            contents += ['']
-
-        # Add sources
-        sources = []
+        for lang in (FileType.verilog, FileType.systemverilog):
+            paths = self._include_paths[lang]
+            if paths:
+                if lang.value not in project:
+                    project[lang.value] = {}
+                project[lang.value]["include_paths"] = tuple(paths)
 
         for path, flags, library in self._sources:
-            file_type = getFileType(path)
-            sources.append((file_type, library, path, flags))
+            info = {}
+            if library:
+                info["library"] = library
+            if flags:
+                info["flags"] = flags
 
-        sources.sort(key=lambda x: x[2])
+            if info:
+                project["sources"].append(
+                    (str(path), {"library": library, "flags": tuple(flags)})
+                )
+            else:
+                project["sources"].append(str(path))
 
-        for file_type, library, path, flags in sources:
-            contents += ['{0} {1} {2}{3}'.format(file_type, library, path,
-                                                 ' %s' % flags if flags else '')]
+        from pprint import pformat
 
-        self._logger.info("Resulting file has %d lines", len(contents))
+        self._logger.info("Resulting project:\n%s", pformat(project))
 
-        return '\n'.join(contents)
+        return project

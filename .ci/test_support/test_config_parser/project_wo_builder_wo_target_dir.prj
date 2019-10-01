@@ -1,6 +1,0 @@
-vhdl work sample_file.vhd
-vhdl work sample_package.vhd
-vhdl work sample_testbench.vhd
-verilog work foo.v -some-flag some value
-systemverilog work bar.sv some sv flag
-

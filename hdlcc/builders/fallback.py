@@ -16,6 +16,7 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Fallback builder for cases where no builder is found"
 
+from hdlcc import types as t
 from hdlcc.builders.base_builder import BaseBuilder
 
 class Fallback(BaseBuilder):
@@ -23,11 +24,12 @@ class Fallback(BaseBuilder):
 
     # Implementation of abstract class properties
     builder_name = 'fallback'
-    file_types = ['vhdl', 'verilog', 'systemverilog']
+    file_types = {t.FileType.vhdl, t.FileType.verilog, t.FileType.systemverilog}
 
-    def __init__(self, target_folder):
+    def __init__(self, *args, **kwargs):
+        # type: (...) -> None
         self._version = '<undefined>'
-        super(Fallback, self).__init__(target_folder)
+        super(Fallback, self).__init__(*args, **kwargs)
 
     # Since Fallback._buildSource returns nothing,
     # Fallback._makeRecords is never called
@@ -49,6 +51,3 @@ class Fallback(BaseBuilder):
 
     def _createLibrary(self, library): # pragma: no cover
         pass
-
-    def getBuiltinLibraries(self): # pragma: no cover
-        return []

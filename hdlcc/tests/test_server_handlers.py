@@ -25,30 +25,43 @@ import os
 import os.path as p
 
 import six
-from nose2.tools import such
-from webtest import TestApp
+from webtest import TestApp  # type: ignore
+
+from nose2.tools import such  # type: ignore
+
+from hdlcc.tests import assertCountEqual, disableVunit, getTestTempPath, setupTestSuport
 
 import hdlcc
 import hdlcc.handlers as handlers
-from hdlcc.diagnostics import (CheckerDiagnostic, DiagType, ObjectIsNeverUsed,
-                               StaticCheckerDiag)
-from hdlcc.tests.utils import (assertCountEqual, disableVunit, getTestTempPath,
-                               setupTestSuport)
-from hdlcc.utils import removeIfExists
+from hdlcc.diagnostics import (
+    CheckerDiagnostic,
+    DiagType,
+    ObjectIsNeverUsed,
+    StaticCheckerDiag,
+)
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.path import Path
 
 try:  # Python 3.x
-    import unittest.mock as mock # pylint: disable=import-error, no-name-in-module
+    import unittest.mock as mock  # pylint: disable=import-error, no-name-in-module
 except ImportError:  # Python 2.x
-    import mock
+    import mock  # type: ignore
 
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, 'test_project'))
+TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, "test_project"))
 
-SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'INFO')
+SERVER_LOG_LEVEL = os.environ.get("SERVER_LOG_LEVEL", "INFO")
 
 _logger = logging.getLogger(__name__)
-HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), '..', '..'))
+HDLCC_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
+
+
+def _path(*args):
+    # type: (str) -> str
+    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
+    return p.join(TEST_TEMP_PATH, *args)
+
 
 with such.A("hdlcc bottle app") as it:
     # Workaround for Python 2.x and 3.x differences
@@ -59,224 +72,211 @@ with such.A("hdlcc bottle app") as it:
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
 
-        it.project_file = p.join(TEST_PROJECT, 'vimhdl.prj')
+        it.project_file = p.join(TEST_PROJECT, "vimhdl.prj")
         it.app = TestApp(handlers.app)
-
-    @it.has_teardown
-    def teardown():
-        build_folder = p.join(TEST_PROJECT, '.build')
-        it.assertFalse(p.exists(build_folder))
-
-        cache = p.join(TEST_PROJECT, '.hdlcc')
-        it.assertFalse(p.exists(cache))
-        it.assertFalse(p.exists('.xvhdl.init'))
-
-        removeIfExists('xvhdl.pb')
 
     @it.should("get diagnose info without any project")
     @disableVunit
     def test():
-        reply = it.app.post_json('/get_diagnose_info')
+        reply = it.app.post_json("/get_diagnose_info")
         it.assertCountEqual(
-            reply.json['info'],
-            [u'hdlcc version: %s' % hdlcc.__version__,
-             u'Server PID: %d' % os.getpid(),
-             u'Builder: none'])
+            reply.json["info"],
+            [
+                u"hdlcc version: %s" % hdlcc.__version__,
+                u"Server PID: %d" % os.getpid(),
+                u"Builder: none",
+            ],
+        )
 
-    @it.should("get diagnose info with an existing project file")
+    @it.should("get diagnose info with an existing project file")  # type: ignore
     @disableVunit
     def test():
+        reply = it.app.post("/get_diagnose_info", {"project_file": it.project_file})
+
+        _logger.info("Reply is %s", reply.json["info"])
+
+        it.assertCountEqual(
+            reply.json["info"],
+            [
+                u"hdlcc version: %s" % hdlcc.__version__,
+                u"Server PID: %d" % os.getpid(),
+                u"Builder: none",
+            ],
+        )
+
+    @it.should("get diagnose info with a non existing project file")  # type: ignore
+    @disableVunit
+    def test():
+        open(_path("foo_bar.prj"), "w").write("")
+
         reply = it.app.post(
-            '/get_diagnose_info',
-            {'project_file' : it.project_file})
+            "/get_diagnose_info", {"project_file": _path("foo_bar.prj")}
+        )
 
-        _logger.info("Reply is %s", reply.json['info'])
-
+        _logger.info("Reply is %s", reply.json["info"])
         it.assertCountEqual(
-            reply.json['info'],
-            [u'hdlcc version: %s' % hdlcc.__version__,
-             u'Server PID: %d' % os.getpid(),
-             u'Builder: none'])
+            reply.json["info"],
+            [
+                u"hdlcc version: %s" % hdlcc.__version__,
+                u"Server PID: %d" % os.getpid(),
+                u"Builder: none",
+            ],
+        )
 
-    @it.should("get diagnose info while still not found out the builder name")
+    @it.should("shutdown the server when requested")  # type: ignore
     @disableVunit
     def test():
-        def _getServerByProjectFile(_):
-            server = mock.MagicMock()
-            server.config_parser.isParsing = lambda: True
-            return server
-
-        with mock.patch('hdlcc.handlers._getServerByProjectFile',
-                        _getServerByProjectFile):
-            reply = it.app.post(
-                '/get_diagnose_info',
-                {'project_file' : it.project_file})
-
-            it.assertCountEqual(
-                reply.json['info'],
-                [u'hdlcc version: %s' % hdlcc.__version__,
-                 u'Server PID: %d' % os.getpid(),
-                 u'Builder: <unknown> (config file parsing is underway)'])
-
-    @it.should("get diagnose info with a non existing project file")
-    @disableVunit
-    def test():
-        reply = it.app.post(
-            '/get_diagnose_info',
-            {'project_file' : 'foo_bar.prj'})
-
-        _logger.info("Reply is %s", reply.json['info'])
-        it.assertCountEqual(
-            reply.json['info'],
-            [u'hdlcc version: %s' % hdlcc.__version__,
-             u'Server PID: %d' % os.getpid(),
-             u'Builder: none'])
-
-    @it.should("shutdown the server when requested")
-    @disableVunit
-    def test():
+        open(_path("some_project"), "w").write("")
         # Ensure the server is active
-        reply = it.app.post('/get_diagnose_info',
-                            {'project_file' : 'some_project'})
-        it.assertEqual(reply.status, '200 OK')
+        reply = it.app.post(
+            "/get_diagnose_info", {"project_file": _path("some_project")}
+        )
+        it.assertEqual(reply.status, "200 OK")
 
         # Send a request to shutdown the server and check if it
         # calls the terminate process method
         pids = []
 
-        with mock.patch('hdlcc.handlers.terminateProcess', pids.append):
-            reply = it.app.post('/shutdown')
+        with mock.patch("hdlcc.handlers.terminateProcess", pids.append):
+            reply = it.app.post("/shutdown")
 
-        it.assertEqual(pids, [os.getpid(),])
+        it.assertEqual(pids, [os.getpid()])
 
-
-    @it.should("rebuild the project with directory cleanup")
+    @it.should("rebuild the project with directory cleanup")  # type: ignore
     @disableVunit
     def test():
-        project_file = 'hello.prj'
+        project_file = _path("hello.prj")
+        open(_path("hello.prj"), "w").write("")
         server = mock.MagicMock()
 
         servers = mock.MagicMock()
-        servers.__getitem__.side_effect = {project_file: server}.__getitem__
+        servers.__getitem__.side_effect = {
+            Path(p.dirname(project_file)): server
+        }.__getitem__
 
-        with mock.patch.object(hdlcc.handlers, 'servers', servers):
-            data = {'project_file' : project_file}
-            it.app.post('/rebuild_project', data)
+        with mock.patch.object(hdlcc.handlers, "servers", servers):
+            it.app.post("/rebuild_project", {"project_file": project_file})
 
         # Check the object was removed from the servers list
         servers.__delitem__.assert_called_once_with(project_file)
         # Check the original server cleaned things up
         server.clean.assert_called_once()
 
-    @it.should("handle buffer visits")
-    @disableVunit
-    def test():
-        project_file = 'hello.prj'
-        server = mock.MagicMock()
-
-        servers = mock.MagicMock()
-        servers.__getitem__.side_effect = {project_file: server}.__getitem__
-
-        test_path = 'some_path.vhd'
-
-        with mock.patch.object(hdlcc.handlers, 'servers', servers):
-            data = {'project_file' : project_file,
-                    'path'         : test_path}
-            it.app.post('/on_buffer_visit', data)
-
-        server.onBufferVisit.assert_called_once_with(test_path)
-
-
-    @it.should("get messages with content")
+    @it.should("get messages with content")  # type: ignore
     def test():
         data = {
-            'project_file' : it.project_file,
-            'path'         : p.join(
-                TEST_PROJECT, 'another_library', 'foo.vhd'),
-            'content'      : '-- TODO: Nothing to see here'}
+            "project_file": it.project_file,
+            "path": p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+            "content": "-- TODO: Nothing to see here",
+        }
 
-        ui_reply = it.app.post('/get_ui_messages', data)
-        reply = it.app.post('/get_messages_by_path', data)
+        ui_reply = it.app.post("/get_ui_messages", data)
+        reply = it.app.post("/get_messages_by_path", data)
 
         _logger.info("UI reply: %s", ui_reply)
         _logger.info("Reply: %s", reply)
 
-        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json["messages"]]
 
-        it.assertIn(data['path'], [x.filename for x in messages])
+        it.assertIn(data["path"], [x.filename for x in messages])
 
         expected = StaticCheckerDiag(
-            filename=data['path'],
-            line_number=1, column_number=4,
-            text='TODO: Nothing to see here',
-            severity=DiagType.STYLE_INFO)
+            filename=data["path"],
+            line_number=1,
+            column_number=4,
+            text="TODO: Nothing to see here",
+            severity=DiagType.STYLE_INFO,
+        )
 
         it.assertIn(expected, messages)
 
-    @it.should("get messages by path")
+    @it.should("get messages by path")  # type: ignore
     def test():
-        filename = p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')
-        data = {
-            'project_file' : it.project_file,
-            'path'         : filename}
+        filename = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+        data = {"project_file": it.project_file, "path": filename}
 
-        ui_reply = it.app.post('/get_ui_messages', data)
-        reply = it.app.post('/get_messages_by_path', data)
+        ui_reply = it.app.post("/get_ui_messages", data)
+        reply = it.app.post("/get_messages_by_path", data)
 
         _logger.info("UI reply: %s", ui_reply)
         _logger.info("Reply: %s", reply)
 
-        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json['messages']]
+        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json["messages"]]
 
         it.assertCountEqual(
             messages,
-            [ObjectIsNeverUsed(filename=filename, line_number=27,
-                               column_number=12, object_type='signal',
-                               object_name='clk_enable_unused'),])
+            [
+                ObjectIsNeverUsed(
+                    filename=filename,
+                    line_number=27,
+                    column_number=12,
+                    object_type="signal",
+                    object_name="clk_enable_unused",
+                )
+            ],
+        )
 
-    @it.should("get source dependencies")
+    @it.should("get source dependencies")  # type: ignore
     @disableVunit
     def test():
         data = {
-            'project_file' : it.project_file,
-            'path'         : p.join(
-                TEST_PROJECT, 'another_library', 'foo.vhd')}
+            "project_file": it.project_file,
+            "path": p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+        }
 
         for _ in range(10):
-            ui_reply = it.app.post('/get_ui_messages', data)
-            reply = it.app.post('/get_dependencies', data)
+            ui_reply = it.app.post("/get_ui_messages", data)
+            reply = it.app.post("/get_dependencies", data)
 
             _logger.info("UI reply: %s", ui_reply)
             _logger.info("Reply: %s", reply)
 
-        dependencies = reply.json['dependencies']
+        dependencies = reply.json["dependencies"]
 
-        _logger.info("Dependencies: %s", ', '.join(dependencies))
+        _logger.info("Dependencies: %s", ", ".join(dependencies))
 
         it.assertCountEqual(
-            ["ieee.std_logic_1164",
-             "ieee.numeric_std",
-             "basic_library.clock_divider"],
-            dependencies)
+            ["ieee.std_logic_1164", "ieee.numeric_std", "basic_library.clock_divider"],
+            dependencies,
+        )
 
-    @it.should("get source build sequence")
+    @it.should("get source build sequence")  # type: ignore
     def test():
         data = {
-            'project_file' : it.project_file,
-            'path'         : p.join(
-                TEST_PROJECT, 'another_library', 'foo.vhd')}
+            "project_file": it.project_file,
+            "path": p.join(TEST_PROJECT, "another_library", "foo.vhd"),
+        }
 
-        reply = it.app.post('/get_build_sequence', data)
+        @property
+        def builtin_libraries(_):
+            return {Identifier("ieee")}
 
-        sequence = reply.json['sequence']
+        such.unittest.TestCase.maxDiff = None
+        with mock.patch.object(
+            hdlcc.builders.base_builder.BaseBuilder,
+            "builtin_libraries",
+            builtin_libraries,
+        ):
+            reply = it.app.post("/get_build_sequence", data)
+            #  reply = it.app.post("/shutdown")
+            sequence = reply.json["sequence"]
 
         _logger.info("Sequence: %s", sequence)
 
-        it.assertCountEqual(
-            [p.join(TEST_PROJECT, 'basic_library', 'very_common_pkg.vhd'),
-             p.join(TEST_PROJECT, 'basic_library', 'package_with_constants.vhd'),
-             p.join(TEST_PROJECT, 'basic_library', 'clock_divider.vhd')],
-            sequence)
+        very_common_pkg = p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
+        package_with_constants = p.join(
+            TEST_PROJECT, "basic_library", "package_with_constants.vhd"
+        )
+        clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+
+        it.assertEqual(
+            sequence,
+            [
+                "%s (library: basic_library)" % very_common_pkg,
+                "%s (library: basic_library)" % package_with_constants,
+                "%s (library: basic_library)" % clock_divider,
+            ],
+        )
 
 
 it.createTests(globals())

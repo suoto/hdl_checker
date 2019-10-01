@@ -21,20 +21,24 @@ import os.path as p
 import re
 import shutil
 import tempfile
-
-from hdlcc.diagnostics import BuilderDiag, DiagType
-from hdlcc.utils import runShellCommand
+from typing import Iterable, Optional
 
 from .base_builder import BaseBuilder
 
+from hdlcc.diagnostics import BuilderDiag, DiagType
+from hdlcc.parsers.elements.identifier import Identifier
+from hdlcc.path import Path
+from hdlcc.types import BuildFlags, FileType
+from hdlcc.utils import runShellCommand
+
 
 class XVHDL(BaseBuilder):
-    '''Builder implementation of the xvhdl compiler'''
+    """Builder implementation of the xvhdl compiler"""
 
     # Implementation of abstract class properties
-    builder_name = 'xvhdl'
+    builder_name = "xvhdl"
     # TODO: Add xvlog support
-    file_types = {'vhdl'}
+    file_types = {FileType.vhdl}
 
     # XVHDL specific class properties
     _stdout_message_scanner = re.compile(
@@ -44,37 +48,42 @@ class XVHDL(BaseBuilder):
         r"("
         r"\[(?P<filename>[^:]+):"
         r"(?P<line_number>\d+)\]"
-        r")?", flags=re.I)
+        r")?",
+        flags=re.I,
+    ).scanner
 
     _iter_rebuild_units = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
         r"'?.*/(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb'?"
-        r"\s+needs to be re-saved.*", flags=re.I).finditer
+        r"\s+needs to be re-saved.*",
+        flags=re.I,
+    ).finditer
 
     def _shouldIgnoreLine(self, line):
-        if 'ignored due to previous errors' in line:
+        # type: (str) -> bool
+        if "ignored due to previous errors" in line:
             return True
 
         # Ignore messages like
         # ERROR: [VRFC 10-3032] 'library.package' failed to restore
         # This message doesn't come alone, we should be getting other (more
         # usefull) info anyway
-        if '[VRFC 10-3032]' in line:
+        if "[VRFC 10-3032]" in line:
             return True
 
-        return not (line.startswith('ERROR') or
-                    line.startswith('WARNING'))
+        return not (line.startswith("ERROR") or line.startswith("WARNING"))
 
-    def __init__(self, target_folder):
-        self._version = ''
-        super(XVHDL, self).__init__(target_folder)
-        self._xvhdlini = p.join(self._target_folder, '.xvhdl.init')
-        self._builtin_libraries = {'ieee', 'std', 'unisim', 'xilinxcorelib',
-                                   'synplify', 'synopsis', 'maxii',
-                                   'family_support'}
+    def __init__(self, *args, **kwargs):
+        # type: (...) -> None
+        self._version = ""
+        super(XVHDL, self).__init__(*args, **kwargs)
+        self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
+        # Create the ini file
+        open(self._xvhdlini, "w").close()
 
     def _makeRecords(self, line):
-        scan = self._stdout_message_scanner.scanner(line)
+        # type: (str) -> Iterable[BuilderDiag]
+        scan = self._stdout_message_scanner(line)
 
         match = scan.match()
         if not match:
@@ -84,77 +93,86 @@ class XVHDL(BaseBuilder):
 
         diag = BuilderDiag(
             builder_name=self.builder_name,
-            text=info['error_message'].strip(),
-            line_number=info['line_number'],
-            filename=info['filename'],
-            error_code=info['error_code'])
+            text=info["error_message"].strip(),
+            line_number=info["line_number"],
+            filename=Path(info["filename"]),
+            error_code=info["error_code"],
+        )
 
-        if info.get('severity', None) in ('W', 'e'):
+        if info.get("severity", None) in ("W", "e"):
             diag.severity = DiagType.WARNING
-        elif info.get('severity', None) in ('E', 'e'):
+        elif info.get("severity", None) in ("E", "e"):
             diag.severity = DiagType.ERROR
 
         yield diag
 
     def _parseBuiltinLibraries(self):
         "(Not used by XVHDL)"
+        return (
+            Identifier(x, case_sensitive=False)
+            for x in (
+                "ieee",
+                "std",
+                "unisim",
+                "xilinxcorelib",
+                "synplify",
+                "synopsis",
+                "maxii",
+                "family_support",
+            )
+        )
 
     def _checkEnvironment(self):
-        stdout = runShellCommand(['xvhdl', '--nolog', '--version'],
-                                 cwd=self._target_folder)
-        self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)",
-                                   stdout[0])[0]
-        self._logger.info("xvhdl version string: '%s'. "
-                          "Version number is '%s'",
-                          stdout[:-1], self._version)
+        stdout = runShellCommand(
+            ["xvhdl", "--nolog", "--version"], cwd=self._work_folder
+        )
+        self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
+        self._logger.info(
+            "xvhdl version string: '%s'. " "Version number is '%s'",
+            stdout[:-1],
+            self._version,
+        )
 
     @staticmethod
     def isAvailable():
         try:
             temp_dir = tempfile.mkdtemp()
-            runShellCommand(['xvhdl', '--nolog', '--version'], cwd=temp_dir)
+            runShellCommand(["xvhdl", "--nolog", "--version"], cwd=temp_dir)
             return True
         except OSError:
             return False
         finally:
             shutil.rmtree(temp_dir)
 
-    def getBuiltinLibraries(self):
-        # FIXME: Built-in libraries should not be statically defined
-        # like this. Review this at some point
-        return self._builtin_libraries
-
     def _createLibrary(self, library):
-        library = library.lower()
-        if library in self._builtin_libraries:
-            return
+        # type: (Identifier) -> None
+        if not p.exists(self._work_folder):
+            os.makedirs(self._work_folder)
 
-        assert library != 'ieee'
-
-        if not p.exists(self._target_folder):
-            os.makedirs(self._target_folder)
-            self._added_libraries = set()
-
-        if library in self._added_libraries:
-            return
-
-        self._added_libraries.add(library)
-
-        with open(self._xvhdlini, mode='w') as fd:
-            content = '\n'.join(
-                ["%s=%s" % (x, p.join(self._target_folder, x))
-                 for x in self._added_libraries])
+        with open(self._xvhdlini, mode="w") as fd:
+            content = "\n".join(
+                [
+                    "%s=%s" % (x, p.join(self._work_folder, x.name))
+                    for x in self._added_libraries
+                ]
+            )
             fd.write(content)
 
     def _buildSource(self, path, library, flags=None):
-        cmd = ['xvhdl',
-               '--nolog',
-               '--verbose', '0',
-               '--initfile', self._xvhdlini,
-               '--work', library]
-        cmd += flags
-        cmd += [path]
-        return runShellCommand(cmd, cwd=self._target_folder)
+        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+        cmd = [
+            "xvhdl",
+            "--nolog",
+            "--verbose",
+            "0",
+            "--initfile",
+            self._xvhdlini,
+            "--work",
+            library.name,
+        ]
+        cmd += [str(x) for x in (flags or [])]
+        cmd += [path.name]
+        return runShellCommand(cmd, cwd=self._work_folder)
 
     def _searchForRebuilds(self, line):
         rebuilds = []
@@ -167,10 +185,11 @@ class XVHDL(BaseBuilder):
             #     when sources are from different libraries
             #  2. Reporting which design unit has been affected by a
             #     given change.
-            if 'rebuild_path' in mdict and mdict['rebuild_path'] is not None:
+            if "rebuild_path" in mdict and mdict["rebuild_path"] is not None:
                 rebuilds.append(mdict)
             else:
-                rebuilds.append({'library_name' : 'work',
-                                 'unit_name' : mdict['unit_name']})
+                rebuilds.append(
+                    {"library_name": "work", "unit_name": mdict["unit_name"]}
+                )
 
         return rebuilds

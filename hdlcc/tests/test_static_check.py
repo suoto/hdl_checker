@@ -22,19 +22,21 @@ import re
 
 import six
 
-from nose2.tools import such
-from nose2.tools.params import params
+from nose2.tools import such  # type: ignore
+from nose2.tools.params import params  # type: ignore
 
 import hdlcc.static_check as static_check
-from hdlcc.diagnostics import DiagType, StaticCheckerDiag, LibraryShouldBeOmited
+from hdlcc.diagnostics import DiagType, LibraryShouldBeOmited, StaticCheckerDiag
 
 _logger = logging.getLogger(__name__)
 
 with such.A("hdlcc project") as it:
     # Workaround for Python 2.x and 3.x differences
     if six.PY2:
+
         def _assertCountEqual(actual, expected, msg=None):
             return it.assertEqual(sorted(actual), sorted(expected), msg)
+
         it.assertCountEqual = _assertCountEqual
 
     @it.has_setup
@@ -47,189 +49,200 @@ with such.A("hdlcc project") as it:
 
     @it.should("not repeat an object in the results")
     def test():
-        text = [
-            '',
-            'library ieee;',
-            '',
-            'library ieee;',
-            '',
-            ]
+        text = ["", "library ieee;", "", "library ieee;", ""]
 
         it.assertDictEqual(
-            {'ieee': {'end': 12, 'lnum': 3, 'start': 8, 'type': 'library'}},
-            static_check._getObjectsFromText(text))
+            {"ieee": {"end": 12, "lnum": 3, "start": 8, "type": "library"}},
+            static_check._getObjectsFromText(text),
+        )
 
-    @it.should("not scan after specific end of scan delimiters")
+    @it.should("not scan after specific end of scan delimiters")  # type: ignore
     @params(
-        [" u0 : some_unit",
-         "   generic map (",],
-        [" u0 : some_unit",
-         "   port map (",],
-        [" u0 : entity work.some_unit", ],
-        [" p0 : process", ],
-        [" process(clk)", ],)
+        [" u0 : some_unit", "   generic map ("],
+        [" u0 : some_unit", "   port map ("],
+        [" u0 : entity work.some_unit"],
+        [" p0 : process"],
+        [" process(clk)"],
+    )
     def test(case, parm):
         _logger.info("Running test case '%s'", case)
-        text = ['library foo;',] + parm + ['library bar;']
+        text = ["library foo;"] + parm + ["library bar;"]
 
         it.assertDictEqual(
-            {'foo': {'end': 11, 'lnum': 0, 'start': 8, 'type': 'library'}},
-            static_check._getObjectsFromText(text))
+            {"foo": {"end": 11, "lnum": 0, "start": 8, "type": "library"}},
+            static_check._getObjectsFromText(text),
+        )
 
-    @it.should("extract comment tags")
+    @it.should("extract comment tags")  # type: ignore
     @params(
         " -- XXX: some warning",
         " -- TODO: something to do",
-        " -- FIXME: something to fix")
+        " -- FIXME: something to fix",
+    )
     def test(case, parm):
         _logger.info("Running test case '%s'", case)
         expected = re.sub(r"\s*--\s*", "", parm)
 
         text = [
-            'library ieee;',
-            '    use ieee.std_logic_1164.all;',
-            '    use ieee.numeric_std.all;',
-            'library basic_library;',
-            'entity foo is',
-            '',
+            "library ieee;",
+            "    use ieee.std_logic_1164.all;",
+            "    use ieee.numeric_std.all;",
+            "library basic_library;",
+            "entity foo is",
+            "",
             parm,
-            '',
-            '    generic (',
-            '        DIVIDER_A : integer := 10;',
-            '        DIVIDER_B : integer := 20',
-            '    );',
-            '    port (',
-            '        clk_in_a : in std_logic;',
-            '        clk_out_a : out std_logic;',
-            '',
-            '        clk_in_b : in std_logic;',
-            '        clk_out_b : out std_logic',
-            '',
-            '    );',
-            'end foo;',
-            '',
-            'architecture foo of foo is',
-            'begin',
-            'clk_out_a <= not clk_in_a;',
-            '-- clk_out_b <= not clk_in_b;',
-            'end architecture foo;']
+            "",
+            "    generic (",
+            "        DIVIDER_A : integer := 10;",
+            "        DIVIDER_B : integer := 20",
+            "    );",
+            "    port (",
+            "        clk_in_a : in std_logic;",
+            "        clk_out_a : out std_logic;",
+            "",
+            "        clk_in_b : in std_logic;",
+            "        clk_out_b : out std_logic",
+            "",
+            "    );",
+            "end foo;",
+            "",
+            "architecture foo of foo is",
+            "begin",
+            "clk_out_a <= not clk_in_a;",
+            "-- clk_out_b <= not clk_in_b;",
+            "end architecture foo;",
+        ]
 
         it.assertCountEqual(
-            [StaticCheckerDiag(
-                line_number=7,
-                column_number=5,
-                severity=DiagType.STYLE_INFO,
-                text=expected)],
-            static_check._getCommentTags(text))
+            [
+                StaticCheckerDiag(
+                    line_number=7,
+                    column_number=5,
+                    severity=DiagType.STYLE_INFO,
+                    text=expected,
+                )
+            ],
+            static_check._getCommentTags(text),
+        )
 
-    @it.should("get misc checks")
+    @it.should("get misc checks")  # type: ignore
     def test():
         text = [
-            'entity foo is',
-            '    port (',
-            '        clk_in_a : in std_logic;',
-            '        clk_out_a : out std_logic;',
-            '',
-            '        clk_in_b : in std_logic;',
-            '        clk_out_b : out std_logic',
-            '',
-            '    );',
-            'end foo;',]
+            "entity foo is",
+            "    port (",
+            "        clk_in_a : in std_logic;",
+            "        clk_out_a : out std_logic;",
+            "",
+            "        clk_in_b : in std_logic;",
+            "        clk_out_b : out std_logic",
+            "",
+            "    );",
+            "end foo;",
+        ]
 
         objects = static_check._getObjectsFromText(text)
 
-        it.assertCountEqual(
-            [],
-            static_check._getMiscChecks(objects))
+        it.assertCountEqual([], static_check._getMiscChecks(objects))
 
     with it.having("an entity-architecture pair"):
 
         @it.has_setup
         def setup():
             it.text = [
-                'library ieee;',
-                '    use ieee.std_logic_1164.all;',
-                '    use ieee.numeric_std.all;',
-                'library work;',
-                '    use work.some_package.all;',
-                'library basic_library;',
-                'entity foo is',
-                '    generic (',
-                '        DIVIDER_A : integer := 10;',
-                '        DIVIDER_B : integer := 20',
-                '    );',
-                '    port (',
-                '        clk_in_a : in std_logic;',
-                '        clk_out_a : out std_logic;',
-                '',
-                '        clk_in_b : in std_logic;',
-                '        clk_out_b : out std_logic',
-                '',
-                '    );',
-                'end foo;',
-                '',
-                'architecture foo of foo is',
-                'begin',
-                'clk_out_a <= not clk_in_a;',
-                '-- clk_out_b <= not clk_in_b;',
-                'end architecture foo;']
+                "library ieee;",
+                "    use ieee.std_logic_1164.all;",
+                "    use ieee.numeric_std.all;",
+                "library work;",
+                "    use work.some_package.all;",
+                "library basic_library;",
+                "entity foo is",
+                "    generic (",
+                "        DIVIDER_A : integer := 10;",
+                "        DIVIDER_B : integer := 20",
+                "    );",
+                "    port (",
+                "        clk_in_a : in std_logic;",
+                "        clk_out_a : out std_logic;",
+                "",
+                "        clk_in_b : in std_logic;",
+                "        clk_out_b : out std_logic",
+                "",
+                "    );",
+                "end foo;",
+                "",
+                "architecture foo of foo is",
+                "begin",
+                "clk_out_a <= not clk_in_a;",
+                "-- clk_out_b <= not clk_in_b;",
+                "end architecture foo;",
+            ]
 
-        @it.should("get VHDL objects from an entity-architecture pair")
+        @it.should("get VHDL objects from an entity-architecture pair")  # type: ignore
         def test():
             it.assertDictEqual(
-                {'DIVIDER_A': {'end': 18, 'lnum': 8, 'start': 8, 'type': 'generic'},
-                 'DIVIDER_B': {'end': 18, 'lnum': 9, 'start': 8, 'type': 'generic'},
-                 'basic_library': {'end': 21, 'lnum': 5, 'start': 8, 'type': 'library'},
-                 'clk_in_a': {'end': 17, 'lnum': 12, 'start': 8, 'type': 'port'},
-                 'clk_in_b': {'end': 17, 'lnum': 15, 'start': 8, 'type': 'port'},
-                 'clk_out_a': {'end': 18, 'lnum': 13, 'start': 8, 'type': 'port'},
-                 'clk_out_b': {'end': 18, 'lnum': 16, 'start': 8, 'type': 'port'},
-                 'ieee': {'end': 12, 'lnum': 0, 'start': 8, 'type': 'library'},
-                 'work': {'end': 12, 'lnum': 3, 'start': 8, 'type': 'library'}},
-                static_check._getObjectsFromText(it.text))
+                {
+                    "DIVIDER_A": {"end": 18, "lnum": 8, "start": 8, "type": "generic"},
+                    "DIVIDER_B": {"end": 18, "lnum": 9, "start": 8, "type": "generic"},
+                    "basic_library": {
+                        "end": 21,
+                        "lnum": 5,
+                        "start": 8,
+                        "type": "library",
+                    },
+                    "clk_in_a": {"end": 17, "lnum": 12, "start": 8, "type": "port"},
+                    "clk_in_b": {"end": 17, "lnum": 15, "start": 8, "type": "port"},
+                    "clk_out_a": {"end": 18, "lnum": 13, "start": 8, "type": "port"},
+                    "clk_out_b": {"end": 18, "lnum": 16, "start": 8, "type": "port"},
+                    "ieee": {"end": 12, "lnum": 0, "start": 8, "type": "library"},
+                    "work": {"end": 12, "lnum": 3, "start": 8, "type": "library"},
+                },
+                static_check._getObjectsFromText(it.text),
+            )
 
-        @it.should("get misc checks")
+        @it.should("get misc checks")  # type: ignore
         def test():
             objects = static_check._getObjectsFromText(it.text)
 
             it.assertCountEqual(
-                [LibraryShouldBeOmited(
-                    line_number=4,
-                    column_number=9,
-                    library='work')],
-                static_check._getMiscChecks(objects))
+                [LibraryShouldBeOmited(line_number=4, column_number=9, library="work")],
+                static_check._getMiscChecks(objects),
+            )
 
-        @it.should("get unused VHDL objects")
+        @it.should("get unused VHDL objects")  # type: ignore
         def test():
             objects = static_check._getObjectsFromText(it.text)
             it.assertCountEqual(
-                ['basic_library', 'DIVIDER_A', 'DIVIDER_B', 'clk_in_b',
-                 'clk_out_b'],
-                static_check._getUnusedObjects(it.text, objects))
+                ["basic_library", "DIVIDER_A", "DIVIDER_B", "clk_in_b", "clk_out_b"],
+                static_check._getUnusedObjects(it.text, objects),
+            )
 
     with it.having("a package-package body pair"):
+
         @it.has_setup
         def setup():
             it.text = [
-                'library ieee;',
-                'package very_common_pkg is',
+                "library ieee;",
+                "package very_common_pkg is",
                 '    constant VIM_HDL_VERSION : string := "0.1";',
-                'end package;',
-                'package body very_common_pkg is',
-                'end package body;']
+                "end package;",
+                "package body very_common_pkg is",
+                "end package body;",
+            ]
 
-        @it.should("get VHDL objects from a package-package body pair")
+        @it.should("get VHDL objects from a package-package body pair")  # type: ignore
         def test():
 
             it.assertDictEqual(
-                {'ieee': {'end': 12, 'lnum': 0, 'start': 8, 'type': 'library'}},
-                static_check._getObjectsFromText(it.text))
+                {"ieee": {"end": 12, "lnum": 0, "start": 8, "type": "library"}},
+                static_check._getObjectsFromText(it.text),
+            )
 
-        @it.should("get unused VHDL objects")
+        @it.should("get unused VHDL objects")  # type: ignore
         def test():
             objects = static_check._getObjectsFromText(it.text)
             it.assertCountEqual(
-                ['ieee', ],
-                static_check._getUnusedObjects(it.text, objects))
+                ["ieee"], static_check._getUnusedObjects(it.text, objects)
+            )
+
 
 it.createTests(globals())

@@ -16,19 +16,21 @@
 # along with HDL Code Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Handlers for hdlcc server"
 
-import json
 import logging
 import os
 import os.path as p
 import signal
+import tempfile
 from multiprocessing import Queue
+from typing import Any, Dict, List, Optional, Tuple
 
-import bottle
+import bottle  # type: ignore
 
-import hdlcc
-from hdlcc.builders import getWorkingBuilders, Fallback
-from hdlcc.config_generators import getGeneratorByName
+from hdlcc import __version__ as version
+from hdlcc import types as t  # pylint: disable=unused-import
+from hdlcc.builders.fallback import Fallback
 from hdlcc.hdlcc_base import HdlCodeCheckerBase
+from hdlcc.path import Path
 from hdlcc.utils import terminateProcess
 
 _logger = logging.getLogger(__name__)
@@ -40,50 +42,68 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     """
     HDL Code Checker project builder class
     """
+
     def __init__(self, *args, **kwargs):
-        self._msg_queue = Queue()
+        # type: (...) -> None
+        self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
         super(HdlCodeCheckerServer, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
+        # type: (...) -> Any
         self._msg_queue.put(("info", message))
 
     def _handleUiWarning(self, message):
+        # type: (...) -> Any
         self._msg_queue.put(("warning", message))
 
     def _handleUiError(self, message):
+        # type: (...) -> Any
         self._msg_queue.put(("error", message))
 
     def getQueuedMessages(self):
+        # type: (...) -> Any
         "Returns queued UI messages"
         while not self._msg_queue.empty():  # pragma: no cover
             yield self._msg_queue.get()
 
 
 def _getServerByProjectFile(project_file):
+    # type: (Optional[str]) -> HdlCodeCheckerServer
     """
     Returns the HdlCodeCheckerServer object that corresponds to the given
     project file. If the object doesn't exists yet it gets created and
     then returned
     """
-    if isinstance(project_file, str) and project_file.lower() == 'none':
+    _logger.debug("project_file: %s", project_file)
+    if isinstance(project_file, str) and project_file.lower() == "none":
         project_file = None
 
     if project_file not in servers:
+        # If there's no project file to use, create a temporary path to use
+        if project_file is None:
+            root_dir = Path(tempfile.mkdtemp())
+        else:
+            root_dir = Path(p.dirname(project_file))
+
+        _logger.info("Creating server for %s (root=%s)", project_file, root_dir)
         try:
-            project = HdlCodeCheckerServer(project_file)
+            project = HdlCodeCheckerServer(root_dir=root_dir)
+            if project_file is not None:
+                project.setConfig(project_file)
             _logger.debug("Created new project server for '%s'", project_file)
-        except (IOError, OSError) as exc:
+        except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")
             project = HdlCodeCheckerServer(None)
 
-        servers[project_file] = project
-    return servers[project_file]
+        servers[root_dir] = project
+    return servers[root_dir]
 
 
 def _exceptionWrapper(func):
     """
     Wraps func to log exception to the standard logger
     """
+
     def _wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -95,31 +115,32 @@ def _exceptionWrapper(func):
 
 
 def setupSignalHandlers():
+    # type: (...) -> Any
     """
     Configures signal handlers that will be called when exiting Python
     shell
     """
+
     def signalHandler(sig, _):
         "Handle to disable hdlcc server"
         _logger.info("Handling signal %s", repr(sig))
         import sys
+
         sys.exit()
 
-    for sig in [signal.SIGTERM,
-                signal.SIGINT]:
+    for sig in [signal.SIGTERM, signal.SIGINT]:
         signal.signal(sig, signalHandler)
 
 
 def _getProjectDiags(project_file):
+    # type: (str) -> Any
     """
     Get project specific diagnose
     """
-    diags = []
+    diags = []  # type: List[str]
     server = _getServerByProjectFile(project_file)
 
-    if server.config_parser.isParsing():
-        diags += ["Builder: <unknown> (config file parsing is underway)"]
-    elif isinstance(server.builder, Fallback):
+    if isinstance(server.builder, Fallback):
         diags += ["Builder: none"]
     else:
         diags += ["Builder: %s" % server.builder.builder_name]
@@ -127,16 +148,16 @@ def _getProjectDiags(project_file):
     return diags
 
 
-@app.post('/get_diagnose_info')
+@app.post("/get_diagnose_info")
 @_exceptionWrapper
 def getDiagnoseInfo():
+    # type: (...) -> Any
     """
     Collects misc diagnose info for the clients
     """
     _logger.info("Collecting diagnose info")
-    project_file = bottle.request.forms.get('project_file')
-    response = ["hdlcc version: %s" % hdlcc.__version__,
-                "Server PID: %d" % os.getpid()]
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
+    response = ["hdlcc version: %s" % version, "Server PID: %d" % os.getpid()]
 
     response += _getProjectDiags(project_file)
 
@@ -144,60 +165,26 @@ def getDiagnoseInfo():
     for diag in response:
         _logger.info(" - %s", diag)
 
-    return {'info': response}
+    return {"info": response}
 
 
-@app.post('/run_config_generator')
-@_exceptionWrapper
-def runConfigGenerator():
-    """
-    Runs the config generator
-    request should have
-        - 'generator': generator's class name
-        - 'args', 'kwargs': arguments to be passed to the generator constructor
-    """
-    name = bottle.request.forms.get('generator', None)
-    args = json.loads(bottle.request.forms.get('args'))
-    kwargs = json.loads(bottle.request.forms.get('kwargs'))
-
-    _logger.info("Running config generator %s(%s, %s)",
-                 repr(name), repr(args), repr(kwargs))
-
-    kwargs['builders'] = list(getWorkingBuilders())
-
-    _logger.debug("Running config generator: %s(%s, %s)", name, args, kwargs)
-    generator = getGeneratorByName(name)(*args, **kwargs)
-    content = generator.generate()
-
-    return {'content': content}
-
-
-@app.post('/on_buffer_visit')
-@_exceptionWrapper
-def onBufferVisit():
-    "Hook for doing actions related to visiting a buffer"
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
-    _logger.debug("Buffer visited is ('%s') '%s'", project_file, path)
-
-    server = _getServerByProjectFile(project_file)
-    server.onBufferVisit(path)
-
-    return {}
-
-
-@app.post('/get_messages_by_path')
+@app.post("/get_messages_by_path")
 @_exceptionWrapper
 def getMessagesByPath():
+    # type: (...) -> Any
     """
     Get messages for a given projec_file/path pair
     """
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
-    content = bottle.request.forms.get('content', None)
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
+    path = Path(bottle.request.forms.get("path"))  # pylint: disable=no-member
+    content = bottle.request.forms.get("content", None)  # pylint: disable=no-member
 
-    _logger.debug("Getting messages for '%s', '%s', %s", project_file, path,
-                  "no content" if content is None else "with content")
+    _logger.debug(
+        "Getting messages for '%s', '%s', %s",
+        project_file,
+        path,
+        "no content" if content is None else "with content",
+    )
 
     server = _getServerByProjectFile(project_file)
     if content is None:
@@ -205,19 +192,22 @@ def getMessagesByPath():
     else:
         messages = server.getMessagesWithText(path, content)
 
+    _logger.info("messages: %s", [x.toDict() for x in messages])
+
     # Messages at this point need to be serializable so that bottle can send
     # them over
-    return {'messages': [x.toDict() for x in messages]}
+    return {"messages": tuple(x.toDict() for x in messages)}
 
 
-@app.post('/get_ui_messages')
+@app.post("/get_ui_messages")
 @_exceptionWrapper
 def getUiMessages():
+    # type: (...) -> Any
     """
     Get messages for a given projec_file/path pair
     """
 
-    project_file = bottle.request.forms.get('project_file')
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
     server = _getServerByProjectFile(project_file)
 
     ui_messages = list(server.getQueuedMessages())
@@ -230,19 +220,20 @@ def getUiMessages():
     for msg in ui_messages:  # pragma: no cover
         _logger.info(msg)
 
-    response = {'ui_messages': ui_messages}
+    response = {"ui_messages": ui_messages}
 
     return response
 
 
-@app.post('/rebuild_project')
+@app.post("/rebuild_project")
 @_exceptionWrapper
 def rebuildProject():
+    # type: (...) -> Any
     """
     Rebuilds the current project
     """
     _logger.info("Rebuilding project")
-    project_file = bottle.request.forms.get('project_file')
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
     server = _getServerByProjectFile(project_file)
     server.clean()
     _logger.debug("Removing and recreating server object")
@@ -250,9 +241,10 @@ def rebuildProject():
     _getServerByProjectFile(project_file)
 
 
-@app.post('/shutdown')
+@app.post("/shutdown")
 @_exceptionWrapper
 def shutdownServer():
+    # type: (...) -> Any
     """
     Terminates the current process to shutdown the server
     """
@@ -260,47 +252,55 @@ def shutdownServer():
     terminateProcess(os.getpid())
 
 
-@app.post('/get_dependencies')
+@app.post("/get_dependencies")
 @_exceptionWrapper
 def getDependencies():
+    # type: (...) -> Any
     """
     Returns the direct dependencies of a given source path
     """
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
+    path = Path(bottle.request.forms.get("path"))  # pylint: disable=no-member
 
     _logger.debug("Getting dependencies for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
-    source, _ = server.getSourceByPath(path)
     content = []
-    for dependency in source.getDependencies():
-        content.append("%s.%s" % (str(dependency.library),
-                                  str(dependency.name)))
+    for dependency in server.database.getDependenciesByPath(path):
+        content.append(
+            "%s.%s" % (dependency.library.display_name, dependency.name.display_name)
+        )
 
     _logger.debug("Found %d dependencies", len(content))
 
-    return {'dependencies': content}
+    return {"dependencies": content}
 
 
-@app.post('/get_build_sequence')
+@app.post("/get_build_sequence")
 @_exceptionWrapper
 def getBuildSequence():
+    # type: (...) -> Any
     """
     Returns the build sequence of a given source path
     """
-    project_file = bottle.request.forms.get('project_file')
-    path = bottle.request.forms.get('path')
+    project_file = bottle.request.forms.get("project_file")  # pylint: disable=no-member
+    path = Path(bottle.request.forms.get("path"))  # pylint: disable=no-member
 
     _logger.debug("Getting build sequence for '%s', '%s'", project_file, path)
 
     server = _getServerByProjectFile(project_file)
-    source, _ = server.getSourceByPath(path)
+    server._updateConfigIfNeeded()
 
-    return {'sequence': [x.filename for x in
-                         server.updateBuildSequenceCache(source)]}
+    return {
+        "sequence": tuple(
+            "%s (library: %s)" % (path, library)
+            for library, path in server.database.getBuildSequence(
+                path, server.builder.builtin_libraries
+            )
+        )
+    }
 
 
 #  We'll store a dict to store differents hdlcc objects
-servers = {}  # pylint: disable=invalid-name
+servers = {}  # type: Dict[Path, HdlCodeCheckerServer] # pylint: disable=invalid-name
 setupSignalHandlers()

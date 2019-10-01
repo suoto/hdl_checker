@@ -22,8 +22,16 @@ import logging
 import os.path as p
 import re
 import subprocess as subp
-import parameterized
-import unittest2
+
+import parameterized  # type: ignore
+import unittest2  # type: ignore
+
+from hdlcc.builder_utils import BuilderName, getBuilderByName
+from hdlcc.builders.fallback import Fallback
+from hdlcc.builders.ghdl import GHDL
+from hdlcc.builders.msim import MSim
+from hdlcc.builders.xvhdl import XVHDL
+from hdlcc.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
@@ -43,33 +51,45 @@ _HEADER = re.compile(
     r"(?:--|#) GNU General Public License for more details\.\n"
     r"(?:--|#)\n"
     r"(?:--|#) You should have received a copy of the GNU General Public License\n"
-    r"(?:--|#) along with HDL Code Checker\.  If not, see <http://www\.gnu\.org/licenses/>\.\n")
+    r"(?:--|#) along with HDL Code Checker\.  If not, see <http://www\.gnu\.org/licenses/>\.\n"
+)
 
 
 def _getFiles():
     for filename in subp.check_output(
-            ['git', 'ls-tree', '--name-only', '-r', 'HEAD']).splitlines():
+        ["git", "ls-tree", "--name-only", "-r", "HEAD"]
+    ).splitlines():
         yield p.abspath(filename).decode()
+
 
 def _getRelevantFiles():
     def _fileFilter(path):
         # Exclude versioneer files
-        if p.basename(path) in ('_version.py', 'versioneer.py'):
+        if p.basename(path) in ("_version.py", "versioneer.py"):
             return False
-        if p.join('.ci', 'test_support') in path:
+        if p.join(".ci", "test_support") in path:
             return False
-        return path.split('.')[-1] in ('py', 'sh', 'ps1')
+        return path.split(".")[-1] in ("py", "sh", "ps1")
 
     return filter(_fileFilter, _getFiles())
 
+
 def checkFile(filename):
-    lines = open(filename, mode='rb').read().decode(errors='replace')
+    lines = readFile(filename)
 
     match = _HEADER.search(lines)
     return match is not None
 
+
 class TestFileHeaders(unittest2.TestCase):
-    @parameterized.parameterized.expand([
-        (x, ) for x in _getRelevantFiles()])
+    @parameterized.parameterized.expand([(x,) for x in _getRelevantFiles()])
     def test_has_license(self, path):
         self.assertTrue(checkFile(path))
+
+
+class TestBuilderUtils(unittest2.TestCase):
+    def test_getBuilderByName(self):
+        self.assertEqual(getBuilderByName(BuilderName.msim.value), MSim)
+        self.assertEqual(getBuilderByName(BuilderName.ghdl.value), GHDL)
+        self.assertEqual(getBuilderByName(BuilderName.xvhdl.value), XVHDL)
+        self.assertEqual(getBuilderByName("foo"), Fallback)
