@@ -93,47 +93,81 @@ incorrectly.
 
 JSON format is as show below:
 
-```json
+```json5
 {
-    "include": [ "/path/to/another/json/file" ],
-    "sources": [
-        "/path/to/file_0",
-        "/path/to/file_1",
-        [ "/path/with/library/and/flags", { "library": "foo", "flags": "-2008" } ],
-        [ "/path/with/library",           { "library": "foo" } ],
-        [ "/path/with/flags",             { "flags": "-2008" } ]
-    ],
+  /*
+   * List of source files (optional, defaults to []).
+   * If specificed, must be a list of either strings or source spec tuples, where
+   * source spec tuple is a tuple in the form [string, dict[string, string]] (see
+   * below for details).
+   */
+  "sources": [
 
-    "vhdl": {
-      "flags": {
-        "single": [],
-        "dependencies": [],
-        "global": []
-      }
-    },
+    /*
+     * Sources can be defined solely by their paths. Absolute paths are
+     * unchanged, relative paths are made absolute by using the path to the
+     * configuration file. Sources imported from an included file will follow
+     * the same principle but using the path to the included path.
+     */
+    "/path/to/file_0",
 
-    "verilog": {
-      "flags": {
-        "single": [],
-        "dependencies": [],
-        "global": []
-      }
-    },
-    "systemverilog": {
-      "flags": {
-        "single": [],
-        "dependencies": [],
-        "global": []
-      }
+    /*
+     * Tuples can be used to add more info on the path. First element of the
+     * tuple must the a string with the path, second element is optional
+     * (defaults to an empty dictionary). Dictionary can specify the path's
+     * library ({"library": "name_of_the_library"}, special compile
+     * flags({"flags": ["flag_1", "flag_2"]}) or both.
+     */
+    [ "/path/with/library/and/flags", { "library": "foo", "flags": ["-2008"] } ],
+    [ "/path/with/library",           { "library": "foo" } ],
+    [ "/path/with/flags",             { "flags": ["-2008"] } ]
+  ],
+
+  /*
+   * Extra config files to be added to the project (optional, defaults to [])
+   * If specificed, must be a list of stings.
+   */
+  "include": [ "/path/to/another/json/file" ],
+
+  /*
+   * Language / scope specific info (optional, defaults to {}). Setting these,
+   * event if empty, will override values defined per compiler. Flags should be
+   * specified as a list of strings.
+   *
+   * The scope keys are:
+   *   - "single": flags used to build the file being checked
+   *   - "dependencies": flags used to build the dependencies of the file being
+   *     checked
+   *   - "global": flags used on both target and its dependencies
+   *
+   * For example, suppose the compilation sequence for a given source S is A, B,
+   * C and then S. The tool will compile A, B and C using global and dependencies
+   * flags, while S will be compiled using global and single flags.
+   */
+  "vhdl": {
+    "flags": {
+      "single": ["flag_1", "flag_2"],
+      "dependencies": [],
+      "global": []
     }
+  },
+
+  "verilog": {
+    "flags": {
+      "single": [],
+      "dependencies": [],
+      "global": []
+    }
+  },
+  "systemverilog": {
+    "flags": {
+      "single": [],
+      "dependencies": [],
+      "global": []
+    }
+  }
 }
 ```
-
-Compilation flags can be specified per language and per scope. The scopes can be
-
-* `single`: flags used to build the file being checked
-* `dependencies`: flags used to build the dependencies of the file being checked
-* `global`: flags used on both target and its dependencies
 
 #### Using legacy `prj` file
 
