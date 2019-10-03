@@ -68,11 +68,11 @@ class Database(HashableByKey):
 
         self._paths = set()  # type: Set[Path]
         self._parse_timestamp = {}  # type: Dict[Path, float]
-        self._libraries = {}  # type: Dict[Path, Identifier]
+        self._library_map = {}  # type: Dict[Path, Identifier]
+        self._flags_map = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
+        self._dependencies_map = {}  # type: Dict[Path, Set[DependencySpec]]
         self._inferred_libraries = set()  # type: Set[Path]
-        self._flags = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
-        self._dependencies = {}  # type: Dict[Path, Set[DependencySpec]]
         self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
 
         # Use this to know which methods should be cache
@@ -101,10 +101,8 @@ class Database(HashableByKey):
 
         while self._inferred_libraries:
             try:
-                name = self._inferred_libraries.pop()
-                del self._libraries[name]
-                _logger.debug("Removed inferred library '%s'", name)
-            except KeyError:
+                del self._library_map[self._inferred_libraries.pop()]
+            except KeyError:  # pragma: no cover
                 pass
 
         for path in self.paths:
@@ -137,12 +135,12 @@ class Database(HashableByKey):
             dependencies_flags,
         )
         self._paths.add(path)
-        self._flags[path] = {
+        self._flags_map[path] = {
             BuildFlagScope.single: tuple(single_flags or ()),
             BuildFlagScope.dependencies: tuple(dependencies_flags or ()),
         }
         if library is not None:
-            self._libraries[path] = Identifier(
+            self._library_map[path] = Identifier(
                 library, case_sensitive=FileType.fromPath(path) != FileType.vhdl
             )
 
@@ -177,19 +175,19 @@ class Database(HashableByKey):
             pass
 
         try:
-            del self._libraries[path]
+            del self._library_map[path]
             clear_lru_caches = True
         except KeyError:
             pass
 
         try:
-            del self._flags[path]
+            del self._flags_map[path]
             clear_lru_caches = True
         except KeyError:
             pass
 
         try:
-            del self._dependencies[path]
+            del self._dependencies_map[path]
             clear_lru_caches = True
         except KeyError:
             pass
@@ -235,18 +233,18 @@ class Database(HashableByKey):
                 "path": path,
                 "mtime": self._parse_timestamp[path],
                 "flags": {
-                    BuildFlagScope.single.value: self._flags[path].get(
+                    BuildFlagScope.single.value: self._flags_map[path].get(
                         BuildFlagScope.single, ()
                     ),
-                    BuildFlagScope.dependencies.value: self._flags[path].get(
+                    BuildFlagScope.dependencies.value: self._flags_map[path].get(
                         BuildFlagScope.dependencies, ()
                     ),
                 },
-                "dependencies": tuple(self._dependencies.get(path, ())),
+                "dependencies": tuple(self._dependencies_map.get(path, ())),
                 "diags": tuple(),
             }
 
-            library = self._libraries.get(path, None)
+            library = self._library_map.get(path, None)
             if library is not None:
                 source_info["library"] = library
 
@@ -269,16 +267,16 @@ class Database(HashableByKey):
             obj._parse_timestamp[path] = float(info.pop("mtime"))
 
             if "library" in info:
-                obj._libraries[path] = info.pop("library")
+                obj._library_map[path] = info.pop("library")
 
-            obj._flags[path] = {}
-            obj._flags[path][BuildFlagScope.single] = tuple(
+            obj._flags_map[path] = {}
+            obj._flags_map[path][BuildFlagScope.single] = tuple(
                 info.get("flags", {}).pop(BuildFlagScope.single.value, ())
             )
-            obj._flags[path][BuildFlagScope.dependencies] = tuple(
+            obj._flags_map[path][BuildFlagScope.dependencies] = tuple(
                 info.pop("flags", {}).pop(BuildFlagScope.dependencies.value, ())
             )
-            obj._dependencies[path] = {x for x in info.pop("dependencies")}
+            obj._dependencies_map[path] = {x for x in info.pop("dependencies")}
             obj._diags[path] = {x for x in info.pop("diags")}
         # pylint: enable=protected-access
 
@@ -290,7 +288,7 @@ class Database(HashableByKey):
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
-        return self._flags.get(path, {}).get(scope or BuildFlagScope.single, ())
+        return self._flags_map.get(path, {}).get(scope or BuildFlagScope.single, ())
 
     @property
     def paths(self):
@@ -305,10 +303,10 @@ class Database(HashableByKey):
         their owner's path
         """
 
-        if path not in self._libraries:
+        if path not in self._library_map:
             _logger.info("Setting library for '%s' to '%s'", path, library)
         else:
-            current_library = self._libraries.get(path)
+            current_library = self._library_map.get(path)
             # No change, avoid manipulating the database
             if current_library == library:
                 return
@@ -320,20 +318,20 @@ class Database(HashableByKey):
                 library,
             )
 
-        self._libraries[path] = library
+        self._library_map[path] = library
 
         # Nothing to resolve if the dependency entry is empty
-        if not self._dependencies.get(path, None):
+        if not self._dependencies_map.get(path, None):
             return
 
         # Extract the unresolved dependencies that will be replaced
         unresolved_dependencies = {
-            x for x in self._dependencies[path] if x.library is None
+            x for x in self._dependencies_map[path] if x.library is None
         }
 
         # DependencySpec is not mutable, so we actually need to replace the objects
         for dependency in unresolved_dependencies:
-            self._dependencies[path].add(
+            self._dependencies_map[path].add(
                 DependencySpec(
                     owner=dependency.owner,
                     name=dependency.name,
@@ -343,7 +341,7 @@ class Database(HashableByKey):
             )
 
         # Safe to remove the unresolved ones
-        self._dependencies[path] -= unresolved_dependencies
+        self._dependencies_map[path] -= unresolved_dependencies
 
     @lru_cache()
     def getLibrary(self, path):
@@ -358,14 +356,14 @@ class Database(HashableByKey):
             # config is valid
             self._addDiagnostic(PathNotInProjectFile(path))
 
-        elif path not in self._libraries:
+        elif path not in self._library_map:
             # Library is not defined, try to infer
             _logger.info("Library for '%s' not set, inferring it", path)
             library = self._inferLibraryIfNeeded(path)
             if library is not None:
                 self._updatePathLibrary(path, library)
 
-        return self._libraries.get(path, None)
+        return self._library_map.get(path, None)
 
     def _parseSourceIfNeeded(self, path):
         # type: (Path) -> None
@@ -400,7 +398,7 @@ class Database(HashableByKey):
 
         src_parser = getSourceParserFromPath(path)
         self._design_units |= src_parser.getDesignUnits()
-        self._dependencies[path] = src_parser.getDependencies()
+        self._dependencies_map[path] = src_parser.getDependencies()
         self._clearLruCaches()
 
     def _clearLruCaches(self):
@@ -428,9 +426,9 @@ class Database(HashableByKey):
         Returns parsed dependencies for the given path
         """
         self._parseSourceIfNeeded(path)
-        if path not in self._dependencies:
+        if path not in self._dependencies_map:
             return frozenset()
-        return frozenset(self._dependencies[path])
+        return frozenset(self._dependencies_map[path])
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]
@@ -492,7 +490,7 @@ class Database(HashableByKey):
         project
         """
         result = []  # List[Identifier]
-        for path, dependencies in self._dependencies.items():
+        for path, dependencies in self._dependencies_map.items():
             for dependency in dependencies:
                 library = dependency.library
                 if library is None or name != dependency.name:
@@ -501,7 +499,7 @@ class Database(HashableByKey):
                 # If the dependency's library refers to 'work', it's actually
                 # referring to the library its owner is in
                 if library is None:
-                    library = self._libraries.get(path, None)
+                    library = self._library_map.get(path, None)
                 if library is not None:
                     result.append(library)
 
@@ -562,7 +560,7 @@ class Database(HashableByKey):
 
         for dependency in (
             dependency
-            for dependency in chain.from_iterable(self._dependencies.values())
+            for dependency in chain.from_iterable(self._dependencies_map.values())
             if (library, name) == (dependency.library, dependency.name)
         ):
 
@@ -618,7 +616,7 @@ class Database(HashableByKey):
                     dependency.name,
                 )
                 for search_path in search_paths
-                for dependency in self._dependencies[search_path]
+                for dependency in self._dependencies_map[search_path]
             } - units
 
             _logger.debug(
@@ -680,7 +678,7 @@ class Database(HashableByKey):
 
                 deps = {
                     (x.library or self.getLibrary(x.owner), x.name)
-                    for x in self._dependencies[current_path]
+                    for x in self._dependencies_map[current_path]
                     if x.library not in builtin_libraries
                 }
 

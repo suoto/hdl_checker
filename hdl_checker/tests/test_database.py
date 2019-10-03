@@ -72,12 +72,12 @@ class _Database(Database):
         _logger.debug("- %d paths:", len(self._paths))
         for path in self._paths:
             timestamp = self._parse_timestamp[path]
-            dependencies = self._dependencies.get(
+            dependencies = self._dependencies_map.get(
                 path, set()
             )  # type: Set[DependencySpec]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
-            _logger.debug("    - library:      : %s", self._libraries.get(path, "<??>"))
-            _logger.debug("    - flags:        : %s", self._flags.get(path, "-"))
+            _logger.debug("    - library:      : %s", self._library_map.get(path, "?"))
+            _logger.debug("    - flags:        : %s", self._flags_map.get(path, "-"))
             _logger.debug("    - %d dependencies:", len(dependencies))
             for dependency in dependencies:
                 _logger.debug("      - %s", dependency)
@@ -479,12 +479,12 @@ class TestDatabase(TestCase):
         self.assertCountEqual(database.design_units, recovered.design_units)
         self.assertCountEqual(database._paths, recovered._paths)
         self.assertDictEqual(database._parse_timestamp, recovered._parse_timestamp)
-        self.assertDictEqual(database._libraries, recovered._libraries)
+        self.assertDictEqual(database._library_map, recovered._library_map)
         self.assertCountEqual(
             database._inferred_libraries, recovered._inferred_libraries
         )
-        self.assertDictEqual(database._flags, recovered._flags)
-        self.assertDictEqual(database._dependencies, recovered._dependencies)
+        self.assertDictEqual(database._flags_map, recovered._flags_map)
+        self.assertDictEqual(database._dependencies_map, recovered._dependencies_map)
 
     def test_removing_a_path_that_was_added(self):
         self.database._configFromSources(
@@ -847,85 +847,6 @@ class TestMultilevelCircularDependencies(TestCase):
             self.database.test_getDependenciesUnits(_Path("unit_d.vhd")),
             {("work", "unit_a"), ("work", "unit_b"), ("work", "unit_c")},
         )
-
-
-#  class TestAmbiguousSourceSet(TestCase):
-#      # Create the following setup:
-#      # - Library 'lib' with 'pkg_in_lib':
-#      #   - All sources using 'lib.pkg_in_lib' should work
-#      #   - Sources inside 'lib' should be able to use 'lib.pkg_in_lib' or
-#      #     'work.pkg_in_lib'
-#      # - Source without library set, with entity 'pkg_in_indirect'
-#      #   - Every source using this package should use
-#      #     'indirect.pkg_in_indirect'
-#      #   - At least one source in 'indirect' referring to 'pkg_in_indirect'
-#      #     as 'work.pkg_in_indirect'
-#      # - Source without library set, with entity 'pkg_in_implicit'
-#      #   - Every source using this package should use
-#      #     'implicit.pkg_in_implicit'
-
-#      # Test that we can infer the correct libraries:
-#      # If the library is not set for the a given path, try to guess it by
-#      # (1) given every design unit defined in this file
-#      # (2) search for every file that also depends on it and
-#      # (3) identify which library is used
-#      # If all of them converge on the same library name, just use that.
-#      # If there's no agreement, use the library that satisfies the path
-#      # in question but warn the user that something is not right
-
-#      def setUp(self):
-#          # type: (...) -> Any
-#          _logger.info("Setting up %s", self)
-#          self.database = _Database()
-
-#          sources = {
-#              _SourceMock(
-#                  filename=_path("top.vhd"),
-#                  library="lib",
-#                  design_units=[{"name": "top", "type": "entity"}],
-#                  dependencies=[
-#                      ("ieee", "std_logic_unsigned"),
-#                      ("lib", "some_package"),
-#                      ("lib", "some_entity"),
-#                  ],
-#              ),
-#              _SourceMock(
-#                  filename=_path("some_entity.vhd"),
-#                  library="lib",
-#                  design_units=[{"name": "some_entity", "type": "entity"}],
-#              ),
-#              _SourceMock(
-#                  filename=_path("some_package.vhd"),
-#                  library="lib",
-#                  design_units=[{"name": "some_package", "type": "package"}],
-#              ),
-#              _SourceMock(
-#                  filename=_path("not_a_dependency.vhd"),
-#                  design_units=[{"name": "not_a_dependency", "type": "package"}],
-#                  dependencies=[("lib", "top")],
-#              ),
-#          }
-
-#          self.database._configFromSources(sources, TEST_TEMP_PATH)
-
-#      def tearDown(self):
-#          # type: (...) -> Any
-#          _logger.info("Tearing down %s", self)
-#          self.database.test_reportCacheInfo()
-#          del self.database
-
-#      def test_get_the_correct_build_sequence(self):
-#          # type: (...) -> Any
-#          sequence = tuple(self.database.test_getBuildSequence(_Path("top.vhd")))
-
-#          # Both are on the same level, their order don't matter
-#          self.assertCountEqual(
-#              sequence,
-#              {
-#                  (Identifier("lib"), _Path("some_package.vhd")),
-#                  (Identifier("lib"), _Path("some_entity.vhd")),
-#              },
-#          )
 
 
 class TestIndirectLibraryInference(TestCase):
