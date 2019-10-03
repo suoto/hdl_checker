@@ -49,6 +49,7 @@ CLASS_MAP = {
     "Identifier": Identifier,
     "MSim": MSim,
     "Path": path.Path,
+    "TemporaryPath": path.TemporaryPath,
     "VerilogIdentifier": VerilogIdentifier,
     "VerilogParser": VerilogParser,
     "VhdlDesignUnit": VhdlDesignUnit,

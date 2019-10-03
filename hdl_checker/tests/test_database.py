@@ -28,6 +28,8 @@ import time
 from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple
 
+from mock import patch
+
 from hdl_checker.tests import (
     SourceMock,
     TestCase,
@@ -41,7 +43,7 @@ from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path
+from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
 from hdl_checker.types import BuildFlagScope, FileType
 
@@ -617,6 +619,24 @@ class TestDatabase(TestCase):
             self.database.getDiagnosticsForPath(path), [PathNotInProjectFile(path)]
         )
 
+    def test_temporary_paths_dont_generate_path_not_in_project(self):
+        # type: (...) -> Any
+        path = _path("foo.vhd")
+
+        self.database._clearLruCaches()
+
+        # Temporary paths should NOT generate PathNotInProjectFile diagnostic
+        with patch.object(self.database, "_addDiagnostic") as meth:
+            self.database.getLibrary(TemporaryPath(path))
+            meth.assert_not_called()
+
+        self.database._clearLruCaches()
+
+        # Regular paths should generate PathNotInProjectFile diagnostic
+        with patch.object(self.database, "_addDiagnostic") as meth:
+            self.database.getLibrary(Path(path))
+            meth.assert_called_once_with(PathNotInProjectFile(Path(path)))
+
 
 class TestDirectDependencies(TestCase):
     def setUp(self):
@@ -1016,3 +1036,64 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             },
             self.database.getDiagnosticsForPath(_Path("no_lib_target.vhd")),
         )
+        self.assertNotEqual(
+            list(
+                self.database.getPathsDefining(
+                    name=Identifier("no_lib_package"), library=None
+                )
+            ),
+            [],
+        )
+
+    def test_temporary_paths_dont_generate_diagnostics(self):
+        # type: (...) -> Any
+
+        # Create a copy of a source file with same contents but a different
+        # name to mimic getting info from a dump (which is in itself a version
+        # of an existing file)
+        _SourceMock(
+            filename=_path("no_lib_package_3.vhd"),
+            library=None,
+            design_units=[{"name": "no_lib_package", "type": "package"}],
+        )
+        # This file should be added so that the database is aware of its
+        # existence.
+
+        # Add this as a regular file to make sure the test will fail
+        self.database.addSource(_Path("no_lib_package_3.vhd"), None)
+        with self.assertRaises(AssertionError):
+            self.test_non_unique_units_are_reported()
+        self.database.removeSource(_Path("no_lib_package_3.vhd"))
+
+        # Now add the same path using TemporaryPath, which should make the
+        # previous test pass
+        self.database.addSource(TemporaryPath(_path("no_lib_package_3.vhd")), None)
+
+        # Test should run exactly the same as before. If we added using the
+        # path.Path class, the test would have failed
+        self.test_non_unique_units_are_reported()
+
+    def test_temporary_paths_are_excluded(self):
+        # type: (...) -> Any
+        # This should add diagnostics
+        with patch.object(self.database, "_addDiagnostic") as meth:
+            name = Identifier("no_lib_package")
+            choices = {_Path("no_lib_package_1.vhd"), _Path("no_lib_package_2.vhd")}
+            self.database._reportDependencyNotUnique(
+                name=name, library=None, choices=choices
+            )
+
+            meth.assert_called()
+
+        # This should not
+        with patch.object(self.database, "_addDiagnostic") as meth:
+            name = Identifier("no_lib_package")
+            choices = {
+                _Path("no_lib_package_1.vhd"),
+                TemporaryPath(_path("no_lib_package_2.vhd")),
+            }
+            self.database._reportDependencyNotUnique(
+                name=name, library=None, choices=choices
+            )
+
+            meth.assert_not_called()

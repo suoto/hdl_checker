@@ -31,13 +31,17 @@ from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Union
 import six
 
 from hdl_checker import CACHE_NAME, WORK_PATH
-from hdl_checker.builder_utils import getBuilderByName, getVunitSources, getWorkingBuilders
+from hdl_checker.builder_utils import (
+    getBuilderByName,
+    getVunitSources,
+    getWorkingBuilders,
+)
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType, PathNotInProjectFile
 from hdl_checker.parsers.config_parser import ConfigParser
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path
+from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
 from hdl_checker.static_check import getStaticMessages
 from hdl_checker.types import (
@@ -451,7 +455,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         ext = path.name.split(".")[-1]
         temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
 
-        temp_path = Path(temporary_file.name)
+        temp_path = TemporaryPath(temporary_file.name)
 
         # If the reference path was added to the database, add the
         # temporary file with the same attributes
@@ -473,8 +477,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # file by content. In this case, we'll assume the empty filenames
         # refer to the same filename we got in the first place
         for diag in self.getMessagesByPath(temp_path):
-            if isinstance(diag, PathNotInProjectFile):
-                continue
             diag.filename = path
             diag.text = diag.text.replace(temporary_file.name, path.name)
             diags.add(diag)

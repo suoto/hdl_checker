@@ -44,7 +44,7 @@ from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import tAnyDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path
+from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
 from hdl_checker.utils import HashableByKey, getMostCommonItem, isFileReadable
 
@@ -354,7 +354,8 @@ class Database(HashableByKey):
             self._updatePathLibrary(path, Identifier("not_in_project", True))
             # If path is not on the list of paths added, report this. If the
             # config is valid
-            self._addDiagnostic(PathNotInProjectFile(path))
+            if not isinstance(path, TemporaryPath):
+                self._addDiagnostic(PathNotInProjectFile(path))
 
         elif path not in self._library_map:
             # Library is not defined, try to infer
@@ -537,6 +538,8 @@ class Database(HashableByKey):
             else:
                 units = units_matching_library
 
+        # These include paths and temporary paths, which is what this method
+        # should return but useless when reporting dependencies not unique.
         paths = {unit.owner for unit in units}
 
         if len(paths) > 1:
@@ -554,6 +557,12 @@ class Database(HashableByKey):
         Reports a dependency failed to be resolved due to multiple files
         defining the required design unit
         """
+        # Filter out of choices paths that are temporary. If that reduces the
+        # choices to 1 element, there's no need to report anything
+        choices = {x for x in choices if not isinstance(x, TemporaryPath)}
+        if len(choices) < 2:
+            return
+
         # Reverse dependency search. Need to evaluate how this performs, but
         # we'll try to avoid creating a set to store DependencySpec objects for
         # now

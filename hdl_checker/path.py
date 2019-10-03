@@ -120,3 +120,10 @@ class Path(object):
         obj._name = state["name"]
 
         return obj
+
+class TemporaryPath(Path):
+    """
+    Class made just to differentiate a path from a temporary path created to
+    dump a source's content
+    """
+    pass
