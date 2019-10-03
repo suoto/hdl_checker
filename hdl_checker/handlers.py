@@ -78,13 +78,13 @@ def _getServerByProjectFile(project_file):
     if isinstance(project_file, str) and project_file.lower() == "none":
         project_file = None
 
-    if project_file not in servers:
-        # If there's no project file to use, create a temporary path to use
-        if project_file is None:
-            root_dir = Path(tempfile.mkdtemp())
-        else:
-            root_dir = Path(p.dirname(project_file))
+    # If there's no project file to use, create a temporary path to use
+    if project_file is None:
+        root_dir = Path(tempfile.mkdtemp())
+    else:
+        root_dir = Path(p.dirname(project_file))
 
+    if root_dir not in servers:
         _logger.info("Creating server for %s (root=%s)", project_file, root_dir)
         try:
             project = HdlCodeCheckerServer(root_dir=root_dir)
