@@ -25,6 +25,7 @@ import tempfile
 import traceback
 from collections import namedtuple
 from multiprocessing.pool import ThreadPool
+from threading import RLock
 from pprint import pformat
 from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Union
 
@@ -81,6 +82,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # pad, everything within it may be deleted or changed
         self.work_dir = Path(p.join(str(self.root_dir), WORK_PATH))
 
+        self._lock = RLock()
         self.config_file = None  # type: Optional[WatchedFile]
 
         self.database = Database()
@@ -449,44 +451,46 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
         """
-        _logger.info("Getting messages for '%s' with content", path)
-        self._updateConfigIfNeeded()
+        with self._lock:
+            _logger.info("Getting messages for '%s' with content", path)
+            self._updateConfigIfNeeded()
 
-        ext = path.name.split(".")[-1]
-        temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
+            ext = path.name.split(".")[-1]
+            temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
 
-        temp_path = TemporaryPath(temporary_file.name)
+            temp_path = TemporaryPath(temporary_file.name)
 
-        # If the reference path was added to the database, add the
-        # temporary file with the same attributes
-        if path in self.database.paths:
-            library = self.database.getLibrary(path)
-            self.database.addSource(
-                temp_path,
-                getattr(library, "display_name", None),
-                self.database.getFlags(path, BuildFlagScope.single),
-                self.database.getFlags(path, BuildFlagScope.dependencies),
-            )
+            temporary_file.file.write(toBytes(content))  # type: ignore
+            temporary_file.close()
 
-        temporary_file.file.write(toBytes(content))  # type: ignore
-        temporary_file.close()
 
-        diags = set()  # type: Set[CheckerDiagnostic]
+            # If the reference path was added to the database, add the
+            # temporary file with the same attributes
+            if path in self.database.paths:
+                library = self.database.getLibrary(path)
+                self.database.addSource(
+                    temp_path,
+                    getattr(library, "display_name", None),
+                    self.database.getFlags(path, BuildFlagScope.single),
+                    self.database.getFlags(path, BuildFlagScope.dependencies),
+                )
 
-        # Some messages may not include the filename field when checking a
-        # file by content. In this case, we'll assume the empty filenames
-        # refer to the same filename we got in the first place
-        for diag in self.getMessagesByPath(temp_path):
-            diag.filename = path
-            diag.text = diag.text.replace(temporary_file.name, path.name)
-            diags.add(diag)
+            diags = set()  # type: Set[CheckerDiagnostic]
 
-        self.database.removeSource(temp_path)
-        removeIfExists(temporary_file.name)
+            # Some messages may not include the filename field when checking a
+            # file by content. In this case, we'll assume the empty filenames
+            # refer to the same filename we got in the first place
+            for diag in self.getMessagesByPath(temp_path):
+                diag.filename = path
+                diag.text = diag.text.replace(temporary_file.name, path.name)
+                diags.add(diag)
 
-        diags |= set(self.database.getDiagnosticsForPath(path))
+            self.database.removeSource(temp_path)
+            removeIfExists(temporary_file.name)
 
-        if self.config_file and path not in self.database.paths:
-            diags.add(PathNotInProjectFile(path))
+            diags |= set(self.database.getDiagnosticsForPath(path))
+
+            if self.config_file and path not in self.database.paths:
+                diags.add(PathNotInProjectFile(path))
 
         return diags
