@@ -243,21 +243,17 @@ with such.A("hdl_checker project") as it:
 
         @it.should("recover from cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        def test():
+        @patch('hdl_checker.hdl_checker_base.HdlCodeCheckerBase._setState')
+        def test(set_state):
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
 
             it.project.getMessagesByPath(source.filename)
 
-            project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+            _ = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
 
-            cache_filename = project._getCacheFilename()
-
-            it.assertIn(
-                ("info", "Recovered cache from '{}'".format(cache_filename)),
-                list(it.project.getUiMessages()),
-            )
+            set_state.assert_called_once()
 
             # Setting the config file should not trigger reparsing
             with patch.object(it.project, "_readConfig") as readConfig:

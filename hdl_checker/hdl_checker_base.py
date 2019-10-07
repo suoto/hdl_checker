@@ -246,7 +246,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         try:
             cache = json.load(open(cache_fname.name, "r"), object_hook=jsonObjectHook)
-            self._handleUiInfo("Recovered cache from '{}'".format(cache_fname))
+            _logger.debug("Recovered cache from '%s'", cache_fname)
         except IOError:
             _logger.debug("Couldn't read cache file %s, skipping recovery", cache_fname)
             return

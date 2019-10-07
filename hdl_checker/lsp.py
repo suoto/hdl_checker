@@ -225,7 +225,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # sources automatically
         config = SimpleFinder([self.workspace.root_path]).generate()
         self.workspace.show_message(
-            "Added {} files from {}".format(
+            "Adding {} files from {}".format(
                 len(config["sources"]), self.workspace.root_path
             ),
             defines.MessageType.Info,
