@@ -153,53 +153,54 @@ class Database(HashableByKey):
         Removes a path from the database. No error is raised if the path wasn't
         added previously. In this case, avoid clearning LRU caches
         """
-        _logger.debug("Removing %s from database", path)
+        _logger.info("Removing %s from database", path)
         clear_lru_caches = False
 
-        units = frozenset(self._getDesignUnitsByPath(path))
-        self._design_units -= units
+        with self._lock:
+            units = frozenset(self._getDesignUnitsByPath(path))
+            self._design_units -= units
 
-        if units:
-            clear_lru_caches = True
+            if units:
+                clear_lru_caches = True
 
-        try:
-            self._paths.remove(path)
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                self._paths.remove(path)
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        try:
-            del self._parse_timestamp[path]
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                del self._parse_timestamp[path]
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        try:
-            del self._library_map[path]
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                del self._library_map[path]
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        try:
-            del self._flags_map[path]
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                del self._flags_map[path]
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        try:
-            del self._dependencies_map[path]
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                del self._dependencies_map[path]
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        try:
-            del self._diags[path]
-            clear_lru_caches = True
-        except KeyError:
-            pass
+            try:
+                del self._diags[path]
+                clear_lru_caches = True
+            except KeyError:
+                pass
 
-        if clear_lru_caches:
-            self._clearLruCaches()
+            if clear_lru_caches:
+                self._clearLruCaches()
 
     def _addDiagnostic(self, diagnostic):
         # type: (CheckerDiagnostic) -> None
@@ -390,17 +391,22 @@ class Database(HashableByKey):
         items before
         """
         _logger.debug("Parsing %s", path)
-        # Update the timestamp
-        self._parse_timestamp[path] = p.getmtime(str(path))
-
-        # Remove all design units that referred to this path before adding new
-        # ones, but use the non API method for that to avoid recursing
-        self._design_units -= frozenset(self._getDesignUnitsByPath(path))
 
         src_parser = getSourceParserFromPath(path)
-        self._design_units |= src_parser.getDesignUnits()
-        self._dependencies_map[path] = src_parser.getDependencies()
-        self._clearLruCaches()
+        design_units = src_parser.getDesignUnits()
+        dependencies = src_parser.getDependencies()
+
+        with self._lock:
+            # Update the timestamp
+            self._parse_timestamp[path] = p.getmtime(str(path))
+
+            # Remove all design units that referred to this path before adding new
+            # ones, but use the non API method for that to avoid recursing
+            self._design_units -= frozenset(self._getDesignUnitsByPath(path))
+
+            self._design_units |= design_units
+            self._dependencies_map[path] = dependencies
+            self._clearLruCaches()
 
     def _clearLruCaches(self):
         "Clear caches from lru_caches"
