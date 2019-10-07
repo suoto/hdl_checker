@@ -689,10 +689,16 @@ class Database(HashableByKey):
                     for x in self.getDesignUnitsByPath(current_path)
                 }
 
+                # Filter out dependencies that are on the 'use foo.all'
+                # because this only indicates that a source needs a given
+                # library to exist (which is handled by the builder).
+                # Also filter out dependencies that are provided natively by
+                # the builder.
                 deps = {
                     (x.library or self.getLibrary(x.owner), x.name)
                     for x in self._dependencies_map[current_path]
-                    if x.library not in builtin_libraries
+                    if x.name != Identifier("all", False)
+                    and x.library not in builtin_libraries
                 }
 
                 # Units still needed are the ones we haven't seen before
