@@ -147,7 +147,6 @@ def getVunitSources(builder):
         return
 
     for source in sources:
-        _logger.info("Source: %s", source)
         path = p.abspath(source.name)
         library = source.library.name
 

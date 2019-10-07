@@ -373,7 +373,7 @@ class Database(HashableByKey):
         Parses a given path if needed, removing info from the database prior to that
         """
         if not isFileReadable(path):
-            _logger.info("Won't parse file that's not readable %s", path)
+            _logger.warning("Won't parse file that's not readable %s", repr(path))
             return
 
         # Sources will get parsed on demand
@@ -518,12 +518,10 @@ class Database(HashableByKey):
         """
         Search for paths that define a given name optionally inside a library.
         """
-        _logger.debug("Searching for paths defining %s.%s", library, name)
-
         units = {unit for unit in self.design_units if unit.name == name}
 
         if not units:
-            _logger.info(
+            _logger.debug(
                 "Could not find any source defining name=%s, library=%s", name, library
             )
             return ()
@@ -548,11 +546,11 @@ class Database(HashableByKey):
         # should return but useless when reporting dependencies not unique.
         paths = {unit.owner for unit in units}
 
-        if len(paths) > 1:
-            _logger.info(
-                "%s/%s is defined in %d files: %s", library, name, len(paths), paths
-            )
+        _logger.debug(
+            "There's %d path(s) defining %s.%s: %s", len(paths), library, name, paths
+        )
 
+        if len(paths) > 1:
             self._reportDependencyNotUnique(library=library, name=name, choices=paths)
 
         return paths
