@@ -19,7 +19,7 @@
 import setuptools
 import versioneer
 
-LONG_DESCRIPTION = open("README.md", "r").read()
+LONG_DESCRIPTION = open("README.md", "rb").read().decode(encoding='utf8', errors='replace')
 
 CLASSIFIERS = """\
 Development Status :: 5 - Production/Stable
