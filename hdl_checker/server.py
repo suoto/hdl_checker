@@ -107,7 +107,7 @@ def parseArguments():
     args = parser.parse_args()
 
     if args.version:
-        print(version)
+        sys.stdout.write("%s\n" % version)
         sys.exit(0)
 
     if args.lsp:

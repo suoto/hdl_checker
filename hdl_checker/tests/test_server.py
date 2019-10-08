@@ -27,8 +27,8 @@ import time
 from multiprocessing import Event, Process, Queue
 from threading import Thread
 
-import mock
 import requests
+from mock import MagicMock, patch
 
 from pyls import uris  # type: ignore
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
@@ -38,7 +38,7 @@ from nose2.tools import such  # type: ignore
 from hdl_checker.tests import disableVunit, getTestTempPath
 
 import hdl_checker.lsp
-from hdl_checker.utils import ON_WINDOWS, isProcessRunning, terminateProcess
+from hdl_checker.utils import ON_LINUX, ON_WINDOWS, isProcessRunning, terminateProcess
 
 _logger = logging.getLogger(__name__)
 
@@ -135,6 +135,21 @@ with such.A("hdl_checker server") as it:
         "--log-stream",
         p.join(TEST_LOG_PATH, "tests.log"),
     ]
+
+    @it.should("return hdl_checker version")
+    @disableVunit
+    def test():
+        from hdl_checker import server
+        from hdl_checker import __version__ as version
+
+        with patch.object(server, "sys") as sys:
+            with patch.object(
+                server.argparse._sys, "argv", [p.abspath(server.__file__), "--version"]
+            ):
+                server.parseArguments()
+
+        sys.stdout.write.assert_called_with(version + "\n")
+        sys.exit.assert_called_with(0)
 
     with it.having("http server"):
 
@@ -243,7 +258,7 @@ with such.A("hdl_checker server") as it:
             it._server.terminate()
             terminateProcess(it._server.pid)
 
-        @it.should("start and respond a request")
+        @it.should("start and respond a request")  # type: ignore
         @disableVunit
         def test():
             startCodeCheckerServer()
@@ -337,13 +352,13 @@ with such.A("hdl_checker server") as it:
             # Python 2 won't allow to mock sys.stdout.write directly
             import sys
 
-            stdout = mock.MagicMock(spec=sys.stdout)
-            stdout.write = mock.MagicMock(spec=sys.stdout.write)
+            stdout = MagicMock(spec=sys.stdout)
+            stdout.write = MagicMock(spec=sys.stdout.write)
 
-            with mock.patch(
+            with patch(
                 "hdl_checker.server.start_io_lang_server", _start_io_lang_server
             ):
-                with mock.patch("hdl_checker.server.sys.stdout", stdout):
+                with patch("hdl_checker.server.sys.stdout", stdout):
                     with it.assertRaises(AssertionError):
                         hdl_checker.server.run(args)
 
@@ -378,6 +393,29 @@ with such.A("hdl_checker server") as it:
 
             stdout.write.assert_called_once_with(response)
 
+        @it.should("log to temporary files if files aren't specified")  # type: ignore
+        @disableVunit
+        def test():
+            from hdl_checker import server
+
+            with patch.object(
+                server.argparse._sys, "argv", [p.abspath(server.__file__)]
+            ):
+                args = server.parseArguments()
+
+            it.assertIs(args.log_stream, server.sys.stdout)
+
+            if ON_LINUX:
+                it.assertEqual(
+                    p.basename(args.stderr),
+                    "hdl_checker_stderr_pid{}.log".format(os.getpid()),
+                )
+            else:
+                it.assertTrue(
+                    p.basename(args.stderr).startswith("hdl_checker_stderr_pid"),
+                    "stderr log should not be {}".format(args.stderr),
+                )
+
     with it.having("LSP server executable"):
 
         def assertCommandPrints(cmd, stdout, **kwargs):
@@ -385,7 +423,7 @@ with such.A("hdl_checker server") as it:
             output = subp.check_output(cmd, **kwargs).decode().strip()
             it.assertEqual(output, stdout)
 
-        @it.should("report version correctly")  # type: ignore
+        @it.should("report version correctly")
         def test():
             assertCommandPrints(["hdl_checker", "--version"], hdl_checker.__version__)
 
@@ -433,9 +471,6 @@ with such.A("hdl_checker server") as it:
             for line in expected:
                 it.assertIn(line, "\n".join(log_content))
 
-            #  it.assertEqual(log_content[: len(expected)], expected)
-            #  it.fail("stop")
-
             os.remove(log_file)
 
         @it.should(  # type: ignore
@@ -454,6 +489,36 @@ with such.A("hdl_checker server") as it:
         @it.should("start server given the --lsp flag")  # type: ignore
         def test():
             startServerWrapper(["hdl_checker", "--lsp"])
+
+        @it.should("log to temporary files if files aren't specified")  # type: ignore
+        @disableVunit
+        def test():
+            from hdl_checker import server
+
+            with patch.object(
+                server.argparse._sys, "argv", [p.abspath(server.__file__), "--lsp"]
+            ):
+                args = server.parseArguments()
+
+            if ON_LINUX:
+                it.assertEqual(
+                    p.basename(args.log_stream),
+                    "hdl_checker_log_pid{}.log".format(os.getpid()),
+                )
+
+                it.assertEqual(
+                    p.basename(args.stderr),
+                    "hdl_checker_stderr_pid{}.log".format(os.getpid()),
+                )
+            else:
+                it.assertTrue(
+                    p.basename(args.log_stream).startswith("hdl_checker_log_pid"),
+                    "log file should not be {}".format(args.stderr),
+                )
+                it.assertTrue(
+                    p.basename(args.stderr).startswith("hdl_checker_stderr_pid"),
+                    "stderr file should not be {}".format(args.stderr),
+                )
 
 
 it.createTests(globals())
