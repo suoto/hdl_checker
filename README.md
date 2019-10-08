@@ -44,7 +44,7 @@ for more info on how to use it.
 $ hdl_checker -h
 usage: hdl_checker [-h] [--host HOST] [--port PORT] [--lsp]
              [--attach-to-pid ATTACH_TO_PID] [--log-level LOG_LEVEL]
-             [--log-stream LOG_STREAM] [--nocolor] [--stdout STDOUT]
+             [--log-stream LOG_STREAM] [--stdout STDOUT]
              [--stderr STDERR] [--version]
 
 optional arguments:
@@ -61,8 +61,6 @@ optional arguments:
                         [HTTP, LSP] Log file, defaults to stdout when in HTTP
                         or a temporary file named hdl_checker_log_pid<PID>.log when
                         in LSP mode
-  --nocolor             [HTTP, LSP] Enables colored logging (defaults to
-                        false)
   --stdout STDOUT       [HTTP] File to redirect stdout to. Defaults to a
                         temporary file named hdl_checker_stdout_pid<PID>.log
   --stderr STDERR       [HTTP] File to redirect stdout to. Defaults to a

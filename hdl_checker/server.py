@@ -70,12 +70,6 @@ def parseArguments():
         help="[HTTP, LSP] Log file, defaults to stdout when in HTTP or a "
         "temporary file named hdl_checker_log_pid<PID>.log when in LSP mode",
     )
-    parser.add_argument(
-        "--nocolor",
-        action="store_true",
-        default=False,
-        help="[HTTP, LSP] Enables colored logging (defaults to false)",
-    )
 
     parser.add_argument(
         "--stdout",
@@ -123,9 +117,6 @@ def parseArguments():
     args.stderr = args.stderr or getTemporaryFilename("stderr")
 
     args.log_level = args.log_level or logging.INFO
-    args.color = not args.nocolor
-
-    del args.nocolor
 
     return args
 
@@ -206,7 +197,7 @@ def startServer(args):
     Import modules and tries to start a hdl_checker server
     """
     if args.log_stream:
-        setupLogging(args.log_stream, args.log_level, args.color)
+        setupLogging(args.log_stream, args.log_level)
 
     globals()["_logger"] = logging.getLogger(__name__)
 

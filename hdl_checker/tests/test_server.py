@@ -344,7 +344,6 @@ with such.A("hdl_checker server") as it:
                     "log_level": SERVER_LOG_LEVEL,
                     "stderr": p.join(TEST_LOG_PATH, "hdl_checker-stderr.log"),
                     "log_stream": p.join(TEST_LOG_PATH, "tests.log"),
-                    "color": None,
                     "attach_to_pid": None,
                 },
             )
@@ -430,7 +429,7 @@ with such.A("hdl_checker server") as it:
         def startServerWrapper(cmd):
             log_file = tempfile.mktemp()
 
-            actual_cmd = cmd + ["--nocolor", "--log-stream", log_file]
+            actual_cmd = cmd + ["--log-stream", log_file]
 
             _logger.info("Actual command: %s", actual_cmd)
 

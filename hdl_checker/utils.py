@@ -27,7 +27,6 @@ import subprocess as subp
 import sys
 from collections import Counter
 from tempfile import NamedTemporaryFile
-from threading import Lock
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
 
 import six
@@ -41,54 +40,23 @@ ON_LINUX = sys.platform == "linux"
 ON_MAC = sys.platform == "darwin"
 
 
-def setupLogging(stream, level, color=True):  # pragma: no cover
+def setupLogging(stream, level):  # pragma: no cover
     "Setup logging according to the command line parameters"
-
     if isinstance(stream, six.string_types):
-
-        class Stream(object):  # pylint: disable=useless-object-inheritance
-            """
-            File subclass that allows RainbowLoggingHandler to write
-            with colors
-            """
-
-            _lock = Lock()
-            _color = color
-
-            def __init__(self, *args, **kwargs):
-                self._fd = open(*args, **kwargs)
-
-            def isatty(self):
-                """
-                Tells if this stream accepts control chars
-                """
-                return self._color
-
-            def write(self, text):
-                """
-                Writes to the stream
-                """
-                with self._lock:
-                    self._fd.write(toBytes(text))
-
-        _stream = Stream(stream, "ab", buffering=0)
+        _stream = open(stream, "a")
     else:
         _stream = stream
 
-    try:
-        # This is mostly for debugging when doing stuff directly from a
-        # terminal
-        from rainbow_logging_handler import RainbowLoggingHandler  # type: ignore
+    handler = logging.StreamHandler(_stream)
+    handler.formatter = logging.Formatter(
+        "%(levelname)-7s | %(asctime)s | "
+        + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
+        + "|\t%(message)s",
+        datefmt="%H:%M:%S",
+    )
 
-        handler = RainbowLoggingHandler(_stream)
-    except ImportError:  # pragma: no cover
-        handler = logging.StreamHandler(_stream)
-        handler.formatter = logging.Formatter(
-            "%(levelname)-7s | %(asctime)s | "
-            + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
-            + "|\t%(message)s",
-            datefmt="%H:%M:%S",
-        )
+    logging.root.addHandler(handler)
+    logging.root.setLevel(level)
 
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("pynvim").setLevel(logging.WARNING)
@@ -97,8 +65,6 @@ def setupLogging(stream, level, color=True):  # pragma: no cover
     logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
     logging.getLogger("pyls_jsonrpc.endpoint").setLevel(logging.INFO)
-    logging.root.addHandler(handler)
-    logging.root.setLevel(level)
 
 
 # From here: http://stackoverflow.com/a/8536476/1672783
