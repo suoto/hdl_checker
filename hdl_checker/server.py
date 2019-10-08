@@ -191,7 +191,7 @@ def run(args):  # pylint: disable=missing-docstring
         startServer(args)
     except Exception as exc:
         if args.lsp:  # pragma: no cover
-            msg = ["Unable to start HDL Checker LSP server: '%s'!" % repr(exc)]
+            msg = ["Unable to start HDL Checker LSP server: %s!" % repr(exc)]
             if args.stderr:
                 msg += ["Check %s for more info" % args.stderr]
             else:

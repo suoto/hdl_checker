@@ -29,7 +29,7 @@ from threading import Thread
 
 import mock
 import requests
-import six
+
 from pyls import uris  # type: ignore
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
 
@@ -38,7 +38,7 @@ from nose2.tools import such  # type: ignore
 from hdl_checker.tests import disableVunit, getTestTempPath
 
 import hdl_checker.lsp
-from hdl_checker.utils import isProcessRunning, ON_WINDOWS, terminateProcess
+from hdl_checker.utils import ON_WINDOWS, isProcessRunning, terminateProcess
 
 _logger = logging.getLogger(__name__)
 
@@ -340,16 +340,19 @@ with such.A("hdl_checker server") as it:
             stdout = mock.MagicMock(spec=sys.stdout)
             stdout.write = mock.MagicMock(spec=sys.stdout.write)
 
-            with mock.patch("hdl_checker.server.start_io_lang_server", _start_io_lang_server):
+            with mock.patch(
+                "hdl_checker.server.start_io_lang_server", _start_io_lang_server
+            ):
                 with mock.patch("hdl_checker.server.sys.stdout", stdout):
                     with it.assertRaises(AssertionError):
                         hdl_checker.server.run(args)
 
-            assertion_msg = "'Expected fail to trigger the test'"
-
-            # Don't know why Python 2 adds an extra comma to the msg
-            if six.PY2:
-                assertion_msg += ","
+            # Grab the message from the method itself
+            try:
+                _start_io_lang_server()
+                it.fail("No exception caught")
+            except AssertionError as exc:
+                assertion_msg = repr(exc)
 
             # Build up the expected response
             body = json.dumps(
@@ -358,8 +361,10 @@ with such.A("hdl_checker server") as it:
                     "jsonrpc": JSONRPC_VERSION,
                     "params": {
                         "message": "Unable to start HDL Checker LSP server: "
-                        "'AssertionError(" + assertion_msg + ")'! "
-                        "Check " + p.abspath(args.stderr) + " for more info",
+                        + assertion_msg
+                        + "! Check "
+                        + p.abspath(args.stderr)
+                        + " for more info",
                         "type": 1,
                     },
                 }
