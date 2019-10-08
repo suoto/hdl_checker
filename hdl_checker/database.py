@@ -695,10 +695,13 @@ class Database(HashableByKey):
                 # Also filter out dependencies that are provided natively by
                 # the builder.
                 deps = {
-                    (x.library or self.getLibrary(x.owner), x.name)
-                    for x in self._dependencies_map[current_path]
-                    if x.name != Identifier("all", False)
-                    and x.library not in builtin_libraries
+                    (
+                        dependency.library or self.getLibrary(dependency.owner),
+                        dependency.name,
+                    )
+                    for dependency in self._dependencies_map[current_path]
+                    if dependency.name.name != "all"
+                    and dependency.library not in builtin_libraries
                 }
 
                 # Units still needed are the ones we haven't seen before
