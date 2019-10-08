@@ -41,7 +41,6 @@ class DependencySpec(ParsedElement):
         self._owner = owner
         self._library = library
         self._name = name
-        assert self._name.name != "identifier", "wtf"
         super(DependencySpec, self).__init__(locations)
 
     @property
@@ -71,7 +70,6 @@ class DependencySpec(ParsedElement):
         )
 
     def __jsonEncode__(self):
-        #  def __init__(self, owner, name, library=None, locations=None):
         return {
             "owner": self.owner,
             "name": self.name,
