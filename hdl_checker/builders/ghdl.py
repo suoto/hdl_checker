@@ -27,7 +27,7 @@ from .base_builder import BaseBuilder
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
-from hdl_checker.types import BuildFlags, FileType
+from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
 from hdl_checker.utils import runShellCommand
 
 
@@ -41,7 +41,9 @@ class GHDL(BaseBuilder):
     file_types = {FileType.vhdl}
 
     # Default build flags
-    default_flags = {"global": {FileType.vhdl: ("-fexplicit", "-frelaxed-rules")}}
+    default_flags = {
+        BuildFlagScope.all: {FileType.vhdl: ("-fexplicit", "-frelaxed-rules")}
+    }
 
     # GHDL specific class properties
     _stdout_message_parser = re.compile(
