@@ -8,8 +8,9 @@
 [![Join the chat at https://gitter.im/suoto/hdl_checker](https://badges.gitter.im/suoto/hdl_checker.svg)](https://gitter.im/suoto/hdl_checker?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdl_checker)
 
-HDL Checker provides a Python API that uses HDL compilers to build a project and
-return info that can be used to populate syntax checkers. It can infer library
+HDL Checker is a language server that wraps VHDL/Verilg/SystemVerilog tools that
+aims to reduce the boilerplate code needed to set things up. It supports
+[Language Server Protocol][LSP] or a custom HTTP interface; can infer library
 VHDL files likely belong to, besides working out mixed language dependencies,
 compilation order, interpreting some compilers messages and providing some
 (limited) static checks.
@@ -17,14 +18,14 @@ compilation order, interpreting some compilers messages and providing some
 ---
 
 * [Installation](#installation)
+* [Editor support](#editor-support)
 * [Usage](#usage)
   * [Third-party tools](#third-party-tools)
-  * [Configuration file](#configuration-file)
+  * [Configuring HDL Checker](#configuring-HDL-Checker)
   * [LSP server](#lsp-server)
   * [HTTP server](#http-server)
 * [Testing](#testing)
 * [Supported systems](#supported-systems)
-* [Editor support](#editor-support)
 * [Style checking](#style-checking)
 * [Issues](#issues)
 * [License](#license)
@@ -34,6 +35,13 @@ compilation order, interpreting some compilers messages and providing some
 ```sh
 pip install hdl_checker
 ```
+
+## Editor support
+
+| Editor | Info                                                         |
+| :---:  | :---                                                         |
+| Vim    | Out of the box via [ALE][ALE], other LSP clients should work |
+| VSCode | Upcoming                                                     |
 
 ## Usage
 
@@ -79,159 +87,7 @@ HDL Checker supports
 
 ### Configuring HDL Checker
 
-HDL Checker can work with or without a configuration file. When not using a
-configuration file and LSP mode, HDL Checker will search for files on the root of
-the workspace and try to work out libraries.
-
-Because automatic library discovery might be incorrect, one can use a JSON
-configuration file to list files or to hint those which libraries were guessed
-incorrectly.
-
-#### Using JSON file
-
-JSON format is as show below:
-
-```json5
-{
-  /*
-   * List of source files (optional, defaults to []).
-   * If specificed, must be a list of either strings or source spec tuples, where
-   * source spec tuple is a tuple in the form [string, dict[string, string]] (see
-   * below for details).
-   */
-  "sources": [
-
-    /*
-     * Sources can be defined solely by their paths. Absolute paths are
-     * unchanged, relative paths are made absolute by using the path to the
-     * configuration file. Sources imported from an included file will follow
-     * the same principle but using the path to the included path.
-     */
-    "/path/to/file_0",
-
-    /*
-     * Tuples can be used to add more info on the path. First element of the
-     * tuple must the a string with the path, second element is optional
-     * (defaults to an empty dictionary). Dictionary can specify the path's
-     * library ({"library": "name_of_the_library"}, special compile
-     * flags({"flags": ["flag_1", "flag_2"]}) or both.
-     */
-    [ "/path/with/library/and/flags", { "library": "foo", "flags": ["-2008"] } ],
-    [ "/path/with/library",           { "library": "foo" } ],
-    [ "/path/with/flags",             { "flags": ["-2008"] } ]
-  ],
-
-  /*
-   * Extra config files to be added to the project (optional, defaults to [])
-   * If specificed, must be a list of stings.
-   */
-  "include": [ "/path/to/another/json/file" ],
-
-  /*
-   * Language / scope specific info (optional, defaults to {}). Setting these,
-   * event if empty, will override values defined per compiler. Flags should be
-   * specified as a list of strings.
-   *
-   * The scope keys are:
-   *   - "single": flags used to build the file being checked
-   *   - "dependencies": flags used to build the dependencies of the file being
-   *     checked
-   *   - "global": flags used on both target and its dependencies
-   *
-   * For example, suppose the compilation sequence for a given source S is A, B,
-   * C and then S. The tool will compile A, B and C using global and dependencies
-   * flags, while S will be compiled using global and single flags.
-   */
-  "vhdl": {
-    "flags": {
-      "single": ["flag_1", "flag_2"],
-      "dependencies": [],
-      "global": []
-    }
-  },
-
-  "verilog": {
-    "flags": {
-      "single": [],
-      "dependencies": [],
-      "global": []
-    }
-  },
-  "systemverilog": {
-    "flags": {
-      "single": [],
-      "dependencies": [],
-      "global": []
-    }
-  }
-}
-```
-
-#### Using legacy `prj` file
-
-Old style project file syntax is as follows:
-
-```bash
-# This is a comment
-
-[ builder = (msim|ghdl|xvhdl) ] # This is being deprecated
-
-[ global_build_flags[ (vhdl|verilog|systemverilog) ] = <language specific flags> ]
-
-# Specifying sources
-(vhdl|verilog|systemverilog) <library name> <path/to/source> [file specific flags]
-```
-
-An example project file could be:
-
-```bash
-# Specifying builder
-# HDL Checker will try to use ModelSim, GHDL and XVHDL in this order, so
-# only add this if you want to force to a particular one
-builder = msim
-
-global_build_flags[vhdl] = -rangecheck
-global_build_flags[verilog] = -lint
-global_build_flags[systemverilog] = -lint
-
-# Relative paths (relative to the project file if using HTTP mode or the project
-# root if using LSP mode)
-vhdl          my_library foo.vhd                               -check_synthesis
-vhdl          my_library foo_tb.vhd                            -2008
-verilog       my_library verilog/a_verilog_file.v              -pedanticerrors
-# Absolute paths are handled as such
-systemverilog my_library /home/user/some_systemverilog_file.sv -pedanticerrors
-# Wildcards are supported
-vhdl          my_library library/*.vhd
-vhdl          my_library library/*/*.vhd
-```
-
-Setting specific flags can be done per language or per file:
-
-```
-global_build_flags[vhdl] = <flags passed to the compiler when building VHDL files>
-global_build_flags[verilog] = <flags passed to the compiler when building Verilog files>
-global_build_flags[systemverilog] = <flags passed to the compiler when building SystemVerilog files>
-```
-
-When unset, HDL Checker sets the following default values depending on the
-compiler being used:
-
-* ModelSim
-
-| Compiler      | ModelSim                                                       |
-| :---:         | :---                                                           |
-| VHDL          | `-lint -pedanticerrors -check_synthesis -rangecheck -explicit` |
-| Verilog       | `-lint -pedanticerrors -hazards`                               |
-| SystemVerilog | `-lint -pedanticerrors -hazards`                               |
-
-* GHDL
-
-| Language      | Flags                        |
-| :---:         | :---                         |
-| VHDL          | `-fexplicit -frelaxed-rules` |
-| Verilog       | N/A                          |
-| SystemVerilog | N/A                          |
+See the [Setting up a new project][Setting-up-a-project] section on the wiki.
 
 ### LSP server
 
@@ -266,18 +122,14 @@ run them, clone this repository and on the root folder run
 ./run_tests.sh
 ```
 
-The container used for testing is [suoto/hdl_checker][hdl_checker_container]
+The container used for testing is [suoto/hdl_checker_test][hdl_checker_container]
 
 ## Supported systems
 
-| System  | CI   | CI status                                                                                                                                                         |
-| :--:    | :--: | :--:                                                                                                                                                              |
-| Linux   | Yes  | [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)                                                         |
+| System  | CI   | CI status                                                                                                                                                               |
+| :--:    | :--: | :--:                                                                                                                                                                    |
+| Linux   | Yes  | [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)                                                   |
 | Windows | Yes  | [![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdl_checker/branch/master) |
-
-## Editor support
-
-* Vim: [vim-hdl](https://github.com/suoto/vim-hdl/)
 
 ---
 
@@ -326,6 +178,7 @@ Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
 HDL Checker's author has no connection or affiliation to any of the
 trademarks mentioned or used by this software.
 
+[ALE]: https://github.com/dense-analysis/ale
 [docker]: https://www.docker.com/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
@@ -334,6 +187,7 @@ trademarks mentioned or used by this software.
 [issue_tracker]: https://github.com/suoto/hdl_checker/issues
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
 [Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
+[Setting-up-a-project]: https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project
 [vim-hdl]: https://github.com/suoto/vim-hdl/
 [Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
 [Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
