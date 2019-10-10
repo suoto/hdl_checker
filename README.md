@@ -38,10 +38,10 @@ pip install hdl_checker
 
 ## Editor support
 
-| Editor | Info                                                         |
-| :---:  | :---                                                         |
-| Vim    | Out of the box via [ALE][ALE], other LSP clients should work |
-| VSCode | Upcoming                                                     |
+| Editor | Info                                                                        |
+| :---:  | :---                                                                        |
+| Vim    | Out of the box via [dense-analysis/ale][ALE], other LSP clients should work |
+| VSCode | [HDL Checker HDL Checker VSCode client][hdl_checker_vscode]                 |
 
 ## Usage
 
@@ -183,6 +183,7 @@ trademarks mentioned or used by this software.
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [hdl_checker_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdl_checker_test
+[hdl_checker_vscode]: https://marketplace.visualstudio.com/items?itemName=suoto.hdl-checker-client
 [Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
 [issue_tracker]: https://github.com/suoto/hdl_checker/issues
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
