@@ -55,6 +55,7 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 _DEFAULT_LIBRARY_NAME = Identifier("library")
+_LIBRARY_WORK = Identifier("work", case_sensitive=False)
 
 UnresolvedLibrary = Union[Identifier, None]
 LibraryUnitTuple = Tuple[UnresolvedLibrary, Identifier]
@@ -490,25 +491,29 @@ class Database(HashableByKey):
         return library
 
     @lru_cache()
-    def getLibrariesReferredByUnit(self, name, library=None):
-        # type: (Identifier, UnresolvedLibrary) -> List[Identifier]
+    def getLibrariesReferredByUnit(self, name):
+        # type: (Identifier) -> List[Identifier]
         """
         Gets libraries that the (library, name) pair is used throughout the
         project
         """
+        _logger.debug("Searching for uses of %s", repr(name))
+
         result = []  # List[Identifier]
         for path, dependencies in self._dependencies_map.items():
             for dependency in dependencies:
-                library = dependency.library
-                if library is None or name != dependency.name:
+                if name != dependency.name:
                     continue
 
                 # If the dependency's library refers to 'work', it's actually
-                # referring to the library its owner is in
-                if library is None:
-                    library = self._library_map.get(path, None)
-                if library is not None:
-                    result.append(library)
+                # referring to the library its owner is in. At this point we
+                # resolve a library name (so that 'work' no longer means 'this
+                # library' and actually means a library named 'work'). Typing
+                # might be a good way of separating which is which
+                if dependency.library is not None:
+                    result.append(dependency.library)
+                else:
+                    result.append(self._library_map.get(path, _LIBRARY_WORK))
 
         return result
 

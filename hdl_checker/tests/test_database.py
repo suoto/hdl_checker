@@ -984,12 +984,12 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             set(self.database.test_getBuildSequence(_Path("no_lib_target.vhd"))),
             (
                 {
-                    (Identifier("library"), _Path("dependency.vhd")),
-                    (Identifier("library"), _Path("no_lib_package_1.vhd")),
+                    (Identifier("work"), _Path("dependency.vhd")),
+                    (Identifier("work"), _Path("no_lib_package_1.vhd")),
                 },
                 {
-                    (Identifier("library"), _Path("dependency.vhd")),
-                    (Identifier("library"), _Path("no_lib_package_2.vhd")),
+                    (Identifier("work"), _Path("dependency.vhd")),
+                    (Identifier("work"), _Path("no_lib_package_2.vhd")),
                 },
             ),
         )
