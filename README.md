@@ -33,7 +33,7 @@ compilation order, interpreting some compilers messages and providing some
 ## Installation
 
 ```sh
-pip install hdl_checker
+pip install hdl-checker
 ```
 
 ## Editor support
