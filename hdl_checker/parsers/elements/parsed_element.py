@@ -16,6 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+from collections import namedtuple
 from typing import Any, FrozenSet, Iterable, Optional, Set, Tuple
 
 from hdl_checker import types as t  # pylint: disable=unused-import
@@ -23,7 +24,7 @@ from hdl_checker.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-Location = Tuple[Any, Any]
+Location = namedtuple("Location", ["line", "column"])
 LocationList = Iterable[Location]
 
 
@@ -33,7 +34,7 @@ class ParsedElement(HashableByKey):
         set_of_locations = set()  # type: Set[Location]
         for line_number, column_number in locations or []:
             set_of_locations.add(
-                (
+                Location(
                     None if line_number is None else int(line_number),
                     None if column_number is None else int(column_number),
                 )

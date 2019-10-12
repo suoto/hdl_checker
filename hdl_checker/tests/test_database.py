@@ -43,6 +43,7 @@ from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
+from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
 from hdl_checker.types import BuildFlagScope, FileType
@@ -270,7 +271,7 @@ class TestDatabase(TestCase):
                     owner=foo_path,
                     name="entity_a",
                     type_=DesignUnitType.entity,
-                    locations={(3, None)},
+                    locations={Location(3, 7)},
                 )
             },
         )
@@ -319,7 +320,7 @@ class TestDatabase(TestCase):
                     owner=_Path("foo.vhd"),
                     name="entity_b",
                     type_=DesignUnitType.entity,
-                    locations={(0, None)},
+                    locations={Location(0, 6)},
                 )
             ],
         )
@@ -1017,8 +1018,8 @@ class TestUnitsDefinedInMultipleSources(TestCase):
                         _Path("no_lib_package_1.vhd"),
                         _Path("no_lib_package_2.vhd"),
                     },
-                    line_number=2,
-                    column_number=5,
+                    line_number=1,
+                    column_number=4,
                 ),
                 DependencyNotUnique(
                     filename=_Path("no_lib_target.vhd"),
@@ -1030,8 +1031,8 @@ class TestUnitsDefinedInMultipleSources(TestCase):
                         _Path("no_lib_package_1.vhd"),
                         _Path("no_lib_package_2.vhd"),
                     },
-                    line_number=4,
-                    column_number=5,
+                    line_number=3,
+                    column_number=4,
                 ),
             },
             self.database.getDiagnosticsForPath(_Path("no_lib_target.vhd")),
