@@ -21,6 +21,7 @@ import functools
 import logging
 import os
 import os.path as p
+import re
 import shutil
 import signal
 import subprocess as subp
@@ -382,3 +383,57 @@ else:
     def readFile(path):
         "Wrapper around open().read() that return \n for new lines"
         return open(path, mode="r", newline="\n").read()
+
+
+REPO_URL = "https://github.com/suoto/hdl_checker"
+
+
+def _getLatestReleaseVersion():
+    # type: () -> Optional[str]
+    """
+    Return the latest tag from https://github.com/suoto/hdl_checker, striping
+    the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to
+    the URL fails, return None
+    """
+    try:
+        tags = [
+            x.decode()
+            for x in subp.check_output(
+                ["git", "ls-remote", "--sort=v:refname", "--tags", REPO_URL],
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stderr=subp.PIPE,
+            ).splitlines()
+        ]
+    except subp.CalledProcessError:
+        _logger.warning("Couldn't fetch latest tag from %s", REPO_URL)
+        return None
+
+    latest = tags[-1].split("/")[-1]
+
+    if not re.match(r"v\d+\.\d+\.\d+", latest):
+        _logger.info("Don't know how to handle version format on %s", latest)
+        return None
+
+    return latest[1:]
+
+
+def onNewReleaseFound(func):
+    """
+    Checks if a new release is out and calls func if the running an older
+    version
+    """
+    from hdl_checker import __version__ as current
+
+    latest = _getLatestReleaseVersion()
+
+    if latest is None:
+        return
+
+    _logger.debug("Current is %s, latest is %s", current, latest)
+
+    if latest > current:
+        func(
+            "HDL Checker version {} is out! (current version is {})".format(
+                latest, current
+            )
+        )

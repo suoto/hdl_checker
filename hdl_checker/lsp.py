@@ -43,7 +43,7 @@ from hdl_checker.parsers.elements.design_unit import (
 )
 from hdl_checker.path import Path
 from hdl_checker.types import Location, MarkupKind
-from hdl_checker.utils import logCalls
+from hdl_checker.utils import logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
 
@@ -203,6 +203,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         handle window/showMessage requests)
         """
         self._onConfigUpdate(self._initialization_options)
+        onNewReleaseFound(self.showInfo)
         return super(HdlCheckerLanguageServer, self).m_initialized(**_kwargs)
 
     @logCalls
