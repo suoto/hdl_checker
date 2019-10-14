@@ -33,15 +33,24 @@ compilation order, interpreting some compilers messages and providing some
 ## Installation
 
 ```sh
-pip install hdl-checker
+pip install hdl-checker --upgrade
 ```
+
+or
+
+```sh
+pip install hdl-checker --user --upgrade
+```
+
+(Need to add `$HOME/.local/bin` to your `PATH` environment variable)
 
 ## Editor support
 
-| Editor | Info                                                                        |
-| :---:  | :---                                                                        |
-| Vim    | Out of the box via [dense-analysis/ale][ALE], other LSP clients should work |
-| VSCode | [HDL Checker HDL Checker VSCode client][hdl_checker_vscode]                 |
+| Editor                          | Info                                                        |
+| :---                            | :---                                                        |
+| Vim - [dense-analysis/ale][ALE] | Soon, see (PR [#2804][ALE_PR])                              |
+| Vim - [coc.vim][coc_vim]        | Will add instructions to the [Wiki][hdl_checker_wiki] soon  |
+| VSCode                          | [HDL Checker HDL Checker VSCode client][hdl_checker_vscode] |
 
 ## Usage
 
@@ -87,7 +96,7 @@ HDL Checker supports
 
 ### Configuring HDL Checker
 
-See the [Setting up a new project][Setting-up-a-project] section on the wiki.
+See the [Setting up a new project][hdl_checker_wiki_setup] section on the wiki.
 
 ### LSP server
 
@@ -100,6 +109,14 @@ hdl_checker --lsp
 
 On a Linux system, log file will be at `/tmp/hdl_checker_log_pid<PID_NUMBER>.log` and
 `/tmp/hdl_checker_stderr_pid<PID_NUMBER>.log`.
+
+As a language server, HDL Checker will provide
+
+* Diagnostics
+* Hover information
+  * Dependencies: will report which path and library have been assigned
+  * Design units: will report the compilation sequence and libraries
+* Go to definition of dependencies
 
 ### HTTP server
 
@@ -179,16 +196,19 @@ HDL Checker's author has no connection or affiliation to any of the
 trademarks mentioned or used by this software.
 
 [ALE]: https://github.com/dense-analysis/ale
+[ALE_PR]: https://github.com/dense-analysis/ale/pull/2804
+[coc_vim]: https://github.com/neoclide/coc.nvim
 [docker]: https://www.docker.com/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [hdl_checker_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdl_checker_test
 [hdl_checker_vscode]: https://marketplace.visualstudio.com/items?itemName=suoto.hdl-checker-client
+[hdl_checker_wiki]: https://github.com/suoto/hdl_checker/wiki
+[hdl_checker_wiki_setup]: https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project
 [Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
 [issue_tracker]: https://github.com/suoto/hdl_checker/issues
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
 [Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
-[Setting-up-a-project]: https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project
 [vim-hdl]: https://github.com/suoto/vim-hdl/
 [Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
 [Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
