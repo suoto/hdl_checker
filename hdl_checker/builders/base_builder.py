@@ -31,6 +31,7 @@ from hdl_checker.path import Path
 from hdl_checker.types import (
     BuildFlags,
     BuildFlagScope,
+    DesignUnitType,
     FileType,
     RebuildInfo,
     RebuildLibraryUnit,
@@ -200,24 +201,30 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         rebuilds = set()  # type: Set[RebuildInfo]
         for rebuild in parse_results:
-            unit_type = rebuild.get("unit_type", None)
-            library_name = rebuild.get("library_name", None)
-            unit_name = rebuild.get("unit_name", None)
-            rebuild_path = rebuild.get("rebuild_path", None)
+            unit_type = rebuild.get("unit_type", None)  # type: str
+            library_name = rebuild.get("library_name", None)  # type: str
+            unit_name = rebuild.get("unit_name", None)  # type: str
+            rebuild_path = rebuild.get("rebuild_path", None)  # type: str
 
             if None not in (unit_type, unit_name):
                 for dependency in self._database.getDependenciesByPath(path):
                     if dependency.name.name == rebuild["unit_name"]:
-                        rebuilds.add(RebuildUnit(unit_name, unit_type))
+                        rebuilds.add(
+                            RebuildUnit(
+                                Identifier(unit_name), DesignUnitType(unit_type)
+                            )
+                        )
                         break
             elif None not in (library_name, unit_name):
                 if library_name == "work":
                     library_name = library.name
-                rebuilds.add(RebuildLibraryUnit(unit_name, library_name))
+                rebuilds.add(
+                    RebuildLibraryUnit(Identifier(unit_name), Identifier(library_name))
+                )
             elif rebuild_path is not None:
                 # GHDL sometimes gives the full path of the file that
                 # should be recompiled
-                rebuilds.add(RebuildPath(rebuild_path))
+                rebuilds.add(RebuildPath(Path(rebuild_path)))
             else:  # pragma: no cover
                 self._logger.warning("Don't know what to do with %s", rebuild)
 

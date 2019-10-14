@@ -17,24 +17,15 @@
 "Class defining a parsed design unit"
 
 import logging
-from enum import Enum
 from typing import Optional, Union
 
 from .identifier import Identifier, VerilogIdentifier, VhdlIdentifier
 from .parsed_element import LocationList, ParsedElement
 
-from hdl_checker import types as t  # pylint: disable=unused-import
+from hdl_checker.types import DesignUnitType
 from hdl_checker.path import Path
 
 _logger = logging.getLogger(__name__)
-
-
-class DesignUnitType(str, Enum):
-    "Specifies tracked design unit types"
-    package = "package"
-    entity = "entity"
-    context = "context"
-
 
 class _DesignUnit(ParsedElement):
     """

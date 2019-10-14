@@ -41,12 +41,12 @@ from hdl_checker.tests import (
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
-from hdl_checker.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
+from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
-from hdl_checker.types import BuildFlagScope, FileType
+from hdl_checker.types import BuildFlagScope, DesignUnitType, FileType
 
 _logger = logging.getLogger(__name__)
 
@@ -928,6 +928,8 @@ class TestIndirectLibraryInference(TestCase):
 
 
 class TestUnitsDefinedInMultipleSources(TestCase):
+    maxDiff = None
+
     def setUp(self):
         # type: (...) -> Any
         _logger.info("Setting up %s", self)

@@ -20,9 +20,11 @@ import logging
 import re
 from typing import Any, Generator
 
-from .elements.design_unit import DesignUnitType, VerilogDesignUnit
+from .elements.design_unit import VerilogDesignUnit
+from .elements.parsed_element import Location
 
 from hdl_checker.parsers.base_parser import BaseSourceFile
+from hdl_checker.types import DesignUnitType
 from hdl_checker.utils import readFile
 
 _logger = logging.getLogger(__name__)
@@ -76,14 +78,14 @@ class VerilogParser(BaseSourceFile):
                     owner=self.filename,
                     name=match["module_name"],
                     type_=DesignUnitType.entity,
-                    locations={(line_number, None)},
+                    locations={Location(line_number, None)},
                 )
             if match["package_name"] is not None:
                 yield VerilogDesignUnit(
                     owner=self.filename,
                     name=match["package_name"],
                     type_=DesignUnitType.package,
-                    locations={(line_number, None)},
+                    locations={Location(line_number, None)},
                 )
 
     def _getLibraries(self):

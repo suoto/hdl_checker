@@ -27,10 +27,10 @@ from nose2.tools import such  # type: ignore
 
 from hdl_checker.tests import assertCountEqual, writeListToFile
 
-from hdl_checker.parsers.elements.design_unit import DesignUnitType
 from hdl_checker.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
+from hdl_checker.types import DesignUnitType
 
 _logger = logging.getLogger(__name__)
 

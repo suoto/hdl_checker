@@ -32,11 +32,12 @@ from nose2.tools import such  # type: ignore
 from hdl_checker.tests import assertCountEqual, assertSameFile, writeListToFile
 
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
-from hdl_checker.parsers.elements.design_unit import DesignUnitType, VhdlDesignUnit
+from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.vhdl_parser import VhdlParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
+from hdl_checker.types import DesignUnitType
 
 _logger = logging.getLogger(__name__)
 

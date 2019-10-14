@@ -45,13 +45,19 @@ from hdl_checker.builder_utils import (
     Fallback,
     MSim,
 )
-from hdl_checker.builders.base_builder import RebuildLibraryUnit, RebuildPath, RebuildUnit
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.exceptions import SanityCheckError
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
-from hdl_checker.types import BuildFlagScope, FileType
+from hdl_checker.types import (
+    BuildFlagScope,
+    DesignUnitType,
+    FileType,
+    RebuildLibraryUnit,
+    RebuildPath,
+    RebuildUnit,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -558,19 +564,23 @@ class TestBuilder(TestCase):
         [
             (
                 {"unit_type": "package", "unit_name": "very_common_pkg"},
-                RebuildUnit(name="very_common_pkg", type_="package"),
+                RebuildUnit(
+                    name=Identifier("very_common_pkg"), type_=DesignUnitType.package
+                ),
             ),
             # Should replace 'work' with the path's library
             (
                 {"library_name": "work", "unit_name": "foo"},
-                RebuildLibraryUnit(name="foo", library="some_lib"),
+                RebuildLibraryUnit(
+                    name=Identifier("foo"), library=Identifier("some_lib")
+                ),
             ),
             # Should not touch the library name when != 'work'
             (
                 {"library_name": "foo", "unit_name": "bar"},
-                RebuildLibraryUnit(name="bar", library="foo"),
+                RebuildLibraryUnit(name=Identifier("bar"), library=Identifier("foo")),
             ),
-            ({"rebuild_path": "some_path"}, RebuildPath("some_path")),
+            ({"rebuild_path": "some_path"}, RebuildPath(Path("some_path"))),
         ]
     )
     def test_get_rebuilds(self, rebuild_info, expected):

@@ -17,16 +17,29 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import Tuple, Union
+from typing import NamedTuple, Tuple, Union
 
+from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
+
+
+class DesignUnitType(str, Enum):
+    "Specifies tracked design unit types"
+    package = "package"
+    entity = "entity"
+    context = "context"
+
 
 BuildFlags = Tuple[str, ...]
 LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
-RebuildUnit = namedtuple("RebuildUnit", ["name", "type_"])
-RebuildLibraryUnit = namedtuple("RebuildLibraryUnit", ["name", "library"])
-RebuildPath = namedtuple("RebuildPath", ["path"])
+RebuildUnit = NamedTuple(
+    "RebuildUnit", (("name", Identifier), ("type_", DesignUnitType))
+)
+RebuildLibraryUnit = NamedTuple(
+    "RebuildLibraryUnit", (("name", Identifier), ("library", Identifier))
+)
+RebuildPath = NamedTuple("RebuildPath", (("path", Path),))
 
 RebuildInfo = Union[RebuildUnit, RebuildLibraryUnit, RebuildPath]
 

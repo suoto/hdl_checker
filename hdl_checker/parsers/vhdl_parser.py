@@ -21,11 +21,12 @@ import re
 from typing import Any, Dict, Generator, Optional, Set, Tuple, Union
 
 from .elements.dependency_spec import DependencySpec
-from .elements.design_unit import DesignUnitType, VhdlDesignUnit
+from .elements.design_unit import VhdlDesignUnit
 from .elements.identifier import VhdlIdentifier
 from .elements.parsed_element import Location
 
 from hdl_checker.parsers.base_parser import BaseSourceFile
+from hdl_checker.types import DesignUnitType
 from hdl_checker.utils import readFile
 
 _logger = logging.getLogger(__name__)
