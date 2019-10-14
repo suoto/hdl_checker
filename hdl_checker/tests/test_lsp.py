@@ -22,6 +22,7 @@
 # pylint: disable=function-redefined
 # pylint: disable=invalid-name
 
+import json
 import logging
 import os
 import os.path as p
@@ -34,7 +35,7 @@ from typing import Any
 import parameterized  # type: ignore
 import six
 import unittest2  # type: ignore
-from mock import MagicMock, call, patch
+from mock import MagicMock, patch
 from pyls import _utils  # type: ignore
 from pyls import lsp as defines
 from pyls import uris
@@ -44,6 +45,7 @@ from tabulate import tabulate
 
 from nose2.tools import such  # type: ignore
 
+from hdl_checker.base_server import WatchedFile
 from hdl_checker.exceptions import HdlCheckerNotInitializedError
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import (
@@ -275,27 +277,6 @@ with such.A("LSP server") as it:
         show_warning.assert_not_called()
         stopLspServer()
 
-    import hdl_checker
-
-    @it.should(  # type: ignore
-        "warn when setup takes more than lsp._SETUP_IS_TOO_LONG_TIMEOUT"
-    )
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer.showWarning")
-    @patch("hdl_checker.lsp._SETUP_IS_TOO_LONG_TIMEOUT", 0.5)
-    @patch.object(
-        hdl_checker.base_server.HdlCodeCheckerBase,
-        "configure",
-        lambda self, _: time.sleep(1),
-    )
-    def test(show_warning):
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-        )
-        show_warning.assert_called_once_with(lsp._SETUP_IS_TOO_LONG_MSG)
-        stopLspServer()
-
     @it.should(  # type: ignore
         "show info and warning messages"
     )
@@ -308,14 +289,8 @@ with such.A("LSP server") as it:
         )
 
         # Initialization calls
-        show_message.assert_has_calls(
-            [
-                call(
-                    "Searching %s for HDL files..." % TEST_PROJECT,
-                    defines.MessageType.Info,
-                ),
-                call("Added 10 sources", defines.MessageType.Info),
-            ]
+        show_message.assert_called_once_with(
+            "Searching %s for HDL files..." % TEST_PROJECT, defines.MessageType.Info
         )
 
         show_message.reset_mock()
@@ -340,16 +315,19 @@ with such.A("LSP server") as it:
         import hdl_checker
 
         @it.should("search for files on initialization")  # type: ignore
-        @patch.object(hdl_checker.base_server.HdlCodeCheckerBase, "configure")
+        @patch.object(WatchedFile, "__init__", return_value=None)
         @patch.object(
             hdl_checker.config_generators.base_generator.BaseGenerator, "generate"
         )
-        def test(configure, generate):
+        @patch("hdl_checker.base_server.json.dump", spec=json.dump)
+        def test(dump, generate, watched_file):
             _initializeServer(
                 it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
             )
-            configure.assert_called_once()
+            watched_file.assert_called_once()
             generate.assert_called_once()
+            # Will get called twice
+            dump.assert_called()
 
         @it.should("lint file when opening it")  # type: ignore
         def test():
@@ -366,7 +344,16 @@ with such.A("LSP server") as it:
                         },
                         "message": "Signal 'neat_signal' is never used",
                         "severity": defines.DiagnosticSeverity.Information,
-                    }
+                    },
+                    {
+                        "source": "HDL Checker",
+                        "range": {
+                            "start": {"line": 0, "character": 0},
+                            "end": {"line": 0, "character": 0},
+                        },
+                        "message": 'Path "%s" not found in project file' % source,
+                        "severity": defines.DiagnosticSeverity.Warning,
+                    },
                 ],
             )
 

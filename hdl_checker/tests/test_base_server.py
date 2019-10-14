@@ -25,6 +25,7 @@ import logging
 import os
 import os.path as p
 import shutil
+import tempfile
 import time
 
 import six
@@ -131,6 +132,38 @@ with such.A("hdl_checker project") as it:
             it.fail("\n".join(msg))
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
+
+    import hdl_checker
+
+    @it.should("warn when setup is taking too long")
+    @patch("hdl_checker.base_server._SETUP_IS_TOO_LONG_TIMEOUT", 0.1)
+    @patch.object(
+        hdl_checker.base_server.HdlCodeCheckerBase,
+        "configure",
+        lambda *_: time.sleep(0.5),
+    )
+    def test():
+
+        path = tempfile.mkdtemp()
+
+        config = p.join(path, "config.json")
+        source = p.join(path, "source.vhd")
+
+        # Make sure the files exists
+        open(config, "w").write("")
+        open(source, "w").write("")
+
+        project = StandaloneProjectBuilder(_Path(path))
+        project.setConfig(Path(config))
+        # Get messages of anything to trigger reading the config
+        project.getMessagesByPath(Path(source))
+
+        it.assertCountEqual(
+            [("info", hdl_checker.base_server._SETUP_IS_TOO_LONG_MSG)],
+            list(project.getUiMessages()),
+        )
+
+        removeIfExists(path)
 
     with it.having("non existing root dir"):
 
@@ -272,7 +305,10 @@ with such.A("hdl_checker project") as it:
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
             if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+                it.assertCountEqual(
+                    [("info", "Added 0 sources")],
+                    list(it.project.getUiMessages()),
+                )
 
             it.project.clean()
 
@@ -516,7 +552,10 @@ with such.A("hdl_checker project") as it:
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
             if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+                it.assertCountEqual(
+                    [("info", "Added 10 sources")],
+                    list(it.project.getUiMessages()),
+                )
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
 

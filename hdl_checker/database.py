@@ -117,10 +117,14 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             self._parseSourceIfNeeded(path)
 
     def configure(self, root_config, root_path):
-        # type: (Dict[str, Any], str) -> None
+        # type: (Dict[str, Any], str) -> int
         """
-        Handles adding sources, libraries and flags from a dict
+        Handles adding sources, libraries and flags from a dict, unrolling and
+        flatenning references.
+
+        Returns the number of sources added.
         """
+        cnt = 0
         for entry in flattenConfig(root_config, root_path):
             self.addSource(
                 path=entry.path,
@@ -128,6 +132,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 single_flags=entry.single_flags,
                 dependencies_flags=entry.dependencies_flags,
             )
+            cnt += 1
+
+        return cnt
 
     def addSource(self, path, library, single_flags=None, dependencies_flags=None):
         # type: (Path, Optional[str], Optional[BuildFlags], Optional[BuildFlags]) -> None

@@ -16,9 +16,9 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Language server protocol implementation"
 
+import json
 import logging
 import os.path as p
-from threading import Timer
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import six
@@ -43,25 +43,14 @@ from hdl_checker.parsers.elements.design_unit import (
 )
 from hdl_checker.path import Path
 from hdl_checker.types import Location, MarkupKind
-from hdl_checker.utils import logCalls, onNewReleaseFound
+from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
 
+AUTO_PROJECT_FILE_NAME = "project.json"
 LINT_DEBOUNCE_S = 0.5  # 500 ms
 
 URI = str
-
-_SETTING_UP_A_PROJECT_URL = (
-    "https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project"
-)
-
-_SETUP_IS_TOO_LONG_TIMEOUT = 15
-
-_SETUP_IS_TOO_LONG_MSG = (
-    "Configuring the project seems to be taking too long. Consider using a "
-    "smaller workspace or a configuration file. More info: "
-    "[{0}]({0})".format(_SETTING_UP_A_PROJECT_URL)
-)
 
 if six.PY2:
     FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
@@ -177,6 +166,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         """
         Shorthand for self.workspace.show_message(msg, defines.MessageType.Info)
         """
+        _logger.info("[INFO] %s", msg)
         self.workspace.show_message(msg, defines.MessageType.Info)
 
     def showWarning(self, msg):
@@ -184,6 +174,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         """
         Shorthand for self.workspace.show_message(msg, defines.MessageType.Warning)
         """
+        _logger.info("[WARNING] %s", msg)
         self.workspace.show_message(msg, defines.MessageType.Warning)
 
     def capabilities(self):
@@ -267,23 +258,16 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             _logger.debug("No workspace and/or root path not set, can't search files")
             return
 
-        # Don't let the user hanging if adding sources is taking too long. Also
-        # need to notify when adding is done.
-        timer = Timer(
-            _SETUP_IS_TOO_LONG_TIMEOUT, self.showWarning, args=(_SETUP_IS_TOO_LONG_MSG,)
-        )
-        timer.start()
-
         self.showInfo("Searching {} for HDL files...".format(self.workspace.root_path))
 
         # Having no project file but with root URI triggers searching for
         # sources automatically
         config = SimpleFinder([self.workspace.root_path]).generate()
-        source_cnt = len(config["sources"])  # key will be consumed by the checker
-        self.checker.configure(config)
 
-        timer.cancel()
-        self.showInfo("Added {} sources".format(source_cnt))
+        # Write this to a file and tell the server to use it
+        auto_project_file = getTemporaryFilename(AUTO_PROJECT_FILE_NAME)
+        json.dump(config, open(auto_project_file, "w"))
+        self.checker.setConfig(auto_project_file)
 
     def _getProjectFilePath(self, options=None):
         # type: (...) -> str

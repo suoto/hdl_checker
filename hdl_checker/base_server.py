@@ -23,11 +23,10 @@ import os
 import os.path as p
 import tempfile
 import traceback
-from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 from pprint import pformat
-from threading import RLock
-from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Tuple, Union
+from threading import RLock, Timer
+from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
 
 import six
 
@@ -62,12 +61,25 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
+_SETUP_IS_TOO_LONG_TIMEOUT = 15
+
+_SETTING_UP_A_PROJECT_URL = (
+    "https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project"
+)
+
+_SETUP_IS_TOO_LONG_MSG = (
+    "Configuring the project seems to be taking too long. Consider using a "
+    "smaller workspace or a configuration file. More info: "
+    "[{0}]({0})".format(_SETTING_UP_A_PROJECT_URL)
+)
+
+
 if six.PY2:
     JSONDecodeError = ValueError
 else:
     JSONDecodeError = json.decoder.JSONDecodeError
 
-WatchedFile = namedtuple("WatchedFile", ("path", "last_read"))
+WatchedFile = NamedTuple("WatchedFile", (("path", Path), ("last_read", float)))
 
 
 class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
@@ -92,11 +104,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self.config_file = None  # type: Optional[WatchedFile]
 
         self._database = Database()
-        self._builder = Fallback(self.work_dir, self.database)
+        self._builder = Fallback(self.work_dir, self._database)
 
-        if not p.exists(str(self.work_dir)):
-            os.makedirs(str(self.work_dir))
-
+        self._setupIfNeeded()
         self._recoverCacheIfPossible()
         self._saveCache()
 
@@ -138,7 +148,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # type: (Union[Path, str]) -> None
         """
         Sets the configuration file. Calling this method will only trigger a
-        configuration update if the given filename is different what was
+        configuration update if the given file name is different what was
         configured previously (that includes no value previously set)
         """
         path = Path(filename, self.root_dir)
@@ -161,6 +171,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Checks if self.config_file has changed; if it has, cleans up and
         re-reads the file
         """
+        self._setupIfNeeded()
+
         # No config file set
         if self.config_file is None:
             return
@@ -170,8 +182,16 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         if self.config_file.last_read >= file_mtime:
             return
 
-        self.clean()
+        # Don't let the user hanging if adding sources is taking too long. Also
+        # need to notify when adding is done.
+        timer = Timer(
+            _SETUP_IS_TOO_LONG_TIMEOUT,
+            self._handleUiInfo,
+            args=(_SETUP_IS_TOO_LONG_MSG,),
+        )
+        timer.start()
         self._readConfig()
+        timer.cancel()
 
     def _readConfig(self):
         # type: (...) -> None
@@ -213,7 +233,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self._builder = builder_cls(self.work_dir, self.database)
 
-        self.database.configure(config, str(self.root_dir))
+        sources_added = self.database.configure(config, str(self.root_dir))
         # Add VUnit
         if not isinstance(self._builder, Fallback):
             for path, library, flags in getVunitSources(self._builder):
@@ -225,6 +245,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
             _logger.warning(
                 "Some configuration elements weren't used:\n%s", pformat(config)
             )
+
+        self._handleUiInfo("Added {} sources".format(sources_added))
 
     def _getCacheFilename(self):
         # type: () -> Path
@@ -297,13 +319,22 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._setState(cache)
         self._builder.setup()
 
-    def _cleanIfNeeded(self):
+    def _setupIfNeeded(self):
         # type: (...) -> Any
         """
         Sanity checks to make sure the environment is sane
         """
-        if not p.exists(self._builder.work_folder):
-            self._builder.setup()
+        if p.exists(str(self.work_dir)) and p.exists(self._builder.work_folder):
+            return
+
+        _logger.warning("Not all directories exist, forcing setup")
+        self.clean()
+
+        if self.config_file is None:
+            return
+
+        # Force config file out of to date to trigger reparsing
+        self.config_file = WatchedFile(self.config_file.path, 0)
 
     def clean(self):
         # type: (...) -> Any
@@ -312,6 +343,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         _logger.debug("Cleaning up project")
         removeDirIfExists(str(self.work_dir))
+        os.makedirs(str(self.work_dir))
 
         del self._builder
         del self._database
@@ -319,6 +351,8 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         database = Database()
         self._database = database
         self._builder = Fallback(self.work_dir, database)
+
+        self._builder.setup()
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
@@ -377,7 +411,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         rebuilding until there is nothing to rebuild. The number of iteractions
         is fixed in 10.
         """
-        self._cleanIfNeeded()
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):

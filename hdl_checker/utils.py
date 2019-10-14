@@ -218,14 +218,19 @@ def getTemporaryFilename(name):
     Gets a temporary filename following the format 'hdl_checker_pid<>.log' on Linux
     and 'hdl_checker_pid<>_<unique>.log' on Windows
     """
+    try:
+        name, suffix = name.split(".")
+    except ValueError:
+        suffix = None
+
     basename = "hdl_checker_" + name + "_pid{}".format(os.getpid())
 
     if ON_WINDOWS:
         return NamedTemporaryFile(
-            prefix=basename + "_", suffix=".log", delete=False
+            prefix=basename + "_", suffix="." + (suffix or "log"), delete=False
         ).name
 
-    return p.join(p.sep, "tmp", basename + ".log")
+    return p.join(p.sep, "tmp", basename + "." + (suffix or "log"))
 
 
 def isFileReadable(path):
