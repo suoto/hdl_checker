@@ -468,10 +468,15 @@ with such.A("LSP server") as it:
         @patch.object(HdlCheckerNotInitializedError, "__init__", return_value=None)
         def test(exc):
             source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-            with it.assertRaises(
-                HdlCheckerNotInitializedError if ON_WINDOWS else MockWaitTimeout
-            ):
+            try:
                 checkLintFileOnOpen(source)
+                it.fail(
+                    "Should have raised one of %s",
+                    HdlCheckerNotInitializedError,
+                    MockWaitTimeout,
+                )
+            except (HdlCheckerNotInitializedError, MockWaitTimeout):
+                pass
 
             exc.assert_called_once()
 
@@ -504,10 +509,15 @@ with such.A("LSP server") as it:
         @patch.object(HdlCheckerNotInitializedError, "__init__", return_value=None)
         def test(exc):
             source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-            with it.assertRaises(
-                HdlCheckerNotInitializedError if ON_WINDOWS else MockWaitTimeout
-            ):
+            try:
                 checkLintFileOnOpen(source)
+                it.fail(
+                    "Should have raised one of %s",
+                    HdlCheckerNotInitializedError,
+                    MockWaitTimeout,
+                )
+            except (HdlCheckerNotInitializedError, MockWaitTimeout):
+                pass
 
             exc.assert_called_once()
 
