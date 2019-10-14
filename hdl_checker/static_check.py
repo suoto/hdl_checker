@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import Any, Tuple
+from typing import List, Tuple
 
 #  from hdl_checker.path import Path
 from hdl_checker.diagnostics import (
@@ -87,27 +87,46 @@ _SHOULD_END_SCAN = re.compile(
 ).search
 
 
+def _getAreaFromMatch(dict_):  # pylint: disable=inconsistent-return-statements
+    """
+    Returns code area based on the match dict
+    """
+    if dict_["entity_name"] is not None:
+        return "entity"
+    if dict_["architecture_name"] is not None:
+        return "architecture"
+    if dict_["package_name"] is not None:
+        return "package"
+    if dict_["package_body_name"] is not None:
+        return "package_body"
+
+    assert False, "Can't determine area from {}".format(dict_)  # pragma: no cover
+
+
 def _getObjectsFromText(lines):
     """
-    Returns a dict containing the objects found at the given text buffer
+    Converts the iterator from _findObjects into a dict, whose key is the
+    object's name and the value if the object's info
     """
     objects = {}
+    for name, info in _findObjects(lines):
+        if name not in objects:
+            objects[name] = info
+
+    return objects
+
+
+def _findObjects(lines):
+    """
+    Returns an iterator with the object name and a dict with info about its
+    location
+    """
     lnum = 0
     area = None
     for _line in lines:
         line = re.sub(r"\s*--.*", "", _line)
         for match in _GET_SCOPE(line):
-            _dict = match.groupdict()
-            if _dict["entity_name"] is not None:
-                area = "entity"
-            elif _dict["architecture_name"] is not None:
-                area = "architecture"
-            elif _dict["package_name"] is not None:
-                area = "package"
-            elif _dict["package_body_name"] is not None:
-                area = "package_body"
-            else:  # pragma: no cover
-                assert False
+            area = _getAreaFromMatch(match.groupdict())
 
         matches = []
         if area is None:
@@ -133,18 +152,16 @@ def _getObjectsFromText(lines):
                 for submatch in re.finditer(r"(\w+)", value):
                     # Need to decrement the last index because we have a group that
                     # catches the port type (in, out, inout, etc)
-                    text = submatch.group(submatch.lastindex)
-                    if text not in objects.keys():
-                        objects[text] = {}
-                    objects[text]["lnum"] = lnum
-                    objects[text]["start"] = start + submatch.start(submatch.lastindex)
-                    objects[text]["end"] = end + submatch.start(submatch.lastindex)
-                    objects[text]["type"] = key
+                    name = submatch.group(submatch.lastindex)
+                    yield name, {
+                        "lnum": lnum,
+                        "start": start + submatch.start(submatch.lastindex),
+                        "end": end + submatch.start(submatch.lastindex),
+                        "type": key,
+                    }
         lnum += 1
         if _SHOULD_END_SCAN(line):
             break
-
-    return objects
 
 
 def _getUnusedObjects(lines, objects):
@@ -222,11 +239,11 @@ def _getMiscChecks(objects):
 
 
 def getStaticMessages(lines):
-    # type: (Tuple[str, ...]) -> Any
+    # type: (Tuple[str, ...]) -> List[StaticCheckerDiag]
     "VHDL static checking"
     objects = _getObjectsFromText(lines)
 
-    result = []
+    result = []  # type: List[StaticCheckerDiag]
 
     for _object in _getUnusedObjects(lines, objects.keys()):
         obj_dict = objects[_object]

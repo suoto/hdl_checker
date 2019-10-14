@@ -16,11 +16,10 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Diagnostics holders for checkers"
 
-import os.path as p
 from typing import Optional
 
-from hdl_checker.path import Path
-from hdl_checker.utils import HashableByKey, samefile
+from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.utils import HashableByKey
 
 # pylint: disable=useless-object-inheritance
 
@@ -47,8 +46,8 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
     Base container for diagnostics
     """
 
-    def __init__(
-        self,  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
         checker,  # type: str
         text,  # type: str
         filename=None,  # type: Optional[Path]
@@ -104,24 +103,6 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
             self.severity,
             self.text,
         )
-
-    #  def __hash__(self):
-    #      # Don't include the filename in the hash key to avoid it being used on
-    #      # __eq__
-    #      return hash((self.filename.abspath, super(CheckerDiagnostic, self).__hash__()))
-
-    #  def __eq__(self, other):
-    #      # type: (...) -> bool
-    #      if (
-    #          self.filename is not None
-    #          and p.exists(self.filename.name)
-    #          and other.filename is not None
-    #          and p.exists(other.filename.name)
-    #      ):
-    #          if not samefile(self.filename, other.filename):
-    #              return False
-
-    #      return super(CheckerDiagnostic, self).__eq__(other)
 
     def toDict(self):
         """Returns a dict representation of the object. All keys are always
@@ -217,8 +198,8 @@ class PathNotInProjectFile(CheckerDiagnostic):
 class StaticCheckerDiag(CheckerDiagnostic):
     "Base diagnostics issues from static checks"
 
-    def __init__(
-        self,  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
         text,
         severity,
         filename=None,
@@ -262,8 +243,8 @@ class LibraryShouldBeOmited(StaticCheckerDiag):
 class ObjectIsNeverUsed(StaticCheckerDiag):
     "Reports an object that was created but never used"
 
-    def __init__(
-        self,  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
         filename=None,
         line_number=None,
         column_number=None,
@@ -287,8 +268,8 @@ class BuilderDiag(CheckerDiagnostic):
     project file
     """
 
-    def __init__(
-        self,  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
         builder_name,
         text,
         filename=None,
@@ -336,7 +317,7 @@ class DependencyNotUnique(CheckerDiagnostic):
     Searching for a dependency should yield a single source file
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self, filename, design_unit, choices, line_number=None, column_number=None
     ):
         _choices = list(choices)

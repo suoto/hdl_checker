@@ -55,6 +55,7 @@ from hdl_checker.diagnostics import (
     ObjectIsNeverUsed,
     PathNotInProjectFile,
 )
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import (
@@ -237,13 +238,13 @@ with such.A("hdl_checker project") as it:
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
 
-            with patch("hdl_checker.hdl_checker_base.json.dump", spec=json.dump) as func:
+            with patch("hdl_checker.base_server.json.dump", spec=json.dump) as func:
                 it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
         @it.should("recover from cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        @patch('hdl_checker.hdl_checker_base.HdlCodeCheckerBase._setState')
+        @patch("hdl_checker.base_server.HdlCodeCheckerBase._setState")
         def test(set_state):
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
@@ -256,16 +257,16 @@ with such.A("hdl_checker project") as it:
             set_state.assert_called_once()
 
             # Setting the config file should not trigger reparsing
-            with patch.object(it.project, "_readConfig") as readConfig:
+            with patch.object(it.project, "_readConfig") as read_config:
                 with patch(
-                    "hdl_checker.hdl_checker_base.WatchedFile.__init__", side_effect=[None]
-                ) as WatchedFile:
+                    "hdl_checker.base_server.WatchedFile.__init__", side_effect=[None]
+                ) as watched_file:
                     old = it.project.config_file
                     it.project.setConfig(it.config_file)
                     it.project._updateConfigIfNeeded()
                     it.assertEqual(it.project.config_file, old)
-                    readConfig.assert_not_called()
-                    WatchedFile.assert_not_called()
+                    read_config.assert_not_called()
+                    watched_file.assert_not_called()
 
         @it.should("clean up root dir")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
@@ -324,7 +325,7 @@ with such.A("hdl_checker project") as it:
         @it.should("get builder messages by path")  # type: ignore
         # Avoid saving to cache because the patched method is not JSON
         # serializable
-        @patch("hdl_checker.hdl_checker_base.json.dump")
+        @patch("hdl_checker.base_server.json.dump")
         def test(_):
             with PatchBuilder():
                 it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
@@ -417,10 +418,44 @@ with such.A("hdl_checker project") as it:
                     ],
                 )
 
+        @it.should("Resolve dependency to path")  # type: ignore
+        def test():
+            path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
+
+            clock_divider = DependencySpec(
+                name=Identifier("clock_divider"),
+                library=Identifier("basic_library"),
+                owner=path,
+                locations=(),
+            )
+
+            it.assertEqual(
+                it.project.resolveDependencyToPath(clock_divider),
+                (
+                    _Path(TEST_PROJECT, "basic_library", "clock_divider.vhd"),
+                    Identifier("basic_library"),
+                ),
+            )
+
+        @it.should("Not resolve dependencies whose library is built in")  # type: ignore
+        def test():
+            path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
+
+            numeric_std = DependencySpec(
+                name=Identifier("numeric_std"),
+                library=Identifier("ieee"),
+                owner=path,
+                locations=(),
+            )
+
+            it.assertIs(it.project.resolveDependencyToPath(numeric_std), None)
+
         @it.should(  # type: ignore
             "warn when unable to recreate a builder described in cache"
         )
-        @patch("hdl_checker.hdl_checker_base.getBuilderByName", new=lambda name: FailingBuilder)
+        @patch(
+            "hdl_checker.base_server.getBuilderByName", new=lambda name: FailingBuilder
+        )
         def test():
             if ON_WINDOWS:
                 raise it.skipTest("Test doesn't run on Windows")

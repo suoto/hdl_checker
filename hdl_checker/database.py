@@ -35,17 +35,23 @@ from typing import (
     Union,
 )
 
-from hdl_checker.diagnostics import (
+from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     CheckerDiagnostic,
     DependencyNotUnique,
     PathNotInProjectFile,
 )
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
-from hdl_checker.parsers.elements.design_unit import tAnyDesignUnit
+from hdl_checker.parsers.elements.design_unit import (  # pylint: disable=unused-import,
+    tAnyDesignUnit,
+)
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
+from hdl_checker.path import Path, TemporaryPath  # pylint: disable=unused-import
+from hdl_checker.types import (  # pylint: disable=unused-import
+    BuildFlags,
+    BuildFlagScope,
+    FileType,
+)
 from hdl_checker.utils import HashableByKey, getMostCommonItem, isFileReadable
 
 try:
@@ -61,7 +67,7 @@ UnresolvedLibrary = Union[Identifier, None]
 LibraryUnitTuple = Tuple[UnresolvedLibrary, Identifier]
 
 
-class Database(HashableByKey):
+class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
     "Stores info on and provides operations for a project file set"
 
     def __init__(self):  # type: () -> None
@@ -85,6 +91,7 @@ class Database(HashableByKey):
 
     @property
     def __hash_key__(self):
+        # Just to allow lru_cache
         return 0
 
     @property
@@ -261,8 +268,8 @@ class Database(HashableByKey):
     def __jsonDecode__(cls, state):
         # pylint: disable=protected-access
         obj = cls()
-        obj._design_units = {x for x in state.pop("design_units")}
-        obj._inferred_libraries = {x for x in state.pop("inferred_libraries")}
+        obj._design_units = set(state.pop("design_units"))
+        obj._inferred_libraries = set(state.pop("inferred_libraries"))
         for info in state.pop("sources"):
             path = info.pop("path")
             obj._paths.add(path)
@@ -278,8 +285,8 @@ class Database(HashableByKey):
             obj._flags_map[path][BuildFlagScope.dependencies] = tuple(
                 info.pop("flags", {}).pop(BuildFlagScope.dependencies.value, ())
             )
-            obj._dependencies_map[path] = {x for x in info.pop("dependencies")}
-            obj._diags[path] = {x for x in info.pop("diags")}
+            obj._dependencies_map[path] = set(info.pop("dependencies"))
+            obj._diags[path] = set(info.pop("diags"))
         # pylint: enable=protected-access
 
         return obj
@@ -375,6 +382,7 @@ class Database(HashableByKey):
         """
         if not isFileReadable(path):
             _logger.warning("Won't parse file that's not readable %s", repr(path))
+            self.removeSource(path)
             return
 
         # Sources will get parsed on demand

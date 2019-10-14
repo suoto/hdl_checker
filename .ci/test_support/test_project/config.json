@@ -6,6 +6,8 @@
         "basic_library/package_with_constants.vhd",
         "basic_library/package_with_functions.vhd",
         "basic_library/very_common_pkg.vhd",
+        "basic_library/two_entities_one_file.vhd",
+        "basic_library/use_entity_a_and_b.vhd",
         "verilog/parity.sv",
         "verilog/parity.v"
     ]

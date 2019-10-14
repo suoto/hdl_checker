@@ -19,7 +19,7 @@
 # pylint: disable=useless-object-inheritance
 
 import logging
-import os.path as p
+from os import path as p
 from os import stat
 from typing import Union
 
@@ -49,25 +49,43 @@ class Path(object):
     @property
     def mtime(self):
         # type: () -> float
+        """
+        Equivalent to os.path.getmtime(self.name)
+        """
         return p.getmtime(self.name)
 
     @property
     def abspath(self):
         # type: () -> str
+        """
+        Equivalent to os.path.abspath(self.name)
+        """
         return p.abspath(self.name)
 
     @property
     def basename(self):
         # type: () -> str
+        """
+        Equivalent to os.path.basename(self.name)
+        """
         return p.basename(self.name)
 
     @property
     def dirname(self):
         # type: () -> str
+        """
+        Equivalent to os.path.dirname(self.name)
+        """
         return p.dirname(self.name)
 
     @property
     def name(self):
+        """
+        Absolute path, either the path passed to the constructor or the path
+        prepended with base_path. In the second case, it's up to the caller to
+        ensure an absolute path can be constructed; no exception or warning is
+        thrown.
+        """
         return self._name
 
     def __str__(self):
@@ -78,6 +96,9 @@ class Path(object):
 
     @property
     def stat(self):
+        """
+        Equivalent to os.path.stat(self.name)
+        """
         return stat(self.name)
 
     def __hash__(self):
@@ -90,8 +111,7 @@ class Path(object):
             # to avoid calling os.stat all the time
             if self.abspath == other.abspath:
                 return True
-            else:
-                return p.samestat(self.stat, other.stat)
+            return p.samestat(self.stat, other.stat)
         except (AttributeError, FileNotFoundError):
             return False
 
@@ -117,7 +137,7 @@ class Path(object):
         """Returns an object of cls based on a given state"""
 
         obj = super(Path, cls).__new__(cls)
-        obj._name = state["name"]
+        obj._name = state["name"]  # pylint: disable=protected-access
 
         return obj
 

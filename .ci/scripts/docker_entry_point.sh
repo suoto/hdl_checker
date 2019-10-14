@@ -34,7 +34,7 @@ ln -s /builders "/home/$USERNAME/builders"
 
 su -l "$USERNAME" -c "    \
   cd /hdl_checker      && \
-  tox ${TOX_ARGS[*]};     \
+  tox ${TOX_ARGS[*]}   && \
   coverage combine     && \
   coverage xml         && \
   coverage report      && \

@@ -17,8 +17,9 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import NamedTuple, Tuple, Union
+from typing import NamedTuple, Optional, Tuple, Union
 
+from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 
@@ -42,20 +43,6 @@ RebuildLibraryUnit = NamedTuple(
 RebuildPath = NamedTuple("RebuildPath", (("path", Path),))
 
 RebuildInfo = Union[RebuildUnit, RebuildLibraryUnit, RebuildPath]
-
-
-class UnknownTypeExtension(Exception):
-    """
-    Exception thrown when trying to get the file type of an unknown extension.
-    Known extensions are one of '.vhd', '.vhdl', '.v', '.vh', '.sv', '.svh'
-    """
-
-    def __init__(self, path):
-        super(UnknownTypeExtension, self).__init__()
-        self._path = path
-
-    def __str__(self):
-        return "Couldn't determine file type for path '%s'" % self._path
 
 
 class FileType(Enum):
@@ -98,3 +85,16 @@ class BuildFlagScope(Enum):
     single = "single"
     dependencies = "dependencies"
     all = "global"
+
+
+class MarkupKind(Enum):
+    "LSP Markup kinds"
+    PlainText = "plaintext"
+    Markdown = "markdown"
+
+
+# A location on a source file
+Location = NamedTuple("Location", (("line", Optional[int]), ("column", Optional[int])))
+
+# A location range within a source file
+Range = NamedTuple("Range", (("start", Location), ("end", Optional[Location])))

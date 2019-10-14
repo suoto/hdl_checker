@@ -25,6 +25,8 @@ import six
 from nose2.tools import such  # type: ignore
 from nose2.tools.params import params  # type: ignore
 
+from hdl_checker.tests import assertCountEqual
+
 import hdl_checker.static_check as static_check
 from hdl_checker.diagnostics import DiagType, LibraryShouldBeOmited, StaticCheckerDiag
 
@@ -33,11 +35,9 @@ _logger = logging.getLogger(__name__)
 with such.A("hdl_checker project") as it:
     # Workaround for Python 2.x and 3.x differences
     if six.PY2:
-
-        def _assertCountEqual(actual, expected, msg=None):
-            return it.assertEqual(sorted(actual), sorted(expected), msg)
-
-        it.assertCountEqual = _assertCountEqual
+        # Can't use assertCountEqual for lists of unhashable types.
+        # Workaround for https://bugs.python.org/issue10242
+        it.assertCountEqual = assertCountEqual(it)
 
     @it.has_setup
     def setup():
@@ -52,7 +52,7 @@ with such.A("hdl_checker project") as it:
         text = ["", "library ieee;", "", "library ieee;", ""]
 
         it.assertDictEqual(
-            {"ieee": {"end": 12, "lnum": 3, "start": 8, "type": "library"}},
+            {"ieee": {"end": 12, "lnum": 1, "start": 8, "type": "library"}},
             static_check._getObjectsFromText(text),
         )
 

@@ -26,7 +26,6 @@ from threading import RLock
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
 from hdl_checker import exceptions
-from hdl_checker.builder_utils import BuilderName
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
 

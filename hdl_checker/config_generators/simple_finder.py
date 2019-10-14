@@ -22,8 +22,9 @@ from typing import Iterable, List
 
 from .base_generator import BaseGenerator
 
+from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.path import Path
-from hdl_checker.types import FileType, UnknownTypeExtension
+from hdl_checker.types import FileType
 from hdl_checker.utils import isFileReadable
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"

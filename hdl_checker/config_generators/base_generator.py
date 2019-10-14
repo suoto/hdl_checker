@@ -22,7 +22,7 @@ from typing import Dict, Optional, Set, Tuple
 
 from hdl_checker.builder_utils import AnyValidBuilder
 from hdl_checker.path import Path
-from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
+from hdl_checker.types import BuildFlags, FileType
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
 _HEADER_EXTENSIONS = "vh", "svh"

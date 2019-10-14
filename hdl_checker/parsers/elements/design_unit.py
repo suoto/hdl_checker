@@ -19,13 +19,18 @@
 import logging
 from typing import Optional, Union
 
-from .identifier import Identifier, VerilogIdentifier, VhdlIdentifier
-from .parsed_element import LocationList, ParsedElement
+from .identifier import (  # pylint: disable=unused-import
+    Identifier,
+    VerilogIdentifier,
+    VhdlIdentifier,
+)
+from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
 
-from hdl_checker.types import DesignUnitType
-from hdl_checker.path import Path
+from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.types import DesignUnitType  # pylint: disable=unused-import
 
 _logger = logging.getLogger(__name__)
+
 
 class _DesignUnit(ParsedElement):
     """
@@ -39,6 +44,9 @@ class _DesignUnit(ParsedElement):
         self._name = name
 
         super(_DesignUnit, self).__init__(locations)
+
+    def __len__(self):
+        return len(self.name)
 
     def __repr__(self):
         return '{}(name="{}", type={}, owner={}, locations={})'.format(

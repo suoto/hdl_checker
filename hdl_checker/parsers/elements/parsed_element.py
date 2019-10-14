@@ -16,19 +16,20 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from collections import namedtuple
-from typing import Any, FrozenSet, Iterable, Optional, Set, Tuple
+from typing import Iterable, Optional, Set
+import abc
 
-from hdl_checker import types as t  # pylint: disable=unused-import
+from hdl_checker.types import Location
 from hdl_checker.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-Location = namedtuple("Location", ["line", "column"])
 LocationList = Iterable[Location]
 
 
 class ParsedElement(HashableByKey):
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self, locations=None):
         # type: (Optional[LocationList]) -> None
         set_of_locations = set()  # type: Set[Location]
@@ -40,7 +41,7 @@ class ParsedElement(HashableByKey):
                 )
             )
 
-        self._locations = frozenset(set_of_locations)
+        self._locations = tuple(set_of_locations)
 
     @property
     def locations(self):
@@ -49,3 +50,24 @@ class ParsedElement(HashableByKey):
     @property
     def __hash_key__(self):
         return (self.locations,)
+
+    @abc.abstractmethod
+    def __len__(self):
+        # type: (...) -> int
+        """
+        len(self) should return the length the parsed element uses on the text.
+        It will be used to calculate an end position for it and allow checking
+        if a given location is within the element's text
+        """
+
+    def includes(self, position):
+        # type: (Location) -> bool
+        name_length = len(self)
+
+        for location in self.locations:
+            if position.line != location.line:
+                continue
+
+            if location.column <= position.column < location.column + name_length:
+                return True
+        return False

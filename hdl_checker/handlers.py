@@ -29,7 +29,7 @@ import bottle  # type: ignore
 from hdl_checker import __version__ as version
 from hdl_checker import types as t  # pylint: disable=unused-import
 from hdl_checker.builders.fallback import Fallback
-from hdl_checker.hdl_checker_base import HdlCodeCheckerBase
+from hdl_checker.base_server import HdlCodeCheckerBase
 from hdl_checker.path import Path
 from hdl_checker.utils import terminateProcess
 

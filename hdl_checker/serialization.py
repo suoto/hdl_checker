@@ -18,9 +18,7 @@
 
 import json
 import logging
-from pprint import pformat
 
-from hdl_checker import path, types
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
@@ -35,6 +33,8 @@ from hdl_checker.parsers.elements.identifier import (
 )
 from hdl_checker.parsers.verilog_parser import VerilogParser
 from hdl_checker.parsers.vhdl_parser import VhdlParser
+from hdl_checker.path import Path, TemporaryPath
+from hdl_checker.types import FileType
 
 _logger = logging.getLogger(__name__)
 
@@ -44,12 +44,12 @@ CLASS_MAP = {
     "Database": Database,
     "DependencySpec": DependencySpec,
     "Fallback": Fallback,
-    "FileType": types.FileType,
+    "FileType": FileType,
     "GHDL": GHDL,
     "Identifier": Identifier,
     "MSim": MSim,
-    "Path": path.Path,
-    "TemporaryPath": path.TemporaryPath,
+    "Path": Path,
+    "TemporaryPath": TemporaryPath,
     "VerilogIdentifier": VerilogIdentifier,
     "VerilogParser": VerilogParser,
     "VhdlDesignUnit": VhdlDesignUnit,

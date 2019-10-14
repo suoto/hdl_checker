@@ -6,3 +6,5 @@ vhdl           basic_library    basic_library/package_with_functions.vhd
 vhdl           basic_library    basic_library/clk_en_generator.vhd
 verilog        verilog          verilog/parity.v
 systemverilog  verilog          verilog/parity.sv
+vhdl   basic_library     basic_library/two_entities_one_file.vhd
+vhdl   basic_library     basic_library/use_entity_a_and_b.vhd

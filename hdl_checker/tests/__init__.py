@@ -32,8 +32,8 @@ import six
 from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker import exceptions
+from hdl_checker.base_server import HdlCodeCheckerBase
 from hdl_checker.builders.base_builder import BaseBuilder
-from hdl_checker.hdl_checker_base import HdlCodeCheckerBase
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
@@ -273,10 +273,10 @@ class PatchBuilder(object):
         self.meth = meth
         self.patches = (
             mock.patch(
-                "hdl_checker.hdl_checker_base.getWorkingBuilders",
+                "hdl_checker.base_server.getWorkingBuilders",
                 side_effect=[iter((MockBuilder,))],
             ),
-            mock.patch("hdl_checker.hdl_checker_base.getBuilderByName", getBuilderByName),
+            mock.patch("hdl_checker.base_server.getBuilderByName", getBuilderByName),
             disableVunit,
         )
 

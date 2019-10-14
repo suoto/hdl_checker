@@ -36,7 +36,7 @@ from .builders.msim import MSim
 from .builders.xvhdl import XVHDL
 
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import removeDirIfExists
 

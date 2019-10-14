@@ -54,6 +54,9 @@ class Identifier(object):
     def __str__(self):
         return self.display_name
 
+    def __len__(self):
+        return len(self.display_name)
+
     def __repr__(self):
         if self.name == self.display_name:
             return "{}({})".format(self.__class__.__name__, repr(self.name))

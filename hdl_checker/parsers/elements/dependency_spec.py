@@ -20,10 +20,10 @@ import logging
 from typing import Optional
 
 from .identifier import Identifier
-from .parsed_element import LocationList, ParsedElement
+from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
 
-from hdl_checker import types as t  # pylint: disable=unused-import
-from hdl_checker.path import Path
+from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.types import FileType
 
 _logger = logging.getLogger(__name__)
 
@@ -58,7 +58,12 @@ class DependencySpec(ParsedElement):
     @property
     def case_sensitive(self):  # type: () -> bool
         ext = self.owner.split(".")[-1].lower()
-        return ext not in t.FileType.vhdl.value
+        return ext not in FileType.vhdl.value
+
+    def __len__(self):
+        if self.library is None:
+            return len(self.name)
+        return len(self.name) + len(self.library) + 1
 
     @property
     def __hash_key__(self):

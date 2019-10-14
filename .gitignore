@@ -66,6 +66,5 @@ target/
 tags
 # .coverage
 # htmlcov/
-source.vhd
-.ci/test_support/grlib/
 .mypy_cache
+.hdl_checker/

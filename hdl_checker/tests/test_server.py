@@ -29,7 +29,6 @@ from threading import Thread
 
 import requests
 from mock import MagicMock, patch
-
 from pyls import uris  # type: ignore
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
 
@@ -328,7 +327,16 @@ with such.A("hdl_checker server") as it:
             ).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)
-            it.assertEqual(response, {"capabilities": {"textDocumentSync": 1}})
+            it.assertDictEqual(
+                response,
+                {
+                    "capabilities": {
+                        "textDocumentSync": 1,
+                        "definitionProvider": True,
+                        "hoverProvider": True,
+                    }
+                },
+            )
 
         @it.should("show message with reason for failing to start")  # type: ignore
         @disableVunit

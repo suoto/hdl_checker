@@ -25,9 +25,9 @@ import tempfile
 import traceback
 from collections import namedtuple
 from multiprocessing.pool import ThreadPool
-from threading import RLock
 from pprint import pformat
-from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Union
+from threading import RLock
+from typing import Any, AnyStr, Dict, Iterable, Optional, Set, Tuple, Union
 
 import six
 
@@ -41,6 +41,7 @@ from hdl_checker.builders.fallback import Fallback
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType, PathNotInProjectFile
 from hdl_checker.parsers.config_parser import ConfigParser
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
@@ -53,6 +54,11 @@ from hdl_checker.types import (
     RebuildUnit,
 )
 from hdl_checker.utils import removeDirIfExists, removeIfExists, toBytes
+
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
@@ -85,7 +91,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         self._lock = RLock()
         self.config_file = None  # type: Optional[WatchedFile]
 
-        self.database = Database()
+        self._database = Database()
         self._builder = Fallback(self.work_dir, self.database)
 
         if not p.exists(str(self.work_dir)):
@@ -93,6 +99,13 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         self._recoverCacheIfPossible()
         self._saveCache()
+
+        # Use this to know which methods should be cache
+        self._cached_methods = {
+            getattr(self, x)
+            for x in dir(self)
+            if hasattr(getattr(self, x), "cache_clear")
+        }
 
     @property
     def builder(self):
@@ -102,6 +115,24 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         self._updateConfigIfNeeded()
         return self._builder
+
+    @property
+    def database(self):
+        """
+        Parses the config file if it has been set and returns the builder in
+        use
+        """
+        self._updateConfigIfNeeded()
+        return self._database
+
+    def __hash__(self):
+        # Just to allow lru_cache
+        return hash(0)
+
+    def _clearLruCaches(self):
+        "Clear caches from lru_caches"
+        for meth in self._cached_methods:
+            meth.cache_clear()
 
     def setConfig(self, filename):
         # type: (Union[Path, str]) -> None
@@ -190,11 +221,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
         # Add the flags from the root config file last, it should overwrite
         # values set by the included files
-        #  self.database.addSources(config.pop("sources", ()), config_root_path)
-        #  if config
-        assert not config, "Some configuration elements weren't used:\n{}".format(
-            pformat(config)
-        )
+        if config:
+            _logger.warning(
+                "Some configuration elements weren't used:\n%s", pformat(config)
+            )
 
     def _getCacheFilename(self):
         # type: () -> Path
@@ -227,7 +257,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         """
         Serializer load implementation
         """
-        self.database = state.pop("database")
+        self._database = state.pop("database")
         self._builder = state.pop("builder", Fallback)
         config_file = state.pop("config_file", None)
         if config_file is None:
@@ -284,10 +314,11 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         removeDirIfExists(str(self.work_dir))
 
         del self._builder
-        del self.database
+        del self._database
 
-        self.database = Database()
-        self._builder = Fallback(self.work_dir, self.database)
+        database = Database()
+        self._database = database
+        self._builder = Fallback(self.work_dir, database)
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
@@ -401,7 +432,7 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
         """
-        self._updateConfigIfNeeded()
+        self._clearLruCaches()
 
         path = Path(path, self.root_dir)
 
@@ -451,9 +482,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
         """
+        self._clearLruCaches()
         with self._lock:
             _logger.info("Getting messages for '%s' with content", path)
-            self._updateConfigIfNeeded()
 
             ext = path.name.split(".")[-1]
             temporary_file = tempfile.NamedTemporaryFile(suffix="." + ext, delete=False)
@@ -462,7 +493,6 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
 
             temporary_file.file.write(toBytes(content))  # type: ignore
             temporary_file.close()
-
 
             # If the reference path was added to the database, add the
             # temporary file with the same attributes
@@ -494,3 +524,21 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 diags.add(PathNotInProjectFile(path))
 
         return diags
+
+    @lru_cache()
+    def resolveDependencyToPath(self, dependency):
+        # type: (DependencySpec) -> Optional[Tuple[Path, Identifier]]
+        """
+        Retrieves the build sequence for the dependency's owner and extracts
+        the path that implements a design unit whose names match the
+        dependency.
+        """
+        for library, path in self.database.getBuildSequence(
+            dependency.owner, self.builder.builtin_libraries
+        ):
+            if dependency.name in (
+                x.name for x in self.database.getDesignUnitsByPath(path)
+            ):
+                return path, library
+
+        return None

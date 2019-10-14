@@ -306,7 +306,8 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
 
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def __hash_key__(self):
         """ Implement this attribute to use it for hashing and comparing"""
 
