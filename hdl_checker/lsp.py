@@ -429,7 +429,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         if isinstance(element, DependencySpec):
             return {"contents": self._getDependencyInfoForHover(element)}
 
-        return {}
+        return None
 
     @logCalls
     def definitions(self, doc_uri, position):

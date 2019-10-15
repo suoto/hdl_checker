@@ -62,7 +62,7 @@ setuptools.setup(
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
                                      'prettytable>=0.7.2',
-                                     'python-language-server>=0.26.1,<=0.27.0',
+                                     'python-language-server>=0.26.1',
                                      'requests==2.20.0',
                                      'tabulate>=0.8.5',
                                      'typing>=3.7.4',

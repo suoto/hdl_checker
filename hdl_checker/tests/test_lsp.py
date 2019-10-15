@@ -64,6 +64,8 @@ from hdl_checker.tests import (  # isort:skip
     TestCase,
 )
 
+if six.PY3:
+    unicode = str
 
 # Debouncing will hurt testing since it won't actually call the debounced
 # function if we call it too quickly.
@@ -251,7 +253,7 @@ with such.A("LSP server") as it:
         with patch.object(it.server.workspace, "publish_diagnostics"):
             _logger.info("Sending %s request", method)
             getattr(it.server, method)(
-                textDocument={"uri": uris.from_fs_path(source), "text": None}
+                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
             )
 
             mock_call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
@@ -567,7 +569,7 @@ class TestValidProject(TestCase):
         with patch.object(self.server.workspace, "publish_diagnostics"):
             _logger.info("Sending %s request", method)
             getattr(self.server, method)(
-                textDocument={"uri": uris.from_fs_path(source), "text": None}
+                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
             )
 
             mock_call = _waitOnMockCall(self.server.workspace.publish_diagnostics)
