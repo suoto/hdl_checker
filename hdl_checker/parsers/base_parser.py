@@ -26,7 +26,7 @@ from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-impor
 
 from hdl_checker.path import Path
 from hdl_checker.types import FileType
-from hdl_checker.utils import HashableByKey, removeDuplicates
+from hdl_checker.utils import HashableByKey, readFile, removeDuplicates
 
 _logger = logging.getLogger(__name__)
 
@@ -39,19 +39,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractproperty
-    def _comment(self):
-        """
-        Should return a regex object that matches a comment (or comments)
-        used by the language
-        """
-
     def __init__(self, filename):
         # type: (Path, ) -> None
         assert isinstance(filename, Path), "Invalid type: {}".format(filename)
         self.filename = filename
         self._cache = {}  # type: Dict[str, Any]
-        self._content = None
+        self._content = None  # type: Optional[str]
         self._mtime = 0  # type: Optional[float]
         self.filetype = FileType.fromPath(self.filename)
         self._dependencies = None  # type: Optional[Set[DependencySpec]]
@@ -142,6 +135,14 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._content
 
+    def _getSourceContent(self):
+        # type: () -> str
+        """
+        Method that can be overriden to change the contents of the file, like
+        striping comments off.
+        """
+        return readFile(str(self.filename))
+
     def getDesignUnits(self):  # type: () -> Set[tAnyDesignUnit]
         """
         Cached version of the _getDesignUnits method
@@ -186,15 +187,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             self._libraries = removeDuplicates(self._getLibraries())
 
         return self._libraries
-
-    @abc.abstractmethod
-    def _getSourceContent(self):
-        """
-        Method that should implement pre parsing of the source file.
-        This includes removing comments and unnecessary or unimportant
-        chunks of text to make the life of the real parsing easier.
-        Should return a string and NOT a list of lines
-        """
 
     @abc.abstractmethod
     def _getDesignUnits(self):

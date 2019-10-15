@@ -78,14 +78,14 @@ class VerilogParser(BaseSourceFile):
                     owner=self.filename,
                     name=match["module_name"],
                     type_=DesignUnitType.entity,
-                    locations={(line_number, None)},
+                    locations={Location(line_number, None)},
                 )
             if match["package_name"] is not None:
                 yield VerilogDesignUnit(
                     owner=self.filename,
                     name=match["package_name"],
                     type_=DesignUnitType.package,
-                    locations={(line_number, None)},
+                    locations={Location(line_number, None)},
                 )
 
     def _getLibraries(self):
