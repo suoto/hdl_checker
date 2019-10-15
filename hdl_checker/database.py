@@ -38,6 +38,7 @@ from typing import (
 from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     CheckerDiagnostic,
     DependencyNotUnique,
+    PathLibraryIsNotUnique,
     PathNotInProjectFile,
 )
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
@@ -376,7 +377,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         elif path not in self._library_map:
             # Library is not defined, try to infer
             _logger.info("Library for '%s' not set, inferring it", path)
-            library = self._inferLibraryIfNeeded(path)
+            library = self._inferLibraryForPath(path)
             if library is not None:
                 self._updatePathLibrary(path, library)
 
@@ -465,7 +466,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             if (unit.name, unit.type_) == (design_unit.name, design_unit.type_)
         )
 
-    def _inferLibraryIfNeeded(self, path):
+    def _inferLibraryForPath(self, path):
         # type: (Path) -> UnresolvedLibrary
         """
         Tries to infer which library the given path should be compiled on by
@@ -476,11 +477,13 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         _logger.debug("Units defined here in %s: %s", path, list(map(str, units)))
         # Store all cases to use in case there are multiple libraries that
         # could be used. If that happens, we'll use the most common one
-        all_libraries = list(
-            chain.from_iterable(
+        all_libraries = [
+            library
+            for library in chain.from_iterable(
                 self.getLibrariesReferredByUnit(name=unit.name) for unit in units
             )
-        )
+            if library != _LIBRARY_WORK
+        ]
 
         libraries = set(all_libraries)
 
@@ -491,15 +494,16 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             library = libraries.pop()
         else:
             library = getMostCommonItem(all_libraries)
-            _msg = []
-            for lib in libraries:
-                _msg.append("%s (x%d)" % (lib, all_libraries.count(lib)))
-            _logger.info(
-                "Path %s is in %d libraries: %s, using %s",
-                path,
-                len(libraries),
-                ", ".join(_msg),
-                library,
+
+            # For now we'll report this as an issue on the dependecy. In the
+            # future, we should probably store this diagnostic on a different
+            # dict where the dependency is the key and put it all together when
+            # the self.getDiagnosticsForPath is called (aka, cross reference on
+            # demand)
+            self._addDiagnostic(
+                PathLibraryIsNotUnique(
+                    filename=path, actual=library, choices=all_libraries
+                )
             )
 
         self._inferred_libraries.add(path)
@@ -521,10 +525,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     continue
 
                 # If the dependency's library refers to 'work', it's actually
-                # referring to the library its owner is in. At this point we
-                # resolve a library name (so that 'work' no longer means 'this
-                # library' and actually means a library named 'work'). Typing
-                # might be a good way of separating which is which
+                # referring to the library its owner is in
                 if dependency.library is not None:
                     result.append(dependency.library)
                 else:

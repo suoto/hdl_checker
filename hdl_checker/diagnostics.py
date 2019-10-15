@@ -16,8 +16,9 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Diagnostics holders for checkers"
 
-from typing import Optional
+from typing import Iterable, Optional
 
+from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path  # pylint: disable=unused-import
 from hdl_checker.utils import HashableByKey
 
@@ -48,7 +49,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        checker,  # type: str
+        checker,  # type: Optional[str]
         text,  # type: str
         filename=None,  # type: Optional[Path]
         line_number=None,
@@ -338,4 +339,27 @@ class DependencyNotUnique(CheckerDiagnostic):
             line_number=line_number,
             column_number=column_number,
             text=text,
+        )
+
+
+class PathLibraryIsNotUnique(CheckerDiagnostic):
+    """
+    Searching for a dependency should yield a single source file
+    """
+
+    def __init__(self, filename, actual, choices):
+        # type: (Path, Identifier, Iterable[Identifier]) -> None
+        _choices = list(choices)
+
+        msg = []
+        for library in set(_choices):
+            msg.append("'{}' (x{})".format(library, _choices.count(library)))
+
+        text = (
+            "Using library '{}' for this file but its units are referenced in "
+            "multiple libraries: {}".format(actual, ", ".join(msg))
+        )
+
+        super(PathLibraryIsNotUnique, self).__init__(
+            checker=None, filename=filename, severity=DiagType.WARNING, text=text
         )

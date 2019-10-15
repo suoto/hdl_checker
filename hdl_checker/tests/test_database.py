@@ -40,6 +40,7 @@ from hdl_checker.tests import (
 
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
+from hdl_checker.lsp import _DEFAULT_LIBRARY_NAME
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -62,9 +63,9 @@ class _SourceMock(SourceMock):
 
 class _Database(Database):
     def configure(self, root_config, root_path):
-        # type: (Dict[str, Any], str) -> None
+        # type: (Dict[str, Any], str) -> int
         _logger.info("Updating config from\n%s", pformat(root_config))
-        super(_Database, self).configure(root_config, root_path)
+        result = super(_Database, self).configure(root_config, root_path)
 
         _logger.debug("State after updating:")
 
@@ -84,6 +85,8 @@ class _Database(Database):
             _logger.debug("    - %d dependencies:", len(dependencies))
             for dependency in dependencies:
                 _logger.debug("      - %s", dependency)
+
+        return result
 
     def __jsonEncode__(self):
         state = super(_Database, self).__jsonEncode__()
@@ -447,6 +450,95 @@ class TestDatabase(TestCase):
         self.assertEqual(
             self.database.getLibrary(_Path("some_dependency.vhd")),
             Identifier("lib_b", False),
+        )
+
+    def test_LibraryInferenceIgnoresWorkReferences(self):
+        # type: (...) -> Any
+        # When using work.something, 'work' means the current library and
+        # should be ignored
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library=None,
+                    #  library="file_0_library",
+                    design_units=[{"name": "package_0", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_1.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_1", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_2.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_2", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_3.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_3", "type": "package"}],
+                    dependencies=(("some_dep_lib", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("some_dependency.vhd"),
+                    library=None,
+                    design_units=[{"name": "some_dependency", "type": "package"}],
+                ),
+            },
+            TEST_TEMP_PATH,
+        )
+
+        self.assertEqual(
+            self.database.getLibrary(_Path("some_dependency.vhd")),
+            Identifier("some_dep_lib", False),
+        )
+
+    def test_LibraryInferenceUsesTheMostCommon(self):
+        # type: (...) -> Any
+        # When using work.something and on a source whose library has been set,
+        # should use that instead of the most common
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library="file_0_library",
+                    design_units=[{"name": "package_0", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_1.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_1", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_2.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_2", "type": "package"}],
+                    dependencies=(("some_dep_lib", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_3.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_3", "type": "package"}],
+                    dependencies=(("some_dep_lib", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("some_dependency.vhd"),
+                    library=None,
+                    design_units=[{"name": "some_dependency", "type": "package"}],
+                ),
+            },
+            TEST_TEMP_PATH,
+        )
+
+        self.assertEqual(
+            self.database.getLibrary(_Path("some_dependency.vhd")),
+            Identifier("some_dep_lib", False),
         )
 
     def test_json_encoding_and_decoding(self):
@@ -987,12 +1079,12 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             set(self.database.test_getBuildSequence(_Path("no_lib_target.vhd"))),
             (
                 {
-                    (Identifier("work"), _Path("dependency.vhd")),
-                    (Identifier("work"), _Path("no_lib_package_1.vhd")),
+                    (_DEFAULT_LIBRARY_NAME, _Path("dependency.vhd")),
+                    (_DEFAULT_LIBRARY_NAME, _Path("no_lib_package_1.vhd")),
                 },
                 {
-                    (Identifier("work"), _Path("dependency.vhd")),
-                    (Identifier("work"), _Path("no_lib_package_2.vhd")),
+                    (_DEFAULT_LIBRARY_NAME, _Path("dependency.vhd")),
+                    (_DEFAULT_LIBRARY_NAME, _Path("no_lib_package_2.vhd")),
                 },
             ),
         )
