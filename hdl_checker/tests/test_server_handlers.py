@@ -182,8 +182,8 @@ with such.A("hdl_checker bottle app") as it:
 
         expected = StaticCheckerDiag(
             filename=data["path"],
-            line_number=1,
-            column_number=4,
+            line_number=0,
+            column_number=3,
             text="TODO: Nothing to see here",
             severity=DiagType.STYLE_INFO,
         )
@@ -208,8 +208,8 @@ with such.A("hdl_checker bottle app") as it:
             [
                 ObjectIsNeverUsed(
                     filename=filename,
-                    line_number=27,
-                    column_number=12,
+                    line_number=26,
+                    column_number=11,
                     object_type="signal",
                     object_name="clk_enable_unused",
                 )

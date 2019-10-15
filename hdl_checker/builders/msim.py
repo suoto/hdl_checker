@@ -148,9 +148,9 @@ class MSim(BaseBuilder):
             if filename is not None:
                 diag.filename = Path(filename)
             if line_number is not None:
-                diag.line_number = line_number
+                diag.line_number = int(line_number) - 1
             if column_number is not None:
-                diag.column_number = column_number
+                diag.column_number = int(column_number) - 1
 
             if info.get("severity", None) in ("W", "e"):
                 diag.severity = DiagType.WARNING

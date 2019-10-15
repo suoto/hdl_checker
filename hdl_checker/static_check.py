@@ -211,8 +211,8 @@ def _getCommentTags(lines):
             _dict = match.groupdict()
             result += [
                 StaticCheckerDiag(
-                    line_number=lnum,
-                    column_number=match.start(match.lastindex - 1) + 1,
+                    line_number=lnum - 1,
+                    column_number=match.start(match.lastindex - 1),
                     severity=DiagType.STYLE_INFO,
                     text="%s: %s" % (_dict["tag"].upper(), _dict["text"]),
                 )
@@ -232,8 +232,8 @@ def _getMiscChecks(objects):
             continue
         if library == "work":
             yield LibraryShouldBeOmited(
-                line_number=obj["lnum"] + 1,
-                column_number=obj["start"] + 1,
+                line_number=obj["lnum"],
+                column_number=obj["start"],
                 library=library,
             )
 
@@ -249,8 +249,8 @@ def getStaticMessages(lines):
         obj_dict = objects[_object]
         result += [
             ObjectIsNeverUsed(
-                line_number=obj_dict["lnum"] + 1,
-                column_number=obj_dict["start"] + 1,
+                line_number=obj_dict["lnum"],
+                column_number=obj_dict["start"],
                 object_type=obj_dict["type"],
                 object_name=_object,
             )

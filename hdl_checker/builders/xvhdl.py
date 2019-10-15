@@ -94,7 +94,7 @@ class XVHDL(BaseBuilder):
         diag = BuilderDiag(
             builder_name=self.builder_name,
             text=info["error_message"].strip(),
-            line_number=info["line_number"],
+            line_number=int(info["line_number"]) - 1,
             filename=Path(info["filename"]),
             error_code=info["error_code"],
         )

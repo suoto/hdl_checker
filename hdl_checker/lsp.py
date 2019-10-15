@@ -85,12 +85,12 @@ def checkerDiagToLspDict(diag):
         "source": diag.checker,
         "range": {
             "start": {
-                "line": (diag.line_number or 1) - 1,
-                "character": (diag.column_number or 1) - 1,
+                "line": (diag.line_number or 0),
+                "character": (diag.column_number or 0),
             },
             "end": {
-                "line": (diag.line_number or 1) - 1,
-                "character": (diag.column_number or 1) - 1,
+                "line": (diag.line_number or 0),
+                "character": (diag.column_number or 0),
             },
         },
         "message": diag.text,

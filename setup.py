@@ -14,9 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
-"hdl_checker installation script"
+"HDL Checker installation script"
 
-import setuptools
+import setuptools  # type: ignore
 import versioneer
 
 LONG_DESCRIPTION = open("README.md", "rb").read().decode(encoding='utf8', errors='replace')

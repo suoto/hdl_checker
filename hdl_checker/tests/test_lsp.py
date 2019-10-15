@@ -133,8 +133,8 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
             checker="hdl_checker test",
             text="some diag",
             filename=Path("filename"),
-            line_number=1,
-            column_number=1,
+            line_number=0,
+            column_number=0,
             error_code="error code",
             severity=diag_type,
         )
@@ -800,8 +800,8 @@ class TestValidProject(TestCase):
     )
     def test_HoverOnInvalidRange(self):
         path = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-        self.assertEqual(
-            self.server.hover(uris.from_fs_path(path), {"line": 0, "character": 0}), {}
+        self.assertIsNone(
+            self.server.hover(uris.from_fs_path(path), {"line": 0, "character": 0})
         )
 
     @patch(

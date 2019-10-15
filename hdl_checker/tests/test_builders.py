@@ -181,7 +181,7 @@ class TestBuilder(TestCase):
                     builder_name=self.builder_name,
                     text="near \"EOF\": expecting ';'.",
                     filename=Path(path),
-                    line_number=21,
+                    line_number=20,
                     error_code="vcom-1576",
                     severity=DiagType.ERROR,
                 )
@@ -203,7 +203,7 @@ class TestBuilder(TestCase):
                     "ambiguous; using element type STD_LOGIC_VECTOR, not "
                     "aggregate type register_type.",
                     filename=Path(path),
-                    line_number=23,
+                    line_number=22,
                     error_code="vcom-1320",
                     severity=DiagType.WARNING,
                 )
@@ -224,7 +224,7 @@ class TestBuilder(TestCase):
                     text="Range choice direction (downto) does not determine "
                     "aggregate index range direction (to).",
                     filename=Path(path),
-                    line_number=39,
+                    line_number=38,
                     error_code="vcom-1514",
                     severity=DiagType.WARNING,
                 )
@@ -259,7 +259,7 @@ class TestBuilder(TestCase):
                     builder_name=self.builder_name,
                     text='Cannot find expanded name "work.regfile_pkg".',
                     filename=Path(path),
-                    line_number=7,
+                    line_number=6,
                     error_code="vcom-1195",
                     severity=DiagType.ERROR,
                 )
@@ -276,7 +276,7 @@ class TestBuilder(TestCase):
                 BuilderDiag(
                     builder_name=self.builder_name,
                     text="Unknown expanded name.",
-                    line_number="7",
+                    line_number="6",
                     filename=Path(path),
                     severity=DiagType.ERROR,
                 )
@@ -294,7 +294,7 @@ class TestBuilder(TestCase):
                 BuilderDiag(
                     builder_name=self.builder_name,
                     text="Length of expected is 4; length of actual is 8.",
-                    line_number="103",
+                    line_number="102",
                     error_code="vcom-1272",
                     filename=Path(path),
                     severity=DiagType.WARNING,
@@ -313,7 +313,7 @@ class TestBuilder(TestCase):
                 BuilderDiag(
                     builder_name=self.builder_name,
                     text="Range -1 downto 0 is null.",
-                    line_number="31",
+                    line_number="30",
                     error_code="vcom-1246",
                     filename=Path(path),
                     severity=DiagType.WARNING,
@@ -344,8 +344,8 @@ class TestBuilder(TestCase):
             BuilderDiag(
                 builder_name=self.builder_name,
                 filename=Path(path),
-                line_number=11,
-                column_number=35,
+                line_number=10,
+                column_number=34,
                 severity=DiagType.ERROR,
                 text="extra ';' at end of interface list",
             )
@@ -376,7 +376,7 @@ class TestBuilder(TestCase):
                     builder_name=self.builder_name,
                     text="syntax error near )",
                     filename=Path(path),
-                    line_number=12,
+                    line_number=11,
                     error_code="VRFC 10-1412",
                     severity=DiagType.ERROR,
                 )
@@ -465,7 +465,7 @@ class TestBuilder(TestCase):
                     filename=source,
                     builder_name=self.builder_name,
                     text='Unknown identifier "some_lib".',
-                    line_number=4,
+                    line_number=3,
                     error_code="vcom-1136",
                     severity=DiagType.ERROR,
                 )
@@ -476,8 +476,8 @@ class TestBuilder(TestCase):
                     filename=source,
                     builder_name=self.builder_name,
                     text='no declaration for "some_lib"',
-                    line_number=4,
-                    column_number=5,
+                    line_number=3,
+                    column_number=4,
                     severity=DiagType.ERROR,
                 )
             ]
@@ -488,7 +488,7 @@ class TestBuilder(TestCase):
                     filename=source,
                     builder_name=self.builder_name,
                     text="some_lib is not declared",
-                    line_number=4,
+                    line_number=3,
                     error_code="VRFC 10-91",
                     severity=DiagType.ERROR,
                 ),
@@ -496,7 +496,7 @@ class TestBuilder(TestCase):
                     filename=source,
                     builder_name=self.builder_name,
                     text="'some_lib' is not declared",
-                    line_number="4",
+                    line_number=3,
                     error_code="VRFC 10-2989",
                     severity=DiagType.ERROR,
                 ),
@@ -606,7 +606,7 @@ class TestBuilder(TestCase):
             )
 
 
-class TestSanityError(unittest2.TestCase):
+class TestSanityError(TestCase):
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
     def test_not_available(self, builder_class):
         # type: (...) -> Any

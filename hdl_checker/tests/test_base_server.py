@@ -206,8 +206,8 @@ with such.A("hdl_checker project") as it:
                     LibraryShouldBeOmited(
                         library="work",
                         filename=_Path("some_lib_target.vhd"),
-                        line_number=1,
-                        column_number=9,
+                        line_number=0,
+                        column_number=8,
                     )
                 },
             )
@@ -432,8 +432,8 @@ with such.A("hdl_checker project") as it:
                         LibraryShouldBeOmited(
                             library="work",
                             filename=entity_a.filename,
-                            column_number=9,
-                            line_number=1,
+                            column_number=8,
+                            line_number=0,
                         ),
                         PathNotInProjectFile(entity_a.filename),
                         CheckerDiagnostic(
@@ -562,8 +562,8 @@ with such.A("hdl_checker project") as it:
             it.assertIn(
                 ObjectIsNeverUsed(
                     filename=Path(filename),
-                    line_number=29,
-                    column_number=12,
+                    line_number=28,
+                    column_number=11,
                     object_type="signal",
                     object_name="neat_signal",
                 ),
@@ -592,8 +592,8 @@ with such.A("hdl_checker project") as it:
             it.assertIn(
                 ObjectIsNeverUsed(
                     filename=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
-                    line_number=29,
-                    column_number=12,
+                    line_number=28,
+                    column_number=11,
                     object_type="signal",
                     object_name="neat_signal",
                 ),
@@ -632,15 +632,15 @@ with such.A("hdl_checker project") as it:
             expected = [
                 ObjectIsNeverUsed(
                     filename=filename,
-                    line_number=30,
-                    column_number=12,
+                    line_number=29,
+                    column_number=11,
                     object_type="signal",
                     object_name="neat_signal",
                 ),
                 ObjectIsNeverUsed(
                     filename=filename,
-                    line_number=29,
-                    column_number=8,
+                    line_number=28,
+                    column_number=7,
                     object_type="signal",
                     object_name="another_signal",
                 ),
@@ -672,7 +672,7 @@ with such.A("hdl_checker project") as it:
 
             expected = [
                 LibraryShouldBeOmited(
-                    library="work", filename=filename, column_number=9, line_number=1
+                    library="work", filename=filename, column_number=8, line_number=0
                 ),
                 PathNotInProjectFile(filename),
             ]
@@ -709,8 +709,8 @@ with such.A("hdl_checker project") as it:
                     ObjectIsNeverUsed(
                         object_type="constant",
                         object_name="ADDR_WIDTH",
-                        line_number=29,
-                        column_number=14,
+                        line_number=28,
+                        column_number=13,
                     ),
                     diagnostics,
                 )
@@ -734,8 +734,8 @@ with such.A("hdl_checker project") as it:
                 [
                     ObjectIsNeverUsed(
                         filename=filename,
-                        line_number=27,
-                        column_number=12,
+                        line_number=26,
+                        column_number=11,
                         object_type="signal",
                         object_name="clk_enable_unused",
                     )

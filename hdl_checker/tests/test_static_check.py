@@ -116,8 +116,8 @@ with such.A("hdl_checker project") as it:
         it.assertCountEqual(
             [
                 StaticCheckerDiag(
-                    line_number=7,
-                    column_number=5,
+                    line_number=6,
+                    column_number=4,
                     severity=DiagType.STYLE_INFO,
                     text=expected,
                 )
@@ -204,7 +204,7 @@ with such.A("hdl_checker project") as it:
             objects = static_check._getObjectsFromText(it.text)
 
             it.assertCountEqual(
-                [LibraryShouldBeOmited(line_number=4, column_number=9, library="work")],
+                [LibraryShouldBeOmited(line_number=3, column_number=8, library="work")],
                 static_check._getMiscChecks(objects),
             )
 
