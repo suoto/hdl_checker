@@ -77,9 +77,12 @@ def checkerDiagToLspDict(diag):
     # Translate the error into LSP severity
     severity = diag.severity
 
-    if severity in (DiagType.INFO, DiagType.STYLE_INFO):
-        severity = defines.DiagnosticSeverity.Hint
-    elif severity in (DiagType.STYLE_WARNING, DiagType.STYLE_ERROR):
+    if severity in (
+        DiagType.STYLE_WARNING,
+        DiagType.STYLE_ERROR,
+        DiagType.INFO,
+        DiagType.STYLE_INFO,
+    ):
         severity = defines.DiagnosticSeverity.Information
     elif severity in (DiagType.WARNING,):
         severity = defines.DiagnosticSeverity.Warning

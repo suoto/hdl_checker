@@ -115,8 +115,8 @@ class MockWaitTimeout(Exception):
 class TestCheckerDiagToLspDict(unittest2.TestCase):
     @parameterized.parameterized.expand(
         [
-            (DiagType.INFO, defines.DiagnosticSeverity.Hint),
-            (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Hint),
+            (DiagType.INFO, defines.DiagnosticSeverity.Information),
+            (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Information),
             (DiagType.STYLE_WARNING, defines.DiagnosticSeverity.Information),
             (DiagType.STYLE_ERROR, defines.DiagnosticSeverity.Information),
             (DiagType.WARNING, defines.DiagnosticSeverity.Warning),
