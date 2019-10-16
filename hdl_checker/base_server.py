@@ -61,13 +61,13 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
-_SETUP_IS_TOO_LONG_TIMEOUT = 15
+_HOW_LONG_IS_TOO_LONG = 15
 
 _SETTING_UP_A_PROJECT_URL = (
     "https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project"
 )
 
-_SETUP_IS_TOO_LONG_MSG = (
+_HOW_LONG_IS_TOO_LONG_MSG = (
     "Configuring the project seems to be taking too long. Consider using a "
     "smaller workspace or a configuration file. More info: "
     "[{0}]({0})".format(_SETTING_UP_A_PROJECT_URL)
@@ -185,9 +185,9 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
         # Don't let the user hanging if adding sources is taking too long. Also
         # need to notify when adding is done.
         timer = Timer(
-            _SETUP_IS_TOO_LONG_TIMEOUT,
+            _HOW_LONG_IS_TOO_LONG,
             self._handleUiInfo,
-            args=(_SETUP_IS_TOO_LONG_MSG,),
+            args=(_HOW_LONG_IS_TOO_LONG_MSG,),
         )
         timer.start()
         self._readConfig()
@@ -246,7 +246,10 @@ class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
                 "Some configuration elements weren't used:\n%s", pformat(config)
             )
 
-        self._handleUiInfo("Added {} sources".format(sources_added))
+        if sources_added:
+            self._handleUiInfo("Added {} sources".format(sources_added))
+        else:
+            self._handleUiInfo("No sources were added")
 
     def _getCacheFilename(self):
         # type: () -> Path

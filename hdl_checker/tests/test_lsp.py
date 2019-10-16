@@ -268,20 +268,7 @@ with such.A("LSP server") as it:
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
 
-    @it.should("not warn when setup takes less than lsp._SETUP_IS_TOO_LONG_TIMEOUT")
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer.showWarning")
-    def test(show_warning):
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-        )
-        show_warning.assert_not_called()
-        stopLspServer()
-
-    @it.should(  # type: ignore
-        "show info and warning messages"
-    )
+    @it.should("show info and warning messages")
     @patch("pyls.workspace.Workspace.show_message")
     def test(show_message):
         startLspServer()

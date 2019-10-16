@@ -29,6 +29,7 @@ import tempfile
 import time
 
 import six
+
 from mock import patch
 
 from nose2.tools import such  # type: ignore
@@ -47,6 +48,7 @@ from hdl_checker.tests import (
     writeListToFile,
 )
 
+import hdl_checker
 from hdl_checker import CACHE_NAME, WORK_PATH
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.diagnostics import (
@@ -96,8 +98,6 @@ def _Path(*args):
 
 
 def patchClassMap(**kwargs):
-    import hdl_checker
-
     class_map = hdl_checker.serialization.CLASS_MAP.copy()
     for name, value in kwargs.items():
         class_map.update({name: value})
@@ -133,10 +133,8 @@ with such.A("hdl_checker project") as it:
 
     it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
 
-    import hdl_checker
-
     @it.should("warn when setup is taking too long")
-    @patch("hdl_checker.base_server._SETUP_IS_TOO_LONG_TIMEOUT", 0.1)
+    @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
         hdl_checker.base_server.HdlCodeCheckerBase,
         "configure",
@@ -159,8 +157,32 @@ with such.A("hdl_checker project") as it:
         project.getMessagesByPath(Path(source))
 
         it.assertCountEqual(
-            [("info", hdl_checker.base_server._SETUP_IS_TOO_LONG_MSG)],
+            [("info", hdl_checker.base_server._HOW_LONG_IS_TOO_LONG_MSG)],
             list(project.getUiMessages()),
+        )
+
+        removeIfExists(path)
+
+    @it.should(  # type: ignore
+        "not warn when setup takes less than _HOW_LONG_IS_TOO_LONG"
+    )
+    def test():
+        path = tempfile.mkdtemp()
+
+        config = p.join(path, "config.json")
+        source = p.join(path, "source.vhd")
+
+        # Make sure the files exists
+        open(config, "w").write("")
+        open(source, "w").write("")
+
+        project = StandaloneProjectBuilder(_Path(path))
+        project.setConfig(Path(config))
+        # Get messages of anything to trigger reading the config
+        project.getMessagesByPath(Path(source))
+
+        it.assertCountEqual(
+            [("info", "No sources were added")], list(project.getUiMessages())
         )
 
         removeIfExists(path)
@@ -172,7 +194,7 @@ with such.A("hdl_checker project") as it:
             it.project_file = Path("non_existing_file")
             it.assertFalse(p.exists(it.project_file.name))
 
-        @it.should("raise exception when trying to instantiate")
+        @it.should("raise exception when trying to instantiate")  # type: ignore
         def test():
             project = StandaloneProjectBuilder(_Path("nonexisting"))
             with it.assertRaises(FileNotFoundError):
@@ -306,7 +328,7 @@ with such.A("hdl_checker project") as it:
         def test():
             if not ON_WINDOWS:
                 it.assertCountEqual(
-                    [("info", "Added 0 sources")],
+                    [("info", "No sources were added")],
                     list(it.project.getUiMessages()),
                 )
 
@@ -553,8 +575,7 @@ with such.A("hdl_checker project") as it:
 
             if not ON_WINDOWS:
                 it.assertCountEqual(
-                    [("info", "Added 10 sources")],
-                    list(it.project.getUiMessages()),
+                    [("info", "Added 10 sources")], list(it.project.getUiMessages())
                 )
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
@@ -853,7 +874,7 @@ with such.A("hdl_checker project") as it:
         def _RebuildPath(path):
             return RebuildPath(Path(path))
 
-        @it.should("rebuild sources with path as a hint")
+        @it.should("rebuild sources with path as a hint")  # type: ignore
         def test():
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
