@@ -28,6 +28,7 @@ import subprocess as subp
 import sys
 from collections import Counter
 from tempfile import NamedTemporaryFile
+from threading import Timer
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
 
 import six
@@ -61,10 +62,10 @@ def setupLogging(stream, level):  # pragma: no cover
 
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("pynvim").setLevel(logging.WARNING)
-    logging.getLogger("pyls").setLevel(logging.INFO)
-    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
-    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
+    logging.getLogger("pyls").setLevel(logging.INFO)
+    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
+    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
     logging.getLogger("pyls_jsonrpc.endpoint").setLevel(logging.INFO)
 
 
@@ -400,18 +401,26 @@ def _getLatestReleaseVersion():
     the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to
     the URL fails, return None
     """
+    proc = subp.Popen(
+        ["git", "ls-remote", "--sort=v:refname", "--tags", REPO_URL],
+        env={"GIT_TERMINAL_PROMPT": "0"},
+        stdout=subp.PIPE,
+        stderr=subp.PIPE,
+    )
+
+    timer = Timer(5, proc.kill)
+    timer.start()
+
     try:
-        tags = [
-            x.decode()
-            for x in subp.check_output(
-                ["git", "ls-remote", "--sort=v:refname", "--tags", REPO_URL],
-                env={"GIT_TERMINAL_PROMPT": "0"},
-                stderr=subp.PIPE,
-            ).splitlines()
-        ]
-    except subp.CalledProcessError:
-        _logger.warning("Couldn't fetch latest tag from %s", REPO_URL)
+        stdout, stderr = proc.communicate()
+    finally:
+        timer.cancel()
+
+    if not stdout or stderr:
+        _logger.info("Couldn't fetch latest tag from %s", REPO_URL)
         return None
+
+    tags = [x.decode() for x in stdout.splitlines()]
 
     latest = tags[-1].split("/")[-1]
 

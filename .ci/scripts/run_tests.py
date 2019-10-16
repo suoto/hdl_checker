@@ -155,7 +155,9 @@ def _getNoseCommandLineArgs(args):
     if args.debugger:
         argv += ["--debugger"]
     if args.fail_fast:
-        argv += ["--fail-fast", "--verbose"]
+        argv += ["--fail-fast", ]
+        # Need at least 2 verbose levels for this to work!
+        argv += ["--verbose"] * (2 - len(args.verbose))
     if not args.log_to_stdout:
         argv += ["--log-capture"]
 
@@ -199,6 +201,9 @@ def main():
     logging.getLogger("nose2").setLevel(logging.FATAL)
     logging.getLogger("vunit").setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("pyls").setLevel(logging.INFO)
+    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
+    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
     file_handler = logging.FileHandler(args.log_file)
     log_format = (
         "%(levelname)-7s | %(asctime)s | "

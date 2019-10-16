@@ -46,7 +46,6 @@ from tabulate import tabulate
 from nose2.tools import such  # type: ignore
 
 from hdl_checker.base_server import WatchedFile
-from hdl_checker.exceptions import HdlCheckerNotInitializedError
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import (
     DesignUnitType,
@@ -158,7 +157,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         workspace = MagicMock(spec=Workspace)
 
         server = lsp.Server(
-            workspace, root_path=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
+            workspace, root_dir=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
         )
 
         server._handleUiInfo("some info")  # pylint: disable=protected-access
@@ -197,7 +196,8 @@ with such.A("LSP server") as it:
             },
         )
 
-        it.assertEqual(server.m_initialized(), None)
+        with patch("hdl_checker.lsp.onNewReleaseFound"):
+            it.assertEqual(server.m_initialized(), None)
 
     def startLspServer():
         _logger.debug("Creating server")
@@ -421,81 +421,37 @@ with such.A("LSP server") as it:
                 ],
             )
 
-    # as per LSP spec, this is invalid. rootUri is a mandatory field
-    with it.having("neither root URI nor project file set"):
+    @it.should("lint file with neither root URI nor project file set")  # type: ignore
+    def test():
+        startLspServer()
 
-        @it.has_setup
-        def setup():
-            startLspServer()
+        _initializeServer(
+            it.server, params={"initializationOptions": {"project_file": None}}
+        )
 
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
+        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+        checkLintFileOnOpen(source)
 
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            _initializeServer(
-                it.server, params={"initializationOptions": {"project_file": None}}
-            )
+        stopLspServer()
 
-        # Linting might happen on a different thread, so we might not actually
-        # get the exception. In any case, its constructor must be called
-        @it.should("fail to lint files")  # type: ignore
-        @patch.object(HdlCheckerNotInitializedError, "__init__", return_value=None)
-        def test(exc):
-            source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-            try:
-                checkLintFileOnOpen(source)
-                it.fail(
-                    "Should have raised one of %s",
-                    HdlCheckerNotInitializedError,
-                    MockWaitTimeout,
-                )
-            except (HdlCheckerNotInitializedError, MockWaitTimeout):
-                pass
+    @it.should("lint file with no root URI but project file set")  # type: ignore
+    def test():
+        startLspServer()
 
-            exc.assert_called_once()
-
-    with it.having("no root URI but project file set"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            # In this case, project file is an absolute path, since there's no
-            # root URI
-            _initializeServer(
-                it.server,
-                params={
-                    "initializationOptions": {
-                        "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
-                    }
+        _initializeServer(
+            it.server,
+            params={
+                "rootUri": None,
+                "initializationOptions": {
+                    "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
                 },
-            )
+            },
+        )
 
-        # Linting might happen on a different thread, so we might not actually
-        # get the exception. In any case, its constructor must be called
-        @it.should("fail to lint files")  # type: ignore
-        @patch.object(HdlCheckerNotInitializedError, "__init__", return_value=None)
-        def test(exc):
-            source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-            try:
-                checkLintFileOnOpen(source)
-                it.fail(
-                    "Should have raised one of %s",
-                    HdlCheckerNotInitializedError,
-                    MockWaitTimeout,
-                )
-            except (HdlCheckerNotInitializedError, MockWaitTimeout):
-                pass
+        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+        checkLintFileOnOpen(source)
 
-            exc.assert_called_once()
+        stopLspServer()
 
 
 class TestValidProject(TestCase):
@@ -531,7 +487,8 @@ class TestValidProject(TestCase):
         )
 
         _logger.info("Calling m_initialized")
-        self.assertIsNone(self.server.m_initialized())
+        with patch("hdl_checker.lsp.onNewReleaseFound"):
+            self.assertIsNone(self.server.m_initialized())
 
     def teardown(self):
         _logger.debug("Shutting down server")

@@ -18,7 +18,9 @@
 
 import json
 import logging
-import os.path as p
+from os import getpid
+from os import path as p
+from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import six
@@ -34,16 +36,21 @@ from hdl_checker.base_server import BaseServer
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.database import _DEFAULT_LIBRARY_NAME
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
-from hdl_checker.exceptions import HdlCheckerNotInitializedError, UnknownParameterError
+from hdl_checker.exceptions import UnknownParameterError
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import (
     VerilogDesignUnit,
     VhdlDesignUnit,
     tAnyDesignUnit,
 )
-from hdl_checker.path import Path
+from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location, MarkupKind
-from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
+from hdl_checker.utils import (
+    getTemporaryFilename,
+    logCalls,
+    onNewReleaseFound,
+    removeIfExists,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -150,15 +157,16 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
 
     @property
     def checker(self):
-        # type: () -> HdlCodeCheckerServer
+        # type: () -> Server
         """
-        Returns a valid checker, otherwise raise HdlCheckerNotInitializedError.
-        In theory this shouldn't happen since root URI is mandatory when
-        initializing the server.
+        Returns a valid checker, either the one configured during
+        HdlCheckerLanguageServer._onConfigUpdate or a new one using a temporary
+        directory.
         """
         if self._checker is None:
-            _logger.error("Checker not initialized")
-            raise HdlCheckerNotInitializedError()
+            _logger.info("Server was not initialized, using a temporary one")
+            root_dir = mkdtemp(prefix="temp_hdl_checker_pid{}_".format(getpid()))
+            self._checker = Server(self.workspace, root_dir=TemporaryPath(root_dir))
         return self._checker
 
     def showInfo(self, msg):

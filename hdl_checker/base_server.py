@@ -333,6 +333,17 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         _logger.warning("Not all directories exist, forcing setup")
         self.clean()
 
+        os.makedirs(str(self.work_dir))
+
+        del self._builder
+        del self._database
+
+        database = Database()
+        self._database = database
+        self._builder = Fallback(self.work_dir, database)
+
+        self._builder.setup()
+
         if self.config_file is None:
             return
 
@@ -346,16 +357,6 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         """
         _logger.debug("Cleaning up project")
         removeDirIfExists(str(self.work_dir))
-        os.makedirs(str(self.work_dir))
-
-        del self._builder
-        del self._database
-
-        database = Database()
-        self._database = database
-        self._builder = Fallback(self.work_dir, database)
-
-        self._builder.setup()
 
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None

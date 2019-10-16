@@ -66,12 +66,3 @@ class UnknownTypeExtension(HdlCheckerBaseException):
 
     def __str__(self):
         return "Couldn't determine file type for path '%s'" % self._path
-
-
-class HdlCheckerNotInitializedError(HdlCheckerBaseException):
-    """
-    Exception thrown by the LSP server when the client asks for info that
-    depends on having BaseServer properly setup.
-    """
-    def __str__(self):
-        return "HDL Checker server needs a root URI to work correctly"
