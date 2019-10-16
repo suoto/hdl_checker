@@ -30,7 +30,7 @@ from pyls.workspace import Workspace  # type: ignore
 from tabulate import tabulate
 
 from hdl_checker import DEFAULT_PROJECT_FILE
-from hdl_checker.base_server import HdlCodeCheckerBase
+from hdl_checker.base_server import BaseServer
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.database import _DEFAULT_LIBRARY_NAME
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
@@ -103,15 +103,15 @@ def checkerDiagToLspDict(diag):
     return result
 
 
-class HdlCodeCheckerServer(HdlCodeCheckerBase):
+class Server(BaseServer):
     """
     HDL Checker project builder class
     """
 
-    def __init__(self, workspace, root_path):
-        # type: (Workspace, str) -> None
+    def __init__(self, workspace, root_dir):
+        # type: (Workspace, Path) -> None
         self._workspace = workspace
-        super(HdlCodeCheckerServer, self).__init__(Path(root_path))
+        super(Server, self).__init__(root_dir)
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
@@ -141,7 +141,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
 
     def __init__(self, *args, **kwargs):
         # type: (...) -> None
-        self._checker = None  # type: Optional[HdlCodeCheckerServer]
+        self._checker = None  # type: Optional[Server]
         super(HdlCheckerLanguageServer, self).__init__(*args, **kwargs)
         # Default checker
         self._onConfigUpdate({"project_file": None})
@@ -233,8 +233,8 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         if not self.workspace or not self.workspace.root_uri:
             return
 
-        root_path = to_fs_path(self.workspace.root_uri)
-        self._checker = HdlCodeCheckerServer(self.workspace, root_path=root_path)
+        root_dir = to_fs_path(self.workspace.root_uri)
+        self._checker = Server(self.workspace, root_dir=Path(root_dir))
 
         _logger.debug("Updating from %s", options)
 

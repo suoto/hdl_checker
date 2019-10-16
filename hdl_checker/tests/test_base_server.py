@@ -39,7 +39,7 @@ from hdl_checker.tests import (
     MockBuilder,
     PatchBuilder,
     SourceMock,
-    StandaloneProjectBuilder,
+    DummyServer,
     assertCountEqual,
     assertSameFile,
     getTestTempPath,
@@ -136,7 +136,7 @@ with such.A("hdl_checker project") as it:
     @it.should("warn when setup is taking too long")
     @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.base_server.HdlCodeCheckerBase,
+        hdl_checker.base_server.BaseServer,
         "configure",
         lambda *_: time.sleep(0.5),
     )
@@ -151,7 +151,7 @@ with such.A("hdl_checker project") as it:
         open(config, "w").write("")
         open(source, "w").write("")
 
-        project = StandaloneProjectBuilder(_Path(path))
+        project = DummyServer(_Path(path))
         project.setConfig(Path(config))
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
@@ -176,7 +176,7 @@ with such.A("hdl_checker project") as it:
         open(config, "w").write("")
         open(source, "w").write("")
 
-        project = StandaloneProjectBuilder(_Path(path))
+        project = DummyServer(_Path(path))
         project.setConfig(Path(config))
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
@@ -196,7 +196,7 @@ with such.A("hdl_checker project") as it:
 
         @it.should("raise exception when trying to instantiate")  # type: ignore
         def test():
-            project = StandaloneProjectBuilder(_Path("nonexisting"))
+            project = DummyServer(_Path("nonexisting"))
             with it.assertRaises(FileNotFoundError):
                 project.setConfig(str(it.project_file))
 
@@ -204,7 +204,7 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
-            it.project = StandaloneProjectBuilder(Path(TEST_PROJECT))
+            it.project = DummyServer(Path(TEST_PROJECT))
 
         @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
@@ -240,7 +240,7 @@ with such.A("hdl_checker project") as it:
         def setup():
             setupTestSuport(TEST_TEMP_PATH)
 
-            it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+            it.project = DummyServer(_Path(TEST_TEMP_PATH))
 
             it.config_file = _makeConfigFromDict(
                 {
@@ -299,7 +299,7 @@ with such.A("hdl_checker project") as it:
 
         @it.should("recover from cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        @patch("hdl_checker.base_server.HdlCodeCheckerBase._setState")
+        @patch("hdl_checker.base_server.BaseServer._setState")
         def test(set_state):
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
@@ -307,7 +307,7 @@ with such.A("hdl_checker project") as it:
 
             it.project.getMessagesByPath(source.filename)
 
-            _ = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+            _ = DummyServer(_Path(TEST_TEMP_PATH))
 
             set_state.assert_called_once()
 
@@ -334,7 +334,7 @@ with such.A("hdl_checker project") as it:
 
             it.project.clean()
 
-            project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+            project = DummyServer(_Path(TEST_TEMP_PATH))
 
             if not ON_WINDOWS:
                 it.assertMsgQueueIsEmpty(project)
@@ -355,7 +355,7 @@ with such.A("hdl_checker project") as it:
             open(cache_filename.name, "w").write("corrupted cache contents")
 
             # Try to recreate
-            project = StandaloneProjectBuilder(root_dir)
+            project = DummyServer(root_dir)
 
             if six.PY2:
                 it.assertIn(
@@ -552,7 +552,7 @@ with such.A("hdl_checker project") as it:
             removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
 
             with PatchBuilder():
-                it.project = StandaloneProjectBuilder(_Path(TEST_TEMP_PATH))
+                it.project = DummyServer(_Path(TEST_TEMP_PATH))
                 it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
                 it.project._updateConfigIfNeeded()
 

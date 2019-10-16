@@ -28,8 +28,8 @@ import bottle  # type: ignore
 
 from hdl_checker import __version__ as version
 from hdl_checker import types as t  # pylint: disable=unused-import
+from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.fallback import Fallback
-from hdl_checker.base_server import HdlCodeCheckerBase
 from hdl_checker.path import Path
 from hdl_checker.utils import terminateProcess
 
@@ -38,7 +38,7 @@ _logger = logging.getLogger(__name__)
 app = bottle.Bottle()  # pylint: disable=invalid-name
 
 
-class HdlCodeCheckerServer(HdlCodeCheckerBase):
+class Server(BaseServer):
     """
     HDL Checker project builder class
     """
@@ -46,7 +46,7 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
     def __init__(self, *args, **kwargs):
         # type: (...) -> None
         self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
-        super(HdlCodeCheckerServer, self).__init__(*args, **kwargs)
+        super(Server, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
@@ -68,11 +68,10 @@ class HdlCodeCheckerServer(HdlCodeCheckerBase):
 
 
 def _getServerByProjectFile(project_file):
-    # type: (Optional[str]) -> HdlCodeCheckerServer
+    # type: (Optional[str]) -> Server
     """
-    Returns the HdlCodeCheckerServer object that corresponds to the given
-    project file. If the object doesn't exists yet it gets created and
-    then returned
+    Returns the Server object that corresponds to the given project file. If
+    the object doesn't exists yet it gets created and then returned
     """
     _logger.debug("project_file: %s", project_file)
     if isinstance(project_file, str) and project_file.lower() == "none":
@@ -87,13 +86,13 @@ def _getServerByProjectFile(project_file):
     if root_dir not in servers:
         _logger.info("Creating server for %s (root=%s)", project_file, root_dir)
         try:
-            project = HdlCodeCheckerServer(root_dir=root_dir)
+            project = Server(root_dir=root_dir)
             if project_file is not None:
                 project.setConfig(project_file)
             _logger.debug("Created new project server for '%s'", project_file)
         except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")
-            project = HdlCodeCheckerServer(None)
+            project = Server(None)
 
         servers[root_dir] = project
     return servers[root_dir]
@@ -302,5 +301,5 @@ def getBuildSequence():
 
 
 #  We'll store a dict to store differents hdl_checker objects
-servers = {}  # type: Dict[Path, HdlCodeCheckerServer] # pylint: disable=invalid-name
+servers = {}  # type: Dict[Path, Server] # pylint: disable=invalid-name
 setupSignalHandlers()

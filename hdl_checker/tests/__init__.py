@@ -32,7 +32,7 @@ import six
 from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker import exceptions
-from hdl_checker.base_server import HdlCodeCheckerBase
+from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.base_builder import BaseBuilder
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -46,8 +46,8 @@ _logger = logging.getLogger(__name__)
 MockDep = Union[Tuple[str], Tuple[str, str]]
 
 
-class StandaloneProjectBuilder(HdlCodeCheckerBase):
-    "Class for testing HdlCodeCheckerBase"
+class DummyServer(BaseServer):
+    "Class for testing BaseServer"
     _msg_queue = Queue()  # type: Queue[Tuple[str, str]]
     _ui_handler = logging.getLogger("UI")
 

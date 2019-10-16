@@ -71,7 +71,7 @@ class UnknownTypeExtension(HdlCheckerBaseException):
 class HdlCheckerNotInitializedError(HdlCheckerBaseException):
     """
     Exception thrown by the LSP server when the client asks for info that
-    depends on having HdlCodeCheckerBase properly setup.
+    depends on having BaseServer properly setup.
     """
     def __str__(self):
         return "HDL Checker server needs a root URI to work correctly"

@@ -82,7 +82,7 @@ else:
 WatchedFile = NamedTuple("WatchedFile", (("path", Path), ("last_read", float)))
 
 
-class HdlCodeCheckerBase(object):  # pylint: disable=useless-object-inheritance
+class BaseServer(object):  # pylint: disable=useless-object-inheritance
     """
     HDL Checker project builder class
     """

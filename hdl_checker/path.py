@@ -92,7 +92,8 @@ class Path(object):
         return self.name
 
     def __repr__(self):
-        return "Path({})".format(repr(self.name))
+        # type: () -> str
+        return "{}({})".format(self.__class__.__name__, repr(self.name))
 
     @property
     def stat(self):

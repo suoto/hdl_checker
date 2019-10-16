@@ -54,7 +54,7 @@ from hdl_checker.parsers.elements.design_unit import (
     VhdlDesignUnit,
 )
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path
+from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location
 
 from hdl_checker.tests import (  # isort:skip
@@ -157,8 +157,8 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         # type: (...) -> Any
         workspace = MagicMock(spec=Workspace)
 
-        server = lsp.HdlCodeCheckerServer(
-            workspace, root_path=mkdtemp(prefix="hdl_checker_")
+        server = lsp.Server(
+            workspace, root_path=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
         )
 
         server._handleUiInfo("some info")  # pylint: disable=protected-access
@@ -613,7 +613,7 @@ class TestValidProject(TestCase):
         self.runTestBuildSequenceTable(tablefmt="github")
 
     @patch.object(
-        hdl_checker.base_server.HdlCodeCheckerBase,
+        hdl_checker.base_server.BaseServer,
         "resolveDependencyToPath",
         lambda self, _: None,
     )
@@ -631,7 +631,7 @@ class TestValidProject(TestCase):
         )
 
     @patch.object(
-        hdl_checker.base_server.HdlCodeCheckerBase,
+        hdl_checker.base_server.BaseServer,
         "resolveDependencyToPath",
         lambda self, _: (Path("some_path"), Identifier("some_library")),
     )
