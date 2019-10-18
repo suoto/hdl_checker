@@ -19,6 +19,8 @@ compilation order, interpreting some compilers messages and providing some
 
 * [Installation](#installation)
 * [Editor support](#editor-support)
+  * [Vim/NeoVim](#vimneovim)
+  * [VS Code](#vs-code)
 * [Usage](#usage)
   * [Third-party tools](#third-party-tools)
   * [Configuring HDL Checker](#configuring-HDL-Checker)
@@ -46,11 +48,40 @@ pip install hdl-checker --user --upgrade
 
 ## Editor support
 
-| Editor                          | Info                                                        |
-| :---                            | :---                                                        |
-| Vim - [dense-analysis/ale][ALE] | Soon, see (PR [#2804][ALE_PR])                              |
-| Vim - [coc.vim][coc_vim]        | Will add instructions to the [Wiki][hdl_checker_wiki] soon  |
-| VSCode                          | [HDL Checker HDL Checker VSCode client][hdl_checker_vscode] |
+### Vim/NeoVim
+
+#### Using [dense-analysis/ale][ALE]
+
+See (PR [#2804][ALE_PR]), once it gets merged, ALE should support HDL Checker out of the
+box.
+
+#### Usgin [coc.nvim][coc_nvim]
+
+Following [coc.nvim custom language server setup][coc_nvim_register_lsp], add
+this to your [coc.nvim configuration file][coc_nvim_config_file]:
+
+
+```json
+{
+    "languageserver": {
+        "hdlChecker": {
+            "command": "hdl_checker",
+            "args": [
+                "--lsp"
+            ],
+            "filetypes": [
+                "vhdl",
+                "verilog",
+                "systemverilog"
+            ]
+        }
+    }
+}
+```
+
+### VS Code
+
+Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
 
 ## Usage
 
@@ -197,7 +228,9 @@ trademarks mentioned or used by this software.
 
 [ALE]: https://github.com/dense-analysis/ale
 [ALE_PR]: https://github.com/dense-analysis/ale/pull/2804
-[coc_vim]: https://github.com/neoclide/coc.nvim
+[coc_nvim]: https://github.com/neoclide/coc.nvim
+[coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
+[coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
 [docker]: https://www.docker.com/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
