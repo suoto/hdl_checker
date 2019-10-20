@@ -54,25 +54,6 @@ else:
         return _glob(pathname)
 
 
-def _isVhdl(path):  # pragma: no cover
-    "Uses the file extension to check if the given path is a VHDL file"
-    if path.lower().endswith(".vhd"):
-        return True
-    if path.lower().endswith(".vhdl"):
-        return True
-    return False
-
-
-def _isVerilog(path):  # pragma: no cover
-    """Uses the file extension to check if the given path is a Verilog
-    or SystemVerilog file"""
-    if path.lower().endswith(".v"):
-        return True
-    if path.lower().endswith(".sv"):
-        return True
-    return False
-
-
 PARSERS = {
     FileType.vhdl: VhdlParser,
     FileType.verilog: VerilogParser,
@@ -86,29 +67,6 @@ def getSourceParserFromPath(path):  # type: (Path) -> tSourceFile
     extension
     """
     return PARSERS[FileType.fromPath(path)](path)
-
-
-def getSourceFileObjects(kwargs_list, workers=None):
-    """
-    Gets source file objects by applying each item on kwargs_list as
-    kwargs on the source parser class. Uses kwargs['filename'] to
-    determine if the source is VHDL or Verilog/SystemVerilog
-    """
-    pool = Pool(workers)
-    async_results = []
-
-    for kwargs in kwargs_list:
-        if _isVhdl(kwargs["filename"]):
-            cls = VhdlParser
-        else:
-            cls = VerilogParser
-        async_results += [pool.apply_async(cls, kwds=kwargs)]
-
-    pool.close()
-    pool.join()
-    results = [x.get() for x in async_results]
-
-    return results
 
 
 def _makeAbsoluteIfNeeded(root, paths):

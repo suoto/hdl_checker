@@ -27,8 +27,9 @@ import time
 from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import mock
 import six
+
+import mock
 from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker import exceptions
@@ -450,7 +451,9 @@ if six.PY2:
 
     class TestCase(_TestCase):
         def __new__(cls, *args, **kwargs):
-            result = super(_TestCase, cls).__new__(cls, *args, **kwargs)
+            result = super(_TestCase, cls).__new__(  #  pylint: disable=bad-super-call
+                cls, *args, **kwargs
+            )
             result.assertCountEqual = assertCountEqual(result)
             return result
 
