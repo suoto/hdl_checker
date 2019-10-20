@@ -288,7 +288,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         if config_file is None:
             self.config_file = None
         else:
-            WatchedFile._make(config_file)
+            self.config_file = WatchedFile._make(config_file)
 
     def _recoverCacheIfPossible(self):
         # type: (...) -> Any

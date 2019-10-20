@@ -322,6 +322,7 @@ with such.A("hdl_checker project") as it:
                     it.assertEqual(it.project.config_file, old)
                     read_config.assert_not_called()
                     watched_file.assert_not_called()
+                    it.assertIsNotNone(it.project.config_file)
 
         @it.should("clean up root dir")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
