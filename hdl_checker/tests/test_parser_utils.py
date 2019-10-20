@@ -23,12 +23,19 @@
 
 import json
 import logging
+import os
 import os.path as p
 from pprint import pformat
+from tempfile import mkdtemp
+from typing import Any
+
+import six
+
+from mock import patch
 
 from hdl_checker.tests import TestCase, getTestTempPath
 
-from hdl_checker.parser_utils import flattenConfig, getIncludedConfigs
+from hdl_checker.parser_utils import SourceEntry, flattenConfig, getIncludedConfigs
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlagScope, FileType
 from hdl_checker.utils import removeIfExists
@@ -81,7 +88,7 @@ class _ConfigDict(object):
 class TestConfigHandlers(TestCase):
     maxDiff = None
 
-    def test_direct_inclusion(self):
+    def test_DirectInclusion(self):
         incl_0 = _path("incl_0.json")
         incl_1 = _path("incl_1.json")
         incl_2 = _path("incl_2.json")
@@ -111,7 +118,7 @@ class TestConfigHandlers(TestCase):
             ),
         )
 
-    def test_recursive_inclusion(self):
+    def test_RecursiveInclusion(self):
         incl_0 = _path("incl_0.json")
         incl_1 = _path("incl_1.json")
 
@@ -131,7 +138,7 @@ class TestConfigHandlers(TestCase):
             ),
         )
 
-    def test_ignores_non_existing_files(self):
+    def test_IgnoresNonExistingFiles(self):
         incl_0 = _path("incl_0.json")
         incl_1 = _path("incl_1.json")
 
@@ -145,7 +152,7 @@ class TestConfigHandlers(TestCase):
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(result, ((TEST_TEMP_PATH, {"name": "incl_1"}),))
 
-    def test_ignores_json_decoding_errors(self):
+    def test_IgnoresJsonDecodingErrors(self):
         search_paths = (_path("incl_0.json"),)
 
         open(_path("incl_0.json"), "w").write("hello")
@@ -155,7 +162,7 @@ class TestConfigHandlers(TestCase):
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(result, ())
 
-    def test_includes_relative_paths(self):
+    def test_IncludesRelativePaths(self):
         incl_0 = _path("incl_0.json")
         incl_1 = _path("incl_1.json")
         incl_2 = _path("incl_2.json")
@@ -181,7 +188,10 @@ class TestConfigHandlers(TestCase):
             ),
         )
 
-    def test_flatten_config_and_preserve_scopes(self):
+    # glob needs an existing path or else it won't return anything. Paths on
+    # this test don't exist, so need to mock that
+    @patch("hdl_checker.parser_utils.glob", lambda x: [x])
+    def test_FlattenConfigAndPreserveScopes(self):
         incl_0 = _path("incl_0.json")
         incl_1 = _path("incl_1.json")
         #  incl_2 = _path("incl_2.json")
@@ -333,3 +343,176 @@ class TestConfigHandlers(TestCase):
                 ),
             ),
         )
+
+
+class TestExpandingPathNames(TestCase):
+    maxDiff = None
+
+    def join(self, *args):
+        return p.join(self.base_path, *args)
+
+    def setUp(self):
+        self.base_path = mkdtemp(prefix=__name__ + "_")
+
+        # Create some files
+        for path in (
+            self.join("README.md"),
+            self.join("some_vhd.vhd"),
+            self.join("some_v.v"),
+            self.join("some_sv.sv"),
+            self.join("dir_0", "some_vhd.vhd"),
+            self.join("dir_0", "some_v.v"),
+            self.join("dir_0", "some_sv.sv"),
+            self.join("dir_0", "dir_1", "some_vhd.vhd"),
+            self.join("dir_0", "dir_1", "some_v.v"),
+            self.join("dir_0", "dir_1", "some_sv.sv"),
+            self.join("dir_2", "some_vhd.vhd"),
+            self.join("dir_2", "some_v.v"),
+            self.join("dir_2", "some_sv.sv"),
+            self.join("dir_2", "dir_3", "some_vhd.vhd"),
+            self.join("dir_2", "dir_3", "some_v.v"),
+            self.join("dir_2", "dir_3", "some_sv.sv"),
+        ):
+            self.assertFalse(p.exists(path))
+            try:
+                os.makedirs(p.dirname(path))
+            except OSError:
+                pass
+            open(path, "w").close()
+            self.assertTrue(p.exists(path))
+
+    def test_ExpandWithFileWildcards(self):
+        # type: (...) -> Any
+        config = {
+            "sources": [
+                self.join("*.vhd"),
+                self.join("*", "some_v.v"),
+                self.join("*", "dir_1", "*.sv"),
+            ]
+        }
+
+        _logger.info("config:\n%s", pformat(config))
+
+        self.assertCountEqual(
+            flattenConfig(config, root_path=self.base_path),
+            (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("some_vhd.vhd"),
+                    self.join("dir_0", "some_v.v"),
+                    self.join("dir_2", "some_v.v"),
+                    self.join("dir_0", "dir_1", "some_sv.sv"),
+                )
+            ),
+        )
+
+    def test_ExpandWithRecursiveWildcards(self):
+        # type: (...) -> Any
+        """
+        Recursive wildcards are only available on Python3, expected result will
+        be different but we're not porting it back
+        """
+        config = {"sources": [self.join("**/*.vhd")]}
+
+        _logger.info("config:\n%s", pformat(config))
+
+        if six.PY3:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("some_vhd.vhd"),
+                    self.join("dir_0", "some_vhd.vhd"),
+                    self.join("dir_0", "dir_1", "some_vhd.vhd"),
+                    self.join("dir_2", "some_vhd.vhd"),
+                    self.join("dir_2", "dir_3", "some_vhd.vhd"),
+                )
+            )
+        else:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    #  self.join("some_vhd.vhd"),
+                    self.join("dir_0", "some_vhd.vhd"),
+                    self.join("dir_2", "some_vhd.vhd"),
+                )
+            )
+
+        self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
+
+    def test_ExpandWithRecursiveWildcardsAndRelativePaths(self):
+        # type: (...) -> Any
+        """
+        Recursive wildcards are only available on Python3, expected result will
+        be different but we're not porting it back
+        """
+        config = {"sources": ["**/*.sv"]}
+
+        _logger.info("config:\n%s", pformat(config))
+
+        if six.PY3:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("some_sv.sv"),
+                    self.join("dir_0", "some_sv.sv"),
+                    self.join("dir_0", "dir_1", "some_sv.sv"),
+                    self.join("dir_2", "some_sv.sv"),
+                    self.join("dir_2", "dir_3", "some_sv.sv"),
+                )
+            )
+        else:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("dir_0", "some_sv.sv"),
+                    self.join("dir_2", "some_sv.sv"),
+                )
+            )
+
+        self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
+
+    def test_ExpandWhenPatternMatchesNonRtlFiles(self):
+        # type: (...) -> Any
+        """
+        Recursive wildcards are only available on Python3, expected result will
+        be different but we're not porting it back
+        """
+        config = {"sources": ["**/*"]}
+
+        _logger.info("config:\n%s", pformat(config))
+
+        if six.PY3:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("some_vhd.vhd"),
+                    self.join("some_v.v"),
+                    self.join("some_sv.sv"),
+                    self.join("dir_0", "some_vhd.vhd"),
+                    self.join("dir_0", "some_v.v"),
+                    self.join("dir_0", "some_sv.sv"),
+                    self.join("dir_0", "dir_1", "some_vhd.vhd"),
+                    self.join("dir_0", "dir_1", "some_v.v"),
+                    self.join("dir_0", "dir_1", "some_sv.sv"),
+                    self.join("dir_2", "some_vhd.vhd"),
+                    self.join("dir_2", "some_v.v"),
+                    self.join("dir_2", "some_sv.sv"),
+                    self.join("dir_2", "dir_3", "some_vhd.vhd"),
+                    self.join("dir_2", "dir_3", "some_v.v"),
+                    self.join("dir_2", "dir_3", "some_sv.sv"),
+                )
+            )
+        else:
+            expected = (
+                SourceEntry(Path(x), None, (), ())
+                for x in (
+                    self.join("dir_0", "some_vhd.vhd"),
+                    self.join("dir_0", "some_v.v"),
+                    self.join("dir_0", "some_sv.sv"),
+                    self.join("dir_2", "some_vhd.vhd"),
+                    self.join("dir_2", "some_v.v"),
+                    self.join("dir_2", "some_sv.sv"),
+                )
+            )
+
+        self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)

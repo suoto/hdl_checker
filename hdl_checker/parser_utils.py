@@ -16,31 +16,42 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Top of the hdl_checker.parsers submodule"
 
-# pylint: disable=useless-object-inheritance
-
 import json
 import logging
 import os.path as p
-from collections import namedtuple
-from multiprocessing.pool import ThreadPool as Pool
-from typing import Any, Dict, Iterable, Set, Tuple, Type, Union
+from glob import iglob as _glob
+from typing import Any, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Type, Union
 
 import six
 
 from .parsers.verilog_parser import VerilogParser
 from .parsers.vhdl_parser import VhdlParser
 
+from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.path import Path
-from hdl_checker.types import BuildFlagScope, FileType
+from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
 
 _logger = logging.getLogger(__name__)
 
 tSourceFile = Union[VhdlParser, VerilogParser]
 
 if six.PY3:
-    JSONDecodeError = json.decoder.JSONDecodeError
+    JSONDecodeError = (  # pylint: disable=invalid-name
+        json.decoder.JSONDecodeError  # pylint: disable=no-member
+    )
+
+    # Python 2 iglob does not take recursive argument
+    def glob(pathname):
+        "Alias for glob.iglob(pathname, recursive=True)"
+        return _glob(pathname, recursive=True)
+
+
 else:
     JSONDecodeError = ValueError
+
+    def glob(pathname):
+        "Alias for glob.iglob(pathname)"
+        return _glob(pathname)
 
 
 def _isVhdl(path):  # pragma: no cover
@@ -102,6 +113,7 @@ def getSourceFileObjects(kwargs_list, workers=None):
 
 def _makeAbsoluteIfNeeded(root, paths):
     # type: (str, Iterable[str]) -> Iterable[str]
+    "Makes paths absolute by prepending root if needed"
     for path in paths:
         if p.isabs(path):
             yield path
@@ -145,16 +157,27 @@ def getIncludedConfigs(search_paths, root_dir="."):
         yield p.dirname(path), config
 
 
-class JsonSourceEntry(namedtuple("JsonSourceEntry", ("path", "library", "flags"))):
+class JsonSourceEntry(
+    NamedTuple(
+        "JsonSourceEntry",
+        (("path_expr", str), ("library", Optional[str]), ("flags", str)),
+    )
+):
     """
     Converts different methods of representing a source on the JSON file to a
     saner named tuple
     """
 
     @classmethod
-    def _make(cls, iterable):  # pylint: disable=arguments-differ
+    def make(cls, iterable):  # pylint: disable=arguments-differ
+        # type: (...) -> Any
+        """
+        Creates a JsonSourceEntry from all supported formats:
+            - str
+            - [str, {"library": "<library_name>", "flags": BuildFlags}]
+        """
         path = iterable
-        info = {}
+        info = {}  # type: Dict[str, Union[None, str, BuildFlags]]
 
         if not isinstance(path, six.string_types):
             path = iterable[0]
@@ -166,8 +189,14 @@ class JsonSourceEntry(namedtuple("JsonSourceEntry", ("path", "library", "flags")
         return super(JsonSourceEntry, cls)._make([path, library, flags])
 
 
-SourceEntry = namedtuple(
-    "SourceEntry", ("path", "library", "single_flags", "dependencies_flags")
+SourceEntry = NamedTuple(
+    "SourceEntry",
+    (
+        ("path", Path),
+        ("library", Optional[str]),
+        ("single_flags", BuildFlags),
+        ("dependencies_flags", BuildFlags),
+    ),
 )
 
 
@@ -206,18 +235,29 @@ def _expand(config, ref_path):
         )
 
     for entry in config.pop("sources", ()):
-        source = JsonSourceEntry._make(entry)
-        path = Path(source.path, ref_path)
-
-        filetype = FileType.fromPath(path)
-
-        single_flags = flags[filetype][0]
-        dependencies_flags = flags[filetype][1]
-        global_flags = flags[filetype][2]
-
-        yield SourceEntry(
-            path,
-            source.library,
-            tuple(global_flags) + tuple(single_flags) + tuple(source.flags),
-            tuple(global_flags) + tuple(dependencies_flags),
+        source = JsonSourceEntry.make(entry)
+        path_expr = (
+            source.path_expr
+            if p.isabs(source.path_expr)
+            else p.join(ref_path, source.path_expr)
         )
+
+        for _path in glob(path_expr):
+            path = Path(_path, ref_path)
+
+            try:
+                filetype = FileType.fromPath(path)
+            except UnknownTypeExtension:
+                _logger.warning("Won't include non RTL file '%s'", path)
+                continue
+
+            single_flags = flags[filetype][0]
+            dependencies_flags = flags[filetype][1]
+            global_flags = flags[filetype][2]
+
+            yield SourceEntry(
+                path,
+                source.library,
+                tuple(global_flags) + tuple(single_flags) + tuple(source.flags),
+                tuple(global_flags) + tuple(dependencies_flags),
+            )
