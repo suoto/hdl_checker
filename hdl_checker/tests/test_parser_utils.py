@@ -419,7 +419,7 @@ class TestExpandingPathNames(TestCase):
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
         """
-        config = {"sources": [self.join("**/*.vhd")]}
+        config = {"sources": [self.join("**", "*.vhd")]}
 
         _logger.info("config:\n%s", pformat(config))
 
@@ -452,7 +452,7 @@ class TestExpandingPathNames(TestCase):
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
         """
-        config = {"sources": ["**/*.sv"]}
+        config = {"sources": [p.join("**", "*.sv")]}
 
         _logger.info("config:\n%s", pformat(config))
 
@@ -484,7 +484,7 @@ class TestExpandingPathNames(TestCase):
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
         """
-        config = {"sources": ["**/*"]}
+        config = {"sources": [p.join("**", "*")]}
 
         _logger.info("config:\n%s", pformat(config))
 

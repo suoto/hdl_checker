@@ -32,7 +32,7 @@ from .parsers.vhdl_parser import VhdlParser
 from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
-from hdl_checker.utils import isFileReadable, toBytes
+from hdl_checker.utils import ON_WINDOWS, isFileReadable, toBytes
 
 _logger = logging.getLogger(__name__)
 
@@ -263,11 +263,31 @@ def isGitRepo(path):
         return False
 
 
-def filterGitIgnoredPaths(path_to_repo, paths):
+def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
     # type: (Path, Iterable[Path]) -> Iterable[Path]
     """
-    Filters out paths that are ignored; paths outside the repo are kept.
-    Uses a git check-ignore --stdin and writes <paths> iteratively to avoid
+    Filters out paths that are ignored by git; paths outside the repo are kept.
+    Uses a multiple calls to 'git check-ignore' and checks if the output is
+    empty (ignored paths will be echoed). The command will return non zero exit
+    code for paths outside the repo or if <path_to_repo> is not actually a git
+    repo, in which cases paths will be included.
+    """
+    base_cmd = ("git", "-C", path_to_repo.abspath, "check-ignore")
+
+    for path in paths:
+        cmd = base_cmd + (str(path),)
+        try:
+            if not subp.check_output(cmd):
+                yield path
+        except subp.CalledProcessError:
+            yield path
+
+
+def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
+    # type: (Path, Iterable[Path]) -> Iterable[Path]
+    """
+    Filters out paths that are ignored by git; paths outside the repo are kept.
+    Uses a 'git check-ignore --stdin' and writes <paths> iteratively to avoid
     piping to the OS all the time
     """
     _logger.debug("Filtering git ignored files from %s", path_to_repo)
@@ -290,7 +310,7 @@ def filterGitIgnoredPaths(path_to_repo, paths):
         if proc is None:
             proc = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
 
-        proc.stdin.write(b"%s\n" % toBytes(str(path.abspath)))
+        proc.stdin.write(toBytes(str(path.abspath) + "\n"))
         # Flush so that data makes to the process
         proc.stdin.flush()
 
@@ -306,3 +326,8 @@ def filterGitIgnoredPaths(path_to_repo, paths):
             # process behind)
             del proc
             proc = None
+
+
+filterGitIgnoredPaths = (  # pylint: disable=invalid-name
+    _filterGitIgnoredPathsOnWin if ON_WINDOWS else _filterGitIgnoredPathsOnUnix
+)
