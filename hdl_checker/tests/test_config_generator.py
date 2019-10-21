@@ -24,7 +24,9 @@ import logging
 import os
 import os.path as p
 import shutil
+from tempfile import mkdtemp
 
+from mock import patch
 from webtest import TestApp  # type: ignore
 
 from hdl_checker.tests import TestCase, getTestTempPath, setupTestSuport
@@ -35,12 +37,7 @@ from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
 from hdl_checker.builders.xvhdl import XVHDL
 from hdl_checker.config_generators.simple_finder import SimpleFinder
-
-try:  # Python 3.x
-    import unittest.mock as mock
-except ImportError:  # Python 2.x
-    import mock  # type: ignore
-
+from hdl_checker.utils import removeDirIfExists
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, "test_project"))
@@ -63,15 +60,15 @@ class TestConfigGenerator(TestCase):
     def setUp(self):
         self.app = TestApp(handlers.app)
 
-        # Needs to agree with vroom test file
-        self.dummy_test_path = p.join(TEST_TEMP_PATH, "dummy_test_path")
+        #  self.dummy_test_path = p.join(TEST_TEMP_PATH, "dummy_test_path")
+        self.dummy_test_path = mkdtemp(prefix=__name__ + "_")
 
-        self.assertFalse(
-            p.exists(self.dummy_test_path),
-            "Path '%s' shouldn't exist right now" % p.abspath(self.dummy_test_path),
-        )
+        #  self.assertFalse(
+        #      p.exists(self.dummy_test_path),
+        #      "Path '%s' shouldn't exist right now" % p.abspath(self.dummy_test_path),
+        #  )
 
-        os.makedirs(self.dummy_test_path)
+        #  os.makedirs(self.dummy_test_path)
 
         os.mkdir(p.join(self.dummy_test_path, "path_a"))
         os.mkdir(p.join(self.dummy_test_path, "path_b"))
@@ -99,12 +96,10 @@ class TestConfigGenerator(TestCase):
 
     def teardown(self):
         # Create a dummy arrangement of sources
-        if p.exists(self.dummy_test_path):
-            _logger.info("Removing %s", repr(self.dummy_test_path))
-            shutil.rmtree(self.dummy_test_path)
+        removeDirIfExists(self.dummy_test_path)
 
-    @mock.patch(
-        "hdl_checker.config_generators.simple_finder.isFileReadable",
+    @patch(
+        "hdl_checker.parser_utils.isFileReadable",
         lambda path: "nonreadable" not in path.name,
     )
     def test_run_simple_config_gen(self):

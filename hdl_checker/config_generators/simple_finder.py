@@ -16,19 +16,22 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base class for creating a project file"
 
-import os
-import os.path as p
 from typing import Iterable, List
 
 from .base_generator import BaseGenerator
 
-from hdl_checker.exceptions import UnknownTypeExtension
+from hdl_checker.parser_utils import filterGitIgnoredPaths, findRtlSourcesByPath, isGitRepo
 from hdl_checker.path import Path
-from hdl_checker.types import FileType
-from hdl_checker.utils import isFileReadable
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
 _HEADER_EXTENSIONS = "vh", "svh"
+
+
+def _noFilter(_, paths):
+    """
+    Dummy filter, returns paths
+    """
+    return paths
 
 
 class SimpleFinder(BaseGenerator):
@@ -59,24 +62,14 @@ class SimpleFinder(BaseGenerator):
         """
         Iterates over the paths and searches for relevant files by extension.
         """
-        for path in self._paths:
-            for dirpath, _, filenames in os.walk(path.name):
-                for filename in filenames:
-                    full_path = Path(p.join(dirpath, filename))
+        for search_path in self._paths:
+            sources = findRtlSourcesByPath(search_path)
 
-                    if not p.isfile(full_path.name):
-                        continue
+            # Filter out ignored git files if on a git repo
+            filter_func = filterGitIgnoredPaths if isGitRepo(search_path) else _noFilter
 
-                    try:
-                        # FileType.fromPath will fail if the file's extension is not
-                        # valid (one of '.vhd', '.vhdl', '.v', '.vh', '.sv',
-                        # '.svh')
-                        FileType.fromPath(full_path)
-                    except UnknownTypeExtension:
-                        continue
-
-                    if isFileReadable(full_path):
-                        yield full_path
+            for source_path in filter_func(search_path, sources):
+                yield source_path
 
     def _populate(self):  # type: (...) -> None
         for path in self._findSources():

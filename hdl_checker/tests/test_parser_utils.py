@@ -25,8 +25,9 @@ import json
 import logging
 import os
 import os.path as p
+import subprocess as subp
 from pprint import pformat
-from tempfile import mkdtemp
+from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Any
 
 import six
@@ -35,7 +36,13 @@ from mock import patch
 
 from hdl_checker.tests import TestCase, getTestTempPath
 
-from hdl_checker.parser_utils import SourceEntry, flattenConfig, getIncludedConfigs
+from hdl_checker.parser_utils import (
+    SourceEntry,
+    filterGitIgnoredPaths,
+    flattenConfig,
+    getIncludedConfigs,
+    isGitRepo,
+)
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlagScope, FileType
 from hdl_checker.utils import removeIfExists
@@ -516,3 +523,89 @@ class TestExpandingPathNames(TestCase):
             )
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
+
+
+class TestFilterGitIgnoredPaths(TestCase):
+    def join(self, *args):
+        return p.join(self.base_path, *args)
+
+    def setUp(self):
+        # type: (...) -> Any
+        self.base_path = mkdtemp(prefix=__name__ + "_")
+
+        self.out_of_repo = NamedTemporaryFile(
+            prefix=__name__ + "_out_of_repo", suffix=".txt"
+        ).name
+
+        self.paths = (
+            self.join("regular_file"),
+            self.join("untracked_file"),
+            self.join("ignored_file"),
+            self.out_of_repo,
+        )
+
+        # Create some files
+        for path in self.paths:
+            self.assertFalse(p.exists(path))
+            try:
+                os.makedirs(p.dirname(path))
+            except OSError:
+                pass
+            open(path, "w").close()
+            self.assertTrue(p.exists(path))
+
+        open(self.join(".gitignore"), "w").write("ignored_file")
+
+        for cmd in (
+            ["git", "init"],
+            ["git", "add", "regular_file", ".gitignore"],
+            ["git", "config", "--local", "user.name", "foo"],
+            ["git", "config", "--local", "user.email", "bar"],
+            ["git", "commit", "-m", "'initial'"],
+        ):
+            _logger.debug("$ %s", cmd)
+            subp.check_call(cmd, cwd=self.base_path, stdout=subp.PIPE)
+
+        _logger.debug(
+            "Status:\n%s",
+            subp.check_output(("git", "status"), cwd=self.base_path).decode(),
+        )
+
+    def test_FilterGitPaths(self):
+        # type: (...) -> Any
+        self.assertTrue(isGitRepo(Path(self.base_path)))
+
+        result = list(
+            filterGitIgnoredPaths(Path(self.base_path), (Path(x) for x in self.paths))
+        )
+
+        _logger.info("Result: %s", result)
+
+        self.assertCountEqual(
+            result,
+            (
+                Path(x)
+                for x in (
+                    self.join("regular_file"),
+                    self.join("untracked_file"),
+                    self.out_of_repo,
+                )
+            ),
+        )
+
+    def test_FilterGitPathsOutOfGitRepo(self):
+        # type: (...) -> Any
+        """
+        If the base path is not a Git repo, filterGitIgnoredPaths should return
+        all paths
+        """
+        base_path = mkdtemp(prefix=__name__ + "_")
+        self.assertFalse(isGitRepo(Path(base_path)))
+
+        result = list(
+            filterGitIgnoredPaths(Path(base_path), (Path(x) for x in self.paths))
+        )
+
+        _logger.info("Result: %s", result)
+
+        self.assertCountEqual(result, (Path(x) for x in self.paths))

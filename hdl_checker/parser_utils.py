@@ -18,7 +18,9 @@
 
 import json
 import logging
+import os
 import os.path as p
+import subprocess as subp
 from glob import iglob as _glob
 from typing import Any, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Type, Union
 
@@ -30,6 +32,7 @@ from .parsers.vhdl_parser import VhdlParser
 from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
+from hdl_checker.utils import isFileReadable, toBytes
 
 _logger = logging.getLogger(__name__)
 
@@ -219,3 +222,87 @@ def _expand(config, ref_path):
                 tuple(global_flags) + tuple(single_flags) + tuple(source.flags),
                 tuple(global_flags) + tuple(dependencies_flags),
             )
+
+
+def findRtlSourcesByPath(path):
+    # type: (Path) -> Iterable[Path]
+    """
+    Finds RTL sources (files with extensions within FileType enum) inside
+    <path>
+    """
+    for dirpath, _, filenames in os.walk(path.name):
+        for filename in filenames:
+            full_path = Path(p.join(dirpath, filename))
+
+            if not p.isfile(full_path.name):
+                continue
+
+            try:
+                # FileType.fromPath will fail if the file's extension is not
+                # valid (one of '.vhd', '.vhdl', '.v', '.vh', '.sv',
+                # '.svh')
+                FileType.fromPath(full_path)
+            except UnknownTypeExtension:
+                continue
+
+            if isFileReadable(full_path):
+                yield full_path
+
+
+def isGitRepo(path):
+    # type: (Path) -> bool
+    """
+    Checks if path is a git repository by checking if 'git -C path rev-parse
+    --show-toplevel' returns an existing path
+    """
+    cmd = ("git", "-C", path.abspath, "rev-parse", "--show-toplevel")
+
+    try:
+        return p.exists(subp.check_output(cmd, stderr=subp.STDOUT).decode().strip())
+    except subp.CalledProcessError:
+        return False
+
+
+def filterGitIgnoredPaths(path_to_repo, paths):
+    # type: (Path, Iterable[Path]) -> Iterable[Path]
+    """
+    Filters out paths that are ignored; paths outside the repo are kept.
+    Uses a git check-ignore --stdin and writes <paths> iteratively to avoid
+    piping to the OS all the time
+    """
+    _logger.debug("Filtering git ignored files from %s", path_to_repo)
+
+    cmd = (
+        "git",
+        "-C",
+        path_to_repo.abspath,
+        "check-ignore",
+        "--verbose",
+        "--non-matching",
+        "--stdin",
+    )
+
+    proc = None
+
+    for path in paths:
+        # Besides the first iteration, the process also needs to be recreated
+        # whenever it has died
+        if proc is None:
+            proc = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
+
+        proc.stdin.write(b"%s\n" % toBytes(str(path.abspath)))
+        # Flush so that data makes to the process
+        proc.stdin.flush()
+
+        if proc.stdout.readline().decode().startswith("::"):
+            yield path
+
+        # proc will die whenever we write a path that's outside the repo.
+        # Because this method aims to filter *out* ignored files and files
+        # outside the repo aren't subject to this filter, we'll include them
+        if proc.poll() is not None:
+            yield path
+            # Deallocate the process (hopefully this won't leave a zombie
+            # process behind)
+            del proc
+            proc = None
