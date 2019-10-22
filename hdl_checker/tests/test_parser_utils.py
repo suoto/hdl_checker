@@ -26,6 +26,7 @@ import logging
 import os
 import os.path as p
 import subprocess as subp
+import time
 from pprint import pformat
 from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Any
@@ -525,10 +526,22 @@ class TestExpandingPathNames(TestCase):
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 
 
+def timeit(f):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = f(*args, **kwargs)
+        end = time.time()
+        _logger.info("Running %s(%s, %s) took %.2fs", f, args, kwargs, end - start)
+        return result
+
+    return wrapper
+
+
 class TestFilterGitIgnoredPaths(TestCase):
     def join(self, *args):
         return p.join(self.base_path, *args)
 
+    @timeit
     def setUp(self):
         # type: (...) -> Any
         self.base_path = mkdtemp(prefix=__name__ + "_")
@@ -571,6 +584,7 @@ class TestFilterGitIgnoredPaths(TestCase):
             subp.check_output(("git", "status"), cwd=self.base_path).decode(),
         )
 
+    @timeit
     def test_FilterGitPaths(self):
         # type: (...) -> Any
         self.assertTrue(isGitRepo(Path(self.base_path)))
@@ -593,6 +607,7 @@ class TestFilterGitIgnoredPaths(TestCase):
             ),
         )
 
+    @timeit
     def test_FilterGitPathsOutOfGitRepo(self):
         # type: (...) -> Any
         """
