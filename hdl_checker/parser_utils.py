@@ -277,7 +277,7 @@ def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
     for path in paths:
         cmd = base_cmd + (str(path),)
         try:
-            if not subp.check_output(cmd):
+            if not subp.check_output(cmd, stderr=subp.STDOUT):
                 yield path
         except subp.CalledProcessError:
             yield path
