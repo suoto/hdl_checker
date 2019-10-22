@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/hdl_checker.svg)](https://pypi.org/project/hdl_checker/)
 [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)
-[![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdl_checker/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/kbvor84i6xlnw79f/branch/master?svg=true)](https://ci.appveyor.com/project/suoto/hdl-checker/branch/master)
 [![codecov](https://codecov.io/gh/suoto/hdl_checker/branch/master/graph/badge.svg)](https://codecov.io/gh/suoto/hdl_checker)
 [![Code Climate](https://codeclimate.com/github/suoto/hdl_checker/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdl_checker)
 [![Join the chat at https://gitter.im/suoto/hdl_checker](https://badges.gitter.im/suoto/hdl_checker.svg)](https://gitter.im/suoto/hdl_checker?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
