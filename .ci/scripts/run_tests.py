@@ -66,23 +66,41 @@ def _setupLogging(stream, level):  # pragma: no cover
     "Setup logging according to the command line parameters"
     color = False
 
-    if getattr(stream, "isatty", False):
+    if stream is sys.stdout:
+        class Stream(object):
+            def isatty(self):
+                return True
+
+            def write(self, *args, **kwargs):
+                return sys.stdout.write(*args, **kwargs)
+
+        _stream = Stream()
+    else:
+        _stream = stream
+
+    color = False
+    try:
+        color = _stream.isatty()
+    except AttributeError:
+        pass
+
+    if color:
         try:
             from rainbow_logging_handler import (  # type: ignore
                 RainbowLoggingHandler,
-            )  # pylint: disable=import-error
+            )
 
             color = True
         except ImportError:
-            pass
+            color = False
 
     if color:
-        rainbow_stream_handler = RainbowLoggingHandler(stream)
+        rainbow_stream_handler = RainbowLoggingHandler(_stream)
 
         logging.root.addHandler(rainbow_stream_handler)
         logging.root.setLevel(level)
     else:
-        handler = logging.StreamHandler(stream)
+        handler = logging.StreamHandler(_stream)
         handler.formatter = logging.Formatter(
             "%(levelname)-7s | %(asctime)s | "
             + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
