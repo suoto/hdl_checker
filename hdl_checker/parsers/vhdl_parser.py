@@ -17,7 +17,7 @@
 "VHDL source file parser"
 
 import re
-from typing import Any, Dict, Generator, Set, Union
+from typing import Any, Dict, Generator, Iterable, Optional, Set, Tuple, Union
 
 from .elements.dependency_spec import DependencySpec
 from .elements.design_unit import VhdlDesignUnit
@@ -57,6 +57,44 @@ _LIBRARY_USES = re.compile(
 IncompleteDependency = Dict[str, Union[str, Set[Any]]]
 
 
+class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
+    """
+    Stores dependencies definitions to create immutable objects later on
+    """
+
+    def __init__(self):
+        #  type: (...) -> None
+        self._keys = set()  # type: Set[int]
+        self._libraries = {}  # type: Dict[int, Optional[VhdlIdentifier]]
+        self._units = {}  # type: Dict[int, VhdlIdentifier]
+        self._locations = {}  # type: Dict[int, Set[Location]]
+
+    def add(self, library, unit, line, column):
+        #  type: (str, str, int, int) -> None
+        """
+        Adds a dependency definition to the list
+        """
+        _library = None if library.lower() == "work" else VhdlIdentifier(library)
+        _unit = VhdlIdentifier(unit)
+
+        key = hash((_library, _unit))
+        if key not in self._keys:
+            self._keys.add(key)
+            self._libraries[key] = _library
+            self._units[key] = _unit
+            self._locations[key] = set()
+
+        self._locations[key].add(Location(line, column))
+
+    def items(self):
+        #  type: () -> Iterable[Tuple[Optional[VhdlIdentifier], VhdlIdentifier, Set[Location]]]
+        """
+        Returns items added previously
+        """
+        for key in self._keys:
+            yield self._libraries[key], self._units[key], self._locations[key]
+
+
 class VhdlParser(BaseSourceFile):
     """
     Parses and stores information about a source file such as design
@@ -85,10 +123,9 @@ class VhdlParser(BaseSourceFile):
         library_names = {x.lower() for x in self.getLibraries()}
         library_names.add("work")
 
-        dependencies = {}  # type: ignore
+        dependencies = _PartialDependency()
 
         text = self.getSourceContent()
-        #  text = readFile(str(self.filename))
 
         for match in _LIBRARY_USES.finditer(text):
             if match.groupdict()["library"] is None:
@@ -106,31 +143,14 @@ class VhdlParser(BaseSourceFile):
             line_number = text[: match.end()].count("\n")
             column_number = len(text[: match.start()].split("\n")[-1])
 
-            key = hash((library, unit))
-
-            if key not in dependencies:
-                dependencies[key] = {
-                    "library": library,
-                    "name": unit,
-                    "locations": set(),
-                }
-
-            dependency = dependencies[key]
-            dependency["locations"].add((line_number, column_number))
+            dependencies.add(library, unit, line_number, column_number)
 
         # Done parsing, won't add any more locations, so generate the specs
-        for dep in dependencies.values():
+        for _library, name, locations in dependencies.items():
             # Remove references to 'work' (will treat library=None as work,
             # which also means not set in case of packages)
-            if dep["library"].lower() == "work":
-                dep_library = None
-            else:
-                dep_library = VhdlIdentifier(dep["library"])
             yield DependencySpec(
-                owner=self.filename,
-                name=VhdlIdentifier(dep["name"]),
-                library=dep_library,
-                locations=dep["locations"],
+                owner=self.filename, name=name, library=_library, locations=locations
             )
 
         for match in _PACKAGE_BODY.finditer(self.getSourceContent()):
