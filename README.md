@@ -45,7 +45,8 @@ or
 pip install hdl-checker --user --upgrade
 ```
 
-(Need to add `$HOME/.local/bin` to your `PATH` environment variable)
+**Note:** Make sure you can run `hdl_checker --version`, especially if using PIP
+with the `--user` option.
 
 ## Editor support
 
@@ -222,7 +223,8 @@ idelay_ctrl_u : idelay_ctrl
 
 ## Issues
 
-You can use the [issue tracker][issue_tracker] for bugs, feature request and so on.
+You can use the [issue tracker][issue_tracker] for bugs, feature request and so
+on.
 
 ## License
 
@@ -230,15 +232,15 @@ This software is licensed under the [GPL v3 license][gpl].
 
 ## Notice
 
-Mentor Graphics®, ModelSim® and their respective logos are trademarks or registered
-trademarks of Mentor Graphics, Inc.
+Mentor Graphics®, ModelSim® and their respective logos are trademarks or
+registered trademarks of Mentor Graphics, Inc.
 
 Intel® and its logo is a trademark or registered trademark of Intel Corporation.
 
 Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
 
-HDL Checker's author has no connection or affiliation to any of the
-trademarks mentioned or used by this software.
+HDL Checker's author has no connection or affiliation to any of the trademarks
+mentioned or used by this software.
 
 [ALE]: https://github.com/dense-analysis/ale
 [ALE_PR]: https://github.com/dense-analysis/ale/pull/2804
