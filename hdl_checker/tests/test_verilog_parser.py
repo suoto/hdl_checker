@@ -19,14 +19,15 @@
 
 import json
 import logging
-import os
+from tempfile import NamedTemporaryFile
 
-import six
+from parameterized import parameterized_class  # type: ignore
 
-from nose2.tools import such  # type: ignore
+from hdl_checker.tests import TestCase, writeListToFile
 
-from hdl_checker.tests import assertCountEqual, writeListToFile
-
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.identifier import VerilogIdentifier
+from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
@@ -34,113 +35,97 @@ from hdl_checker.types import DesignUnitType
 
 _logger = logging.getLogger(__name__)
 
-_FILENAME = "source.v"
 
-with such.A("Verilog source file object") as it:
-    if six.PY2:
-        it.assertCountEqual = assertCountEqual(it)
+def parametrizeClassWithFileTypes(cls):
+    keys = ["filetype"]
+    values = [(x,) for x in ("v", "vh", "sv", "svh")]
 
-    with it.having("a module code"):
+    return parameterized_class(keys, values)(cls)
 
-        @it.has_setup
-        def setup():
-            if os.path.exists(_FILENAME):
-                os.remove(_FILENAME)
-            it._code = """
-module clock_divider
-    #(parameter DIVISION = 5)
-    (// Usual ports
-    input clk,
-    input rst,
-    // Output clock divided
-    output       clk_div);
-""".splitlines()
 
-            writeListToFile(_FILENAME, it._code)
+@parametrizeClassWithFileTypes
+class TestVerilogSource(TestCase):
+    maxDiff = None
 
-        @it.has_teardown
-        def teardown():
-            if os.path.exists(_FILENAME):
-                os.remove(_FILENAME)
+    @classmethod
+    def setUpClass(cls):
+        cls.filename = NamedTemporaryFile(suffix="." + cls.filetype).name
 
-        @it.should("parse a file without errors")
-        def test():
-            it.source = VerilogParser(Path(_FILENAME))
+        writeListToFile(
+            cls.filename,
+            [
+                '`include "some/include"',
+                "",
+                "import some_package::*;",
+                "import  another_package :: some_name ;",
+                "",
+                "module clock_divider",
+                "    #(parameter DIVISION = 5)",
+                "    (// Usual ports",
+                "    input clk,",
+                "    input rst,",
+                "    // Output clock divided",
+                "    output       clk_div);",
+                "endmodule",
+                "",
+                "package msgPkg;",
+                "  integer  errCnt  = 0;",
+                "  integer  warnCnt = 0;",
+                "endpackage",
+                "",
+            ],
+        )
 
-        @it.should("return its design units")  # type: ignore
-        def test():
-            design_units = list(it.source.getDesignUnits())
-            _logger.debug("Design units: %s", design_units)
-            it.assertCountEqual(
-                design_units,
-                [
-                    VerilogDesignUnit(
-                        owner=it.source.filename,
-                        name="clock_divider",
-                        type_=DesignUnitType.entity,
-                        locations={(0, None)},
-                    )
-                ],
+        cls.source = VerilogParser(Path(cls.filename))
+
+    def test_GetDesignUnits(self):
+        design_units = list(self.source.getDesignUnits())
+        _logger.debug("Design units: %s", design_units)
+        self.assertCountEqual(
+            design_units,
+            [
+                VerilogDesignUnit(
+                    owner=self.source.filename,
+                    name="clock_divider",
+                    type_=DesignUnitType.entity,
+                    locations={(5, None)},
+                ),
+                VerilogDesignUnit(
+                    owner=self.source.filename,
+                    name="msgPkg",
+                    type_=DesignUnitType.package,
+                    locations={(14, None)},
+                ),
+            ],
+        )
+
+    def test_GetDependencies(self):
+        if self.filetype in ("v", "vh"):
+            self.assertCountEqual(self.source.getDependencies(), ())
+        else:
+            self.assertCountEqual(
+                self.source.getDependencies(),
+                (
+                    DependencySpec(
+                        owner=Path(self.filename),
+                        name=VerilogIdentifier("some_package"),
+                        library=None,
+                        locations=(Location(line=2, column=23),),
+                    ),
+                    DependencySpec(
+                        owner=Path(self.filename),
+                        name=VerilogIdentifier("another_package"),
+                        library=None,
+                        locations=(Location(line=3, column=23),),
+                    ),
+                ),
             )
 
-        @it.should("return no dependencies")  # type: ignore
-        def test():
-            it.assertFalse(it.source.getDependencies())
+    def test_CacheRecovery(self):
+        state = json.dumps(self.source, cls=StateEncoder)
+        _logger.info("State before: %s", state)
+        recovered = json.loads(state, object_hook=jsonObjectHook)
+        self.assertEqual(self.source.filename, recovered.filename)
 
-        @it.should("return source modification time")  # type: ignore
-        def test():
-            it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
-
-        @it.should("return no libraries")  # type: ignore
-        def test():
-            it.assertFalse(it.source.getLibraries())
-
-        @it.should("report as equal after recovering from cache")  # type:ignore
-        def test():
-            state = json.dumps(it.source, cls=StateEncoder)
-            _logger.info("State before: %s", state)
-            recovered = json.loads(state, object_hook=jsonObjectHook)
-            it.assertEqual(it.source.filename, recovered.filename)
-
-    with it.having("a package code"):
-
-        @it.has_setup
-        def setup():
-            if os.path.exists(_FILENAME):
-                os.remove(_FILENAME)
-            it._code = """
-package msgPkg;
-  integer  errCnt  = 0;
-  integer  warnCnt = 0;
-endpackage
-""".splitlines()
-
-            writeListToFile(_FILENAME, it._code)
-
-        @it.has_teardown
-        def teardown():
-            if os.path.exists(_FILENAME):
-                os.remove(_FILENAME)
-
-        @it.should("return its design units")  # type: ignore
-        def test():
-            design_units = list(it.source.getDesignUnits())
-            _logger.debug("Design units: %s", design_units)
-            it.assertCountEqual(
-                design_units,
-                [
-                    VerilogDesignUnit(
-                        owner=it.source.filename,
-                        name="msgPkg",
-                        type_=DesignUnitType.package,
-                        locations={(0, None)},
-                    )
-                ],
-            )
-
-        @it.should("return no libraries")  # type: ignore
-        def test():
-            it.assertEqual(it.source.getLibraries(), [])
-
-
-it.createTests(globals())
+    def test_GetsIncludes(self):
+        self.assertCountEqual(self.source.getIncludes(), [Path("some/include")])

@@ -18,27 +18,47 @@
 
 import logging
 import re
-from typing import Any, Generator
+from typing import Any, Generator, Iterable
 
+from .elements.dependency_spec import DependencySpec
 from .elements.design_unit import VerilogDesignUnit
 from .elements.parsed_element import Location
 
 from hdl_checker.parsers.base_parser import BaseSourceFile
-from hdl_checker.types import DesignUnitType
+from hdl_checker.parsers.elements.identifier import VerilogIdentifier
+from hdl_checker.path import Path
+from hdl_checker.types import DesignUnitType, FileType
 from hdl_checker.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
 _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
+_COMMENT = r"(?:\/\*.*?\*\/|//[^(\r\n?|\n)]*)"
+
+
 # Design unit scanner
-_DESIGN_UNIT_SCANNER = re.compile(
+_DESIGN_UNITS = re.compile(
     "|".join(
         [
             r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
             r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
+            _COMMENT,
         ]
     ),
-    flags=re.S,
+    flags=re.DOTALL,
+)
+
+_DEPENDENCIES = re.compile(
+    _COMMENT
+    + r"|"
+    + r"(?:(?:^|\n)\s*import\s+(?P<name>{0})\s*::\s*(?:{0}|\*)\s*;)".format(
+        _VERILOG_IDENTIFIER
+    ),
+    flags=re.DOTALL,
+)
+
+_INCLUDES = re.compile(
+    _COMMENT + r"|(?:^\s*`include\s+\"(?P<name>.*?)\")", flags=re.DOTALL
 )
 
 
@@ -48,28 +68,44 @@ class VerilogParser(BaseSourceFile):
     source file
     """
 
-    _comment = re.compile(r"\/\*.*?\*\/|//[^(\r\n?|\n)]*", flags=re.DOTALL)
-
     def _getSourceContent(self):
         # type: (...) -> Any
         # Remove multiline comments
         content = readFile(str(self.filename))
-        lines = self._comment.sub("", content)
-        return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
+        return content
+        #  lines = _COMMENT.sub("", content)
+        #  return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 
     def _iterDesignUnitMatches(self):
         # type: (...) -> Any
         """
-        Iterates over the matches of _DESIGN_UNIT_SCANNER against
+        Iterates over the matches of _DESIGN_UNITS against
         source's lines
         """
         content = self.getSourceContent()
-        for match in _DESIGN_UNIT_SCANNER.finditer(self.getSourceContent()):
+        for match in _DESIGN_UNITS.finditer(self.getSourceContent()):
             start = match.start()
             yield match.groupdict(), content[:start].count("\n")
 
-    def _getDependencies(self):
-        return []
+    def _getDependencies(self):  # type: () -> Iterable[DependencySpec]
+        if self.filetype is FileType.verilog:
+            return
+
+        # Only SystemVerilog will have dependencies. Includes (which are
+        # present on both) will be handled separately
+        text = self.getSourceContent()
+        for match in _DEPENDENCIES.finditer(text):
+            name = match.groupdict().get("name", None)
+            if name is not None:
+                line_number = text[: match.end()].count("\n")
+                column_number = len(text[: match.start()].split("\n")[-1])
+
+                yield DependencySpec(
+                    owner=self.filename,
+                    name=VerilogIdentifier(name),
+                    library=None,
+                    locations=(Location(line_number, column_number),),
+                )
 
     def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
         for match, line_number in self._iterDesignUnitMatches():
@@ -88,5 +124,12 @@ class VerilogParser(BaseSourceFile):
                     locations={Location(line_number, None)},
                 )
 
-    def _getLibraries(self):
-        return set()
+    def getIncludes(self):
+        # type: (...) -> Iterable[Path]
+        """
+        Returns include paths, applicable to Verilog and SystemVerilog
+        """
+        for match in _INCLUDES.finditer(self.getSourceContent()):
+            name = match.groupdict().get("name", None)
+            if name is not None:
+                yield Path(name)

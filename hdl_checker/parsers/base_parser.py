@@ -19,7 +19,7 @@
 import abc
 import logging
 import os.path as p
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Iterable, Optional, Set
 
 from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
 from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
@@ -188,6 +188,13 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._libraries
 
+    def getIncludes(self):  # pylint: disable=no-self-use
+        # type: (...) -> Iterable[Path]
+        """
+        Returns include paths, applicable to Verilog and SystemVerilog
+        """
+        return ()
+
     @abc.abstractmethod
     def _getDesignUnits(self):
         """
@@ -196,11 +203,11 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         method to avoid unnecessary I/O
         """
 
-    @abc.abstractmethod
     def _getLibraries(self):
         """
         Parses the source file to find libraries required by the file
         """
+        return ()
 
     @abc.abstractmethod
     def _getDependencies(self):
