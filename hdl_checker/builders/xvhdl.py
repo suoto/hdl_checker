@@ -50,7 +50,7 @@ class XVHDL(BaseBuilder):
         r"(?P<line_number>\d+)\]"
         r")?",
         flags=re.I,
-    ).scanner
+    )
 
     _iter_rebuild_units = re.compile(
         r"ERROR:\s*\[[^\]]*\]\s*"
@@ -83,28 +83,28 @@ class XVHDL(BaseBuilder):
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
-        scan = self._stdout_message_scanner(line)
+        for match in self._stdout_message_scanner.finditer(line):
 
-        match = scan.match()
-        if not match:
-            return
+            info = match.groupdict()
 
-        info = match.groupdict()
+            # Filename and line number aren't always present
+            filename = info.get("filename", None)
+            line_number = info.get("line_number", None)
 
-        diag = BuilderDiag(
-            builder_name=self.builder_name,
-            text=info["error_message"].strip(),
-            line_number=int(info["line_number"]) - 1,
-            filename=Path(info["filename"]),
-            error_code=info["error_code"],
-        )
+            diag = BuilderDiag(
+                builder_name=self.builder_name,
+                text=info["error_message"].strip(),
+                line_number=None if line_number is None else int(line_number) - 1,
+                filename=None if filename is None else Path(filename),
+                error_code=info["error_code"],
+            )
 
-        if info.get("severity", None) in ("W", "e"):
-            diag.severity = DiagType.WARNING
-        elif info.get("severity", None) in ("E", "e"):
-            diag.severity = DiagType.ERROR
+            if info.get("severity", None) in ("W", "e"):
+                diag.severity = DiagType.WARNING
+            elif info.get("severity", None) in ("E", "e"):
+                diag.severity = DiagType.ERROR
 
-        yield diag
+            yield diag
 
     def _parseBuiltinLibraries(self):
         "(Not used by XVHDL)"
