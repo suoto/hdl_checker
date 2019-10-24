@@ -40,6 +40,18 @@ from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import removeDirIfExists
 
+try:
+    import vunit  # type: ignore # pylint: disable=unused-import
+    from vunit import VUnit as VUnit_VHDL  # pylint: disable=import-error
+    from vunit.verilog import (  # type: ignore
+        VUnit as VUnit_Verilog,
+    )  # pylint: disable=import-error
+
+    HAS_VUNIT = True
+except ImportError:  # pragma: no cover
+    HAS_VUNIT = False
+
+
 _logger = logging.getLogger(__name__)
 
 AnyValidBuilder = Union[MSim, XVHDL, GHDL]
@@ -89,14 +101,7 @@ def foundVunit():  # type: () -> bool
     """
     Checks if our env has VUnit installed
     """
-    try:
-        import vunit  # type: ignore pylint: disable=unused-import
-
-        return True
-    except ImportError:  # pragma: no cover
-        pass
-
-    return False
+    return HAS_VUNIT
 
 
 _VUNIT_FLAGS = {
@@ -111,13 +116,9 @@ _VUNIT_FLAGS = {
 
 def getVunitSources(builder):
     # type: (AnyValidBuilder) -> Iterable[Tuple[Path, str, BuildFlags]]
-    "Foo bar"
-    if not foundVunit():  # or self._builder_name == BuilderName.fallback:
+    "Gets VUnit sources according to the file types supported by builder"
+    if not foundVunit():
         return
-
-    import vunit  # pylint: disable=import-error
-
-    logging.getLogger("vunit").setLevel(logging.ERROR)
 
     _logger.debug("VUnit installation found")
 
@@ -125,22 +126,16 @@ def getVunitSources(builder):
 
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:
-        from vunit import VUnit  # pylint: disable=import-error
-
-        sources += _getSourcesFromVUnitModule(VUnit)
+        sources += _getSourcesFromVUnitModule(VUnit_VHDL)
         _logger.debug("Added VUnit VHDL files")
 
     if FileType.systemverilog in builder.file_types:
-        from vunit.verilog import (  # type: ignore # pylint: disable=import-error
-            VUnit,
-        )
-
         _logger.debug("Builder supports Verilog, adding VUnit Verilog files")
         builder.addExternalLibrary(FileType.verilog, Identifier("vunit_lib", False))
         builder.addIncludePath(
             FileType.verilog, p.join(p.dirname(vunit.__file__), "verilog", "include")
         )
-        sources += _getSourcesFromVUnitModule(VUnit)
+        sources += _getSourcesFromVUnitModule(VUnit_Verilog)
 
     if not sources:
         _logger.info("Vunit found but no file types are supported by %s", builder)
@@ -172,7 +167,7 @@ def _makeTemporaryDir(*args, **kwargs):
     removeDirIfExists(path)
 
 
-def _getSourcesFromVUnitModule(vunit):
+def _getSourcesFromVUnitModule(vunit_module):
     """
     Creates a temporary VUnit project given a VUnit module and return a list of
     its files
@@ -180,7 +175,7 @@ def _getSourcesFromVUnitModule(vunit):
     with _makeTemporaryDir() as output_path:
 
         # Create a dummy VUnit project to get info on its sources
-        vunit_project = vunit.from_argv(["--output-path", output_path])
+        vunit_project = vunit_module.from_argv(["--output-path", output_path])
 
         # OSVVM is always avilable
         vunit_project.add_osvvm()
