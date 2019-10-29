@@ -78,28 +78,19 @@ class GHDL(BaseBuilder):
         # type: (str) -> Iterable[BuilderDiag]
         for match in GHDL._stdout_message_parser(line):
             info = match.groupdict()
-            diag = BuilderDiag(
-                builder_name=self.builder_name, text=info.get("error_message", None)
-            )
-
-            if info["is_warning"]:
-                diag.severity = DiagType.WARNING
-            else:
-                diag.severity = DiagType.ERROR
 
             filename = info.get("filename")
             line_number = info.get("line_number")
             column_number = info.get("column_number")
 
-            if filename is not None:
-                diag.filename = Path(filename)
-            if line_number is not None:
-                diag.line_number = int(line_number) - 1
-            if column_number is not None:
-                diag.column_number = int(column_number) - 1
-
-            self._logger.info("Diag: %s", diag)
-            yield diag
+            yield BuilderDiag(
+                builder_name=self.builder_name,
+                text=info.get("error_message", None),
+                severity=DiagType.WARNING if info["is_warning"] else DiagType.ERROR,
+                filename=None if filename is None else Path(filename),
+                line_number=None if line_number is None else int(line_number) - 1,
+                column_number=None if column_number is None else int(column_number) - 1,
+            )
 
     def _checkEnvironment(self):
         stdout = runShellCommand(["ghdl", "--version"])

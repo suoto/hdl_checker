@@ -91,20 +91,20 @@ class XVHDL(BaseBuilder):
             filename = info.get("filename", None)
             line_number = info.get("line_number", None)
 
-            diag = BuilderDiag(
-                builder_name=self.builder_name,
-                text=info["error_message"].strip(),
-                line_number=None if line_number is None else int(line_number) - 1,
-                filename=None if filename is None else Path(filename),
-                error_code=info["error_code"],
-            )
-
+            severity = None
             if info.get("severity", None) in ("W", "e"):
-                diag.severity = DiagType.WARNING
+                severity = DiagType.WARNING
             elif info.get("severity", None) in ("E", "e"):
-                diag.severity = DiagType.ERROR
+                severity = DiagType.ERROR
 
-            yield diag
+            yield BuilderDiag(
+                builder_name=self.builder_name,
+                filename=None if filename is None else Path(filename),
+                text=info["error_message"].strip(),
+                error_code=info["error_code"],
+                line_number=None if line_number is None else int(line_number) - 1,
+                severity=severity,
+            )
 
     def _parseBuiltinLibraries(self):
         "(Not used by XVHDL)"

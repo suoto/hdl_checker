@@ -59,24 +59,34 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
     ):
 
         # Checker can't be changed
-        self.__checker = CHECKER_NAME if checker is None else checker
+        self._checker = CHECKER_NAME if checker is None else checker
 
         # Modifiable attributes
-        self.filename = filename  # type: Optional[Path]
-        self.error_code = error_code
-        self.text = str(text)
+        self._filename = filename  # type: Optional[Path]
+        self._error_code = error_code
+        self._text = str(text)
 
         # Modifiable with rules
-        self.__line_number = None if line_number is None else int(line_number)
-        self.__column = None if column_number is None else int(column_number)
-        self.__severity = severity
+        self._line_number = None if line_number is None else int(line_number)
+        self._column = None if column_number is None else int(column_number)
+        self._severity = DiagType.ERROR if severity is None else severity
 
-        if line_number is not None:
-            self.line_number = line_number
-        if column_number is not None:
-            self.column_number = column_number
-        if severity is not None:
-            self.severity = severity
+    def copy(self, **kwargs):
+        """
+        Returns a copy of the object replacing __init__ arguments for values
+        for kwargs keys.
+        """
+        return CheckerDiagnostic(
+            checker=kwargs.get("checker", getattr(self, "checker", None)),
+            text=kwargs.get("text", getattr(self, "text", None)),
+            filename=kwargs.get("filename", getattr(self, "filename", None)),
+            line_number=kwargs.get("line_number", getattr(self, "line_number", None)),
+            column_number=kwargs.get(
+                "column_number", getattr(self, "column_number", None)
+            ),
+            error_code=kwargs.get("error_code", getattr(self, "error_code", None)),
+            severity=kwargs.get("severity", getattr(self, "severity", None)),
+        )
 
     def __repr__(self):
         return (
@@ -144,41 +154,41 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
     @property
     def checker(self):
         "Full checker name"
-        return self.__checker
+        return self._checker
+
+    @property
+    def filename(self):
+        "Full checker name"
+        return self._filename
+
+    @property
+    def text(self):
+        "Full checker name"
+        return self._text
+
+    @property
+    def error_code(self):
+        "Full checker name"
+        return self._error_code
 
     @property
     def line_number(self):
         "Diagnostics line number"
-        if self.__line_number is not None:
-            return int(self.__line_number)
-        return self.__line_number
-
-    @line_number.setter
-    def line_number(self, value):
-        self.__line_number = int(value)
+        if self._line_number is not None:
+            return int(self._line_number)
+        return self._line_number
 
     @property
     def column_number(self):
         "Diagnostics column_number"
-        if self.__column is not None:
-            return int(self.__column)
-        return self.__column
-
-    @column_number.setter
-    def column_number(self, value):
-        self.__column = int(value)
+        if self._column is not None:
+            return int(self._column)
+        return self._column
 
     @property
     def severity(self):
         "Diagnostics severity (use diagnostics.DiagType for consistency)"
-        return self.__severity
-
-    @severity.setter
-    def severity(self, value):
-        assert value in DiagType.__dict__.values(), "Invalid severity {}".format(
-            repr(value)
-        )
-        self.__severity = value
+        return self._severity
 
 
 class PathNotInProjectFile(CheckerDiagnostic):

@@ -495,9 +495,11 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             )
 
         # Static messages don't take the path, only the text, so we need to
-        # set add that to the diagnostic
+        # set that. Also, any diagnostic without filename will be made to
+        # point to the current path
         for diag in static_diags:
-            diag.filename = path
+            if diag.filename is None:
+                diag = diag.copy(filename=path)
             builder_diags.add(diag)
 
         self._saveCache()
@@ -546,9 +548,12 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             # file by content. In this case, we'll assume the empty filenames
             # refer to the same filename we got in the first place
             for diag in self.getMessagesByPath(temp_path):
-                diag.filename = path
-                diag.text = diag.text.replace(temporary_file.name, path.name)
-                diags.add(diag)
+                diags.add(
+                    diag.copy(
+                        text=diag.text.replace(temporary_file.name, path.name),
+                        filename=path,
+                    )
+                )
 
             self.database.removeSource(temp_path)
             removeIfExists(temporary_file.name)

@@ -132,32 +132,30 @@ class MSim(BaseBuilder):
                 r"\s*\((vcom|vlog)-\d+\)\s*", " ", info["error_message"]
             ).strip()
 
-            diag = BuilderDiag(builder_name=self.builder_name, text=text)
-
             error_code = None
 
             if ("vcom-" in line) or ("vlog" in line):
                 error_code = re.findall(r"((?:vcom-|vlog-)\d+)", line)[0]
 
-            diag.error_code = error_code
-
             filename = info.get("filename")
             line_number = info.get("line_number")
             column_number = info.get("column_number")
 
-            if filename is not None:
-                diag.filename = Path(filename)
-            if line_number is not None:
-                diag.line_number = int(line_number) - 1
-            if column_number is not None:
-                diag.column_number = int(column_number) - 1
-
+            severity = None
             if info.get("severity", None) in ("W", "e"):
-                diag.severity = DiagType.WARNING
+                severity = DiagType.WARNING
             elif info.get("severity", None) in ("E", "e"):
-                diag.severity = DiagType.ERROR
+                severity = DiagType.ERROR
 
-            yield diag
+            yield BuilderDiag(
+                builder_name=self.builder_name,
+                text=text,
+                error_code=error_code,
+                severity=severity,
+                filename=None if filename is None else Path(filename),
+                line_number=None if line_number is None else int(line_number) - 1,
+                column_number=None if column_number is None else int(column_number) - 1,
+            )
 
     def _checkEnvironment(self):
         stdout = runShellCommand(["vcom", "-version"])
