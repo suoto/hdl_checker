@@ -57,7 +57,7 @@ class GHDL(BaseBuilder):
 
     _scan_library_paths = re.compile(
         r"^\s*(actual prefix|library directory):" r"\s*(?P<library_path>.*)\s*"
-    ).search
+    )
 
     _shouldIgnoreLine = re.compile(
         "|".join([r"^\s*$", r"ghdl: compilation error"])
@@ -124,7 +124,7 @@ class GHDL(BaseBuilder):
         Discovers libraries that exist regardless before we do anything
         """
         for line in runShellCommand(["ghdl", "--dispconfig"]):
-            library_path_match = self._scan_library_paths(line)
+            library_path_match = self._scan_library_paths.search(line)
             if library_path_match:
                 library_path = library_path_match.groupdict()["library_path"]
                 self._logger.debug("library path is %s", library_path)

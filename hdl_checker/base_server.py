@@ -185,9 +185,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         # Don't let the user hanging if adding sources is taking too long. Also
         # need to notify when adding is done.
         timer = Timer(
-            _HOW_LONG_IS_TOO_LONG,
-            self._handleUiInfo,
-            args=(_HOW_LONG_IS_TOO_LONG_MSG,),
+            _HOW_LONG_IS_TOO_LONG, self._handleUiInfo, args=(_HOW_LONG_IS_TOO_LONG_MSG,)
         )
         timer.start()
         self._readConfig()

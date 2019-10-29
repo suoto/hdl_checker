@@ -289,16 +289,6 @@ class BuilderDiag(CheckerDiagnostic):
             error_code=error_code,
         )
 
-    #  def __hash__(self):
-    #      #  for item in ('checker', 'column_number', 'error_code',
-    #      #          'filename', 'line_number', 'severity', 'text'):
-    #      #      try:
-    #      #          hash(getattr(self, item))
-    #      #      except TypeError:
-    #      #          print("item %s is not hashable!" % item)
-    #      return super(CheckerDiagnostic, self).__hash__()
-    #      #  assert False, 'hey'
-
 
 class FailedToCreateProject(CheckerDiagnostic):
     """

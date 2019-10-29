@@ -729,16 +729,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 still_needed = deps - units_compiled - own
                 new_units = own - units_compiled
 
-                if still_needed:
-                    if _logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-                        _msg = [(library, name.name) for library, name in still_needed]
-                        _logger.debug("%s still needs %s", current_path, _msg)
-                elif not new_units:
-                    # If the current path only defines units that have been
-                    # already compiled, skip it
-                    _logger.debug("Path %s has nothing to add, skipping", current_path)
-                    paths_built.add(current_path)
-                else:
+                if new_units and not still_needed:
                     _logger.debug(
                         "Compiling %s adds %d new units: %s",
                         current_path,
@@ -750,6 +741,16 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     ) or _DEFAULT_LIBRARY_NAME, current_path
                     paths_built.add(current_path)
                     units_compiled |= own
+                elif not new_units:
+                    # If the current path only defines units that have been
+                    # already compiled, skip it
+                    _logger.debug("Path %s has nothing to add, skipping", current_path)
+                    paths_built.add(current_path)
+                elif still_needed and _logger.isEnabledFor(
+                    logging.DEBUG
+                ):  # pragma: no cover
+                    _msg = [(library, name.name) for library, name in still_needed]
+                    _logger.debug("%s still needs %s", current_path, _msg)
 
             paths_to_build -= paths_built
             units_to_build -= units_compiled
