@@ -346,12 +346,6 @@ with such.A("LSP server") as it:
                 ],
             )
 
-        @it.should("fail to lint a file outside workspace")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-            with it.assertRaises(MockWaitTimeout):
-                checkLintFileOnSave(source)
-
     with it.having("an existing and valid old style project file"):
 
         @it.has_setup

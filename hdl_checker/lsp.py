@@ -45,12 +45,7 @@ from hdl_checker.parsers.elements.design_unit import (
 )
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location, MarkupKind
-from hdl_checker.utils import (
-    getTemporaryFilename,
-    logCalls,
-    onNewReleaseFound,
-    removeIfExists,
-)
+from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
 
@@ -296,22 +291,34 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
 
     @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
     def lint(self, doc_uri, is_saved):
-        # type: (...) -> Any
-        diagnostics = set(self._getDiags(doc_uri, is_saved)) | self._global_diags
+        # type: (URI, bool) -> Any
+        _logger.info("linting: %s", doc_uri)
+        diags = set(self._getDiags(doc_uri, is_saved))
 
-        # Since we're debounced, the document may no longer be open
-        if doc_uri in self.workspace.documents:
-            # Both checker methods return generators, convert to a list before
-            # returning
+        # Separate the diagnostics in filename groups to publish diagnostics
+        # referring to all paths
+        paths = {diag.filename for diag in diags}
+        # Add doc_uri to the set to trigger clearing diagnostics when it's not
+        # present
+        paths.add(Path(to_fs_path(doc_uri)))
+
+        for path in paths:
             self.workspace.publish_diagnostics(
-                doc_uri, list([checkerDiagToLspDict(x) for x in diagnostics])
+                from_fs_path(str(path)),
+                list(
+                    checkerDiagToLspDict(diag)
+                    for diag in diags
+                    if diag.filename == path
+                ),
             )
 
     def _getDiags(self, doc_uri, is_saved):
         # type: (URI, bool) -> Iterable[CheckerDiagnostic]
         """
-        Gets diags of the URI, wether from the saved file or from its
-        contents
+        Gets diags of the URI, wether from the saved file or from its contents;
+        returns an iterable containing the diagnostics of the doc_uri and other
+        URIs that were compiled as dependencies and generated diagnostics with
+        severity higher than error
         """
         if self.checker is None:  # pragma: no cover
             _logger.debug("No checker, won't try to get diagnostics")
@@ -324,14 +331,10 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
 
         if is_saved:
-            diags = self.checker.getMessagesByPath(path)
-        else:
-            text = self.workspace.get_document(doc_uri).source
-            diags = self.checker.getMessagesWithText(path, text)
+            return self.checker.getMessagesByPath(path)
 
-        # LSP diagnostics are only valid for the scope of the resource and
-        # hdl_checker may return a tree of issues, so need to filter those out
-        return (diag for diag in diags if diag.filename in (path, None))
+        text = self.workspace.get_document(doc_uri).source
+        return self.checker.getMessagesWithText(path, text)
 
     def m_workspace__did_change_configuration(self, settings=None):
         # type: (...) -> Any
