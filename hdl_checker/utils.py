@@ -21,6 +21,7 @@ import functools
 import logging
 import os
 import os.path as p
+import pprint
 import re
 import shutil
 import signal
@@ -33,7 +34,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Uni
 
 import six
 
-from hdl_checker.path import Path
+from hdl_checker.path import Path  # pylint: disable=unused-import
 
 _logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def terminateProcess(pid):
     "Terminate a process given its PID"
 
     if ON_WINDOWS:
-        import ctypes
+        import ctypes  # pylint: disable=import-outside-toplevel
 
         process_terminate = 1
         handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)
@@ -118,7 +119,12 @@ def _isProcessRunningOnWindows(pid):
     (adapted from code found at
     http://code.activestate.com/recipes/305279-getting-process-information-on-windows/)
     """
-    from ctypes import windll, c_ulong, sizeof, byref
+    from ctypes import (  # pylint: disable=import-outside-toplevel
+        windll,
+        c_ulong,
+        sizeof,
+        byref,
+    )
 
     # PSAPI.DLL
     psapi = windll.psapi
@@ -134,7 +140,7 @@ def _isProcessRunningOnWindows(pid):
     # Number of processes returned
     number_of_pids = int(cb_needed.value / sizeof(c_ulong()))
 
-    pid_list = [i for i in list_of_pids][:number_of_pids]
+    pid_list = list(list_of_pids)[:number_of_pids]
 
     return int(pid) in pid_list
 
@@ -348,7 +354,6 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
 def logCalls(func):  # pragma: no cover
     # type: (Callable) -> Callable
     "Decorator to Log calls to func"
-    import pprint
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -437,7 +442,9 @@ def onNewReleaseFound(func):
     Checks if a new release is out and calls func if the running an older
     version
     """
-    from hdl_checker import __version__ as current
+    from hdl_checker import (  # pylint: disable=import-outside-toplevel
+        __version__ as current,
+    )
 
     latest = _getLatestReleaseVersion()
 

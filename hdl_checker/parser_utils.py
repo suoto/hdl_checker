@@ -36,14 +36,12 @@ from hdl_checker.utils import ON_WINDOWS, isFileReadable, toBytes
 
 _logger = logging.getLogger(__name__)
 
-tSourceFile = Union[VhdlParser, VerilogParser]
-
 if six.PY3:
     JSONDecodeError = (  # pylint: disable=invalid-name
         json.decoder.JSONDecodeError  # pylint: disable=no-member
     )
 
-    # Python 2 iglob does not take recursive argument
+    # Python 2 iglob doesn't have the 'recursive' argument
     def glob(pathname):
         "Alias for glob.iglob(pathname, recursive=True)"
         return _glob(pathname, recursive=True)
@@ -64,7 +62,7 @@ PARSERS = {
 }  # type: Dict[FileType, Type[Union[VhdlParser, VerilogParser]]]
 
 
-def getSourceParserFromPath(path):  # type: (Path) -> tSourceFile
+def getSourceParserFromPath(path):  # type: (Path) -> Union[VhdlParser, VerilogParser]
     """
     Returns either a VhdlParser or VerilogParser based on the path's file
     extension
