@@ -255,28 +255,29 @@ def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
     _logger.debug(" ".join(cmd_with_args))
 
     try:
-        stdout = list(
+        return (
             subp.check_output(
                 cmd_with_args,
                 stderr=subp.STDOUT,
                 shell=shell,
                 env=env or os.environ,
                 cwd=cwd,
-            ).splitlines()
+            )
+            .decode(errors="replace")
+            .splitlines()
         )
     except subp.CalledProcessError as exc:
-        stdout = list(exc.output.splitlines())
+        stdout = tuple(exc.output.decode(errors="replace").splitlines())
         _logger.debug(
             "Command '%s' failed with error code %d.\nStdout:\n%s",
             cmd_with_args,
             exc.returncode,
-            "\n".join([x.decode() for x in stdout]),
+            "\n".join(stdout),
         )
+        return stdout
     except OSError as exc:
         _logger.debug("Command '%s' failed with %s", cmd_with_args, exc)
         raise
-
-    return [x.decode() for x in stdout]
 
 
 def removeIfExists(filename):
