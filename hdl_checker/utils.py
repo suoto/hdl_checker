@@ -34,8 +34,6 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Uni
 
 import six
 
-from hdl_checker.path import Path  # pylint: disable=unused-import
-
 _logger = logging.getLogger(__name__)
 
 ON_WINDOWS = os.name == "nt"
@@ -241,12 +239,12 @@ def getTemporaryFilename(name):
 
 
 def isFileReadable(path):
-    # type: (Path) -> bool
+    # type: (str) -> bool
     """
     Checks if a given file is readable
     """
     try:
-        open(str(path), "r").close()
+        open(path, "r").close()
 
         return True
     except IOError:

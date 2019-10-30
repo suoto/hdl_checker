@@ -18,9 +18,9 @@
 
 import abc
 import logging
+from pprint import pformat
 from typing import Dict, Optional, Set, Tuple
 
-from hdl_checker.builder_utils import AnyValidBuilder
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 
@@ -40,8 +40,6 @@ class BaseGenerator:
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):  # type: () -> None
-        """
-        """
         self._logger = logging.getLogger(self.__class__.__name__)
         self._sources = set()  # type: Set[SourceSpec]
         self._include_paths = {
@@ -73,7 +71,7 @@ class BaseGenerator:
         should be implemented by child classes
         """
 
-    def _getPreferredBuilder(self):  # type: () -> AnyValidBuilder
+    def _getPreferredBuilder(self):  # pylint:disable=no-self-use
         """
         Method should be overridden by child classes to express the preferred
         builder
@@ -116,8 +114,6 @@ class BaseGenerator:
                 )
             else:
                 project["sources"].append(str(path))
-
-        from pprint import pformat
 
         self._logger.info("Resulting project:\n%s", pformat(project))
 

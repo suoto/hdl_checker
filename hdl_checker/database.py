@@ -388,7 +388,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         """
         Parses a given path if needed, removing info from the database prior to that
         """
-        if not isFileReadable(path):
+        if not isFileReadable(path.name):
             _logger.warning("Won't parse file that's not readable %s", repr(path))
             self.removeSource(path)
             return

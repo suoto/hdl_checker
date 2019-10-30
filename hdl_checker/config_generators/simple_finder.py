@@ -20,7 +20,11 @@ from typing import Iterable, List
 
 from .base_generator import BaseGenerator
 
-from hdl_checker.parser_utils import filterGitIgnoredPaths, findRtlSourcesByPath, isGitRepo
+from hdl_checker.parser_utils import (
+    filterGitIgnoredPaths,
+    findRtlSourcesByPath,
+    isGitRepo,
+)
 from hdl_checker.path import Path
 
 _SOURCE_EXTENSIONS = "vhdl", "sv", "v"
@@ -48,7 +52,8 @@ class SimpleFinder(BaseGenerator):
             list(_SOURCE_EXTENSIONS) + list(_HEADER_EXTENSIONS)
         )
 
-    def _getLibrary(self, path):  # type: (Path) -> str
+    def _getLibrary(self, path):  # pylint:disable=no-self-use,unused-argument
+        # type: (Path) -> str
         """
         Returns the library name given the path. On this implementation this
         returns a default name; child classes can override this to provide

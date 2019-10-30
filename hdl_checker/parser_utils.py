@@ -243,7 +243,7 @@ def findRtlSourcesByPath(path):
             except UnknownTypeExtension:
                 continue
 
-            if isFileReadable(full_path):
+            if isFileReadable(full_path.name):
                 yield full_path
 
 

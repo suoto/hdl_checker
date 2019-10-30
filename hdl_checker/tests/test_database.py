@@ -24,6 +24,7 @@
 import json
 import logging
 import os.path as p
+import tempfile
 import time
 from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple
@@ -169,7 +170,7 @@ class TestDatabase(TestCase):
         setupTestSuport(TEST_TEMP_PATH)
         self.database = _Database()
 
-    def test_accepts_empty_sources_list(self):
+    def test_AcceptsEmptySourcesList(self):
         # type: (...) -> Any
         self.database.configure(dict(), TEST_TEMP_PATH)
 
@@ -183,7 +184,7 @@ class TestDatabase(TestCase):
         )
         self.assertEqual(self.database.getFlags(any_path), ())
 
-    def test_accepts_empty_dict(self):
+    def test_AcceptsEmptyDict(self):
         # type: (...) -> Any
         self.database.configure({}, TEST_TEMP_PATH)
 
@@ -192,7 +193,7 @@ class TestDatabase(TestCase):
         #  self.assertEqual(self.database.getLibrary(Path("any")), None)
         self.assertEqual(self.database.getFlags(Path("any")), ())
 
-    def test_accepts_basic_structure(self):
+    def test_AcceptsBasicStructure(self):
         # type: (...) -> Any
         _SourceMock(
             filename=_path("foo.vhd"),
@@ -294,9 +295,9 @@ class TestDatabase(TestCase):
             {foo_path},
         )
 
-    def test_update_info_if_source_changed(self):
+    def test_UpdateInfoIfSourceChanged(self):
         # type: (...) -> Any
-        self.test_accepts_basic_structure()
+        self.test_AcceptsBasicStructure()
 
         # Make sure the env is sane before actually testing
         self.assertTrue(p.exists(_path("foo.vhd")))
@@ -344,7 +345,7 @@ class TestDatabase(TestCase):
             [_Path("foo.vhd"), oof_path],
         )
 
-    def test_update_path_library(self):
+    def test_UpdatePathLibrary(self):
         # type: (...) -> Any
         sources = {
             _SourceMock(
@@ -391,7 +392,7 @@ class TestDatabase(TestCase):
             {("another_library", "foo"), ("lib", "bar")},
         )
 
-    def test_infers_uses_most_common_library_if_needed(self):
+    def test_InfersUsesMostCommonLibraryIfNeeded(self):
         # type: (...) -> Any
         # Given a design unit used in multiple ways, use the most common one
         self.database._configFromSources(
@@ -541,7 +542,7 @@ class TestDatabase(TestCase):
             Identifier("some_dep_lib", False),
         )
 
-    def test_json_encoding_and_decoding(self):
+    def test_JsonEncodingAndDecoding(self):
         database = _Database()
 
         database._configFromSources(
@@ -581,7 +582,7 @@ class TestDatabase(TestCase):
         self.assertDictEqual(database._flags_map, recovered._flags_map)
         self.assertDictEqual(database._dependencies_map, recovered._dependencies_map)
 
-    def test_removing_a_path_that_was_added(self):
+    def test_RemovingAPathThatWasAdded(self):
         self.database._configFromSources(
             {
                 _SourceMock(
@@ -625,7 +626,7 @@ class TestDatabase(TestCase):
         # collateral.vhd units should continue to be found
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
-    def test_removing_an_existing_path_that_was_not_added(self):
+    def test_RemovingAnExistingPathThatWasNotAdded(self):
         self.database._configFromSources(
             {
                 _SourceMock(
@@ -662,7 +663,7 @@ class TestDatabase(TestCase):
         # collateral.vhd units should continue to be found
         self.assertEqual(str(self.database.getLibrary(collateral)), "another_library")
 
-    def test_removing_a_non_existing_path_that_was_not_added(self):
+    def test_RemovingANonExistingPathThatWasNotAdded(self):
         self.database._configFromSources(
             {
                 _SourceMock(
@@ -712,7 +713,7 @@ class TestDatabase(TestCase):
             self.database.getDiagnosticsForPath(path), [PathNotInProjectFile(path)]
         )
 
-    def test_temporary_paths_dont_generate_path_not_in_project(self):
+    def test_TemporaryPathsDontGeneratePathNotInProject(self):
         # type: (...) -> Any
         path = _path("foo.vhd")
 
@@ -798,7 +799,7 @@ class TestDirectDependencies(TestCase):
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_get_correct_dependencies_of_entity_a(self):
+    def test_GetCorrectDependenciesOfEntityA(self):
         # type: (...) -> Any
         deps = list(self.database.test_getDependenciesUnits(_Path("entity_a.vhd")))
 
@@ -814,7 +815,7 @@ class TestDirectDependencies(TestCase):
             },
         )
 
-    def test_get_correct_build_sequency_of_entity_a(self):
+    def test_GetCorrectBuildSequencyOfEntityA(self):
         # type: (...) -> Any
         sequence = list(self.database.test_getBuildSequence(_Path("entity_a.vhd")))
 
@@ -842,7 +843,7 @@ class TestDirectDependencies(TestCase):
         # If conditions above are respected, direct_dep_b can be anywhere
         self.assertIn(direct_dep_b, sequence)
 
-    def test_get_correct_dependencies_of_indirect_dep(self):
+    def test_GetCorrectDependenciesOfIndirectDep(self):
         # type: (...) -> Any
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("indirect_dep.vhd")),
@@ -879,7 +880,7 @@ class TestDirectCircularDependencies(TestCase):
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_should_handle_both_sides(self):
+    def test_ShouldHandleBothSides(self):
         # type: (...) -> Any
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_a.vhd")),
@@ -939,7 +940,7 @@ class TestMultilevelCircularDependencies(TestCase):
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_report_all_but_the_source_in_question(self):
+    def test_ReportAllButTheSourceInQuestion(self):
         # type: (...) -> Any
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_a.vhd")),
@@ -1000,7 +1001,7 @@ class TestIndirectLibraryInference(TestCase):
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_infer_library_when_using_directly(self):
+    def test_InferLibraryWhenUsingDirectly(self):
         # type: (...) -> Any
         sequence = tuple(
             self.database.test_getBuildSequence(_Path("no_lib_but_use_it_directly.vhd"))
@@ -1008,7 +1009,7 @@ class TestIndirectLibraryInference(TestCase):
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 
-    def test_infer_library_from_path(self):
+    def test_InferLibraryFromPath(self):
         # type: (...) -> Any
         sequence = tuple(
             self.database.test_getBuildSequence(
@@ -1068,7 +1069,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_build_sequence_units_are_unique(self):
+    def test_BuildSequenceUnitsAreUnique(self):
         # type: (...) -> Any
         # If a design unit is defined in multiple places, we should not include
         # all of them
@@ -1089,7 +1090,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             ),
         )
 
-    def test_non_unique_units_are_reported(self):
+    def test_NonUniqueUnitsAreReported(self):
         # type: (...) -> Any
 
         # Design units defined in multiple places should trigger
@@ -1140,7 +1141,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             [],
         )
 
-    def test_temporary_paths_dont_generate_diagnostics(self):
+    def test_TemporaryPathsDontGenerateDiagnostics(self):
         # type: (...) -> Any
 
         # Create a copy of a source file with same contents but a different
@@ -1157,7 +1158,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
         # Add this as a regular file to make sure the test will fail
         self.database.addSource(_Path("no_lib_package_3.vhd"), None)
         with self.assertRaises(AssertionError):
-            self.test_non_unique_units_are_reported()
+            self.test_NonUniqueUnitsAreReported()
         self.database.removeSource(_Path("no_lib_package_3.vhd"))
 
         # Now add the same path using TemporaryPath, which should make the
@@ -1166,9 +1167,9 @@ class TestUnitsDefinedInMultipleSources(TestCase):
 
         # Test should run exactly the same as before. If we added using the
         # path.Path class, the test would have failed
-        self.test_non_unique_units_are_reported()
+        self.test_NonUniqueUnitsAreReported()
 
-    def test_temporary_paths_are_excluded(self):
+    def test_TemporaryPathsAreExcluded(self):
         # type: (...) -> Any
         # This should add diagnostics
         with patch.object(self.database, "_addDiagnostic") as meth:

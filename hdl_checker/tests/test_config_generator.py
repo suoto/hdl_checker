@@ -100,7 +100,7 @@ class TestConfigGenerator(TestCase):
 
     @patch(
         "hdl_checker.parser_utils.isFileReadable",
-        lambda path: "nonreadable" not in path.name,
+        lambda path: "nonreadable" not in path,
     )
     def test_run_simple_config_gen(self):
         # type: (...) -> None
