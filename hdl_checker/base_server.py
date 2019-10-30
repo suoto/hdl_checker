@@ -548,12 +548,13 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             # file by content. In this case, we'll assume the empty filenames
             # refer to the same filename we got in the first place
             for diag in self.getMessagesByPath(temp_path):
-                diags.add(
-                    diag.copy(
+                if diag.filename in (temp_path, None):
+                    diag = diag.copy(
                         text=diag.text.replace(temporary_file.name, path.name),
                         filename=path,
                     )
-                )
+
+                diags.add(diag)
 
             self.database.removeSource(temp_path)
             removeIfExists(temporary_file.name)
