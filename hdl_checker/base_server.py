@@ -136,13 +136,14 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         return self._database
 
     def __hash__(self):
-        # Just to allow lru_cache
+        # Just to allow lru_cache to work
         return hash(0)
 
     def _clearLruCaches(self):
         "Clear caches from lru_caches"
-        for meth in self._cached_methods:
-            meth.cache_clear()
+        with self._lock:
+            for meth in self._cached_methods:
+                meth.cache_clear()
 
     def setConfig(self, filename):
         # type: (Union[Path, str]) -> None
@@ -171,25 +172,28 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         Checks if self.config_file has changed; if it has, cleans up and
         re-reads the file
         """
-        self._setupIfNeeded()
+        with self._lock:
+            self._setupIfNeeded()
 
-        # No config file set
-        if self.config_file is None:
-            return
+            # No config file set
+            if self.config_file is None:
+                return
 
-        file_mtime = self.config_file.path.mtime
-        # Check if values we have are up to date
-        if self.config_file.last_read >= file_mtime:
-            return
+            file_mtime = self.config_file.path.mtime
+            # Check if values we have are up to date
+            if self.config_file.last_read >= file_mtime:
+                return
 
-        # Don't let the user hanging if adding sources is taking too long. Also
-        # need to notify when adding is done.
-        timer = Timer(
-            _HOW_LONG_IS_TOO_LONG, self._handleUiInfo, args=(_HOW_LONG_IS_TOO_LONG_MSG,)
-        )
-        timer.start()
-        self._readConfig()
-        timer.cancel()
+            # Don't let the user hanging if adding sources is taking too long. Also
+            # need to notify when adding is done.
+            timer = Timer(
+                _HOW_LONG_IS_TOO_LONG,
+                self._handleUiInfo,
+                args=(_HOW_LONG_IS_TOO_LONG_MSG,),
+            )
+            timer.start()
+            self._readConfig()
+            timer.cancel()
 
     def _readConfig(self):
         # type: (...) -> None
