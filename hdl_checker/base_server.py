@@ -169,8 +169,9 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
     def _updateConfigIfNeeded(self):
         # type: (...) -> Any
         """
-        Checks if self.config_file has changed; if it has, cleans up and
-        re-reads the file
+        Checks if self.config_file has changed; if it has, cleans up working
+        dir and re reads it. The config file will be read as JSON first and, if
+        that fails, ConfigParser is attempted
         """
         with self._lock:
             self._setupIfNeeded()
@@ -192,29 +193,17 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
                 args=(_HOW_LONG_IS_TOO_LONG_MSG,),
             )
             timer.start()
-            self._readConfig()
+
+            try:
+                config = json.load(open(str(self.config_file.path)))
+            except JSONDecodeError:
+                config = ConfigParser(self.config_file.path).parse()
+
+            self.configure(config)
+
+            self.config_file = WatchedFile(self.config_file.path, file_mtime)
+            _logger.debug("Updated config file to %s", self.config_file)
             timer.cancel()
-
-    def _readConfig(self):
-        # type: (...) -> None
-        """
-        Updates the database from a configuration file. Extracting form JSON
-        has priority, then ConfigParser is attempted.
-        """
-        if self.config_file is None:
-            _logger.warning("Can't read config when config file is not set")
-            return
-
-        try:
-            config = json.load(open(str(self.config_file.path)))
-        except JSONDecodeError:
-            config = ConfigParser(self.config_file.path).parse()
-
-        self.config_file = WatchedFile(
-            self.config_file.path, self.config_file.path.mtime
-        )
-        _logger.debug("Updating config file to %s", self.config_file)
-        self.configure(config)
 
     def configure(self, config):
         # type: (Dict[Any, Any]) -> None
@@ -233,13 +222,13 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         _logger.debug("Builder class: %s", builder_cls)
 
-        self._builder = builder_cls(self.work_dir, self.database)
+        self._builder = builder_cls(self.work_dir, self._database)
 
-        sources_added = self.database.configure(config, str(self.root_dir))
+        sources_added = self._database.configure(config, str(self.root_dir))
         # Add VUnit
         if not isinstance(self._builder, Fallback):
             for path, library, flags in getVunitSources(self._builder):
-                self.database.addSource(path, library, flags, flags)
+                self._database.addSource(path, library, flags, flags)
 
         # Add the flags from the root config file last, it should overwrite
         # values set by the included files

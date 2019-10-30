@@ -193,7 +193,14 @@ def _expand(config, ref_path):
             filetype_cfg.get(BuildFlagScope.all.value, ()),
         )
 
-    for entry in config.pop("sources", ()):
+    sources = config.pop("sources", None)
+
+    # XXX: If no sources were defined, search ref_path for sources
+    if sources is None:
+        _logger.debug("No sources found, will search %s", ref_path)
+        sources = (x.name for x in findRtlSourcesByPath(Path(ref_path)))
+
+    for entry in sources:
         source = JsonSourceEntry.make(entry)
         path_expr = (
             source.path_expr

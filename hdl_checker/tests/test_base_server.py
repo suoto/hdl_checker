@@ -35,11 +35,11 @@ from mock import patch
 from nose2.tools import such  # type: ignore
 
 from hdl_checker.tests import (
+    DummyServer,
     FailingBuilder,
     MockBuilder,
     PatchBuilder,
     SourceMock,
-    DummyServer,
     assertCountEqual,
     assertSameFile,
     getTestTempPath,
@@ -136,9 +136,7 @@ with such.A("hdl_checker project") as it:
     @it.should("warn when setup is taking too long")
     @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.base_server.BaseServer,
-        "configure",
-        lambda *_: time.sleep(0.5),
+        hdl_checker.base_server.BaseServer, "configure", lambda *_: time.sleep(0.5)
     )
     def test():
 
@@ -312,36 +310,41 @@ with such.A("hdl_checker project") as it:
             set_state.assert_called_once()
 
             # Setting the config file should not trigger reparsing
-            with patch.object(it.project, "_readConfig") as read_config:
-                with patch(
-                    "hdl_checker.base_server.WatchedFile.__init__", side_effect=[None]
-                ) as watched_file:
-                    old = it.project.config_file
-                    it.project.setConfig(it.config_file)
-                    it.project._updateConfigIfNeeded()
-                    it.assertEqual(it.project.config_file, old)
-                    read_config.assert_not_called()
-                    watched_file.assert_not_called()
-                    it.assertIsNotNone(it.project.config_file)
+            with patch(
+                "hdl_checker.base_server.WatchedFile.__init__", side_effect=[None]
+            ) as watched_file:
+                old = it.project.config_file
+                it.project.setConfig(it.config_file)
+                it.project._updateConfigIfNeeded()
+                it.assertEqual(it.project.config_file, old)
+                watched_file.assert_not_called()
+                it.assertIsNotNone(it.project.config_file)
 
-        @it.should("clean up root dir")  # type: ignore
+        @it.should("clean up and reparse if the config file changes")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
-            if not ON_WINDOWS:
-                it.assertCountEqual(
-                    [("info", "No sources were added")],
-                    list(it.project.getUiMessages()),
-                )
+            # Clean up previous messages
+            list(it.project.getUiMessages())
 
-            it.project.clean()
+            # Make sure everything is up to date prior to running
+            with patch.object(it.project, "configure") as configure:
+                it.project._updateConfigIfNeeded()
+                configure.assert_not_called()
 
-            project = DummyServer(_Path(TEST_TEMP_PATH))
+            # Write the same thing into the file just to change the timestamp
+            previous = p.getmtime(it.config_file)
+            contents = open(it.config_file).read()
+            open(it.config_file, "w").write(contents)
+            it.assertNotEqual(
+                previous,
+                p.getmtime(it.config_file),
+                "Modification times should have changed",
+            )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(project)
-
-            # Reset the project to the previous state
-            setup()
+            # Check that thing are updated
+            with patch.object(it.project, "configure") as configure:
+                it.project._updateConfigIfNeeded()
+                configure.assert_called_once()
 
         @it.should("warn when failing to recover from cache")  # type: ignore
         def test():
@@ -388,7 +391,7 @@ with such.A("hdl_checker project") as it:
         def test(_):
             with PatchBuilder():
                 it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
-                it.project._readConfig()
+                it.project._updateConfigIfNeeded()
 
             entity_a = _SourceMock(
                 filename=_path("entity_a.vhd"),

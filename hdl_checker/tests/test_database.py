@@ -170,28 +170,40 @@ class TestDatabase(TestCase):
         setupTestSuport(TEST_TEMP_PATH)
         self.database = _Database()
 
-    def test_AcceptsEmptySourcesList(self):
+    @patch("hdl_checker.parser_utils.findRtlSourcesByPath")
+    def test_AcceptsEmptySourcesList(self, meth):
         # type: (...) -> Any
-        self.database.configure(dict(), TEST_TEMP_PATH)
+        # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
+        # findRtlSourcesByPath
+        with tempfile.NamedTemporaryFile(suffix=".vhd") as path:
+            meth.return_value = [Path(path.name)]
 
-        #  self.assertEqual(self.database.builder_name, None)
-        self.assertCountEqual(self.database.paths, ())
-        any_path = _Path("any.vhd")
-        # Make sure the path exists
-        open(any_path.name, "w").close()
-        self.assertEqual(
-            self.database.getLibrary(any_path), Identifier("not_in_project", False)
-        )
-        self.assertEqual(self.database.getFlags(any_path), ())
+            self.database.configure(dict(), TEST_TEMP_PATH)
 
-    def test_AcceptsEmptyDict(self):
+            #  self.assertEqual(self.database.builder_name, None)
+            self.assertCountEqual(self.database.paths, (Path(path.name),))
+            any_path = _Path("any.vhd")
+            # Make sure the path exists
+            open(any_path.name, "w").close()
+            self.assertEqual(
+                self.database.getLibrary(any_path), Identifier("not_in_project", False)
+            )
+            self.assertEqual(self.database.getFlags(any_path), ())
+            meth.assert_called_once_with(Path(TEST_TEMP_PATH))
+
+    @patch("hdl_checker.parser_utils.findRtlSourcesByPath")
+    def test_AcceptsEmptyDict(self, meth):
         # type: (...) -> Any
-        self.database.configure({}, TEST_TEMP_PATH)
+        # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
+        # findRtlSourcesByPath
+        with tempfile.NamedTemporaryFile(suffix=".vhd") as path:
+            meth.return_value = [Path(path.name)]
 
-        #  self.assertEqual(self.database.builder_name, None)
-        self.assertCountEqual(self.database.paths, ())
-        #  self.assertEqual(self.database.getLibrary(Path("any")), None)
-        self.assertEqual(self.database.getFlags(Path("any")), ())
+            self.database.configure({}, TEST_TEMP_PATH)
+
+            self.assertCountEqual(self.database.paths, (Path(path.name),))
+            self.assertEqual(self.database.getFlags(Path("any")), ())
+            meth.assert_called_once_with(Path(TEST_TEMP_PATH))
 
     def test_AcceptsBasicStructure(self):
         # type: (...) -> Any
