@@ -29,6 +29,7 @@ import six
 from .parsers.verilog_parser import VerilogParser
 from .parsers.vhdl_parser import VhdlParser
 
+from hdl_checker import DEFAULT_PROJECT_FILE
 from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
@@ -81,10 +82,9 @@ def _makeAbsoluteIfNeeded(root, paths):
 
 
 def getIncludedConfigs(search_paths, root_dir="."):
-    # type: (Dict[str, Any], str) -> Iterable[Tuple[str, Dict[str, Any]]]
+    # type: (Iterable[str], str) -> Iterable[Tuple[str, Dict[str, Any]]]
     "Returns configuration contents of included files"
     # Copy the dict to avoid messing up with the caller's env
-    #  config = root_config.copy()
 
     # Will search for inclusion clauses recursivelly but we need to keep
     # track of infinite loops
@@ -100,20 +100,37 @@ def getIncludedConfigs(search_paths, root_dir="."):
             _logger.warning("Skipping included path '%s' (no such file)", path)
             continue
 
-        # Load the config from the file
-        try:
-            config = json.load(open(path, "r"))
-        except JSONDecodeError:
-            _logger.warning("Failed to decode file %s", path)
-            continue
+        use_json = False
 
-        extracted_paths = set(
-            _makeAbsoluteIfNeeded(p.dirname(path), config.pop("include", ()))
-        )
-        # Add new paths to the set so they get parsed as well
-        paths |= extracted_paths - checked_paths
+        # Cover cases where 'path' is an existing file
+        if not p.isdir(path):
+            use_json = True
 
-        yield p.dirname(path), config
+        # Cover cases where 'path' is a folder that has a file named
+        # DEFAULT_PROJECT_FILE inside
+        if p.isdir(path) and p.exists(p.join(path, DEFAULT_PROJECT_FILE)):
+            path = p.join(path, DEFAULT_PROJECT_FILE)
+            _logger.debug("Path is a folder and %s exists, using it", path)
+            use_json = True
+
+        if use_json:
+            # Load the config from the file
+            try:
+                config = json.load(open(path, "r"))
+            except JSONDecodeError:
+                _logger.warning("Failed to decode file %s", path)
+                continue
+
+            extracted_paths = set(
+                _makeAbsoluteIfNeeded(p.dirname(path), config.pop("include", ()))
+            )
+            # Add new paths to the set so they get parsed as well
+            paths |= extracted_paths - checked_paths
+
+            yield p.dirname(path), config
+        else:
+            # If the path pointed to a folder, search it for sources
+            yield path, {"sources": tuple(findRtlSourcesByPath(Path(path)))}
 
 
 class JsonSourceEntry(
@@ -195,7 +212,7 @@ def _expand(config, ref_path):
 
     sources = config.pop("sources", None)
 
-    # XXX: If no sources were defined, search ref_path for sources
+    # If no sources were defined, search ref_path
     if sources is None:
         _logger.debug("No sources found, will search %s", ref_path)
         sources = (x.name for x in findRtlSourcesByPath(Path(ref_path)))

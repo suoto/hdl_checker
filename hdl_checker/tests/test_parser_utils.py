@@ -37,6 +37,7 @@ from mock import patch
 
 from hdl_checker.tests import TestCase, getTestTempPath
 
+from hdl_checker import DEFAULT_PROJECT_FILE
 from hdl_checker.parser_utils import (
     SourceEntry,
     filterGitIgnoredPaths,
@@ -195,6 +196,32 @@ class TestConfigHandlers(TestCase):
                 (TEST_TEMP_PATH, {"name": "incl_2"}),
             ),
         )
+
+    def test_IncludeFolderShouldUseConfigFileIfPossible(self):
+        # type: (...) -> None
+        folder = mkdtemp()
+        config_file = p.join(folder, DEFAULT_PROJECT_FILE)
+        open(config_file, "w").close()
+        _logger.info("folder=%s, config_file=%s", folder, config_file)
+
+        with patch("hdl_checker.parser_utils.json.load") as load:
+            load.return_value = {"foo": "bar"}
+            result = list(getIncludedConfigs((folder,), TEST_TEMP_PATH))
+
+        _logger.info("Result:\n%s", pformat(result))
+        self.assertCountEqual(result, [(folder, {"foo": "bar"})])
+
+    def test_IncludeFolderShouldSearch(self):
+        # type: (...) -> None
+        folder = mkdtemp()
+
+        with patch("hdl_checker.parser_utils.findRtlSourcesByPath") as meth:
+            meth.return_value = ["sources.vhd"]
+            result = list(getIncludedConfigs((folder,), TEST_TEMP_PATH))
+            meth.assert_called_once_with(Path(folder))
+
+        _logger.info("Result:\n%s", pformat(result))
+        self.assertCountEqual(result, [(folder, {"sources": ("sources.vhd",)})])
 
     # glob needs an existing path or else it won't return anything. Paths on
     # this test don't exist, so need to mock that
