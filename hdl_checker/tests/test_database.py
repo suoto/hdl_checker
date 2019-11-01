@@ -175,8 +175,9 @@ class TestDatabase(TestCase):
         # type: (...) -> Any
         # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
         # findRtlSourcesByPath
-        with tempfile.NamedTemporaryFile(suffix=".vhd") as path:
+        with tempfile.NamedTemporaryFile(suffix=".vhd", delete=False) as path:
             meth.return_value = [Path(path.name)]
+            path.close()
 
             self.database.configure(dict(), TEST_TEMP_PATH)
 
@@ -196,8 +197,9 @@ class TestDatabase(TestCase):
         # type: (...) -> Any
         # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
         # findRtlSourcesByPath
-        with tempfile.NamedTemporaryFile(suffix=".vhd") as path:
+        with tempfile.NamedTemporaryFile(suffix=".vhd", delete=False) as path:
             meth.return_value = [Path(path.name)]
+            path.close()
 
             self.database.configure({}, TEST_TEMP_PATH)
 

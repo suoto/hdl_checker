@@ -21,6 +21,10 @@ stages:
   - test
   - deploy
 
+branches:
+  except:
+  - /.*?\b((?i:windows)|(?i:win)|(?i:appveyor))\b.*/
+
 jobs:
   include:
     - name: Python 2.7

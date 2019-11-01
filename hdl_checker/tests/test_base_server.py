@@ -122,19 +122,6 @@ with such.A("hdl_checker project") as it:
 
     it.assertSameFile = assertSameFile(it)
 
-    def _assertMsgQueueIsEmpty(project):
-        msg = []
-        while not project._msg_queue.empty():
-            msg += [str(project._msg_queue.get())]
-
-        if msg:
-            msg.insert(
-                0, "Message queue should be empty but has %d messages" % len(msg)
-            )
-            it.fail("\n".join(msg))
-
-    it.assertMsgQueueIsEmpty = _assertMsgQueueIsEmpty
-
     @it.should("warn when setup is taking too long")
     @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
@@ -578,8 +565,6 @@ with such.A("hdl_checker project") as it:
                 diagnostics,
             )
 
-            it.assertMsgQueueIsEmpty(it.project)
-
             it.assertTrue(it.project.database.paths)
 
         @it.should("get messages for relative path")  # type: ignore
@@ -590,8 +575,6 @@ with such.A("hdl_checker project") as it:
             )
 
             it.assertFalse(p.isabs(filename))
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
 
@@ -605,8 +588,6 @@ with such.A("hdl_checker project") as it:
                 ),
                 diagnostics,
             )
-
-            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")  # type: ignore
         def test():
@@ -624,8 +605,6 @@ with such.A("hdl_checker project") as it:
             _logger.debug("File content")
             for lnum, line in enumerate(content.split("\n")):
                 _logger.debug("%2d| %s", (lnum + 1), line)
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = set(it.project.getMessagesWithText(filename, content))
 
@@ -651,7 +630,6 @@ with such.A("hdl_checker project") as it:
             ]
 
             it.assertCountEqual(diagnostics, expected)
-            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should(  # type: ignore
             "get messages with text for file outside the project file"
@@ -663,8 +641,6 @@ with such.A("hdl_checker project") as it:
             content = "\n".join(
                 ["library work;", "use work.all;", "entity some_entity is end;"]
             )
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesWithText(filename, content)
 
@@ -688,13 +664,9 @@ with such.A("hdl_checker project") as it:
 
                 raise
 
-            it.assertMsgQueueIsEmpty(it.project)
-
         @it.should("get updated messages")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             code = open(str(filename), "r").read().split("\n")
 
@@ -719,13 +691,9 @@ with such.A("hdl_checker project") as it:
                 code[28] = code[28][3:]
                 writeListToFile(str(filename), code)
 
-            it.assertMsgQueueIsEmpty(it.project)
-
         @it.should("get messages by path of a different source")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             it.assertCountEqual(
                 it.project.getMessagesByPath(filename),
@@ -740,16 +708,12 @@ with such.A("hdl_checker project") as it:
                 ],
             )
 
-            it.assertMsgQueueIsEmpty(it.project)
-
         @it.should(  # type: ignore
             "get messages from a source outside the project file"
         )
         def test():
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["library some_lib;"])
-
-            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
@@ -765,8 +729,6 @@ with such.A("hdl_checker project") as it:
                 "It was expected that the builder added some "
                 "message here indicating an error",
             )
-
-            it.assertMsgQueueIsEmpty(it.project)
 
         def basicRebuildTest(test_filename, rebuilds):
             calls = []
