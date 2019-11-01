@@ -406,7 +406,7 @@ def _getLatestReleaseVersion():
     the URL fails, return None
     """
     proc = subp.Popen(
-        ["git", "ls-remote", "--sort=v:refname", "--tags", REPO_URL],
+        ["git", "ls-remote", "--tags", REPO_URL],
         env={"GIT_TERMINAL_PROMPT": "0"},
         stdout=subp.PIPE,
         stderr=subp.PIPE,
@@ -426,7 +426,7 @@ def _getLatestReleaseVersion():
 
     tags = [x.decode() for x in stdout.splitlines()]
 
-    latest = tags[-1].split("/")[-1]
+    latest = sorted(tags[-1].split("/"))[-1]
 
     if not re.match(r"v\d+\.\d+\.\d+", latest):
         _logger.info("Don't know how to handle version format on %s", latest)

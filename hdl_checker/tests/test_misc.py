@@ -115,7 +115,6 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/v0.6.3"""
 
         self.assertEqual(_getLatestReleaseVersion(), "0.6.3")
 
-
     @patch("hdl_checker.utils.subp.Popen")
     def test_RejectsInvalidFormats(self, popen):
         process_mock = Mock()
@@ -133,6 +132,9 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/0.6.3"""
     @patch("hdl_checker.utils.REPO_URL", "localhost")
     def test_HandlesNoConnection(self, *_):
         self.assertIsNone(_getLatestReleaseVersion())
+
+    def test_UnmockedCallWorks(self):
+        self.assertIsNotNone(_getLatestReleaseVersion())
 
 
 @patch("hdl_checker.utils._getLatestReleaseVersion", return_value="1.0.0")
