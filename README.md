@@ -19,8 +19,8 @@ compilation order, interpreting some compilers messages and providing some
 
 * [Installation](#installation)
 * [Editor support](#editor-support)
-  * [Vim/NeoVim](#vimneovim)
   * [VS Code](#vs-code)
+  * [Vim/NeoVim](#vimneovim)
 * [Usage](#usage)
   * [Third-party tools](#third-party-tools)
   * [Configuring HDL Checker](#configuring-HDL-Checker)
@@ -48,18 +48,21 @@ pip install hdl-checker --user --upgrade
 
 ## Editor support
 
+### VS Code
+
+Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
+
 ### Vim/NeoVim
 
 #### Using [dense-analysis/ale][ALE]
 
-See (PR [#2804][ALE_PR]), once it gets merged, ALE should support HDL Checker out of the
-box.
+See (PR [#2804][ALE_PR]), once it gets merged, ALE should support HDL Checker out
+of the box.
 
-#### Usgin [coc.nvim][coc_nvim]
+#### Using [coc.nvim][coc_nvim]
 
 Following [coc.nvim custom language server setup][coc_nvim_register_lsp], add
 this to your [coc.nvim configuration file][coc_nvim_config_file]:
-
 
 ```json
 {
@@ -79,9 +82,19 @@ this to your [coc.nvim configuration file][coc_nvim_config_file]:
 }
 ```
 
-### VS Code
+#### Using [autozimu/LanguageClient-neovim][lc_nvim]
 
-Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
+Add HDL Checker to the server commands:
+
+```viml
+let g:LanguageClient_serverCommands = {
+\   'vhdl': ['hdl_checker', '--lsp'],
+\   'verilog': ['hdl_checker', '--lsp'],
+\   'systemverilog': ['hdl_checker', '--lsp'],
+\}
+```
+
+Please note that this will start one server per language
 
 ## Usage
 
@@ -138,8 +151,8 @@ in LSP mode:
 hdl_checker --lsp
 ```
 
-On a Linux system, log file will be at `/tmp/hdl_checker_log_pid<PID_NUMBER>.log` and
-`/tmp/hdl_checker_stderr_pid<PID_NUMBER>.log`.
+On a Linux system, log file will be at `/tmp/hdl_checker_log_pid<PID_NUMBER>.log`
+and `/tmp/hdl_checker_stderr_pid<PID_NUMBER>.log`.
 
 As a language server, HDL Checker will provide
 
@@ -157,9 +170,9 @@ HDL Checker can be used in HTTP server mode also:
 hdl_checker
 ```
 
-*Please note that this mode **does not use LSP to communicate**. Request/response
-API is not yet available, but a reference implementation can be found in
-[vim-hdl][vim-hdl]*
+*Please note that this mode **does not use LSP over http to communicate**.
+Request/response API is not yet available and is going to be deprecated in the
+future. A reference implementation can be found in [vim-hdl][vim-hdl]*
 
 ## Testing
 
@@ -240,6 +253,7 @@ trademarks mentioned or used by this software.
 [hdl_checker_wiki_setup]: https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project
 [Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
 [issue_tracker]: https://github.com/suoto/hdl_checker/issues
+[lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
 [Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
 [vim-hdl]: https://github.com/suoto/vim-hdl/
