@@ -30,6 +30,8 @@ import parameterized  # type: ignore
 import unittest2  # type: ignore
 from mock import MagicMock, Mock, patch
 
+from hdl_checker.tests import linuxOnly
+
 from hdl_checker.builder_utils import BuilderName, getBuilderByName
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
@@ -133,6 +135,7 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/0.6.3"""
     def test_HandlesNoConnection(self, *_):
         self.assertIsNone(_getLatestReleaseVersion())
 
+    @linuxOnly
     def test_UnmockedCallWorks(self):
         self.assertIsNotNone(_getLatestReleaseVersion())
 

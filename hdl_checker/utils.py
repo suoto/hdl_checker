@@ -421,7 +421,7 @@ def _getLatestReleaseVersion():
         timer.cancel()
 
     if not stdout or stderr:
-        _logger.info("Couldn't fetch latest tag from %s", REPO_URL)
+        _logger.info("Couldn't fetch latest tag from %s: %s", REPO_URL, stderr.decode())
         return None
 
     tags = [x.decode() for x in stdout.splitlines()]
