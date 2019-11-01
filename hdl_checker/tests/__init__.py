@@ -51,8 +51,14 @@ MockDep = Union[Tuple[str], Tuple[str, str]]
 
 class DummyServer(BaseServer):
     "Class for testing BaseServer"
-    _msg_queue = Queue()  # type: Queue[Tuple[str, str]]
-    _ui_handler = logging.getLogger("UI")
+    _server_index = 0
+
+    def __init__(self, *args, **kwargs):
+        _logger.info("Creating server %d", DummyServer._server_index)
+        self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
+        self._ui_handler = logging.getLogger("server %d/UI" % DummyServer._server_index)
+        DummyServer._server_index += 1
+        super(DummyServer, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
         self._msg_queue.put(("info", message))

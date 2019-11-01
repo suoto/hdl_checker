@@ -26,6 +26,7 @@ import os.path as p
 import shutil
 import tempfile
 import time
+from pprint import pformat
 
 import six
 
@@ -42,8 +43,10 @@ from hdl_checker.tests import (
     assertCountEqual,
     assertSameFile,
     getTestTempPath,
+    linuxOnly,
     logIterable,
     setupTestSuport,
+    windowsOnly,
     writeListToFile,
 )
 
@@ -67,7 +70,7 @@ from hdl_checker.types import (
     RebuildPath,
     RebuildUnit,
 )
-from hdl_checker.utils import ON_WINDOWS, removeIfExists
+from hdl_checker.utils import removeIfExists
 
 _logger = logging.getLogger(__name__)
 
@@ -137,14 +140,15 @@ with such.A("hdl_checker project") as it:
     @patch.object(
         hdl_checker.base_server.BaseServer, "configure", lambda *_: time.sleep(0.5)
     )
-    def test():
+    @patch("hdl_checker.tests.DummyServer._handleUiInfo")
+    def test(handle_ui_info):
 
         path = tempfile.mkdtemp()
 
         config = p.join(path, "config.json")
         source = p.join(path, "source.vhd")
 
-        # Make sure the files exists
+        # Make sure the files exist
         open(config, "w").write("")
         open(source, "w").write("")
 
@@ -153,9 +157,8 @@ with such.A("hdl_checker project") as it:
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
 
-        it.assertCountEqual(
-            [("info", hdl_checker.base_server._HOW_LONG_IS_TOO_LONG_MSG)],
-            list(project.getUiMessages()),
+        handle_ui_info.assert_called_once_with(
+            hdl_checker.base_server._HOW_LONG_IS_TOO_LONG_MSG
         )
 
         removeIfExists(path)
@@ -163,7 +166,8 @@ with such.A("hdl_checker project") as it:
     @it.should(  # type: ignore
         "not warn when setup takes less than _HOW_LONG_IS_TOO_LONG"
     )
-    def test():
+    @patch("hdl_checker.tests.DummyServer._handleUiInfo")
+    def test(handle_ui_info):
         path = tempfile.mkdtemp()
 
         config = p.join(path, "config.json")
@@ -178,9 +182,7 @@ with such.A("hdl_checker project") as it:
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
 
-        it.assertCountEqual(
-            [("info", "No sources were added")], list(project.getUiMessages())
-        )
+        handle_ui_info.assert_called_once_with("No sources were added")
 
         removeIfExists(path)
 
@@ -320,11 +322,9 @@ with such.A("hdl_checker project") as it:
                 it.assertIsNotNone(it.project.config_file)
 
         @it.should("clean up and reparse if the config file changes")  # type: ignore
+        @linuxOnly
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
-            # Clean up previous messages
-            list(it.project.getUiMessages())
-
             # Make sure everything is up to date prior to running
             with patch.object(it.project, "configure") as configure:
                 it.project._updateConfigIfNeeded()
@@ -346,7 +346,8 @@ with such.A("hdl_checker project") as it:
                 configure.assert_called_once()
 
         @it.should("warn when failing to recover from cache")  # type: ignore
-        def test():
+        @patch("hdl_checker.tests.DummyServer._handleUiWarning")
+        def test(handle_ui_warning):
             it.project._saveCache()
             # Copy parameters of the object we're checking against
             root_dir = it.project.root_dir
@@ -361,24 +362,14 @@ with such.A("hdl_checker project") as it:
             project = DummyServer(root_dir)
 
             if six.PY2:
-                it.assertIn(
-                    (
-                        "warning",
-                        "Unable to recover cache from '{}': "
-                        "No JSON object could be decoded".format(cache_filename),
-                    ),
-                    list(project.getUiMessages()),
+                handle_ui_warning.assert_called_once_with(
+                    "Unable to recover cache from '{}': "
+                    "No JSON object could be decoded".format(cache_filename)
                 )
             else:
-                it.assertIn(
-                    (
-                        "warning",
-                        "Unable to recover cache from '{}': "
-                        "Expecting value: line 1 column 1 (char 0)".format(
-                            cache_filename
-                        ),
-                    ),
-                    list(project.getUiMessages()),
+                handle_ui_warning.assert_called_once_with(
+                    "Unable to recover cache from '{}': "
+                    "Expecting value: line 1 column 1 (char 0)".format(cache_filename)
                 )
 
             it.assertIsInstance(project.builder, Fallback)
@@ -514,13 +505,11 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "warn when unable to recreate a builder described in cache"
         )
+        @linuxOnly
         @patch(
             "hdl_checker.base_server.getBuilderByName", new=lambda name: FailingBuilder
         )
         def test():
-            if ON_WINDOWS:
-                raise it.skipTest("Test doesn't run on Windows")
-
             cache_content = {"builder": FailingBuilder.builder_name}
 
             cache_path = it.project._getCacheFilename()
@@ -549,7 +538,8 @@ with such.A("hdl_checker project") as it:
     with it.having("test_project as reference and a valid project file"):
 
         @it.has_setup
-        def setup():
+        @patch("hdl_checker.tests.DummyServer._handleUiInfo")
+        def setup(handle_ui_info):
             setupTestSuport(TEST_TEMP_PATH)
 
             removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
@@ -558,8 +548,7 @@ with such.A("hdl_checker project") as it:
                 it.project = DummyServer(_Path(TEST_TEMP_PATH))
                 it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
                 it.project._updateConfigIfNeeded()
-
-            from pprint import pformat
+                handle_ui_info.assert_called_once_with("Added 10 sources")
 
             _logger.info(
                 "Database state:\n%s", pformat(it.project.database.__jsonEncode__())
@@ -576,11 +565,6 @@ with such.A("hdl_checker project") as it:
         def test():
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-            if not ON_WINDOWS:
-                it.assertCountEqual(
-                    [("info", "Added 10 sources")], list(it.project.getUiMessages())
-                )
-
             diagnostics = it.project.getMessagesByPath(Path(filename))
 
             it.assertIn(
@@ -594,8 +578,7 @@ with such.A("hdl_checker project") as it:
                 diagnostics,
             )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             it.assertTrue(it.project.database.paths)
 
@@ -608,8 +591,7 @@ with such.A("hdl_checker project") as it:
 
             it.assertFalse(p.isabs(filename))
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
 
@@ -624,8 +606,7 @@ with such.A("hdl_checker project") as it:
                 diagnostics,
             )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages with text")  # type: ignore
         def test():
@@ -644,8 +625,7 @@ with such.A("hdl_checker project") as it:
             for lnum, line in enumerate(content.split("\n")):
                 _logger.debug("%2d| %s", (lnum + 1), line)
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = set(it.project.getMessagesWithText(filename, content))
 
@@ -671,8 +651,7 @@ with such.A("hdl_checker project") as it:
             ]
 
             it.assertCountEqual(diagnostics, expected)
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should(  # type: ignore
             "get messages with text for file outside the project file"
@@ -685,8 +664,7 @@ with such.A("hdl_checker project") as it:
                 ["library work;", "use work.all;", "entity some_entity is end;"]
             )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesWithText(filename, content)
 
@@ -710,15 +688,13 @@ with such.A("hdl_checker project") as it:
 
                 raise
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get updated messages")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             code = open(str(filename), "r").read().split("\n")
 
@@ -743,15 +719,13 @@ with such.A("hdl_checker project") as it:
                 code[28] = code[28][3:]
                 writeListToFile(str(filename), code)
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should("get messages by path of a different source")  # type: ignore
         def test():
             filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             it.assertCountEqual(
                 it.project.getMessagesByPath(filename),
@@ -766,8 +740,7 @@ with such.A("hdl_checker project") as it:
                 ],
             )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         @it.should(  # type: ignore
             "get messages from a source outside the project file"
@@ -776,8 +749,7 @@ with such.A("hdl_checker project") as it:
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["library some_lib;"])
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
             diagnostics = it.project.getMessagesByPath(filename)
 
@@ -794,8 +766,7 @@ with such.A("hdl_checker project") as it:
                 "message here indicating an error",
             )
 
-            if not ON_WINDOWS:
-                it.assertMsgQueueIsEmpty(it.project)
+            it.assertMsgQueueIsEmpty(it.project)
 
         def basicRebuildTest(test_filename, rebuilds):
             calls = []
@@ -967,7 +938,8 @@ with such.A("hdl_checker project") as it:
             )
 
         @it.should("give up trying to rebuild after 20 attempts")  # type: ignore
-        def test():
+        @patch("hdl_checker.tests.DummyServer._handleUiError")
+        def test(handle_ui_error):
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
@@ -991,15 +963,8 @@ with such.A("hdl_checker project") as it:
                 ],
             )
 
-            # Not sure why this is needed, might be hiding something weird
-            time.sleep(0.1)
-
-            ui_msgs = list(it.project.getUiMessages())
-            logIterable("UI messages", ui_msgs, _logger.info)
-
-            it.assertIn(
-                ("error", "Unable to build '{}' after 20 attempts".format(filename)),
-                ui_msgs,
+            handle_ui_error.assert_called_once_with(
+                "Unable to build '{}' after 20 attempts".format(filename)
             )
 
 
