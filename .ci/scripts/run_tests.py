@@ -207,7 +207,7 @@ def main():
     file_handler = logging.FileHandler(args.log_file)
     log_format = (
         "%(levelname)-7s | %(asctime)s | "
-        + "%(name)s @ %(funcName)s():%(lineno)d |\t%(message)s"
+        + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s |\t%(message)s"
     )
     file_handler.formatter = logging.Formatter(log_format, datefmt="%H:%M:%S")
     logging.root.addHandler(file_handler)
