@@ -18,7 +18,6 @@
 # pylint: disable=function-redefined
 # pylint: disable=missing-docstring
 # pylint: disable=protected-access
-# pylint: disable=useless-object-inheritance
 
 import json
 import logging

@@ -215,7 +215,8 @@ class MSim(BaseBuilder):
         self._logger.error(  # pragma: no cover
             "Unknown file type %s for path '%s'", filetype, path
         )
-        return ""
+
+        return ""  # Just to satisfy pylint
 
     def _getExtraFlags(self, lang):
         # type: (FileType) -> Iterable[str]
