@@ -18,6 +18,7 @@
 # pylint: disable=missing-docstring
 # pylint: disable=useless-object-inheritance
 
+import functools
 import logging
 import os
 import os.path as p
@@ -30,6 +31,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import six
 
 import mock
+import unittest2  # type: ignore
 from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker import exceptions
@@ -39,7 +41,7 @@ from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import FileType
-from hdl_checker.utils import ON_WINDOWS, removeDuplicates, samefile
+from hdl_checker.utils import ON_LINUX, ON_WINDOWS, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
@@ -459,4 +461,24 @@ if six.PY2:
 
 
 else:
-    from unittest2 import TestCase  # type: ignore
+    from unittest2 import TestCase
+
+
+def windowsOnly(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not ON_WINDOWS:
+            return unittest2.skip("Windows only test")
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def linuxOnly(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not ON_LINUX:
+            return unittest2.skip("Linux only test")
+        return func(*args, **kwargs)
+
+    return wrapper
