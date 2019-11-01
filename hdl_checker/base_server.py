@@ -108,7 +108,6 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         self._setupIfNeeded()
         self._recoverCacheIfPossible()
-        self._saveCache()
 
         # Use this to know which methods should be cache
         self._cached_methods = {
