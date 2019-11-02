@@ -1,4 +1,4 @@
-# HDL Checker
+# HDL Checker [![Mentioned in Awesome Computer Architecture](https://awesome.re/mentioned-badge.svg)](https://github.com/rajesh-s/awesome-computer-architecture)
 
 [![PyPI version](https://img.shields.io/pypi/v/hdl_checker.svg)](https://pypi.org/project/hdl_checker/)
 [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)
