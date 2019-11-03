@@ -25,6 +25,7 @@ import os
 import sys
 from threading import Timer
 
+import six
 from pyls.python_ls import start_io_lang_server  # type: ignore
 
 from hdl_checker import __version__ as version
@@ -37,7 +38,6 @@ from hdl_checker.utils import (
 )
 
 _logger = logging.getLogger(__name__)
-PY2 = sys.version_info[0] == 2
 
 _LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage", "jsonrpc": "2.0"}
 
@@ -135,7 +135,7 @@ def openForStdHandle(filepath):
     # Since this function is used for logging purposes, we don't want the output
     # to be delayed. This means no buffering for binary mode and line buffering
     # for text mode. See https://docs.python.org/2/library/io.html#io.open
-    if PY2:
+    if six.PY2:
         return open(filepath, mode="wb", buffering=0)
     return open(filepath, mode="w", buffering=1)
 
@@ -156,7 +156,7 @@ def _binaryStdio():
         https://stackoverflow.com/questions/2850893/reading-binary-data-from-stdin
     """
 
-    if not PY2:
+    if six.PY3:
         # pylint: disable=no-member
         stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
     else:
