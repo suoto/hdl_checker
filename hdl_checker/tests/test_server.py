@@ -28,9 +28,10 @@ from multiprocessing import Event, Process, Queue
 from threading import Thread
 
 import requests
-from mock import MagicMock, patch
 from pyls import uris  # type: ignore
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
+
+from mock import MagicMock, patch
 
 from nose2.tools import such  # type: ignore
 

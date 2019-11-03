@@ -473,12 +473,12 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             )
 
             builder_check = pool.apply_async(self._getBuilderMessages, args=[path])
-            builder_diags |= {x for x in builder_check.get()}
+            builder_diags |= set(builder_check.get())
 
             pool.close()
             pool.join()
 
-            static_diags = {x for x in static_check.get()}
+            static_diags = set(static_check.get())
 
         else:  # pragma: no cover
             builder_diags |= set(self._getBuilderMessages(path))
@@ -563,7 +563,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         # type: (DependencySpec) -> Optional[Tuple[Path, Identifier]]
         """
         Retrieves the build sequence for the dependency's owner and extracts
-        the path that implements a design unit whose names match the
+        the path that implements a design unit whose names match that of the
         dependency.
         """
         for library, path in self.database.getBuildSequence(

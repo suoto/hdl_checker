@@ -340,8 +340,6 @@ with such.A("hdl_checker project") as it:
             root_dir = it.project.root_dir
             cache_filename = it.project._getCacheFilename()
 
-            #  it.assertIsInstance(it.project.builder, Fallback)
-
             # Corrupt the cache file
             open(cache_filename.name, "w").write("corrupted cache contents")
 
