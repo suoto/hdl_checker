@@ -39,8 +39,6 @@ from hdl_checker.utils import (
 
 _logger = logging.getLogger(__name__)
 
-_LSP_ERROR_MSG_TEMPLATE = {"method": "window/showMessage", "jsonrpc": "2.0"}
-
 
 def parseArguments():
     "Argument parser for standalone hdl_checker"
@@ -181,13 +179,6 @@ def run(args):  # pylint: disable=missing-docstring
 
         startServer(args)
     except Exception as exc:
-        if args.lsp:  # pragma: no cover
-            msg = ["Unable to start HDL Checker LSP server: %s!" % repr(exc)]
-            if args.stderr:
-                msg += ["Check %s for more info" % args.stderr]
-            else:
-                msg += ["Use --stderr to redirect the output to a file for more info"]
-            _reportException(" ".join(msg))
         _logger.exception("Failed to start server")
         raise
 
@@ -236,38 +227,6 @@ def startServer(args):
             _attachPids(args.attach_to_pid, os.getpid())
 
         handlers.app.run(host=args.host, port=args.port, threads=10, server="waitress")
-
-
-# This is a redefinition to be used as last resort if failed to setup
-# the server
-class MessageType:  # pylint: disable=too-few-public-methods
-    "LSP message types"
-    Error = 1
-    Warning = 2
-    Info = 3
-    Log = 4
-
-
-def _reportException(text):
-    "Hand crafted message to report issues when starting up the HDL Checker server"
-    _logger.warning("Reporting exception with text %s", text)
-
-    import json
-
-    message = _LSP_ERROR_MSG_TEMPLATE.copy()
-    message["params"] = {"message": text, "type": MessageType.Error}
-
-    body = json.dumps(message)
-
-    # Ensure we get the byte length, not the character length
-    content_length = len(body) if isinstance(body, bytes) else len(body.encode("utf-8"))
-    response = (
-        "Content-Length: {}\r\n"
-        "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-        "{}".format(content_length, body)
-    )
-
-    sys.stdout.write(response)
 
 
 def main():

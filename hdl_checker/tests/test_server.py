@@ -338,68 +338,6 @@ with such.A("hdl_checker server") as it:
                 },
             )
 
-        @it.should("show message with reason for failing to start")  # type: ignore
-        @disableVunit
-        def test():
-            def _start_io_lang_server(*_):  # pylint: disable=invalid-name
-                assert False, "Expected fail to trigger the test"
-
-            args = type(
-                "args",
-                (object,),
-                {
-                    "lsp": True,
-                    "log_level": SERVER_LOG_LEVEL,
-                    "stderr": p.join(TEST_LOG_PATH, "hdl_checker-stderr.log"),
-                    "log_stream": p.join(TEST_LOG_PATH, "tests.log"),
-                    "attach_to_pid": None,
-                },
-            )
-
-            # Python 2 won't allow to mock sys.stdout.write directly
-            import sys
-
-            stdout = MagicMock(spec=sys.stdout)
-            stdout.write = MagicMock(spec=sys.stdout.write)
-
-            with patch(
-                "hdl_checker.server.start_io_lang_server", _start_io_lang_server
-            ):
-                with patch("hdl_checker.server.sys.stdout", stdout):
-                    with it.assertRaises(AssertionError):
-                        hdl_checker.server.run(args)
-
-            # Grab the message from the method itself
-            try:
-                _start_io_lang_server()
-                it.fail("No exception caught")
-            except AssertionError as exc:
-                assertion_msg = repr(exc)
-
-            # Build up the expected response
-            body = json.dumps(
-                {
-                    "method": "window/showMessage",
-                    "jsonrpc": JSONRPC_VERSION,
-                    "params": {
-                        "message": "Unable to start HDL Checker LSP server: "
-                        + assertion_msg
-                        + "! Check "
-                        + p.abspath(args.stderr)
-                        + " for more info",
-                        "type": 1,
-                    },
-                }
-            )
-
-            response = (
-                "Content-Length: {}\r\n"
-                "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-                "{}".format(len(body), body)
-            )
-
-            stdout.write.assert_called_once_with(response)
-
         @it.should("log to temporary files if files aren't specified")  # type: ignore
         @disableVunit
         def test():
