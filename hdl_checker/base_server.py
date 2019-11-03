@@ -73,6 +73,10 @@ _HOW_LONG_IS_TOO_LONG_MSG = (
     "[{0}]({0})".format(_SETTING_UP_A_PROJECT_URL)
 )
 
+_PYTHON_27_WARNING_MSG = (
+    "Python 2.7 is no longer going to be supported in future "
+    "releases. Please consider using Python 3.x."
+)
 
 if six.PY2:
     JSONDecodeError = ValueError
@@ -115,6 +119,9 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             for x in dir(self)
             if hasattr(getattr(self, x), "cache_clear")
         }
+
+        if six.PY2:
+            self._handleUiWarning(_PYTHON_27_WARNING_MSG)
 
     @property
     def builder(self):

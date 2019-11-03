@@ -30,7 +30,7 @@ from pprint import pformat
 
 import six
 
-from mock import patch
+from mock import call, patch
 
 from nose2.tools import such  # type: ignore
 
@@ -347,9 +347,16 @@ with such.A("hdl_checker project") as it:
             project = DummyServer(root_dir)
 
             if six.PY2:
-                handle_ui_warning.assert_called_once_with(
-                    "Unable to recover cache from '{}': "
-                    "No JSON object could be decoded".format(cache_filename)
+                it.assertIn(
+                    call(
+                        "Unable to recover cache from '{}': "
+                        "No JSON object could be decoded".format(cache_filename)
+                    ),
+                    handle_ui_warning.mock_calls,
+                )
+                it.assertIn(
+                    call(hdl_checker.base_server._PYTHON_27_WARNING_MSG),
+                    handle_ui_warning.mock_calls,
                 )
             else:
                 handle_ui_warning.assert_called_once_with(

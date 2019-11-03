@@ -17,7 +17,6 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
-import json
 import logging
 import os
 import os.path as p
@@ -31,7 +30,7 @@ import requests
 from pyls import uris  # type: ignore
 from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
 
-from mock import MagicMock, patch
+from mock import patch
 
 from nose2.tools import such  # type: ignore
 

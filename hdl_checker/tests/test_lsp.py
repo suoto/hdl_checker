@@ -32,16 +32,17 @@ from tempfile import mkdtemp
 from threading import Event, Timer
 from typing import Any
 
-import parameterized  # type: ignore
 import six
-import unittest2  # type: ignore
-from mock import MagicMock, patch
 from pyls import _utils  # type: ignore
 from pyls import lsp as defines
 from pyls import uris
 from pyls.workspace import Workspace  # type: ignore
 from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
 from tabulate import tabulate
+
+import parameterized  # type: ignore
+import unittest2  # type: ignore
+from mock import MagicMock, patch
 
 from nose2.tools import such  # type: ignore
 
@@ -159,6 +160,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         server = lsp.Server(
             workspace, root_dir=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
         )
+        workspace.show_message.reset_mock()
 
         server._handleUiInfo("some info")  # pylint: disable=protected-access
         workspace.show_message.assert_called_once_with(
@@ -278,7 +280,7 @@ with such.A("LSP server") as it:
         )
 
         # Initialization calls
-        show_message.assert_called_once_with(
+        show_message.assert_called_with(
             "Searching %s for HDL files..." % TEST_PROJECT, defines.MessageType.Info
         )
 
