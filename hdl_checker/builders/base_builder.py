@@ -324,23 +324,22 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             if self._shouldIgnoreLine(line):
                 continue
 
-            for _record in self._makeRecords(line):
+            for record in self._makeRecords(line):
                 try:
-                    diagnostics |= {_record}
+                    # If no filename is set, assume it's for the current path
+                    if record.filename is None:
+                        diagnostics.add(record.copy(filename=path))
+                    else:
+                        diagnostics.add(record)
                 except:
                     self._logger.exception(
                         " - %s hash: %s | %s",
-                        _record,
-                        _record.__hash__,
-                        type(_record).__mro__,
+                        record,
+                        record.__hash__,
+                        type(record).__mro__,
                     )
                     raise
             rebuilds |= self._getRebuilds(path, line, library)
-
-        # If no filename is set, assume it's for the current path
-        for diag in diagnostics:
-            if diag.filename is None:
-                diag.filename = path
 
         self._logBuildResults(diagnostics, rebuilds)
 
