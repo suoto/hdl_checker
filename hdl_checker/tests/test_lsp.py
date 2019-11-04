@@ -46,6 +46,7 @@ from mock import MagicMock, patch
 
 from nose2.tools import such  # type: ignore
 
+from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.base_server import WatchedFile
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import (
@@ -538,7 +539,7 @@ class TestValidProject(TestCase):
             tabulate(
                 [
                     (1, "basic_library", str(very_common_pkg)),
-                    (2, "library", str(clk_en_generator)),
+                    (2, DEFAULT_LIBRARY.name, str(clk_en_generator)),
                 ],
                 headers=("#", "Library", "Path"),
                 tablefmt=tablefmt,
@@ -764,7 +765,7 @@ class TestValidProject(TestCase):
                     (1, "basic_library", str(very_common_pkg)),
                     (2, "basic_library", str(package_with_constants)),
                     (3, "basic_library", str(clock_divider)),
-                    (4, "library", str(path_to_foo)),
+                    (4, DEFAULT_LIBRARY.name, str(path_to_foo)),
                 ],
                 headers=("#", "Library", "Path"),
                 tablefmt="plain",

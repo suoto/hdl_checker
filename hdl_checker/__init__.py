@@ -25,6 +25,7 @@ import os
 
 from ._version import get_versions
 
+from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.utils import ON_WINDOWS
 
 __author__ = "Andre Souto (andre820@gmail.com)"
@@ -35,8 +36,12 @@ __version__ = get_versions()["version"]
 del get_versions
 
 DEFAULT_PROJECT_FILE = os.environ.get(
-    "HDL_CHECKER_DEFAULT_PROJECT_FILE", "_hdl_checker.config" if ON_WINDOWS else ".hdl_checker.config"
+    "HDL_CHECKER_DEFAULT_PROJECT_FILE",
+    "_hdl_checker.config" if ON_WINDOWS else ".hdl_checker.config",
 )
 
 CACHE_NAME = os.environ.get("HDL_CHECKER_CACHE_NAME", "cache.json")
-WORK_PATH = os.environ.get("HDL_CHECKER_WORK_PATH", "_hdl_checker" if ON_WINDOWS else ".hdl_checker")
+WORK_PATH = os.environ.get(
+    "HDL_CHECKER_WORK_PATH", "_hdl_checker" if ON_WINDOWS else ".hdl_checker"
+)
+DEFAULT_LIBRARY = Identifier("default_library")

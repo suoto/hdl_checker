@@ -35,6 +35,7 @@ from typing import (
     Union,
 )
 
+from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     CheckerDiagnostic,
     DependencyNotUnique,
@@ -61,7 +62,6 @@ except ImportError:
     from backports.functools_lru_cache import lru_cache  # type: ignore
 
 _logger = logging.getLogger(__name__)
-_DEFAULT_LIBRARY_NAME = Identifier("library")
 _LIBRARY_WORK = Identifier("work", case_sensitive=False)
 
 UnresolvedLibrary = Union[Identifier, None]
@@ -736,9 +736,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                         len(new_units),
                         new_units,
                     )
-                    yield self.getLibrary(
-                        current_path
-                    ) or _DEFAULT_LIBRARY_NAME, current_path
+                    yield self.getLibrary(current_path) or DEFAULT_LIBRARY, current_path
                     paths_built.add(current_path)
                     units_compiled |= own
                 elif not new_units:

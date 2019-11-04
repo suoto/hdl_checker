@@ -30,7 +30,7 @@ from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple
 
 import six
 
-from hdl_checker import CACHE_NAME, WORK_PATH
+from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH
 from hdl_checker.builder_utils import (
     getBuilderByName,
     getVunitSources,
@@ -399,7 +399,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         library = self.database.getLibrary(path)
         for record in self._buildAndHandleRebuilds(
             path,
-            library if library is not None else Identifier("work"),
+            library if library is not None else DEFAULT_LIBRARY,
             scope=BuildFlagScope.single,
             forced=True,
         ):

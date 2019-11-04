@@ -39,9 +39,9 @@ from hdl_checker.tests import (
     setupTestSuport,
 )
 
+from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
-from hdl_checker.lsp import _DEFAULT_LIBRARY_NAME
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -1094,12 +1094,12 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             set(self.database.test_getBuildSequence(_Path("no_lib_target.vhd"))),
             (
                 {
-                    (_DEFAULT_LIBRARY_NAME, _Path("dependency.vhd")),
-                    (_DEFAULT_LIBRARY_NAME, _Path("no_lib_package_1.vhd")),
+                    (DEFAULT_LIBRARY, _Path("dependency.vhd")),
+                    (DEFAULT_LIBRARY, _Path("no_lib_package_1.vhd")),
                 },
                 {
-                    (_DEFAULT_LIBRARY_NAME, _Path("dependency.vhd")),
-                    (_DEFAULT_LIBRARY_NAME, _Path("no_lib_package_2.vhd")),
+                    (DEFAULT_LIBRARY, _Path("dependency.vhd")),
+                    (DEFAULT_LIBRARY, _Path("no_lib_package_2.vhd")),
                 },
             ),
         )
