@@ -249,7 +249,7 @@ with such.A("hdl_checker bottle app") as it:
 
         @property
         def builtin_libraries(_):
-            return {Identifier("ieee")}
+            return (Identifier("ieee"),)
 
         such.unittest.TestCase.maxDiff = None
         with mock.patch.object(

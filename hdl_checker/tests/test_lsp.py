@@ -553,7 +553,7 @@ class TestValidProject(TestCase):
     @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 0)
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_ReportBuildSequencePlain(self):
         self.runTestBuildSequenceTable(tablefmt="plain")
@@ -561,7 +561,7 @@ class TestValidProject(TestCase):
     @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 1)
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_ReportBuildSequenceMarkdown(self):
         self.runTestBuildSequenceTable(tablefmt="github")
@@ -737,7 +737,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_HoverOnInvalidRange(self):
         path = p.join(TEST_PROJECT, "another_library", "foo.vhd")
@@ -747,7 +747,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_HoverOnDesignUnit(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
@@ -781,7 +781,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_HoverOnDependency(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
@@ -796,7 +796,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_GetDefinitionMatchingDependency(self):
         source = p.join(TEST_PROJECT, "basic_library", "use_entity_a_and_b.vhd")
@@ -830,7 +830,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_GetDefinitionBuiltInLibrary(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
@@ -844,7 +844,7 @@ class TestValidProject(TestCase):
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
-        [Identifier("ieee")],
+        (Identifier("ieee"),),
     )
     def test_GetDefinitionNotKnown(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")

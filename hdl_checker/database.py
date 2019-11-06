@@ -673,16 +673,28 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         units -= own_units
         return units
 
+    @lru_cache()
     def getBuildSequence(self, path, builtin_libraries=None):
-        # type: (Path, Optional[Iterable[Identifier]]) -> Iterable[Tuple[Identifier, Path]]
+        # type: (Path, Optional[Tuple[Identifier]]) -> Iterable[Tuple[Identifier, Path]]
+        """
+        Gets the build sequence that satisfies the preconditions to compile the
+        given path. This is the cached version of self._getBuildSequence(),
+        which can't be cached because it returns an iterator.
+        """
+        return tuple(
+            self._getBuildSequence(
+                path=path, builtin_libraries=frozenset(builtin_libraries or [])
+            )
+        )
+
+    def _getBuildSequence(self, path, builtin_libraries):
+        # type: (Path, FrozenSet[Identifier]) -> Iterable[Tuple[Identifier, Path]]
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
         self._diags[path] = set()
-
         units_compiled = set()  # type: Set[LibraryUnitTuple]
-        builtin_libraries = frozenset(builtin_libraries or [])
 
         units_to_build = self.getDependenciesUnits(path)
         paths_to_build = set(
@@ -698,13 +710,16 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         # dependencies on the previous one
         iteration_limit = len(paths_to_build) + 1
 
+        path_needs_map = (
+            {}
+        )  # type: Dict[Path, Set[Tuple[UnresolvedLibrary, Identifier]]]
+
         for i in range(iteration_limit):
             paths_built = set()  # type: Set[Path]
 
             for current_path in paths_to_build:
-                current_path_library = self.getLibrary(current_path)
                 own = {
-                    (current_path_library, x.name)
+                    (self.getLibrary(current_path), x.name)
                     for x in self.getDesignUnitsByPath(current_path)
                 }
 
@@ -724,10 +739,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 }
 
                 # Units still needed are the ones we haven't seen before
-                still_needed = deps - units_compiled - own
+                path_needs = deps - units_compiled - own
                 new_units = own - units_compiled
 
-                if new_units and not still_needed:
+                path_needs_map[current_path] = path_needs
+
+                if new_units and not path_needs:
                     _logger.debug(
                         "Compiling %s adds %d new units: %s",
                         current_path,
@@ -742,11 +759,14 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     # already compiled, skip it
                     _logger.debug("Path %s has nothing to add, skipping", current_path)
                     paths_built.add(current_path)
-                elif still_needed and _logger.isEnabledFor(
+                elif path_needs and _logger.isEnabledFor(
                     logging.DEBUG
                 ):  # pragma: no cover
-                    _msg = [(library, name.name) for library, name in still_needed]
-                    _logger.debug("%s still needs %s", current_path, _msg)
+                    _logger.debug(
+                        "%s still needs %s",
+                        current_path,
+                        [(library, name.name) for library, name in path_needs],
+                    )
 
             paths_to_build -= paths_built
             units_to_build -= units_compiled
