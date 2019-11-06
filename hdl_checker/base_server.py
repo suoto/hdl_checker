@@ -38,7 +38,12 @@ from hdl_checker.builder_utils import (
 )
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.database import Database
-from hdl_checker.diagnostics import CheckerDiagnostic, DiagType, PathNotInProjectFile
+from hdl_checker.diagnostics import (
+    CheckerDiagnostic,
+    DiagType,
+    PathNotInProjectFile,
+    UnresolvedDependency,
+)
 from hdl_checker.parsers.config_parser import ConfigParser
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -493,9 +498,9 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
                 getStaticMessages(tuple(open(path.name).read().split("\n")))
             )
 
-        # Static messages don't take the path, only the text, so we need to
-        # set that. Also, any diagnostic without filename will be made to
-        # point to the current path
+        # Static messages don't take the path, only the text, so we need to set
+        # that. Also, any diagnostic without filename will be made to point to
+        # the current path
         for diag in static_diags:
             if diag.filename is None:
                 diag = diag.copy(filename=path)
@@ -503,10 +508,19 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         self._saveCache()
 
+        # Add diagnostics the database might have
         diags = builder_diags | set(self.database.getDiagnosticsForPath(path))
 
-        # If we're working off of a project file, no need to filter out
-        # diags about path not being found
+        # Report dependencies that could not be resolved to paths
+        for dependency in self.database.getDependenciesByPath(path):
+            if dependency.library in self.builder.builtin_libraries:
+                continue
+            if not self.resolveDependencyToPath(dependency):
+                for location in dependency.locations:
+                    diags.add(UnresolvedDependency(dependency, location))
+
+        # If we're working off of a project file, no need to filter out diags
+        # about path not being found
         if self.config_file is not None:
             return diags
 
@@ -518,7 +532,6 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
         """
-        self._clearLruCaches()
         with self._lock:
             _logger.info("Getting messages for '%s' with content", path)
 
@@ -565,6 +578,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         return diags
 
+    @lru_cache()
     def resolveDependencyToPath(self, dependency):
         # type: (DependencySpec) -> Optional[Tuple[Path, Identifier]]
         """

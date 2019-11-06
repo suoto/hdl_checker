@@ -18,8 +18,10 @@
 
 from typing import Iterable, Optional
 
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.types import Location
 from hdl_checker.utils import HashableByKey
 
 # pylint: disable=useless-object-inheritance
@@ -49,11 +51,11 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        checker,  # type: Optional[str]
         text,  # type: str
+        checker=None,  # type: Optional[str]
         filename=None,  # type: Optional[Path]
-        line_number=None,
-        column_number=None,
+        line_number=None,  # type: Optional[int]
+        column_number=None,  # type: Optional[int]
         error_code=None,
         severity=None,
     ):
@@ -309,7 +311,9 @@ class FailedToCreateProject(CheckerDiagnostic):
         text = "Exception while creating server: {}"
 
         super(FailedToCreateProject, self).__init__(
-            checker=None, severity=DiagType.ERROR, text=text.format(str(exception))
+            checker=CHECKER_NAME,
+            severity=DiagType.ERROR,
+            text=text.format(str(exception)),
         )
 
 
@@ -335,7 +339,6 @@ class DependencyNotUnique(CheckerDiagnostic):
         )
 
         super(DependencyNotUnique, self).__init__(
-            checker=None,
             filename=filename,
             severity=DiagType.STYLE_WARNING,
             line_number=line_number,
@@ -363,5 +366,23 @@ class PathLibraryIsNotUnique(CheckerDiagnostic):
         )
 
         super(PathLibraryIsNotUnique, self).__init__(
-            checker=None, filename=filename, severity=DiagType.WARNING, text=text
+            filename=filename, severity=DiagType.WARNING, text=text
+        )
+
+
+class UnresolvedDependency(CheckerDiagnostic):
+    """
+    Marks dependencies that could not be resolved for a file
+    """
+
+    def __init__(self, dependency, location):
+        # type: (DependencySpec, Location) -> None
+        super(UnresolvedDependency, self).__init__(
+            filename=dependency.owner,
+            severity=DiagType.STYLE_ERROR,
+            line_number=location.line,
+            column_number=location.column,
+            text="Unable to resolve '{}.{}' to a path".format(
+                dependency.library or "work", dependency.name
+            ),
         )
