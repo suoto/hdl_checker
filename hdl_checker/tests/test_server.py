@@ -34,9 +34,10 @@ from mock import patch
 
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import disableVunit, getTestTempPath
+from hdl_checker.tests import TestCase, disableVunit, getTestTempPath
 
 import hdl_checker.lsp
+from hdl_checker import server
 from hdl_checker.utils import ON_LINUX, ON_WINDOWS, isProcessRunning, terminateProcess
 
 _logger = logging.getLogger(__name__)
@@ -465,5 +466,28 @@ with such.A("hdl_checker server") as it:
                     "stderr file should not be {}".format(args.stderr),
                 )
 
+
+@patch("hdl_checker.server.start_io_lang_server")
+@patch("hdl_checker.server._binaryStdio", return_value=("stdin", "stdout"))
+@patch("hdl_checker.server._setupPipeRedirection")
+def test_StartLsp(redirection, binary_stdio, start_server):
+    args = type(
+        "args",
+        (object,),
+        {
+            "lsp": True,
+            "stderr": "stderr",
+            "log_stream": None,
+            "attach_to_pid": None,
+        },
+    )
+
+    server.run(args)
+
+    redirection.assert_called_once_with(None, "stderr")
+    binary_stdio.assert_called_once()
+    start_server.assert_called_once_with(
+        "stdin", "stdout", True, hdl_checker.lsp.HdlCheckerLanguageServer
+    )
 
 it.createTests(globals())

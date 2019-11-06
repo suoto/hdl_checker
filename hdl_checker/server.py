@@ -146,7 +146,7 @@ def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
         sys.stderr = openForStdHandle(stderr)
 
 
-def _binaryStdio():
+def _binaryStdio(): # pragma: no cover
     """
     (from https://github.com/palantir/python-language-server)
 
@@ -172,21 +172,13 @@ def _binaryStdio():
     return stdin, stdout
 
 
-def run(args):  # pylint: disable=missing-docstring
-    try:
-        # LSP will use stdio to communicate
-        _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
-
-        startServer(args)
-    except Exception as exc:
-        _logger.exception("Failed to start server")
-        raise
-
-
-def startServer(args):
+def run(args):
     """
     Import modules and tries to start a hdl_checker server
     """
+    # LSP will use stdio to communicate
+    _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
+
     if args.log_stream:
         setupLogging(args.log_stream, args.log_level)
 
