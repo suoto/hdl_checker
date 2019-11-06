@@ -321,7 +321,9 @@ class DependencyNotUnique(CheckerDiagnostic):
     def __init__(  # pylint: disable=too-many-arguments
         self, filename, design_unit, choices, line_number=None, column_number=None
     ):
-        _choices = list(choices)
+        # Revert to str and not Paths for the ease for sorting, which helps esp
+        # when testing (order of sets depend on their hash)
+        _choices = sorted(list(map(str, choices)))
         text = (
             "Dependency '{}' (library={}) has {} definitions (files are {}). "
             "The selected option may not be the correct one".format(
