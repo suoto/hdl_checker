@@ -555,17 +555,16 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
                 diags.add(diag)
 
+            diags |= set(self.database.getDiagnosticsForPath(temporary_file))
+
             self.database.removeSource(temp_path)
             removeIfExists(temporary_file.name)
-
-            diags |= set(self.database.getDiagnosticsForPath(path))
 
             if self.config_file and path not in self.database.paths:
                 diags.add(PathNotInProjectFile(path))
 
         return diags
 
-    @lru_cache()
     def resolveDependencyToPath(self, dependency):
         # type: (DependencySpec) -> Optional[Tuple[Path, Identifier]]
         """
