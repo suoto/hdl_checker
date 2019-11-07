@@ -325,29 +325,17 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-            it.assertCountEqual(
-                checkLintFileOnOpen(source),
-                [
-                    {
-                        "source": "HDL Checker/static",
-                        "range": {
-                            "start": {"line": 28, "character": 11},
-                            "end": {"line": 28, "character": 11},
-                        },
-                        "message": "Signal 'neat_signal' is never used",
-                        "severity": defines.DiagnosticSeverity.Information,
-                    },
-                    {
-                        "source": "HDL Checker",
-                        "range": {
-                            "start": {"line": 0, "character": 0},
-                            "end": {"line": 0, "character": 0},
-                        },
-                        "message": 'Path "%s" not found in project file' % source,
-                        "severity": defines.DiagnosticSeverity.Warning,
-                    },
+            with patch(
+                "hdl_checker.lsp.Server.getMessagesByPath",
+                return_value=[
+                    CheckerDiagnostic(filename=Path(source), text="some text")
                 ],
-            )
+            ) as meth:
+                it.assertCountEqual(
+                    checkLintFileOnOpen(source),
+                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+                )
+                meth.assert_called_once_with(Path(source))
 
     with it.having("an existing and valid old style project file"):
 
@@ -373,7 +361,17 @@ with such.A("LSP server") as it:
         def test():
             source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
-            it.assertCountEqual(checkLintFileOnOpen(source), [])
+            with patch(
+                "hdl_checker.lsp.Server.getMessagesByPath",
+                return_value=[
+                    CheckerDiagnostic(filename=Path(source), text="some text")
+                ],
+            ) as meth:
+                it.assertCountEqual(
+                    checkLintFileOnOpen(source),
+                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+                )
+                meth.assert_called_once_with(Path(source))
 
     with it.having("a non existing project file"):
 
@@ -401,22 +399,18 @@ with such.A("LSP server") as it:
         @it.should("lint file when opening it")  # type: ignore
         def test():
             source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-            diagnostics = checkLintFileOnOpen(source)
 
-            it.assertCountEqual(
-                diagnostics,
-                [
-                    {
-                        "source": "HDL Checker/static",
-                        "range": {
-                            "start": {"line": 28, "character": 11},
-                            "end": {"line": 28, "character": 11},
-                        },
-                        "message": "Signal 'neat_signal' is never used",
-                        "severity": defines.DiagnosticSeverity.Information,
-                    }
+            with patch(
+                "hdl_checker.lsp.Server.getMessagesByPath",
+                return_value=[
+                    CheckerDiagnostic(filename=Path(source), text="some text")
                 ],
-            )
+            ) as meth:
+                it.assertCountEqual(
+                    checkLintFileOnOpen(source),
+                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+                )
+                meth.assert_called_once_with(Path(source))
 
     @it.should("lint file with neither root URI nor project file set")  # type: ignore
     def test():
@@ -523,7 +517,16 @@ class TestValidProject(TestCase):
 
     def test_LintFileOnOpening(self):
         source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-        self.assertEqual(self._checkLintFileOnOpen(source), [])
+        with patch(
+            "hdl_checker.lsp.Server.getMessagesByPath",
+            return_value=[CheckerDiagnostic(filename=Path(source), text="some text")],
+        ) as meth:
+            self.assertCountEqual(
+                self._checkLintFileOnOpen(source),
+                [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+            )
+
+            meth.assert_called_once_with(Path(source))
 
     def runTestBuildSequenceTable(self, tablefmt):
         very_common_pkg = Path(

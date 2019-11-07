@@ -197,7 +197,11 @@ with such.A("hdl_checker project") as it:
             it.assertIsInstance(it.project.builder, Fallback)
 
         @it.should("still report static messages")  # type: ignore
-        def test():
+        @patch(
+            "hdl_checker.base_server.getStaticMessages",
+            return_value=[CheckerDiagnostic(text="some text")],
+        )
+        def test(meth):
 
             _logger.info("Files: %s", it.project.database._paths)
 
@@ -208,17 +212,13 @@ with such.A("hdl_checker project") as it:
                 dependencies={("work", "foo")},
             )
 
-            it.assertCountEqual(
+            it.assertIn(
+                CheckerDiagnostic(filename=Path(source.filename), text="some text"),
                 it.project.getMessagesByPath(source.filename),
-                {
-                    LibraryShouldBeOmited(
-                        library="work",
-                        filename=_Path("some_lib_target.vhd"),
-                        line_number=0,
-                        column_number=8,
-                    )
-                },
             )
+
+            # Will be called with the file's contents
+            meth.assert_called_once()
 
     with it.having("an existing and valid project file"):
 
@@ -653,21 +653,14 @@ with such.A("hdl_checker project") as it:
             for diagnostic in diagnostics:
                 _logger.debug("- %s", diagnostic)
 
-            expected = [
+            it.assertIn(
                 LibraryShouldBeOmited(
                     library="work", filename=filename, column_number=8, line_number=0
                 ),
-                PathNotInProjectFile(filename),
-            ]
+                diagnostics,
+            )
 
-            try:
-                it.assertCountEqual(expected, diagnostics)
-            except:
-                _logger.warning("Expected:")
-                for exp in expected:
-                    _logger.warning(exp)
-
-                raise
+            it.assertIn(PathNotInProjectFile(filename), diagnostics)
 
         @it.should("get updated messages")  # type: ignore
         def test():

@@ -25,11 +25,18 @@ import os
 import os.path as p
 
 import six
+
+from mock import MagicMock, patch
 from webtest import TestApp  # type: ignore
 
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import assertCountEqual, disableVunit, getTestTempPath, setupTestSuport
+from hdl_checker.tests import (
+    assertCountEqual,
+    disableVunit,
+    getTestTempPath,
+    setupTestSuport,
+)
 
 import hdl_checker
 import hdl_checker.handlers as handlers
@@ -41,12 +48,6 @@ from hdl_checker.diagnostics import (
 )
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
-
-try:  # Python 3.x
-    import unittest.mock as mock  # pylint: disable=import-error, no-name-in-module
-except ImportError:  # Python 2.x
-    import mock  # type: ignore
-
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, "test_project"))
@@ -137,7 +138,7 @@ with such.A("hdl_checker bottle app") as it:
         # calls the terminate process method
         pids = []
 
-        with mock.patch("hdl_checker.handlers.terminateProcess", pids.append):
+        with patch("hdl_checker.handlers.terminateProcess", pids.append):
             reply = it.app.post("/shutdown")
 
         it.assertEqual(pids, [os.getpid()])
@@ -147,14 +148,14 @@ with such.A("hdl_checker bottle app") as it:
     def test():
         project_file = _path("hello.prj")
         open(_path("hello.prj"), "w").write("")
-        server = mock.MagicMock()
+        server = MagicMock()
 
-        servers = mock.MagicMock()
+        servers = MagicMock()
         servers.__getitem__.side_effect = {
             Path(p.dirname(project_file)): server
         }.__getitem__
 
-        with mock.patch.object(hdl_checker.handlers, "servers", servers):
+        with patch.object(hdl_checker.handlers, "servers", servers):
             it.app.post("/rebuild_project", {"project_file": project_file})
 
         # Check the object was removed from the servers list
@@ -191,29 +192,24 @@ with such.A("hdl_checker bottle app") as it:
         it.assertIn(expected, messages)
 
     @it.should("get messages by path")  # type: ignore
-    def test():
+    @patch(
+        "hdl_checker.handlers.Server.getMessagesByPath",
+        return_value=[CheckerDiagnostic(text="some text")],
+    )
+    def test(meth):
         filename = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         data = {"project_file": it.project_file, "path": filename}
 
         ui_reply = it.app.post("/get_ui_messages", data)
         reply = it.app.post("/get_messages_by_path", data)
 
+        meth.assert_called_once()
+
         _logger.info("UI reply: %s", ui_reply)
         _logger.info("Reply: %s", reply)
 
-        messages = [CheckerDiagnostic.fromDict(x) for x in reply.json["messages"]]
-
         it.assertCountEqual(
-            messages,
-            [
-                ObjectIsNeverUsed(
-                    filename=filename,
-                    line_number=26,
-                    column_number=11,
-                    object_type="signal",
-                    object_name="clk_enable_unused",
-                )
-            ],
+            reply.json["messages"], [CheckerDiagnostic(text="some text").toDict()]
         )
 
     @it.should("get source dependencies")  # type: ignore
@@ -252,7 +248,7 @@ with such.A("hdl_checker bottle app") as it:
             return (Identifier("ieee"),)
 
         such.unittest.TestCase.maxDiff = None
-        with mock.patch.object(
+        with patch.object(
             hdl_checker.builders.base_builder.BaseBuilder,
             "builtin_libraries",
             builtin_libraries,
