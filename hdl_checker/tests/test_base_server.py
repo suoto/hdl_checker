@@ -59,6 +59,7 @@ from hdl_checker.diagnostics import (
     LibraryShouldBeOmited,
     ObjectIsNeverUsed,
     PathNotInProjectFile,
+    UnresolvedDependency,
 )
 from hdl_checker.parsers.elements.dependency_spec import DependencySpec
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -66,6 +67,7 @@ from hdl_checker.path import Path
 from hdl_checker.types import (
     BuildFlagScope,
     FileType,
+    Location,
     RebuildLibraryUnit,
     RebuildPath,
     RebuildUnit,
@@ -172,6 +174,41 @@ with such.A("hdl_checker project") as it:
         handle_ui_info.assert_called_once_with("No sources were added")
 
         removeIfExists(path)
+
+    @it.should("warn when unable to resolve non-builtin dependencies")  # type: ignore
+    @patch(
+        "hdl_checker.builders.fallback.Fallback._parseBuiltinLibraries",
+        return_value=[Identifier("builtin")],
+    )
+    def test(parse_builtins):
+        # type: (...) -> None
+        root = tempfile.mkdtemp()
+        server = DummyServer(Path(root))
+
+        with tempfile.NamedTemporaryFile(suffix=".vhd") as filename:
+            diags = server.getMessagesWithText(
+                Path(filename.name),
+                "library lib; use lib.pkg.all; library builtin; use builtin.foo;",
+            )
+
+            parse_builtins.assert_called()
+
+            logIterable("Diags", diags, _logger.info)
+
+            it.assertCountEqual(
+                diags,
+                [
+                    UnresolvedDependency(
+                        DependencySpec(
+                            name=Identifier("pkg"),
+                            library=Identifier("lib"),
+                            owner=Path(filename.name),
+                            locations=[Location(0, 17)],
+                        ),
+                        Location(0, 17),
+                    )
+                ],
+            )
 
     with it.having("non existing root dir"):
 
