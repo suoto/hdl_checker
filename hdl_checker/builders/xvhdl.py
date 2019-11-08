@@ -16,7 +16,6 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Xilinx xhvdl builder implementation"
 
-import os
 import os.path as p
 import re
 import shutil
@@ -31,6 +30,25 @@ from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import runShellCommand
 
+_ITER_REBUILD_UNITS = re.compile(
+    r"ERROR:\s*\[[^\]]*\]\s*"
+    r"'?.*/(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb'?"
+    r"\s+needs to be re-saved.*",
+    flags=re.I,
+).finditer
+
+# XVHDL specific class properties
+_STDOUT_MESSAGE_SCANNER = re.compile(
+    r"^(?P<severity>[EW])\w+:\s*"
+    r"\[(?P<error_code>[^\]]+)\]\s*"
+    r"(?P<error_message>[^\[]+)\s*"
+    r"("
+    r"\[(?P<filename>[^:]+):"
+    r"(?P<line_number>\d+)\]"
+    r")?",
+    flags=re.I,
+)
+
 
 class XVHDL(BaseBuilder):
     """Builder implementation of the xvhdl compiler"""
@@ -39,25 +57,6 @@ class XVHDL(BaseBuilder):
     builder_name = "xvhdl"
     # TODO: Add xvlog support
     file_types = {FileType.vhdl}
-
-    # XVHDL specific class properties
-    _stdout_message_scanner = re.compile(
-        r"^(?P<severity>[EW])\w+:\s*"
-        r"\[(?P<error_code>[^\]]+)\]\s*"
-        r"(?P<error_message>[^\[]+)\s*"
-        r"("
-        r"\[(?P<filename>[^:]+):"
-        r"(?P<line_number>\d+)\]"
-        r")?",
-        flags=re.I,
-    )
-
-    _iter_rebuild_units = re.compile(
-        r"ERROR:\s*\[[^\]]*\]\s*"
-        r"'?.*/(?P<library_name>\w+)/(?P<unit_name>\w+)\.vdb'?"
-        r"\s+needs to be re-saved.*",
-        flags=re.I,
-    ).finditer
 
     def _shouldIgnoreLine(self, line):
         # type: (str) -> bool
@@ -68,7 +67,7 @@ class XVHDL(BaseBuilder):
         # ERROR: [VRFC 10-3032] 'library.package' failed to restore
         # This message doesn't come alone, we should be getting other (more
         # usefull) info anyway
-        if "[VRFC 10-3032]" in line:
+        if "[VRFC 10-3032]" in line:  # pragma: no cover
             return True
 
         return not (line.startswith("ERROR") or line.startswith("WARNING"))
@@ -83,7 +82,7 @@ class XVHDL(BaseBuilder):
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
-        for match in self._stdout_message_scanner.finditer(line):
+        for match in _STDOUT_MESSAGE_SCANNER.finditer(line):
 
             info = match.groupdict()
 
@@ -91,10 +90,9 @@ class XVHDL(BaseBuilder):
             filename = info.get("filename", None)
             line_number = info.get("line_number", None)
 
-            severity = None
             if info.get("severity", None) in ("W", "e"):
                 severity = DiagType.WARNING
-            elif info.get("severity", None) in ("E", "e"):
+            else:
                 severity = DiagType.ERROR
 
             yield BuilderDiag(
@@ -146,9 +144,6 @@ class XVHDL(BaseBuilder):
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None
-        if not p.exists(self._work_folder):
-            os.makedirs(self._work_folder)
-
         with open(self._xvhdlini, mode="w") as fd:
             content = "\n".join(
                 [
@@ -177,19 +172,10 @@ class XVHDL(BaseBuilder):
     def _searchForRebuilds(self, line):
         rebuilds = []
 
-        for match in self._iter_rebuild_units(line):
-            mdict = match.groupdict()
-            # When compilers reports units out of date, they do this
-            # by either
-            #  1. Giving the path to the file that needs to be rebuilt
-            #     when sources are from different libraries
-            #  2. Reporting which design unit has been affected by a
-            #     given change.
-            if "rebuild_path" in mdict and mdict["rebuild_path"] is not None:
-                rebuilds.append(mdict)
-            else:
-                rebuilds.append(
-                    {"library_name": "work", "unit_name": mdict["unit_name"]}
-                )
+        for match in _ITER_REBUILD_UNITS(line):
+            dict_ = match.groupdict()
+            rebuilds.append(
+                {"library_name": dict_["library_name"], "unit_name": dict_["unit_name"]}
+            )
 
         return rebuilds

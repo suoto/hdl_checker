@@ -123,28 +123,26 @@ class TestBuilder(TestCase):
         if p.exists("._%s" % self.builder_name):
             shutil.rmtree("._%s" % self.builder_name)
 
-    def test_environment_check(self):
+    def test_EnvironmentCheck(self):
         # type: (...) -> Any
         self.builder.checkEnvironment()
 
-    def test_builder_reports_its_available(self):  # pylint: disable=invalid-name
+    def test_BuilderReportsItsAvailable(self):  # pylint: disable=invalid-name
         # type: (...) -> Any
         self.assertTrue(self.builder_class.isAvailable())  # type: ignore
 
-    def test_create_library_multiple_times(self):  # pylint: disable=invalid-name
+    def test_CreateLibraryMultipleTimes(self):  # pylint: disable=invalid-name
         # type: (...) -> Any
         self.builder._createLibraryIfNeeded(Identifier("random_lib"))
         self.builder._createLibraryIfNeeded(Identifier("random_lib"))
 
-    def test_builder_does_nothing_when_creating_builtin_libraries(
+    def test_BuilderDoesNothingWhenCreatingBuiltinLibraries(
         self
     ):  # pylint: disable=invalid-name
         # type: (...) -> Any
-        #  pre = open(self.builder._xvhdlini).read()
         self.builder._createLibraryIfNeeded(Identifier("ieee"))
-        #  post = open(self.builder._xvhdlini).read()
 
-    def test_finds_builtin_libraries(self):
+    def test_FindsBuiltinLibraries(self):
         # type: (...) -> Any
         expected = []  # type: List[str]
 
@@ -165,7 +163,7 @@ class TestBuilder(TestCase):
             (r"C:\some\file\on\windows.vhd",),
         ]
     )
-    def test_parse_msim_result(self, path):
+    def test_ParseMsimResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
@@ -329,7 +327,7 @@ class TestBuilder(TestCase):
             (r"C:\some\file\on\windows.vhd",),
         ]
     )
-    def test_parse_ghdl_result(self, path):
+    def test_ParseGhdlResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, GHDL):
             raise unittest2.SkipTest("GHDL only test")
@@ -360,7 +358,7 @@ class TestBuilder(TestCase):
             ("some_file_on_same_level.vhd",),
         ]
     )
-    def test_parse_xvhdl_result(self, path):
+    def test_ParseXvhdlResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, XVHDL):
             raise unittest2.SkipTest("XVHDL only test")
@@ -383,7 +381,26 @@ class TestBuilder(TestCase):
             ],
         )
 
-    def test_vhdl_compilation(self):
+        self.assertEqual(
+            list(
+                self.builder._makeRecords(
+                    "WARNING: [VRFC 10-1256] possible infinite loop; process "
+                    "does not have a wait statement [%s:119]" % path
+                )
+            ),
+            [
+                BuilderDiag(
+                    builder_name=self.builder_name,
+                    text="possible infinite loop; process does not have a wait statement",
+                    filename=Path(path),
+                    line_number=118,
+                    error_code="VRFC 10-1256",
+                    severity=DiagType.WARNING,
+                )
+            ],
+        )
+
+    def test_VhdlCompilation(self):
         # type: (...) -> Any
         if FileType.vhdl not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -404,7 +421,7 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_verilog_compilation(self):
+    def test_VerilogCompilation(self):
         # type: (...) -> Any
         if FileType.verilog not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -425,7 +442,7 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_systemverilog_compilation(self):
+    def test_SystemverilogCompilation(self):
         # type: (...) -> Any
         if FileType.systemverilog not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -448,7 +465,7 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_catch_a_known_error(self):
+    def test_CatchAKnownError(self):
         # type: (...) -> Any
         source = _source("source_with_error.vhd")
 
@@ -514,7 +531,7 @@ class TestBuilder(TestCase):
 
         self.assertFalse(rebuilds)
 
-    def test_msim_recompile_msg_0(self):
+    def test_MsimRecompileMsg0(self):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
@@ -529,7 +546,7 @@ class TestBuilder(TestCase):
             self.builder._searchForRebuilds(line),
         )
 
-    def test_msim_recompile_msg_1(self):
+    def test_MsimRecompileMsg1(self):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
             raise unittest2.SkipTest("ModelSim only test")
@@ -544,7 +561,7 @@ class TestBuilder(TestCase):
             self.builder._searchForRebuilds(line),
         )
 
-    def test_ghdl_recompile_msg(self):
+    def test_GhdlRecompileMsg(self):
         # type: (...) -> Any
         if not isinstance(self.builder, GHDL):
             raise unittest2.SkipTest("GHDL only test")
@@ -553,6 +570,21 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"unit_type": "package", "unit_name": "leon3"}],
+            self.builder._searchForRebuilds(line),
+        )
+
+    def test_XvhdlRecompileMsg0(self):
+        # type: (...) -> Any
+        if not isinstance(self.builder, XVHDL):
+            raise unittest2.SkipTest("XVHDL only test")
+
+        line = (
+            "ERROR: [VRFC 10-113] /some/path/xsim.dir/some_library/some_package.vdb "
+            "needs to be re-saved since std.standard changed"
+        )
+
+        self.assertEqual(
+            [{"library_name": "some_library", "unit_name": "some_package"}],
             self.builder._searchForRebuilds(line),
         )
 
@@ -583,7 +615,7 @@ class TestBuilder(TestCase):
             ({"rebuild_path": "some_path"}, RebuildPath(Path("some_path"))),
         ]
     )
-    def test_get_rebuilds(self, rebuild_info, expected):
+    def test_GetRebuilds(self, rebuild_info, expected):
         # type: (...) -> Any
         _logger.info("Rebuild info is %s", rebuild_info)
         library = Identifier("some_lib", False)
@@ -608,7 +640,7 @@ class TestBuilder(TestCase):
 
 class TestSanityError(TestCase):
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
-    def test_not_available(self, builder_class):
+    def test_NotAvailable(self, builder_class):
         # type: (...) -> Any
         if builder_class is Fallback:
             self.assertTrue(builder_class.isAvailable())
@@ -616,7 +648,7 @@ class TestSanityError(TestCase):
             self.assertFalse(builder_class.isAvailable())
 
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
-    def test_raises_sanity_error(self, builder_class):
+    def test_RaisesSanityError(self, builder_class):
         # type: (...) -> Any
         if builder_class is Fallback:
             raise self.skipTest("Fallback won't raise any exception")
