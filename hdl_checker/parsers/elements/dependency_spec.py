@@ -16,16 +16,12 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Spec for a parsed dependency"
 
-import logging
 from typing import Optional
 
 from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
 
 from hdl_checker.path import Path  # pylint: disable=unused-import
-from hdl_checker.types import FileType
-
-_logger = logging.getLogger(__name__)
 
 
 class DependencySpec(ParsedElement):
@@ -45,20 +41,28 @@ class DependencySpec(ParsedElement):
 
     @property
     def owner(self):
+        # type: (...) -> Path
+        """
+        Path of the file that the dependency was found in
+        """
         return self._owner
 
     @property
     def name(self):
+        # type: (...) -> Identifier
+        """
+        Name of the design unit this dependency refers to
+        """
         return self._name
 
     @property
     def library(self):
+        # type: (...) -> Optional[Identifier]
+        """
+        Library, if any, this dependency was found. If None, should be
+        equivalent to the library of the owner (aka 'work' library)
+        """
         return self._library
-
-    @property
-    def case_sensitive(self):  # type: () -> bool
-        ext = self.owner.split(".")[-1].lower()
-        return ext not in FileType.vhdl.value
 
     def __len__(self):
         if self.library is None:
