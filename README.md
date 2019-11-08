@@ -1,4 +1,4 @@
-# HDL Checker [![Mentioned in Awesome Computer Architecture](https://awesome.re/mentioned-badge.svg)](https://github.com/rajesh-s/awesome-computer-architecture)
+# HDL Checker
 
 [![PyPI version](https://img.shields.io/pypi/v/hdl_checker.svg)](https://pypi.org/project/hdl_checker/)
 [![Build Status](https://travis-ci.org/suoto/hdl_checker.svg?branch=master)](https://travis-ci.org/suoto/hdl_checker)
@@ -7,6 +7,7 @@
 [![Code Climate](https://codeclimate.com/github/suoto/hdl_checker/badges/gpa.svg)](https://codeclimate.com/github/suoto/hdl_checker)
 [![Join the chat at https://gitter.im/suoto/hdl_checker](https://badges.gitter.im/suoto/hdl_checker.svg)](https://gitter.im/suoto/hdl_checker?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdl_checker)
+[![Mentioned in Awesome Computer Architecture](https://awesome.re/mentioned-badge.svg)](https://github.com/rajesh-s/awesome-computer-architecture)
 
 HDL Checker is a language server that wraps VHDL/Verilg/SystemVerilog tools that
 aims to reduce the boilerplate code needed to set things up. It supports
