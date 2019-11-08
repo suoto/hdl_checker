@@ -518,6 +518,24 @@ with such.A("hdl_checker project") as it:
                 ),
             )
 
+        @it.should(  # type: ignore
+            "Resolve dependency to path when it's defined on the same file"
+        )
+        def test():
+            path = _Path(TEST_PROJECT, "basic_library", "package_with_functions.vhd")
+
+            clock_divider = DependencySpec(
+                name=Identifier("package_with_functions"),
+                library=Identifier("basic_library"),
+                owner=path,
+                locations=(),
+            )
+
+            it.assertEqual(
+                it.project.resolveDependencyToPath(clock_divider),
+                (path, Identifier("basic_library")),
+            )
+
         @it.should("Not resolve dependencies whose library is built in")  # type: ignore
         def test():
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")

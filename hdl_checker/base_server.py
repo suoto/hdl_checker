@@ -586,6 +586,14 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         the path that implements a design unit whose names match that of the
         dependency.
         """
+
+        # Check if the dependency is defined in the same same file
+        if dependency.name in (
+            x.name for x in self.database.getDesignUnitsByPath(dependency.owner)
+        ):
+            return dependency.owner, self.database.getLibrary(dependency.owner)
+
+        # Search through the build sequence
         for library, path in self.database.getBuildSequence(
             dependency.owner, self.builder.builtin_libraries
         ):

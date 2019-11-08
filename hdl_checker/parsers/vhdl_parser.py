@@ -47,7 +47,9 @@ _LIBRARIES = re.compile(
 )
 
 _PACKAGE_BODY = re.compile(
-    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b",
+    r"\bpackage\s+body\s+(?P<package_body_name>\w+)\s+is\b"
+    r"|"
+    r"(?P<comment>\s*--.*)",
     flags=re.MULTILINE | re.IGNORECASE,
 )
 
@@ -153,8 +155,12 @@ class VhdlParser(BaseSourceFile):
                 owner=self.filename, name=name, library=_library, locations=locations
             )
 
+        # Package bodies need a package declaration; include those as
+        # dependencies as well
         for match in _PACKAGE_BODY.finditer(self.getSourceContent()):
             package_body_name = match.groupdict()["package_body_name"]
+            if package_body_name is None:
+                continue
             line_number = int(text[: match.end()].count("\n"))
             column_number = len(text[: match.start()].split("\n")[-1])
 
