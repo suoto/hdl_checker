@@ -33,7 +33,7 @@ from hdl_checker.utils import readFile
 _logger = logging.getLogger(__name__)
 
 _VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
-_COMMENT = r"(?:\/\*.*?\*\/|//[^(\r\n?|\n)]*)"
+_COMMENT = r"(?:\/\*.*?\*\/|//[^(?:\r\n?|\n)]*)"
 
 
 # Design unit scanner
@@ -49,11 +49,9 @@ _DESIGN_UNITS = re.compile(
 )
 
 _DEPENDENCIES = re.compile(
-    _COMMENT
+    r"(?<=\bimport\b)\s+(?P<name>{0})\s*::\s*(?:{0}|\*)\s*;".format(_VERILOG_IDENTIFIER)
     + r"|"
-    + r"(?:(?:^|\n)\s*import\s+(?P<name>{0})\s*::\s*(?:{0}|\*)\s*;)".format(
-        _VERILOG_IDENTIFIER
-    ),
+    + _COMMENT,
     flags=re.DOTALL,
 )
 

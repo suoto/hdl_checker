@@ -110,13 +110,13 @@ class TestVerilogSource(TestCase):
                         owner=Path(self.filename),
                         name=VerilogIdentifier("some_package"),
                         library=None,
-                        locations=(Location(line=2, column=23),),
+                        locations=(Location(line=2, column=6),),
                     ),
                     DependencySpec(
                         owner=Path(self.filename),
                         name=VerilogIdentifier("another_package"),
                         library=None,
-                        locations=(Location(line=3, column=23),),
+                        locations=(Location(line=3, column=6),),
                     ),
                 ),
             )
