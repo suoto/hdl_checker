@@ -188,13 +188,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._libraries
 
-    def getIncludes(self):  # pylint: disable=no-self-use
-        # type: (...) -> Iterable[Path]
-        """
-        Returns include paths, applicable to Verilog and SystemVerilog
-        """
-        return ()
-
     @abc.abstractmethod
     def _getDesignUnits(self):
         """

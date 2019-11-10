@@ -95,7 +95,6 @@ class DependencySpec(ParsedElement):
             owner=state.pop("owner"),
             locations=state.pop("locations"),
         )
-        #  return obj
 
     def __repr__(self):
         return "{}(name='{}', library='{}', owner={}, locations={})".format(
@@ -104,4 +103,12 @@ class DependencySpec(ParsedElement):
             repr(self.library),
             repr(self.owner),
             repr(self.locations),
+        )
+
+
+class IncludedPath(DependencySpec):
+    def __init__(self, owner, name, locations=None):
+        # type: (Path, Identifier, Optional[LocationList]) -> None
+        super(IncludedPath, self).__init__(
+            owner=owner, name=name, library=None, locations=locations
         )

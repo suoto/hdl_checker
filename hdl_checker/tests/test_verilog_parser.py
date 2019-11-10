@@ -25,7 +25,7 @@ from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker.tests import TestCase, writeListToFile
 
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec, IncludedPath
 from hdl_checker.parsers.elements.identifier import VerilogIdentifier
 from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
@@ -100,32 +100,34 @@ class TestVerilogSource(TestCase):
         )
 
     def test_GetDependencies(self):
-        if self.filetype in ("v", "vh"):
-            self.assertCountEqual(self.source.getDependencies(), ())
-        else:
-            self.assertCountEqual(
-                self.source.getDependencies(),
-                (
-                    DependencySpec(
-                        owner=Path(self.filename),
-                        name=VerilogIdentifier("some_package"),
-                        library=None,
-                        locations=(Location(line=2, column=6),),
-                    ),
-                    DependencySpec(
-                        owner=Path(self.filename),
-                        name=VerilogIdentifier("another_package"),
-                        library=None,
-                        locations=(Location(line=3, column=6),),
-                    ),
-                ),
+        expected = [
+            IncludedPath(
+                owner=Path(self.filename),
+                name=VerilogIdentifier("some/include"),
+                locations=(Location(line=0, column=8),),
             )
+        ]
+
+        if self.filetype in ("sv", "svh"):
+            expected += [
+                DependencySpec(
+                    owner=Path(self.filename),
+                    name=VerilogIdentifier("some_package"),
+                    library=None,
+                    locations=(Location(line=2, column=6),),
+                ),
+                DependencySpec(
+                    owner=Path(self.filename),
+                    name=VerilogIdentifier("another_package"),
+                    library=None,
+                    locations=(Location(line=3, column=6),),
+                ),
+            ]
+
+        self.assertCountEqual(self.source.getDependencies(), expected)
 
     def test_CacheRecovery(self):
         state = json.dumps(self.source, cls=StateEncoder)
         _logger.info("State before: %s", state)
         recovered = json.loads(state, object_hook=jsonObjectHook)
         self.assertEqual(self.source.filename, recovered.filename)
-
-    def test_GetsIncludes(self):
-        self.assertCountEqual(self.source.getIncludes(), [Path("some/include")])

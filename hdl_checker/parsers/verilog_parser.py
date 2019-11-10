@@ -20,7 +20,7 @@ import logging
 import re
 from typing import Any, Generator, Iterable
 
-from .elements.dependency_spec import DependencySpec
+from .elements.dependency_spec import DependencySpec, IncludedPath
 from .elements.design_unit import VerilogDesignUnit
 from .elements.parsed_element import Location
 
@@ -49,14 +49,16 @@ _DESIGN_UNITS = re.compile(
 )
 
 _DEPENDENCIES = re.compile(
-    r"(?<=\bimport\b)\s+(?P<name>{0})\s*::\s*(?:{0}|\*)\s*;".format(_VERILOG_IDENTIFIER)
-    + r"|"
-    + _COMMENT,
+    "|".join(
+        [
+            r"(?<=\bimport\b)\s+(?P<package>{0})\s*::\s*(?:{0}|\*)\s*;".format(
+                _VERILOG_IDENTIFIER
+            ),
+            r"(?<=`include\b)\s*\"(?P<include>.*?)\"",
+            _COMMENT,
+        ]
+    ),
     flags=re.DOTALL,
-)
-
-_INCLUDES = re.compile(
-    _COMMENT + r"|(?:^\s*`include\s+\"(?P<name>.*?)\")", flags=re.DOTALL
 )
 
 
@@ -86,22 +88,34 @@ class VerilogParser(BaseSourceFile):
             yield match.groupdict(), content[:start].count("\n")
 
     def _getDependencies(self):  # type: () -> Iterable[DependencySpec]
-        if self.filetype is FileType.verilog:
-            return
-
-        # Only SystemVerilog will have dependencies. Includes (which are
-        # present on both) will be handled separately
         text = self.getSourceContent()
+
         for match in _DEPENDENCIES.finditer(text):
-            name = match.groupdict().get("name", None)
-            if name is not None:
+            include_name = match.groupdict().get("include", None)
+
+            if include_name is not None:
+                line_number = text[: match.end()].count("\n")
+                column_number = len(text[: match.start()].split("\n")[-1])
+
+                yield IncludedPath(
+                    owner=self.filename,
+                    name=VerilogIdentifier(include_name),
+                    locations=(Location(line_number, column_number),),
+                )
+
+            # Only SystemVerilog has imports
+            if self.filetype is FileType.verilog:
+                continue
+
+            import_name = match.groupdict().get("package", None)
+
+            if import_name is not None:
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
 
                 yield DependencySpec(
                     owner=self.filename,
-                    name=VerilogIdentifier(name),
-                    library=None,
+                    name=VerilogIdentifier(import_name),
                     locations=(Location(line_number, column_number),),
                 )
 
@@ -121,13 +135,3 @@ class VerilogParser(BaseSourceFile):
                     type_=DesignUnitType.package,
                     locations={Location(line_number, None)},
                 )
-
-    def getIncludes(self):
-        # type: (...) -> Iterable[Path]
-        """
-        Returns include paths, applicable to Verilog and SystemVerilog
-        """
-        for match in _INCLUDES.finditer(self.getSourceContent()):
-            name = match.groupdict().get("name", None)
-            if name is not None:
-                yield Path(name)
