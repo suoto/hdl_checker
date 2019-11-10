@@ -457,9 +457,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Returns parsed dependencies for the given path
         """
         self._parseSourceIfNeeded(path)
-        if path not in self._dependencies_map:
-            return frozenset()
-        return frozenset(self._dependencies_map[path])
+        return frozenset(self._dependencies_map.get(path, ()))
 
     def getPathsByDesignUnit(self, unit):
         # type: (tAnyDesignUnit) -> Iterator[Path]

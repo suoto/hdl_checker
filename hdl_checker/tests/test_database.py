@@ -183,13 +183,19 @@ class TestDatabase(TestCase):
 
             #  self.assertEqual(self.database.builder_name, None)
             self.assertCountEqual(self.database.paths, (Path(path.name),))
-            any_path = _Path("any.vhd")
+
             # Make sure the path exists
-            open(any_path.name, "w").close()
+            for test_path in (_Path("some_vhd.vhd"), _Path("some_sv.sv")):
+                self.assertFalse(self.database.getDependenciesByPath(test_path))
+                self.assertEqual(self.database.getFlags(test_path), ())
+
             self.assertEqual(
-                self.database.getLibrary(any_path), Identifier("not_in_project", False)
+                self.database.getLibrary(_Path("some_vhd.vhd")),
+                Identifier("not_in_project", False),
             )
-            self.assertEqual(self.database.getFlags(any_path), ())
+
+            self.assertIsNone(self.database.getLibrary(_Path("some_sv.sv")))
+
             meth.assert_called_once_with(Path(TEST_TEMP_PATH))
 
     @patch("hdl_checker.parser_utils.findRtlSourcesByPath")
