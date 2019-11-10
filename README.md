@@ -22,6 +22,7 @@ compilation order, interpreting some compilers messages and providing some
 * [Editor support](#editor-support)
   * [VS Code](#vs-code)
   * [Vim/NeoVim](#vimneovim)
+  * [Emacs](#emacs)
 * [Usage](#usage)
   * [Third-party tools](#third-party-tools)
   * [Configuring HDL Checker](#configuring-HDL-Checker)
@@ -56,15 +57,15 @@ Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
 
 ### Vim/NeoVim
 
-#### Using [dense-analysis/ale][ALE]
+#### Using [dense-analysis/ale][vim_ale]
 
-See (PR [#2804][ALE_PR]), once it gets merged, ALE should support HDL Checker out
-of the box.
+See (PR [#2804][vim_ale_pr]), once it gets merged, ALE should support HDL Checker
+out of the box.
 
-#### Using [coc.nvim][coc_nvim]
+#### Using [coc.nvim][vim_coc_nvim]
 
-Following [coc.nvim custom language server setup][coc_nvim_register_lsp], add
-this to your [coc.nvim configuration file][coc_nvim_config_file]:
+Following [coc.nvim custom language server setup][vim_coc_nvim_register_lsp], add
+this to your [coc.nvim configuration file][vim_coc_nvim_config_file]:
 
 ```json
 {
@@ -84,7 +85,7 @@ this to your [coc.nvim configuration file][coc_nvim_config_file]:
 }
 ```
 
-#### Using [autozimu/LanguageClient-neovim][lc_nvim]
+#### Using [autozimu/LanguageClient-neovim][vim_lc_nvim]
 
 Add HDL Checker to the server commands:
 
@@ -98,10 +99,25 @@ let g:LanguageClient_serverCommands = {
 
 Please note that this will start one server per language
 
+### Emacs
+
+#### Using [emacs-lsp/lsp-mode][emacs_lsp] (soon!)
+
+Add this to your Emacs config file
+
+```elisp
+(require 'use-package)
+(setq lsp-vhdl-server-path "~/.local/bin/hdl_checker") ; only needed if hdl_checker is not already on the PATH
+(custom-set-variables
+  '(lsp-vhdl-server 'hdl-checker))
+(use-package lsp-mode
+  :config (add-hook 'vhdl-mode-hook 'lsp))
+```
+
 ## Usage
 
-HDL Checker server can be started via `hdl_checker` command. Use `hdl_checker --help`
-for more info on how to use it.
+HDL Checker server can be started via `hdl_checker` command. Use `hdl_checker
+--help` for more info on how to use it.
 
 ```bash
 $ hdl_checker -h
@@ -138,7 +154,8 @@ HDL Checker supports
 * [Mentor ModelSim][Mentor_msim]
 * [ModelSim Intel FPGA Edition][Intel_msim]
 * [GHDL][GHDL]
-* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx Vivado][Xilinx_Vivado])
+* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx
+  Vivado][Xilinx_Vivado])
 
 ### Configuring HDL Checker
 
@@ -146,8 +163,8 @@ See the [Setting up a new project][hdl_checker_wiki_setup] section on the wiki.
 
 ### LSP server
 
-HDL Checker has beta support for [Language Server Protocol][LSP]. To start
-in LSP mode:
+HDL Checker has beta support for [Language Server Protocol][LSP]. To start in LSP
+mode:
 
 ```bash
 hdl_checker --lsp
@@ -178,8 +195,8 @@ future. A reference implementation can be found in [vim-hdl][vim-hdl]*
 
 ## Testing
 
-HDL Checker uses a [docker][docker] container to run tests. If you wish to
-run them, clone this repository and on the root folder run
+HDL Checker uses a [docker][docker] container to run tests. If you wish to run
+them, clone this repository and on the root folder run
 
 ```bash
 ./run_tests.sh
@@ -242,12 +259,8 @@ Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
 HDL Checker's author has no connection or affiliation to any of the trademarks
 mentioned or used by this software.
 
-[ALE]: https://github.com/dense-analysis/ale
-[ALE_PR]: https://github.com/dense-analysis/ale/pull/2804
-[coc_nvim]: https://github.com/neoclide/coc.nvim
-[coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
-[coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
 [docker]: https://www.docker.com/
+[emacs_lsp]: https://github.com/emacs-lsp/lsp-mode/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [hdl_checker_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdl_checker_test
@@ -256,9 +269,14 @@ mentioned or used by this software.
 [hdl_checker_wiki_setup]: https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project
 [Intel_msim]: https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/model-sim.html
 [issue_tracker]: https://github.com/suoto/hdl_checker/issues
-[lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
 [LSP]: https://en.wikipedia.org/wiki/Language_Server_Protocol
 [Mentor_msim]: http://www.mentor.com/products/fv/modelsim/
 [vim-hdl]: https://github.com/suoto/vim-hdl/
+[vim_ale]: https://github.com/dense-analysis/ale
+[vim_ale_pr]: https://github.com/dense-analysis/ale/pull/2804
+[vim_coc_nvim]: https://github.com/neoclide/coc.nvim
+[vim_coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
+[vim_coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
+[vim_lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
 [Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
 [Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
