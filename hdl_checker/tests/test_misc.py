@@ -117,20 +117,6 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/v0.6.3"""
 
         self.assertEqual(_getLatestReleaseVersion(), "0.6.3")
 
-    @patch("hdl_checker.utils.subp.Popen")
-    def test_RejectsInvalidFormats(self, popen):
-        process_mock = Mock()
-        stdout = b"""\
-7e5264355da66f71e8d1b80887ac6df55b9829ef        refs/tags/v0.6.2
-a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/0.6.3"""
-
-        stderr = ""
-
-        attrs = {"communicate.return_value": (stdout, stderr)}
-        process_mock.configure_mock(**attrs)
-        popen.return_value = process_mock
-        self.assertIsNone(_getLatestReleaseVersion())
-
     @patch("hdl_checker.utils.REPO_URL", "localhost")
     def test_HandlesNoConnection(self, *_):
         self.assertIsNone(_getLatestReleaseVersion())
@@ -165,10 +151,16 @@ def test_DontReportIfCurrentIsNewer(*_):
     onNewReleaseFound(func)
     func.assert_not_called()
 
-
 @patch("hdl_checker.utils._getLatestReleaseVersion", return_value=None)
 @patch("hdl_checker.__version__", "1.0.1")
 def test_DontReportIfFailedToGetVersion(*_):
+    func = MagicMock()
+    onNewReleaseFound(func)
+    func.assert_not_called()
+
+@patch("hdl_checker.utils._getLatestReleaseVersion", return_value=None)
+@patch("hdl_checker.__version__", "0+unknown")
+def test_DontReportOnInvalidFormats(*_):
     func = MagicMock()
     onNewReleaseFound(func)
     func.assert_not_called()

@@ -324,10 +324,9 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
         """ Implement this attribute to use it for hashing and comparing"""
 
     def __hash__(self):
-        #  return hash(self.__hash_key__)
         try:
             return hash(self.__hash_key__)
-        except:
+        except:  # pragma: no cover
             print("Couldn't hash %s" % repr(self.__hash_key__))
             raise
 
@@ -430,14 +429,14 @@ def _getLatestReleaseVersion():
 
     latest = sorted(tags[-1].split("/"))[-1]
 
-    if not re.match(r"v\d+\.\d+\.\d+", latest):
-        _logger.info("Don't know how to handle version format on %s", latest)
-        return None
-
     return latest[1:]
 
 
+_VERSION_FORMAT = re.compile(r"\d+\.\d+\.\d+")
+
+
 def onNewReleaseFound(func):
+    # type: (Callable[[str], None]) -> None
     """
     Checks if a new release is out and calls func if the running an older
     version
@@ -446,12 +445,17 @@ def onNewReleaseFound(func):
         __version__ as current,
     )
 
-    latest = _getLatestReleaseVersion()
-
-    if latest is None:
+    # When installing via pip from github, versioneer will report the current
+    # version as 0+unknown, in which case we won't notify
+    if not _VERSION_FORMAT.match(current):
         return
 
-    _logger.debug("Current is %s, latest is %s", current, latest)
+    latest = _getLatestReleaseVersion()
+
+    if latest is None or not _VERSION_FORMAT.match(latest):
+        return
+
+    _logger.debug("Current version is %s, latest is %s", current, latest)
 
     if latest > current:
         func(
