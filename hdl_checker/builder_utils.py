@@ -26,6 +26,7 @@ from typing import (  # pylint: disable=unused-import
     Dict,
     Iterable,
     List,
+    Optional,
     Tuple,
     Union,
 )
@@ -35,6 +36,7 @@ from .builders.ghdl import GHDL
 from .builders.msim import MSim
 from .builders.xvhdl import XVHDL
 
+from hdl_checker.parser_utils import findRtlSourcesByPath
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
@@ -114,15 +116,21 @@ _VUNIT_FLAGS = {
 }  # type: Dict[BuilderName, Dict[str, BuildFlags]]
 
 
+def _isHeader(path):
+    # type: (Path) -> bool
+    ext = path.name.split(".")[-1].lower()
+    return ext in ("vh", "svh")
+
+
 def getVunitSources(builder):
-    # type: (AnyValidBuilder) -> Iterable[Tuple[Path, str, BuildFlags]]
+    # type: (AnyValidBuilder) -> Iterable[Tuple[Path, Optional[str], BuildFlags]]
     "Gets VUnit sources according to the file types supported by builder"
     if not foundVunit():
         return
 
     _logger.debug("VUnit installation found")
 
-    sources = []  # type: List[Any]
+    sources = []  # type: List[vunit.source_file.SourceFile]
 
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:
@@ -154,6 +162,11 @@ def getVunitSources(builder):
             flags = tuple()
 
         yield Path(path), library, flags
+
+    if FileType.systemverilog in builder.file_types:
+        for path in findRtlSourcesByPath(Path(p.dirname(vunit.__file__))):
+            if _isHeader(path):
+                yield Path(path), None, ()
 
 
 @contextmanager

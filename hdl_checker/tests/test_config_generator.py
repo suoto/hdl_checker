@@ -23,52 +23,27 @@
 import logging
 import os
 import os.path as p
-import shutil
 from tempfile import mkdtemp
 
 from mock import patch
-from webtest import TestApp  # type: ignore
+from webtest import TestApp  # type: ignore # pylint:disable=import-error
 
-from hdl_checker.tests import TestCase, getTestTempPath, setupTestSuport
+from hdl_checker.tests import TestCase
 
 import hdl_checker.handlers as handlers
-from hdl_checker.builders.fallback import Fallback
-from hdl_checker.builders.ghdl import GHDL
-from hdl_checker.builders.msim import MSim
-from hdl_checker.builders.xvhdl import XVHDL
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.utils import removeDirIfExists
 
-TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_PROJECT = p.abspath(p.join(TEST_TEMP_PATH, "test_project"))
-
-SERVER_LOG_LEVEL = os.environ.get("SERVER_LOG_LEVEL", "INFO")
-
 _logger = logging.getLogger(__name__)
-HDL_CHECKER_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
-
-BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fallback}
 
 
 class TestConfigGenerator(TestCase):
     maxDiff = None
 
-    @classmethod
-    def setUpClass(cls):
-        setupTestSuport(TEST_TEMP_PATH)
-
     def setUp(self):
         self.app = TestApp(handlers.app)
 
-        #  self.dummy_test_path = p.join(TEST_TEMP_PATH, "dummy_test_path")
         self.dummy_test_path = mkdtemp(prefix=__name__ + "_")
-
-        #  self.assertFalse(
-        #      p.exists(self.dummy_test_path),
-        #      "Path '%s' shouldn't exist right now" % p.abspath(self.dummy_test_path),
-        #  )
-
-        #  os.makedirs(self.dummy_test_path)
 
         os.mkdir(p.join(self.dummy_test_path, "path_a"))
         os.mkdir(p.join(self.dummy_test_path, "path_b"))
@@ -116,22 +91,11 @@ class TestConfigGenerator(TestCase):
                 p.join(self.dummy_test_path, "path_a", "source_tb.vhd"),
                 p.join(self.dummy_test_path, "path_b", "some_source.vhd"),
                 p.join(self.dummy_test_path, "path_b", "a_verilog_source.v"),
+                p.join(self.dummy_test_path, "sv_includes", "systemverilog_header.svh"),
+                p.join(self.dummy_test_path, "v_includes", "verilog_header.vh"),
+                p.join(self.dummy_test_path, "path_a", "header_out_of_place.vh"),
             },
         )
 
-        self.assertCountEqual(
-            config.pop("systemverilog"),
-            {"include_paths": {p.join(self.dummy_test_path, "sv_includes")}},
-        )
-
-        self.assertCountEqual(
-            config.pop("verilog"),
-            {
-                "include_paths": {
-                    p.join(self.dummy_test_path, "path_a"),
-                    p.join(self.dummy_test_path, "v_includes"),
-                }
-            },
-        )
-
+        # Assert there's no extra elements
         self.assertFalse(config)

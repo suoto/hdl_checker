@@ -27,10 +27,6 @@ from hdl_checker.parser_utils import (
 )
 from hdl_checker.path import Path
 
-_SOURCE_EXTENSIONS = "vhdl", "sv", "v"
-_HEADER_EXTENSIONS = "vh", "svh"
-
-
 def _noFilter(_, paths):
     """
     Dummy filter, returns paths
@@ -48,9 +44,6 @@ class SimpleFinder(BaseGenerator):
         super(SimpleFinder, self).__init__()
         self._logger.debug("Search paths: %s", paths)
         self._paths = {Path(x) for x in paths}
-        self._valid_extensions = tuple(
-            list(_SOURCE_EXTENSIONS) + list(_HEADER_EXTENSIONS)
-        )
 
     def _getLibrary(self, path):  # pylint:disable=no-self-use,unused-argument
         # type: (Path) -> str

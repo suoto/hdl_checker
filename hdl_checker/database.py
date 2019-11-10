@@ -44,7 +44,7 @@ from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     PathNotInProjectFile,
 )
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import DependencySpec, IncludedPath
 from hdl_checker.parsers.elements.design_unit import (  # pylint: disable=unused-import,
     tAnyDesignUnit,
 )
@@ -361,14 +361,23 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
     @lru_cache()
     def getLibrary(self, path):
         # type: (Path) -> UnresolvedLibrary
-        "Gets a library of a given source (this is likely to be removed)"
+        """
+        Gets the library the VHDL path is in, inferring and updating it if
+        needed.
+
+        Verilog and SystemVerilog have no concept of libraries and will return
+        None.
+        """
         self._parseSourceIfNeeded(path)
+        # Only VHDL has libraries
+        if FileType.fromPath(path) is not FileType.vhdl:
+            return None
         if path not in self.paths:
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)
             self._updatePathLibrary(path, Identifier("not_in_project", True))
-            # If path is not on the list of paths added, report this. If the
-            # config is valid
+            # Report paths that are valid (that is, not temporary) when they
+            # can't be found in the project file
             if not isinstance(path, TemporaryPath):
                 self._addDiagnostic(PathNotInProjectFile(path))
 
@@ -415,8 +424,8 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             # Update the timestamp
             self._parse_timestamp[path] = p.getmtime(str(path))
 
-            # Remove all design units that referred to this path before adding new
-            # ones, but use the non API method for that to avoid recursing
+            # Remove all design units that referred to this path before adding
+            # new ones, but use the non API method for that to avoid recursing
             self._design_units -= frozenset(self._getDesignUnitsByPath(path))
 
             self._design_units |= design_units
@@ -608,6 +617,28 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     )
                 )
 
+    def _resolveIncludedPath(self, included_path):
+        # type: (IncludedPath) -> Optional[Path]
+        """
+        Tries to resolve an include by searching for paths that end with the
+        same set of strings as the included path
+        """
+        paths = {
+            path
+            for path in self.paths
+            if str(path).endswith(p.normpath(str(included_path.name)))
+        }
+
+        if not paths:
+            _logger.warning("No path matched %s", repr(included_path))
+
+        if len(paths) > 1:
+            _logger.warning(
+                "Included path %s matches multiple files: %s", included_path, paths
+            )
+
+        return paths.pop()
+
     def getDependenciesUnits(self, path):
         # type: (Path) -> Set[LibraryUnitTuple]
         """
@@ -615,21 +646,6 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         path but only within the project file set. If a design unit can't be
         found in any source, it will be silently ignored.
         """
-        # These paths define the dependencies that the original path has. In
-        # the ideal case, each dependency is defined once and the config file
-        # specifies the correct library, in which case we don't add any extra
-        # warning.
-        #
-        # If a dependency is defined multiple times, issue a warning indicating
-        # which one is going to actually be used and which are the other
-        # options, just like what has been already implemented.
-        #
-        # If the library is not set for the a given path, try to guess it by
-        # (1) given every design unit defined in this file, (2) search for
-        # every file that also depends on it and (3) identify which library is
-        # used. If all of them converge on the same library name, just use
-        # that. If there's no agreement, use the library that satisfies the
-        # path in question but warn the user that something is not right
         self._parseSourceIfNeeded(path)
 
         units = set()  # type: Set[LibraryUnitTuple]
@@ -640,6 +656,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         }
 
         while search_paths:
+            dependencies = {
+                dependency
+                for search_path in search_paths
+                for dependency in self._dependencies_map[search_path]
+                if not isinstance(dependency, IncludedPath)
+            }
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen
             new_deps = {
@@ -647,8 +669,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     dependency.library or self.getLibrary(dependency.owner),
                     dependency.name,
                 )
-                for search_path in search_paths
-                for dependency in self._dependencies_map[search_path]
+                for dependency in dependencies
             } - units
 
             _logger.debug(
@@ -659,9 +680,17 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             # the search started
             units |= new_deps
 
+            # Resolve included paths to a real, searchable path
+            resolved_includes = (
+                self._resolveIncludedPath(dependency)
+                for search_path in search_paths
+                for dependency in self._dependencies_map[search_path]
+                if isinstance(dependency, IncludedPath)
+            )
+
             # Paths to be searched on the next iteration are the paths of the
-            # dependencies we have not seen before
-            search_paths = set()
+            # dependencies we have not seen before, plus any included paths
+            search_paths = {x for x in resolved_includes if x}
 
             for library, name in new_deps:
                 new_paths = set(self.getPathsDefining(name=name, library=library))

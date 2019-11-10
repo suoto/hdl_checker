@@ -24,11 +24,6 @@ from typing import Dict, Optional, Set, Tuple
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 
-_SOURCE_EXTENSIONS = "vhdl", "sv", "v"
-_HEADER_EXTENSIONS = "vh", "svh"
-
-_DEFAULT_LIBRARY_NAME = {"vhdl": "lib", "verilog": "lib", "systemverilog": "lib"}
-
 SourceSpec = Tuple[Path, BuildFlags, Optional[str]]
 
 
@@ -42,27 +37,16 @@ class BaseGenerator:
     def __init__(self):  # type: () -> None
         self._logger = logging.getLogger(self.__class__.__name__)
         self._sources = set()  # type: Set[SourceSpec]
-        self._include_paths = {
-            FileType.verilog: set(),
-            FileType.systemverilog: set(),
-        }  # type: Dict[FileType, Set[str]]
 
     def _addSource(self, path, flags=None, library=None):
         # type: (Path, BuildFlags, Optional[str]) -> None
         """
-        Add a source to project. 'flags' and 'library' are only used for
-        regular sources and not for header files (files ending in .vh or .svh)
+        Add a source to project, which includes regular sources AND headers
         """
         self._logger.debug(
             "Adding path %s (flags=%s, library=%s)", path, flags, library
         )
-
-        if path.basename.split(".")[-1].lower() in ("vh", "svh"):
-            file_type = FileType.fromPath(path)
-            if file_type in (FileType.verilog, FileType.systemverilog):
-                self._include_paths[file_type].add(path.dirname)
-        else:
-            self._sources.add((path, flags or (), library))
+        self._sources.add((path, flags or (), library))
 
     @abc.abstractmethod
     def _populate(self):  # type: () -> None
@@ -91,15 +75,6 @@ class BaseGenerator:
         builder = self._getPreferredBuilder()
         if builder is not NotImplemented:
             project["builder"] = builder
-
-        # Add include paths if they exists. Need to iterate sorted keys to
-        # generate results always in the same order
-        for lang in (FileType.verilog, FileType.systemverilog):
-            paths = self._include_paths[lang]
-            if paths:
-                if lang.value not in project:
-                    project[lang.value] = {}
-                project[lang.value]["include_paths"] = tuple(paths)
 
         for path, flags, library in self._sources:
             info = {}

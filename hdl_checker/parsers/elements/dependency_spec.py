@@ -107,6 +107,10 @@ class DependencySpec(ParsedElement):
 
 
 class IncludedPath(DependencySpec):
+    """
+    Special type of dependency for Verilog and SystemVerilog files. Its name is
+    actually the string that the source is including.
+    """
     def __init__(self, owner, name, locations=None):
         # type: (Path, Identifier, Optional[LocationList]) -> None
         super(IncludedPath, self).__init__(

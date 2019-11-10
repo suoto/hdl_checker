@@ -103,14 +103,14 @@ class SourceFile(object):
 
 
 class TestGetVunitSources(TestCase):
-    def test_vunit_not_found(self):
+    def test_VunitNotFound(self):
         builder = MagicMock()
         with disableVunit:
             self.assertFalse(list(getVunitSources(builder)))
 
     @patch("vunit.VUnit.get_source_files")
-    def test_vhdl_builder(self, meth):
-        meth.side_effect = [
+    def test_VhdlBuilder(self, get_source_files):
+        get_source_files.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),
                 SourceFile(name=_path("path_1.vhd"), library="libary_1"),
@@ -126,7 +126,7 @@ class TestGetVunitSources(TestCase):
         # Should only have VHDL files
         sources = list(getVunitSources(builder))
 
-        meth.assert_called_once()
+        get_source_files.assert_called_once()
 
         self.assertCountEqual(
             sources,
@@ -136,13 +136,19 @@ class TestGetVunitSources(TestCase):
             },
         )
 
+    @patch("hdl_checker.builder_utils.findRtlSourcesByPath")
     @patch("vunit.verilog.VUnit.get_source_files")
-    def test_systemverilog_only_builder(self, meth):
-        meth.side_effect = [
+    def test_SystemverilogOnlyBuilder(self, get_source_files, find_rtl_sources):
+        get_source_files.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),
                 SourceFile(name=_path("path_1.vhd"), library="libary_1"),
             ]
+        ]
+
+        find_rtl_sources.return_value = [
+            Path(_path("some_header.vh")),
+            Path(_path("some_header.svh")),
         ]
 
         builder = MagicMock()
@@ -153,18 +159,21 @@ class TestGetVunitSources(TestCase):
         # Should only have VHDL files
         sources = list(getVunitSources(builder))
 
-        meth.assert_called_once()
+        get_source_files.assert_called_once()
+        find_rtl_sources.assert_called_once()
 
         self.assertCountEqual(
             sources,
             {
                 (Path(_path("path_0.vhd")), "libary_0", ("-2008",)),
                 (Path(_path("path_1.vhd")), "libary_1", ("-2008",)),
+                (Path(_path("some_header.vh")), None, ()),
+                (Path(_path("some_header.svh")), None, ()),
             },
         )
 
     @patch("hdl_checker.builder_utils._getSourcesFromVUnitModule")
-    def test_verilog_only_builder(self, meth):
+    def test_VerilogOnlyBuilder(self, meth):
         builder = MagicMock()
         builder.builder_name = "msim"
         builder.file_types = {FileType.verilog}
@@ -173,9 +182,12 @@ class TestGetVunitSources(TestCase):
         self.assertFalse(list(getVunitSources(builder)))
         meth.assert_not_called()
 
+    @patch("hdl_checker.builder_utils.findRtlSourcesByPath")
     @patch("vunit.VUnit.get_source_files")
     @patch("vunit.verilog.VUnit.get_source_files")
-    def test_vhdl_and_systemverilog_only_builder(self, vhdl_method, sv_method):
+    def test_VhdlAndSystemverilogOnlyBuilder(
+        self, vhdl_method, sv_method, find_rtl_sources
+    ):
         vhdl_method.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),
@@ -188,6 +200,11 @@ class TestGetVunitSources(TestCase):
                 SourceFile(name=_path("path_2.sv"), library="libary_2"),
                 SourceFile(name=_path("path_3.sv"), library="libary_3"),
             ]
+        ]
+
+        find_rtl_sources.return_value = [
+            Path(_path("some_header.vh")),
+            Path(_path("some_header.svh")),
         ]
 
         builder = MagicMock()
@@ -208,5 +225,7 @@ class TestGetVunitSources(TestCase):
                 (Path(_path("path_1.vhd")), "libary_1", ()),
                 (Path(_path("path_2.sv")), "libary_2", ()),
                 (Path(_path("path_3.sv")), "libary_3", ()),
+                (Path(_path("some_header.vh")), None, ()),
+                (Path(_path("some_header.svh")), None, ()),
             },
         )
