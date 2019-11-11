@@ -35,7 +35,7 @@ import six
 
 from mock import patch
 
-from hdl_checker.tests import TestCase, getTestTempPath
+from hdl_checker.tests import TestCase
 
 from hdl_checker import DEFAULT_PROJECT_FILE
 from hdl_checker.parser_utils import (
@@ -50,23 +50,6 @@ from hdl_checker.types import BuildFlagScope, FileType
 from hdl_checker.utils import removeIfExists
 
 _logger = logging.getLogger(__name__)
-
-TEST_TEMP_PATH = getTestTempPath(__name__)
-TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
-
-TEST_CONFIG_PARSER_SUPPORT_PATH = p.join(TEST_TEMP_PATH, "test_config_parser")
-
-
-def _path(*args):
-    # type: (str) -> str
-    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
-    return p.join(TEST_TEMP_PATH, *args)
-
-
-def _Path(*args):
-    # type: (str) -> Path
-    "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
-    return Path(_path(*args))
 
 
 def json_dump(obj, stream):
@@ -97,12 +80,28 @@ class _ConfigDict(object):
 class TestConfigHandlers(TestCase):
     maxDiff = None
 
+    def setUp(self):
+        self.base_path = mkdtemp()
+
+        def _path(*args):
+            # type: (str) -> str
+            "Helper to reduce foorprint of p.join(self.base_path, *args)"
+            return p.join(self.base_path, *args)
+
+        def _Path(*args):
+            # type: (str) -> Path
+            "Helper to reduce foorprint of Path(p.join(self.base_path, *args))"
+            return Path(_path(*args))
+
+        self._path = _path
+        self._Path = _Path
+
     def test_DirectInclusion(self):
-        incl_0 = _path("incl_0.json")
-        incl_1 = _path("incl_1.json")
-        incl_2 = _path("incl_2.json")
-        incl_3 = _path("incl_3.json")
-        #  incl_4 = _path('incl_4.json')
+        incl_0 = self._path("incl_0.json")
+        incl_1 = self._path("incl_1.json")
+        incl_2 = self._path("incl_2.json")
+        incl_3 = self._path("incl_3.json")
+        #  incl_4 = self._path('incl_4.json')
 
         search_paths = (incl_0, "incl_1.json")
 
@@ -114,67 +113,67 @@ class TestConfigHandlers(TestCase):
         json_dump({"name": "incl_2"}, open(incl_2, "w"))
         json_dump({"name": "incl_3"}, open(incl_3, "w"))
 
-        result = list(getIncludedConfigs(search_paths, TEST_TEMP_PATH))
+        result = list(getIncludedConfigs(search_paths, self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(
             result,
             (
-                (TEST_TEMP_PATH, {"name": "incl_0"}),
-                (TEST_TEMP_PATH, {"name": "incl_1"}),
-                (TEST_TEMP_PATH, {"name": "incl_2"}),
-                (TEST_TEMP_PATH, {"name": "incl_3"}),
+                (self.base_path, {"name": "incl_0"}),
+                (self.base_path, {"name": "incl_1"}),
+                (self.base_path, {"name": "incl_2"}),
+                (self.base_path, {"name": "incl_3"}),
             ),
         )
 
     def test_RecursiveInclusion(self):
-        incl_0 = _path("incl_0.json")
-        incl_1 = _path("incl_1.json")
+        incl_0 = self._path("incl_0.json")
+        incl_1 = self._path("incl_1.json")
 
         search_paths = (incl_0,)
 
         json_dump({"include": (incl_1,), "name": "incl_0"}, open(incl_0, "w"))
         json_dump({"include": (incl_0,), "name": "incl_1"}, open(incl_1, "w"))
 
-        result = list(getIncludedConfigs(search_paths, TEST_TEMP_PATH))
+        result = list(getIncludedConfigs(search_paths, self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(
             result,
             (
-                (TEST_TEMP_PATH, {"name": "incl_0"}),
-                (TEST_TEMP_PATH, {"name": "incl_1"}),
+                (self.base_path, {"name": "incl_0"}),
+                (self.base_path, {"name": "incl_1"}),
             ),
         )
 
     def test_IgnoresNonExistingFiles(self):
-        incl_0 = _path("incl_0.json")
-        incl_1 = _path("incl_1.json")
+        incl_0 = self._path("incl_0.json")
+        incl_1 = self._path("incl_1.json")
 
         search_paths = (incl_0, incl_1)
 
         removeIfExists(incl_0)
         json_dump({"name": "incl_1"}, open(incl_1, "w"))
 
-        result = list(getIncludedConfigs(search_paths, TEST_TEMP_PATH))
+        result = list(getIncludedConfigs(search_paths, self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
-        self.assertCountEqual(result, ((TEST_TEMP_PATH, {"name": "incl_1"}),))
+        self.assertCountEqual(result, ((self.base_path, {"name": "incl_1"}),))
 
     def test_IgnoresJsonDecodingErrors(self):
-        search_paths = (_path("incl_0.json"),)
+        search_paths = (self._path("incl_0.json"),)
 
-        open(_path("incl_0.json"), "w").write("hello")
+        open(self._path("incl_0.json"), "w").write("hello")
 
-        result = list(getIncludedConfigs(search_paths, TEST_TEMP_PATH))
+        result = list(getIncludedConfigs(search_paths, self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(result, ())
 
     def test_IncludesRelativePaths(self):
-        incl_0 = _path("incl_0.json")
-        incl_1 = _path("incl_1.json")
-        incl_2 = _path("incl_2.json")
+        incl_0 = self._path("incl_0.json")
+        incl_1 = self._path("incl_1.json")
+        incl_2 = self._path("incl_2.json")
 
         search_paths = (incl_0, "incl_1.json")
 
@@ -185,15 +184,15 @@ class TestConfigHandlers(TestCase):
         # No inclusion (enpoints)
         json_dump({"name": "incl_2"}, open(incl_2, "w"))
 
-        result = list(getIncludedConfigs(search_paths, TEST_TEMP_PATH))
+        result = list(getIncludedConfigs(search_paths, self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(
             result,
             (
-                (TEST_TEMP_PATH, {"name": "incl_0"}),
-                (TEST_TEMP_PATH, {"name": "incl_1"}),
-                (TEST_TEMP_PATH, {"name": "incl_2"}),
+                (self.base_path, {"name": "incl_0"}),
+                (self.base_path, {"name": "incl_1"}),
+                (self.base_path, {"name": "incl_2"}),
             ),
         )
 
@@ -206,7 +205,7 @@ class TestConfigHandlers(TestCase):
 
         with patch("hdl_checker.parser_utils.json.load") as load:
             load.return_value = {"foo": "bar"}
-            result = list(getIncludedConfigs((folder,), TEST_TEMP_PATH))
+            result = list(getIncludedConfigs((folder,), self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(result, [(folder, {"foo": "bar"})])
@@ -217,7 +216,7 @@ class TestConfigHandlers(TestCase):
 
         with patch("hdl_checker.parser_utils.findRtlSourcesByPath") as meth:
             meth.return_value = ["sources.vhd"]
-            result = list(getIncludedConfigs((folder,), TEST_TEMP_PATH))
+            result = list(getIncludedConfigs((folder,), self.base_path))
             meth.assert_called_once_with(Path(folder))
 
         _logger.info("Result:\n%s", pformat(result))
@@ -227,9 +226,9 @@ class TestConfigHandlers(TestCase):
     # this test don't exist, so need to mock that
     @patch("hdl_checker.parser_utils.glob", lambda x: [x])
     def test_FlattenConfigAndPreserveScopes(self):
-        incl_0 = _path("incl_0.json")
-        incl_1 = _path("incl_1.json")
-        #  incl_2 = _path("incl_2.json")
+        incl_0 = self._path("incl_0.json")
+        incl_1 = self._path("incl_1.json")
+        #  incl_2 = self._path("incl_2.json")
 
         incl_0_cfg = _ConfigDict()
 
@@ -268,11 +267,11 @@ class TestConfigHandlers(TestCase):
         incl_1_cfg = _ConfigDict()
 
         incl_1_cfg.sources += [
-            _path("src_1_0.vhd"),
+            self._path("src_1_0.vhd"),
             "src_1_1.v",
             "src_1_2.sv",
             ("src_1_3.vhd", {"library": "l_1_3"}),
-            (_path("src_1_4.vhd"), {"flags": ("f_1_4",)}),
+            (self._path("src_1_4.vhd"), {"flags": ("f_1_4",)}),
             ("src_1_5.vhd", {"library": "l_1_5", "flags": ("f_1_5",)}),
         ]
 
@@ -297,7 +296,7 @@ class TestConfigHandlers(TestCase):
         json_dump(incl_0_cfg.toDict(), open(incl_0, "w"))
         json_dump(incl_1_cfg.toDict(), open(incl_1, "w"))
 
-        result = list(flattenConfig(incl_0_cfg.toDict(), TEST_TEMP_PATH))
+        result = list(flattenConfig(incl_0_cfg.toDict(), self.base_path))
 
         _logger.info("Result:\n%s", pformat(result))
 
@@ -305,73 +304,73 @@ class TestConfigHandlers(TestCase):
             result,
             (
                 (
-                    _Path("src_0_0.vhd"),
+                    self._Path("src_0_0.vhd"),
                     None,
                     ("vhdl/0/glob", "vhdl/0/single"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
-                    _Path("src_0_1.v"),
+                    self._Path("src_0_1.v"),
                     None,
                     ("verilog/0/glob", "verilog/0/single"),
                     ("verilog/0/glob", "verilog/0/deps"),
                 ),
                 (
-                    _Path("src_0_2.sv"),
+                    self._Path("src_0_2.sv"),
                     None,
                     ("systemverilog/0/glob", "systemverilog/0/single"),
                     ("systemverilog/0/glob", "systemverilog/0/deps"),
                 ),
                 (
-                    _Path("src_0_3.vhd"),
+                    self._Path("src_0_3.vhd"),
                     "l_0_3",
                     ("vhdl/0/glob", "vhdl/0/single"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
-                    _Path("src_0_4.vhd"),
+                    self._Path("src_0_4.vhd"),
                     None,
                     ("vhdl/0/glob", "vhdl/0/single", "f_0_4"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
-                    _Path("src_0_5.vhd"),
+                    self._Path("src_0_5.vhd"),
                     "l_0_5",
                     ("vhdl/0/glob", "vhdl/0/single", "f_0_5"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
-                    _Path("src_1_0.vhd"),
+                    self._Path("src_1_0.vhd"),
                     None,
                     ("vhdl/1/glob", "vhdl/1/single"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
-                    _Path("src_1_1.v"),
+                    self._Path("src_1_1.v"),
                     None,
                     ("verilog/1/glob", "verilog/1/single"),
                     ("verilog/1/glob", "verilog/1/deps"),
                 ),
                 (
-                    _Path("src_1_2.sv"),
+                    self._Path("src_1_2.sv"),
                     None,
                     ("systemverilog/1/glob", "systemverilog/1/single"),
                     ("systemverilog/1/glob", "systemverilog/1/deps"),
                 ),
                 (
-                    _Path("src_1_3.vhd"),
+                    self._Path("src_1_3.vhd"),
                     "l_1_3",
                     ("vhdl/1/glob", "vhdl/1/single"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
-                    _Path("src_1_4.vhd"),
+                    self._Path("src_1_4.vhd"),
                     None,
                     ("vhdl/1/glob", "vhdl/1/single", "f_1_4"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
-                    _Path("src_1_5.vhd"),
+                    self._Path("src_1_5.vhd"),
                     "l_1_5",
                     ("vhdl/1/glob", "vhdl/1/single", "f_1_5"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
