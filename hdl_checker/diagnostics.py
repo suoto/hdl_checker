@@ -19,7 +19,7 @@
 from typing import Iterable, Optional
 
 from hdl_checker.parsers.elements.dependency_spec import (  # pylint: disable=unused-import
-    RequiredDesignUnit,
+    BaseDependencySpec,
 )
 from hdl_checker.parsers.elements.identifier import (  # pylint: disable=unused-import
     Identifier,
@@ -380,7 +380,7 @@ class UnresolvedDependency(CheckerDiagnostic):
     """
 
     def __init__(self, dependency, location):
-        # type: (RequiredDesignUnit, Location) -> None
+        # type: (BaseDependencySpec, Location) -> None
         super(UnresolvedDependency, self).__init__(
             filename=dependency.owner,
             severity=DiagType.STYLE_ERROR,

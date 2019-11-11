@@ -142,6 +142,16 @@ class Path(object):
 
         return obj
 
+    def endswith(self, other):
+        # type: (str) -> bool
+        """
+        Checks if the paths end with the same suffix
+        """
+        # Split the path at the path separator to compare the appropriate
+        # part
+        ref = p.normpath(other).split(p.sep)
+        return self.name.split(p.sep)[-len(ref) :] == ref
+
 
 class TemporaryPath(Path):
     """

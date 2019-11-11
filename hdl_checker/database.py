@@ -620,7 +620,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     )
                 )
 
-    def _resolveIncludedPath(self, included_path):
+    def resolveIncludedPath(self, included_path):
         # type: (IncludedPath) -> Optional[Path]
         """
         Tries to resolve an include by searching for paths that end with the
@@ -629,11 +629,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         paths = {
             path
             for path in self.paths
-            if str(path).endswith(p.normpath(str(included_path.name)))
+            if path.endswith(str(included_path.name))
         }
 
         if not paths:
             _logger.warning("No path matched %s", repr(included_path))
+            return None
 
         if len(paths) > 1:
             _logger.warning(
@@ -685,7 +686,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
             # Resolve included paths to a real, searchable path
             resolved_includes = (
-                self._resolveIncludedPath(dependency)
+                self.resolveIncludedPath(dependency)
                 for search_path in search_paths
                 for dependency in self._dependencies_map[search_path]
                 if isinstance(dependency, IncludedPath)

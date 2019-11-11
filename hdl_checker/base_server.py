@@ -45,7 +45,10 @@ from hdl_checker.diagnostics import (
     UnresolvedDependency,
 )
 from hdl_checker.parsers.config_parser import ConfigParser
-from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
+from hdl_checker.parsers.elements.dependency_spec import (
+    IncludedPath,
+    RequiredDesignUnit,
+)
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
@@ -515,7 +518,15 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         for dependency in self.database.getDependenciesByPath(path):
             if dependency.library in self.builder.builtin_libraries:
                 continue
-            if not self.resolveDependencyToPath(dependency):
+            # Required design units will be translated directly into a path
+            resolved = (
+                isinstance(dependency, RequiredDesignUnit)
+                and self.resolveDependencyToPath(dependency)
+            ) or (
+                isinstance(dependency, IncludedPath)
+                and self.database.resolveIncludedPath(dependency)
+            )
+            if not resolved:
                 for location in dependency.locations:
                     diags.add(UnresolvedDependency(dependency, location))
 
