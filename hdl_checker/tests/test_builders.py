@@ -47,7 +47,7 @@ from hdl_checker.builder_utils import (
 )
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.exceptions import SanityCheckError
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import (
@@ -624,7 +624,7 @@ class TestBuilder(TestCase):
         ):
             self.builder._database.getDependenciesByPath = mock.MagicMock(
                 return_value=[
-                    DependencySpec(
+                    RequiredDesignUnit(
                         owner=Path(""),
                         name=Identifier("very_common_pkg"),
                         library=Identifier("work"),

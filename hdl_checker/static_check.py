@@ -232,9 +232,7 @@ def _getMiscChecks(objects):
             continue
         if library == "work":
             yield LibraryShouldBeOmited(
-                line_number=obj["lnum"],
-                column_number=obj["start"],
-                library=library,
+                line_number=obj["lnum"], column_number=obj["start"], library=library
             )
 
 

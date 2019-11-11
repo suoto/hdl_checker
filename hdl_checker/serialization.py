@@ -24,7 +24,7 @@ from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
 from hdl_checker.builders.xvhdl import XVHDL
 from hdl_checker.database import Database
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import VerilogDesignUnit, VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import (
     Identifier,
@@ -42,7 +42,7 @@ _logger = logging.getLogger(__name__)
 # recreate an object
 CLASS_MAP = {
     "Database": Database,
-    "DependencySpec": DependencySpec,
+    "RequiredDesignUnit": RequiredDesignUnit,
     "Fallback": Fallback,
     "FileType": FileType,
     "GHDL": GHDL,

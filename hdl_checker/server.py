@@ -146,7 +146,7 @@ def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
         sys.stderr = openForStdHandle(stderr)
 
 
-def _binaryStdio(): # pragma: no cover
+def _binaryStdio():  # pragma: no cover
     """
     (from https://github.com/palantir/python-language-server)
 

@@ -22,10 +22,12 @@ from .simple_finder import SimpleFinder
 
 _logger = logging.getLogger(__name__)
 
+
 def getGeneratorByName(name):
     "Returns the builder class given a string name"
     # Check if the builder selected is implemented and create the
     # builder attribute
-    return {'SimpleFinder': SimpleFinder}.get(name, SimpleFinder)
+    return {"SimpleFinder": SimpleFinder}.get(name, SimpleFinder)
 
-__all__ = ['SimpleFinder', ]
+
+__all__ = ["SimpleFinder"]

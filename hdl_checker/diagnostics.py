@@ -18,10 +18,14 @@
 
 from typing import Iterable, Optional
 
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
-from hdl_checker.parsers.elements.identifier import Identifier
+from hdl_checker.parsers.elements.dependency_spec import (  # pylint: disable=unused-import
+    RequiredDesignUnit,
+)
+from hdl_checker.parsers.elements.identifier import (  # pylint: disable=unused-import
+    Identifier,
+)
 from hdl_checker.path import Path  # pylint: disable=unused-import
-from hdl_checker.types import Location
+from hdl_checker.types import Location  # pylint: disable=unused-import
 from hdl_checker.utils import HashableByKey
 
 # pylint: disable=useless-object-inheritance
@@ -376,7 +380,7 @@ class UnresolvedDependency(CheckerDiagnostic):
     """
 
     def __init__(self, dependency, location):
-        # type: (DependencySpec, Location) -> None
+        # type: (RequiredDesignUnit, Location) -> None
         super(UnresolvedDependency, self).__init__(
             filename=dependency.owner,
             severity=DiagType.STYLE_ERROR,

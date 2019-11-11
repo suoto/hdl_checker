@@ -36,7 +36,7 @@ from hdl_checker.base_server import BaseServer
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
 from hdl_checker.exceptions import UnknownParameterError
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import BaseDependencySpec
 from hdl_checker.parsers.elements.design_unit import (
     VerilogDesignUnit,
     VhdlDesignUnit,
@@ -396,7 +396,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         )
 
     def _getDependencyInfoForHover(self, dependency):
-        # type: (DependencySpec) -> Optional[str]
+        # type: (BaseDependencySpec) -> Optional[str]
         """
         Report which source defines a given dependency when the user hovers
         over its name
@@ -411,7 +411,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         )
 
     def _getElementAtPosition(self, path, position):
-        # type: (Path, Location) -> Union[DependencySpec, tAnyDesignUnit, None]
+        # type: (Path, Location) -> Union[BaseDependencySpec, tAnyDesignUnit, None]
         """
         Gets design units and dependencies (in this order) of path and checks
         if their definitions include position
@@ -439,7 +439,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         if isinstance(element, (VerilogDesignUnit, VhdlDesignUnit)):
             return {"contents": self._getBuildSequenceForHover(path)}
 
-        if isinstance(element, DependencySpec):
+        if isinstance(element, BaseDependencySpec):
             return {"contents": self._getDependencyInfoForHover(element)}
 
         return None
@@ -452,7 +452,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             doc_path, Location(line=position["line"], column=position["character"])
         )
 
-        if not isinstance(dependency, DependencySpec):
+        if not isinstance(dependency, BaseDependencySpec):
             _logger.debug("Go to definition not supported for item %s", dependency)
             return []
 

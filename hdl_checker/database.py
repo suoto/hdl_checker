@@ -44,7 +44,11 @@ from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     PathNotInProjectFile,
 )
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec, IncludedPath
+from hdl_checker.parsers.elements.dependency_spec import (
+    BaseDependencySpec,
+    RequiredDesignUnit,
+    IncludedPath,
+)
 from hdl_checker.parsers.elements.design_unit import (  # pylint: disable=unused-import,
     tAnyDesignUnit,
 )
@@ -79,7 +83,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         self._parse_timestamp = {}  # type: Dict[Path, float]
         self._library_map = {}  # type: Dict[Path, Identifier]
         self._flags_map = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
-        self._dependencies_map = {}  # type: Dict[Path, Set[DependencySpec]]
+        self._dependencies_map = {}  # type: Dict[Path, Set[BaseDependencySpec]]
         self._inferred_libraries = set()  # type: Set[Path]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
         self._diags = DefaultDict(set)  # type: Dict[Path, Set[CheckerDiagnostic]]
@@ -344,10 +348,11 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             x for x in self._dependencies_map[path] if x.library is None
         }
 
-        # DependencySpec is not mutable, so we actually need to replace the objects
+        # RequiredDesignUnit is not mutable, so we actually need to replace the
+        # objects
         for dependency in unresolved_dependencies:
             self._dependencies_map[path].add(
-                DependencySpec(
+                RequiredDesignUnit(
                     owner=dependency.owner,
                     name=dependency.name,
                     library=library,
@@ -452,7 +457,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return {x for x in self.design_units if x.owner == path}
 
     def getDependenciesByPath(self, path):
-        # type: (Path) -> FrozenSet[DependencySpec]
+        # type: (Path) -> FrozenSet[BaseDependencySpec]
         """
         Returns parsed dependencies for the given path
         """
@@ -594,8 +599,8 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             return
 
         # Reverse dependency search. Need to evaluate how this performs, but
-        # we'll try to avoid creating a set to store DependencySpec objects for
-        # now
+        # we'll try to avoid creating a set to store BaseDependencySpec objects
+        # for now
 
         for dependency in (
             dependency
@@ -658,7 +663,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 dependency
                 for search_path in search_paths
                 for dependency in self._dependencies_map[search_path]
-                if not isinstance(dependency, IncludedPath)
+                if isinstance(dependency, RequiredDesignUnit)
             }
             # Get the dependencies of the search paths and which design units
             # they define and remove the ones we've already seen

@@ -474,12 +474,7 @@ def test_StartLsp(redirection, binary_stdio, start_server):
     args = type(
         "args",
         (object,),
-        {
-            "lsp": True,
-            "stderr": "stderr",
-            "log_stream": None,
-            "attach_to_pid": None,
-        },
+        {"lsp": True, "stderr": "stderr", "log_stream": None, "attach_to_pid": None},
     )
 
     server.run(args)
@@ -489,5 +484,6 @@ def test_StartLsp(redirection, binary_stdio, start_server):
     start_server.assert_called_once_with(
         "stdin", "stdout", True, hdl_checker.lsp.HdlCheckerLanguageServer
     )
+
 
 it.createTests(globals())

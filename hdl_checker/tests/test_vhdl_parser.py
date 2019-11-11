@@ -31,7 +31,7 @@ from nose2.tools import such  # type: ignore
 
 from hdl_checker.tests import assertCountEqual, assertSameFile, writeListToFile
 
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.vhdl_parser import VhdlParser
@@ -50,7 +50,7 @@ such.unittest.TestCase.maxDiff = None
 def _DependencySpec(owner, name, library, locations=None):
     if library is not None:
         library = Identifier(library, case_sensitive=False)
-    return DependencySpec(
+    return RequiredDesignUnit(
         owner=owner,
         name=Identifier(name, case_sensitive=False),
         library=library,

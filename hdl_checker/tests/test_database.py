@@ -42,7 +42,7 @@ from hdl_checker.tests import (
 from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.elements.parsed_element import Location
@@ -79,7 +79,7 @@ class _Database(Database):
             timestamp = self._parse_timestamp[path]
             dependencies = self._dependencies_map.get(
                 path, set()
-            )  # type: Set[DependencySpec]
+            )  # type: Set[RequiredDesignUnit]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
             _logger.debug("    - library:      : %s", self._library_map.get(path, "?"))
             _logger.debug("    - flags:        : %s", self._flags_map.get(path, "-"))
@@ -1125,7 +1125,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             {
                 DependencyNotUnique(
                     filename=_Path("no_lib_target.vhd"),
-                    design_unit=DependencySpec(
+                    design_unit=RequiredDesignUnit(
                         owner=_Path("no_lib_target.vhd"),
                         name=Identifier("no_lib_package", False),
                     ),
@@ -1138,7 +1138,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
                 ),
                 DependencyNotUnique(
                     filename=_Path("no_lib_target.vhd"),
-                    design_unit=DependencySpec(
+                    design_unit=RequiredDesignUnit(
                         owner=_Path("no_lib_target.vhd"),
                         name=Identifier("no_lib_package", False),
                     ),

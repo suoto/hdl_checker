@@ -25,7 +25,10 @@ from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker.tests import TestCase, writeListToFile
 
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec, IncludedPath
+from hdl_checker.parsers.elements.dependency_spec import (
+    RequiredDesignUnit,
+    IncludedPath,
+)
 from hdl_checker.parsers.elements.identifier import VerilogIdentifier
 from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
@@ -110,13 +113,13 @@ class TestVerilogSource(TestCase):
 
         if self.filetype in ("sv", "svh"):
             expected += [
-                DependencySpec(
+                RequiredDesignUnit(
                     owner=Path(self.filename),
                     name=VerilogIdentifier("some_package"),
                     library=None,
                     locations=(Location(line=2, column=6),),
                 ),
-                DependencySpec(
+                RequiredDesignUnit(
                     owner=Path(self.filename),
                     name=VerilogIdentifier("another_package"),
                     library=None,

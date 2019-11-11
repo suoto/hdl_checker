@@ -45,7 +45,7 @@ from hdl_checker.diagnostics import (
     UnresolvedDependency,
 )
 from hdl_checker.parsers.config_parser import ConfigParser
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
@@ -580,7 +580,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
     @lru_cache()
     def resolveDependencyToPath(self, dependency):
-        # type: (DependencySpec) -> Optional[Tuple[Path, Identifier]]
+        # type: (RequiredDesignUnit) -> Optional[Tuple[Path, Identifier]]
         """
         Retrieves the build sequence for the dependency's owner and extracts
         the path that implements a design unit whose names match that of the

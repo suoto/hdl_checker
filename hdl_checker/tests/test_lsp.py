@@ -48,7 +48,7 @@ from nose2.tools import such  # type: ignore
 
 from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.base_server import WatchedFile
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import (
     DesignUnitType,
     VerilogDesignUnit,
@@ -576,7 +576,7 @@ class TestValidProject(TestCase):
     )
     def test_DependencyInfoForPathNotFound(self):
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
-        dependency = DependencySpec(
+        dependency = RequiredDesignUnit(
             name=Identifier("clock_divider"),
             library=Identifier("basic_library"),
             owner=path,
@@ -594,7 +594,7 @@ class TestValidProject(TestCase):
     )
     def test_ReportDependencyInfo(self):
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
-        dependency = DependencySpec(
+        dependency = RequiredDesignUnit(
             name=Identifier("clock_divider"),
             library=Identifier("basic_library"),
             owner=path,
@@ -620,14 +620,14 @@ class TestValidProject(TestCase):
             locations=(Location(line=5, column=6), Location(line=7, column=8)),
         )
 
-        DEP_A = DependencySpec(
+        DEP_A = RequiredDesignUnit(
             name=Identifier("dep_a"),
             library=Identifier("lib_a"),
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             locations=(Location(line=9, column=10), Location(line=11, column=12)),
         )
 
-        DEP_B = DependencySpec(
+        DEP_B = RequiredDesignUnit(
             name=Identifier("dep_a"),
             library=Identifier("lib_a"),
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),

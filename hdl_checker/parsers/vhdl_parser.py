@@ -19,7 +19,7 @@
 import re
 from typing import Any, Dict, Generator, Iterable, Optional, Set, Tuple, Union
 
-from .elements.dependency_spec import DependencySpec
+from .elements.dependency_spec import RequiredDesignUnit
 from .elements.design_unit import VhdlDesignUnit
 from .elements.identifier import VhdlIdentifier
 from .elements.parsed_element import Location
@@ -121,7 +121,7 @@ class VhdlParser(BaseSourceFile):
 
             yield match.groupdict(), {Location(start_line, start_char)}
 
-    def _getDependencies(self):  # type: () -> Generator[DependencySpec, None, None]
+    def _getDependencies(self):  # type: () -> Generator[RequiredDesignUnit, None, None]
         library_names = {x.lower() for x in self.getLibraries()}
         library_names.add("work")
 
@@ -151,7 +151,7 @@ class VhdlParser(BaseSourceFile):
         for _library, name, locations in dependencies.items():
             # Remove references to 'work' (will treat library=None as work,
             # which also means not set in case of packages)
-            yield DependencySpec(
+            yield RequiredDesignUnit(
                 owner=self.filename, name=name, library=_library, locations=locations
             )
 
@@ -164,7 +164,7 @@ class VhdlParser(BaseSourceFile):
             line_number = int(text[: match.end()].count("\n"))
             column_number = len(text[: match.start()].split("\n")[-1])
 
-            yield DependencySpec(
+            yield RequiredDesignUnit(
                 owner=self.filename,
                 name=VhdlIdentifier(package_body_name),
                 library=None,

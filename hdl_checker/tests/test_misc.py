@@ -151,12 +151,14 @@ def test_DontReportIfCurrentIsNewer(*_):
     onNewReleaseFound(func)
     func.assert_not_called()
 
+
 @patch("hdl_checker.utils._getLatestReleaseVersion", return_value=None)
 @patch("hdl_checker.__version__", "1.0.1")
 def test_DontReportIfFailedToGetVersion(*_):
     func = MagicMock()
     onNewReleaseFound(func)
     func.assert_not_called()
+
 
 @patch("hdl_checker.utils._getLatestReleaseVersion", return_value=None)
 @patch("hdl_checker.__version__", "0+unknown")

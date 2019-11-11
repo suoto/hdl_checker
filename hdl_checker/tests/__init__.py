@@ -37,7 +37,7 @@ from parameterized import parameterized_class  # type: ignore
 from hdl_checker import exceptions
 from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.base_builder import BaseBuilder
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import FileType
@@ -108,7 +108,7 @@ class SourceMock(object):
         self.flags = []  # type: ignore
 
         self.library = library
-        self._dependencies = []  # type: List[DependencySpec]
+        self._dependencies = []  # type: List[RequiredDesignUnit]
         for dep_spec in dependencies or []:
             _name = dep_spec[0]
             _library = "work"
@@ -119,7 +119,7 @@ class SourceMock(object):
                 pass
 
             self._dependencies.append(
-                DependencySpec(
+                RequiredDesignUnit(
                     self._filename,
                     Identifier(_name, False),
                     Identifier(_library, False),

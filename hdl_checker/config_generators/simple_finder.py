@@ -27,6 +27,7 @@ from hdl_checker.parser_utils import (
 )
 from hdl_checker.path import Path
 
+
 def _noFilter(_, paths):
     """
     Dummy filter, returns paths

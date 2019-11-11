@@ -24,7 +24,7 @@ from .parsed_element import LocationList, ParsedElement  # pylint: disable=unuse
 from hdl_checker.path import Path  # pylint: disable=unused-import
 
 
-class DependencySpec(ParsedElement):
+class BaseDependencySpec(ParsedElement):
     "Placeholder for a source dependency"
 
     def __init__(self, owner, name, library=None, locations=None):
@@ -37,7 +37,7 @@ class DependencySpec(ParsedElement):
         self._owner = owner
         self._library = library
         self._name = name
-        super(DependencySpec, self).__init__(locations)
+        super(BaseDependencySpec, self).__init__(locations)
 
     @property
     def owner(self):
@@ -75,7 +75,7 @@ class DependencySpec(ParsedElement):
             self.owner,
             self.library,
             self.name,
-            super(DependencySpec, self).__hash_key__,
+            super(BaseDependencySpec, self).__hash_key__,
         )
 
     def __jsonEncode__(self):
@@ -106,11 +106,16 @@ class DependencySpec(ParsedElement):
         )
 
 
-class IncludedPath(DependencySpec):
+class RequiredDesignUnit(BaseDependencySpec):
+    pass
+
+
+class IncludedPath(BaseDependencySpec):
     """
     Special type of dependency for Verilog and SystemVerilog files. Its name is
     actually the string that the source is including.
     """
+
     def __init__(self, owner, name, locations=None):
         # type: (Path, Identifier, Optional[LocationList]) -> None
         super(IncludedPath, self).__init__(

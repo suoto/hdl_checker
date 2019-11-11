@@ -20,13 +20,16 @@ import logging
 import re
 from typing import Any, Generator, Iterable
 
-from .elements.dependency_spec import DependencySpec, IncludedPath
+from .elements.dependency_spec import (
+    BaseDependencySpec,
+    IncludedPath,
+    RequiredDesignUnit,
+)
 from .elements.design_unit import VerilogDesignUnit
 from .elements.parsed_element import Location
 
 from hdl_checker.parsers.base_parser import BaseSourceFile
 from hdl_checker.parsers.elements.identifier import VerilogIdentifier
-from hdl_checker.path import Path
 from hdl_checker.types import DesignUnitType, FileType
 from hdl_checker.utils import readFile
 
@@ -87,7 +90,7 @@ class VerilogParser(BaseSourceFile):
             start = match.start()
             yield match.groupdict(), content[:start].count("\n")
 
-    def _getDependencies(self):  # type: () -> Iterable[DependencySpec]
+    def _getDependencies(self):  # type: () -> Iterable[BaseDependencySpec]
         text = self.getSourceContent()
 
         for match in _DEPENDENCIES.finditer(text):
@@ -113,7 +116,7 @@ class VerilogParser(BaseSourceFile):
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
 
-                yield DependencySpec(
+                yield RequiredDesignUnit(
                     owner=self.filename,
                     name=VerilogIdentifier(import_name),
                     locations=(Location(line_number, column_number),),

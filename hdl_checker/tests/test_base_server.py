@@ -61,7 +61,7 @@ from hdl_checker.diagnostics import (
     PathNotInProjectFile,
     UnresolvedDependency,
 )
-from hdl_checker.parsers.elements.dependency_spec import DependencySpec
+from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import (
@@ -199,7 +199,7 @@ with such.A("hdl_checker project") as it:
                 diags,
                 [
                     UnresolvedDependency(
-                        DependencySpec(
+                        RequiredDesignUnit(
                             name=Identifier("pkg"),
                             library=Identifier("lib"),
                             owner=Path(filename.name),
@@ -503,7 +503,7 @@ with such.A("hdl_checker project") as it:
         def test():
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
-            clock_divider = DependencySpec(
+            clock_divider = RequiredDesignUnit(
                 name=Identifier("clock_divider"),
                 library=Identifier("basic_library"),
                 owner=path,
@@ -524,7 +524,7 @@ with such.A("hdl_checker project") as it:
         def test():
             path = _Path(TEST_PROJECT, "basic_library", "package_with_functions.vhd")
 
-            clock_divider = DependencySpec(
+            clock_divider = RequiredDesignUnit(
                 name=Identifier("package_with_functions"),
                 library=Identifier("basic_library"),
                 owner=path,
@@ -540,7 +540,7 @@ with such.A("hdl_checker project") as it:
         def test():
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
-            numeric_std = DependencySpec(
+            numeric_std = RequiredDesignUnit(
                 name=Identifier("numeric_std"),
                 library=Identifier("ieee"),
                 owner=path,

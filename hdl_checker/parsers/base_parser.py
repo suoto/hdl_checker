@@ -21,7 +21,9 @@ import logging
 import os.path as p
 from typing import Any, Dict, Iterable, Optional, Set
 
-from .elements.dependency_spec import DependencySpec  # pylint: disable=unused-import
+from .elements.dependency_spec import (
+    RequiredDesignUnit,
+)  # pylint: disable=unused-import
 from .elements.design_unit import tAnyDesignUnit  # pylint: disable=unused-import
 
 from hdl_checker.path import Path
@@ -47,7 +49,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         self._content = None  # type: Optional[str]
         self._mtime = 0  # type: Optional[float]
         self.filetype = FileType.fromPath(self.filename)
-        self._dependencies = None  # type: Optional[Set[DependencySpec]]
+        self._dependencies = None  # type: Optional[Set[RequiredDesignUnit]]
         self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
         self._libraries = None
 
@@ -156,7 +158,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return self._design_units
 
     def getDependencies(self):
-        # type: () -> Set[DependencySpec]
+        # type: () -> Set[RequiredDesignUnit]
         """
         Cached version of the _getDependencies method
         """
