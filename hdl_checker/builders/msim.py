@@ -180,8 +180,6 @@ class MSim(BaseBuilder):
     def _parseBuiltinLibraries(self):
         # type: (...) -> Any
         "Discovers libraries that exist regardless before we do anything"
-        if not self._iniFileExists():
-            self._createIniFile()
         for line in runShellCommand(["vmap"]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 yield Identifier(match.groupdict()["library_name"], False)
@@ -206,19 +204,15 @@ class MSim(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
-        try:
-            filetype = FileType.fromPath(path)
-            if filetype == FileType.vhdl:
-                return self._buildVhdl(path, library, flags)
-            if filetype in (FileType.verilog, FileType.systemverilog):
-                return self._buildVerilog(path, library, flags)
+        filetype = FileType.fromPath(path)
+        if filetype == FileType.vhdl:
+            return self._buildVhdl(path, library, flags)
+        if filetype in (FileType.verilog, FileType.systemverilog):
+            return self._buildVerilog(path, library, flags)
 
-            self._logger.error(  # pragma: no cover
-                "Unknown file type %s for path '%s'", filetype, path
-            )
-        except:
-            self._logger.exception("Failed to build %s", path)
-            raise
+        self._logger.error(  # pragma: no cover
+            "Unknown file type %s for path '%s'", filetype, path
+        )
 
         return ""  # Just to satisfy pylint
 

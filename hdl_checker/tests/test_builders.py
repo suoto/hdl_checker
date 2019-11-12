@@ -23,13 +23,16 @@ import logging
 import os
 import os.path as p
 import shutil
-from typing import Any, List
+from multiprocessing import Queue
+from tempfile import mkdtemp
+from typing import Any, List, Optional, Tuple
 
-import mock
 import parameterized  # type: ignore
 import unittest2  # type: ignore
+from mock import MagicMock, patch
 
 from hdl_checker.tests import (
+    MockBuilder,
     SourceMock,
     TestCase,
     getTestTempPath,
@@ -45,10 +48,16 @@ from hdl_checker.builder_utils import (
     Fallback,
     MSim,
 )
+from hdl_checker.builders.base_builder import BaseBuilder
+from hdl_checker.database import Database
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.exceptions import SanityCheckError
-from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
+from hdl_checker.parsers.elements.dependency_spec import (
+    IncludedPath,
+    RequiredDesignUnit,
+)
 from hdl_checker.parsers.elements.identifier import Identifier
+from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.path import Path
 from hdl_checker.types import (
     BuildFlagScope,
@@ -102,7 +111,7 @@ class TestBuilder(TestCase):
         # Add the builder path to the environment so we can call it
         if self.builder_path:
             _logger.info("Adding '%s' to the system path", self.builder_path)
-            self.patch = mock.patch.dict(
+            self.patch = patch.dict(
                 "os.environ",
                 {"PATH": os.pathsep.join([self.builder_path, os.environ["PATH"]])},
             )
@@ -113,7 +122,7 @@ class TestBuilder(TestCase):
         builder_class = BUILDER_CLASS_MAP[self.builder_name]
         work_folder = _temp("_%s" % self.builder_name)
         _logger.info("Builder class: %s, work folder is %s", builder_class, work_folder)
-        self.builder = builder_class(work_folder, mock.MagicMock())  # type: AnyBuilder
+        self.builder = builder_class(work_folder, MagicMock())  # type: AnyBuilder
         self.builder_class = builder_class
 
     def tearDown(self):
@@ -400,7 +409,8 @@ class TestBuilder(TestCase):
             ],
         )
 
-    def test_VhdlCompilation(self):
+    @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
+    def test_VhdlCompilation(self, *args):
         # type: (...) -> Any
         if FileType.vhdl not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -408,12 +418,9 @@ class TestBuilder(TestCase):
             )
 
         source = _source("no_messages.vhd")
-        with mock.patch.object(
-            self.builder._database, "getLibrary", return_value=Identifier("work")
-        ):
-            records, rebuilds = self.builder.build(
-                source, Identifier("work"), BuildFlagScope.single
-            )
+        records, rebuilds = self.builder.build(
+            source, Identifier("work"), BuildFlagScope.single
+        )
         self.assertNotIn(
             DiagType.ERROR,
             [x.severity for x in records],
@@ -421,7 +428,8 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_VerilogCompilation(self):
+    @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
+    def test_VerilogCompilation(self, *args):
         # type: (...) -> Any
         if FileType.verilog not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -429,12 +437,11 @@ class TestBuilder(TestCase):
             )
 
         source = _source("no_messages.v")
-        with mock.patch.object(
-            self.builder._database, "getLibrary", return_value=Identifier("work")
-        ):
-            records, rebuilds = self.builder.build(
-                source, Identifier("work"), BuildFlagScope.single
-            )
+
+        records, rebuilds = self.builder.build(
+            source, Identifier("work"), BuildFlagScope.single
+        )
+
         self.assertNotIn(
             DiagType.ERROR,
             [x.severity for x in records],
@@ -442,7 +449,8 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_SystemverilogCompilation(self):
+    @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
+    def test_SystemverilogCompilation(self, *args):
         # type: (...) -> Any
         if FileType.systemverilog not in self.builder.file_types:
             raise unittest2.SkipTest(
@@ -451,12 +459,9 @@ class TestBuilder(TestCase):
 
         source = _source("no_messages.sv")
 
-        with mock.patch.object(
-            self.builder._database, "getLibrary", return_value=Identifier("work")
-        ):
-            records, rebuilds = self.builder.build(
-                source, Identifier("work"), BuildFlagScope.single
-            )
+        records, rebuilds = self.builder.build(
+            source, Identifier("work"), BuildFlagScope.single
+        )
 
         self.assertNotIn(
             DiagType.ERROR,
@@ -619,10 +624,10 @@ class TestBuilder(TestCase):
         # type: (...) -> Any
         _logger.info("Rebuild info is %s", rebuild_info)
         library = Identifier("some_lib", False)
-        with mock.patch.object(
+        with patch.object(
             self.builder, "_searchForRebuilds", return_value=[rebuild_info]
         ):
-            self.builder._database.getDependenciesByPath = mock.MagicMock(
+            self.builder._database.getDependenciesByPath = MagicMock(
                 return_value=[
                     RequiredDesignUnit(
                         owner=Path(""),
@@ -638,7 +643,7 @@ class TestBuilder(TestCase):
             )
 
 
-class TestSanityError(TestCase):
+class TestMiscCases(TestCase):
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
     def test_NotAvailable(self, builder_class):
         # type: (...) -> Any
@@ -659,3 +664,97 @@ class TestSanityError(TestCase):
             _ = builder_class(
                 Path(p.join(TEST_TEMP_PATH, "_%s" % builder_class.builder_name)), None
             )
+
+    @parameterized.parameterized.expand(
+        [(x,) for x in (FileType.verilog, FileType.systemverilog)]
+    )
+    def test_IncludedPaths(self, filetype):
+        # type: (...) -> Any
+        work_folder = mkdtemp()
+        database = MagicMock(spec=Database)
+
+        def includedPath(name):
+            return IncludedPath(
+                name=Identifier(name),
+                owner=Path("owner"),
+                locations=frozenset([Location(0, 0)]),
+            )
+
+        def requiredDesignUnit(name):
+            return RequiredDesignUnit(
+                name=Identifier(name),
+                owner=Path("owner"),
+                locations=frozenset([Location(0, 0)]),
+            )
+
+        included_results = Queue()  # type: Queue[Optional[Path]]
+        included_results.put(Path("/library/some/"))
+        included_results.put(None)
+
+        def resolveIncludedPath(*_):
+            return included_results.get(block=False)
+
+        database.getDependenciesByPath.return_value = [
+            includedPath(name="resolved/include"),
+            includedPath(name="unresolved/include"),
+            requiredDesignUnit(name="some_unit"),
+        ]
+
+        database.resolveIncludedPath = resolveIncludedPath
+
+        return_values = Queue()  # type: Queue[Tuple[str]]
+        calls = Queue()  # type: Queue[List[str]]
+
+        # vcom -version
+        return_values.put(("vcom 10.2c Compiler 2013.07 Jul 18 2013",))
+
+        def shell(cmd_with_args, *args, **kwargs):
+            _logger.debug("$ %s", cmd_with_args)
+            calls.put(cmd_with_args)
+            if return_values.empty():
+                return ("",)
+            return return_values.get(block=False)
+
+        if filetype is FileType.verilog:
+            source = _source("no_messages.v")
+        else:
+            source = _source("no_messages.sv")
+
+        with patch("hdl_checker.builders.msim.runShellCommand", shell):
+            builder = MSim(Path(work_folder), database=database)
+
+            records, rebuilds = builder.build(
+                source, Identifier("work"), BuildFlagScope.single
+            )
+
+        list_of_calls = []
+        while not calls.empty():
+            list_of_calls.append(calls.get())
+            _logger.info("- %s", list_of_calls[-1])
+
+        expected = [
+            "vlog",
+            "-modelsimini",
+            p.join(work_folder, "modelsim.ini"),
+            "-quiet",
+            "-work",
+            p.join(work_folder, "work"),
+        ]
+
+        if filetype is FileType.systemverilog:
+            expected += ["-sv"]
+
+        expected += [
+            "-lint",
+            "-hazards",
+            "-pedanticerrors",
+            "-L",
+            "work",
+            "+incdir+/library/some",
+            str(source),
+        ]
+
+        self.assertEqual(expected, list_of_calls[-1])
+
+        self.assertFalse(records)
+        self.assertFalse(rebuilds)

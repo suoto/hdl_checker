@@ -147,10 +147,12 @@ class SourceMock(object):
             lines.append("library {0};".format(lib.display_name))
 
         for dependency in self._dependencies:
+            if dependency.library is not None:
+                dependency_name = dependency.library.display_name
+            else:
+                dependency_name = "work"
             lines.append(
-                "use {0}.{1};".format(
-                    dependency.library.display_name, dependency.name.display_name
-                )
+                "use {0}.{1};".format(dependency_name, dependency.name.display_name)
             )
 
         # Separate if there was libraries already added
