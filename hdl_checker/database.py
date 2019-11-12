@@ -46,8 +46,8 @@ from hdl_checker.diagnostics import (  # pylint: disable=unused-import
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
 from hdl_checker.parsers.elements.dependency_spec import (
     BaseDependencySpec,
-    RequiredDesignUnit,
     IncludedPath,
+    RequiredDesignUnit,
 )
 from hdl_checker.parsers.elements.design_unit import (  # pylint: disable=unused-import,
     tAnyDesignUnit,
@@ -613,9 +613,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 self._addDiagnostic(
                     DependencyNotUnique(
                         filename=dependency.owner,
-                        line_number=location[0],
-                        column_number=location[1],
-                        design_unit=dependency,
+                        line_number=location.line,
+                        column_number=location.column,
+                        dependency=dependency,
                         choices=choices,
                     )
                 )
@@ -626,20 +626,23 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Tries to resolve an include by searching for paths that end with the
         same set of strings as the included path
         """
-        paths = {
-            path
-            for path in self.paths
-            if path.endswith(str(included_path.name))
-        }
+        paths = {path for path in self.paths if path.endswith(str(included_path.name))}
 
         if not paths:
             _logger.warning("No path matched %s", repr(included_path))
             return None
 
         if len(paths) > 1:
-            _logger.warning(
-                "Included path %s matches multiple files: %s", included_path, paths
-            )
+            for location in included_path.locations:
+                self._addDiagnostic(
+                    DependencyNotUnique(
+                        filename=included_path.owner,
+                        line_number=location.line,
+                        column_number=location.column,
+                        dependency=included_path,
+                        choices=paths,
+                    )
+                )
 
         return paths.pop()
 

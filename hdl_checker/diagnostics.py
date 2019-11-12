@@ -20,6 +20,7 @@ from typing import Iterable, Optional
 
 from hdl_checker.parsers.elements.dependency_spec import (  # pylint: disable=unused-import
     BaseDependencySpec,
+    RequiredDesignUnit,
 )
 from hdl_checker.parsers.elements.identifier import (  # pylint: disable=unused-import
     Identifier,
@@ -327,20 +328,31 @@ class DependencyNotUnique(CheckerDiagnostic):
     """
 
     def __init__(  # pylint: disable=too-many-arguments
-        self, filename, design_unit, choices, line_number=None, column_number=None
+        self, filename, dependency, choices, line_number=None, column_number=None
     ):
         # Revert to str and not Paths for the ease for sorting, which helps esp
         # when testing (order of sets depend on their hash)
         _choices = sorted(list(map(str, choices)))
-        text = (
-            "Dependency '{}' (library={}) has {} definitions (files are {}). "
-            "The selected option may not be the correct one".format(
-                design_unit.name,
-                design_unit.library,
-                len(_choices),
-                ", ".join(('"%s"' % x for x in _choices)),
+
+        if isinstance(dependency, RequiredDesignUnit):
+            text = (
+                "Dependency '{}' (library={}) has {} definitions (files are {}). "
+                "The selected option may not be the correct one".format(
+                    dependency.name,
+                    dependency.library,
+                    len(_choices),
+                    ", ".join(('"%s"' % x for x in _choices)),
+                )
             )
-        )
+        else:
+            text = (
+                "Inclue path '{}' has {} definitions (files are {}). "
+                "The selected option may not be the correct one".format(
+                    dependency.name,
+                    len(_choices),
+                    ", ".join(('"%s"' % x for x in _choices)),
+                )
+            )
 
         super(DependencyNotUnique, self).__init__(
             filename=filename,
@@ -381,12 +393,15 @@ class UnresolvedDependency(CheckerDiagnostic):
 
     def __init__(self, dependency, location):
         # type: (BaseDependencySpec, Location) -> None
+        if isinstance(dependency, RequiredDesignUnit):
+            reference = "%s.%s" % (dependency.library or "work", dependency.name)
+        else:
+            reference = str(dependency.name)
+
         super(UnresolvedDependency, self).__init__(
             filename=dependency.owner,
             severity=DiagType.STYLE_ERROR,
             line_number=location.line,
             column_number=location.column,
-            text="Unable to resolve '{}.{}' to a path".format(
-                dependency.library or "work", dependency.name
-            ),
+            text="Unable to resolve '{}' to a path".format(reference),
         )

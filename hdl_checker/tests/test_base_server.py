@@ -46,7 +46,6 @@ from hdl_checker.tests import (
     linuxOnly,
     logIterable,
     setupTestSuport,
-    windowsOnly,
     writeListToFile,
 )
 

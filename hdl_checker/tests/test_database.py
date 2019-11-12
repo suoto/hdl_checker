@@ -29,7 +29,7 @@ import time
 from pprint import pformat
 from typing import Any, Dict, Iterable, Set, Tuple
 
-from mock import patch
+from mock import PropertyMock, patch
 
 from hdl_checker.tests import (
     SourceMock,
@@ -42,7 +42,11 @@ from hdl_checker.tests import (
 from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import DependencyNotUnique, PathNotInProjectFile
-from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
+from hdl_checker.parsers.elements.dependency_spec import (
+    BaseDependencySpec,
+    IncludedPath,
+    RequiredDesignUnit,
+)
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.elements.parsed_element import Location
@@ -79,7 +83,7 @@ class _Database(Database):
             timestamp = self._parse_timestamp[path]
             dependencies = self._dependencies_map.get(
                 path, set()
-            )  # type: Set[RequiredDesignUnit]
+            )  # type: Set[BaseDependencySpec]
             _logger.debug("  - Path: %s (%f)", path, timestamp)
             _logger.debug("    - library:      : %s", self._library_map.get(path, "?"))
             _logger.debug("    - flags:        : %s", self._flags_map.get(path, "-"))
@@ -1125,7 +1129,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             {
                 DependencyNotUnique(
                     filename=_Path("no_lib_target.vhd"),
-                    design_unit=RequiredDesignUnit(
+                    dependency=RequiredDesignUnit(
                         owner=_Path("no_lib_target.vhd"),
                         name=Identifier("no_lib_package", False),
                     ),
@@ -1138,7 +1142,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
                 ),
                 DependencyNotUnique(
                     filename=_Path("no_lib_target.vhd"),
-                    design_unit=RequiredDesignUnit(
+                    dependency=RequiredDesignUnit(
                         owner=_Path("no_lib_target.vhd"),
                         name=Identifier("no_lib_package", False),
                     ),
@@ -1213,3 +1217,73 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             )
 
             meth.assert_not_called()
+
+
+class TestResolveIncludes(TestCase):
+    @patch("hdl_checker.database.Database._addDiagnostic")
+    @patch("hdl_checker.database.Database.paths", new_callable=PropertyMock)
+    def test_ResolveIncludePath(self, paths, add_diagnostic):
+        # type: (...) -> Any
+        database = Database()
+
+        paths.return_value = frozenset(
+            [
+                Path("/some/path/path_0"),
+                Path("/some/path/path_1"),
+                Path("/another/base/path/path_1"),
+                Path("/yet/another/base/path/path_1"),
+                Path("/yet/another/base/path/path_2"),
+                Path("/foo/bar/path_2"),
+            ]
+        )
+
+        def includedPath(name):
+            return IncludedPath(
+                name=Identifier(name),
+                owner=Path("owner"),
+                locations=frozenset([Location(0, 0)]),
+            )
+
+        self.assertEqual(
+            database.resolveIncludedPath(includedPath("path_0")),
+            Path("/some/path/path_0"),
+        )
+        self.assertEqual(
+            database.resolveIncludedPath(includedPath("path/path_0")),
+            Path("/some/path/path_0"),
+        )
+        self.assertEqual(database.resolveIncludedPath(includedPath("/path_0")), None)
+        add_diagnostic.assert_not_called()
+
+        # Test multiple matches
+        self.assertIn(
+            database.resolveIncludedPath(includedPath("path/path_1")),
+            {
+                Path("/some/path/path_1"),
+                Path("/another/base/path/path_1"),
+                Path("/yet/another/base/path/path_1"),
+            },
+        )
+
+        add_diagnostic.assert_called_once()
+        add_diagnostic.reset_mock()
+
+        self.assertIn(
+            database.resolveIncludedPath(includedPath("path_1")),
+            {
+                Path("/some/path/path_1"),
+                Path("/another/base/path/path_1"),
+                Path("/yet/another/base/path/path_1"),
+            },
+        )
+
+        add_diagnostic.assert_called_once()
+        add_diagnostic.reset_mock()
+
+        self.assertIn(
+            database.resolveIncludedPath(includedPath("path_2")),
+            {Path("/yet/another/base/path/path_2"), Path("/foo/bar/path_2")},
+        )
+
+        add_diagnostic.assert_called_once()
+        paths.assert_called()
