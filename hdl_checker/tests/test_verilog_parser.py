@@ -69,6 +69,7 @@ class TestVerilogSource(TestCase):
                 "    input rst,",
                 "    // Output clock divided",
                 "    output       clk_div);",
+                "   localparam foo::bar = std::randomize(cycles);",
                 "endmodule",
                 "",
                 "package msgPkg;",
@@ -91,13 +92,13 @@ class TestVerilogSource(TestCase):
                     owner=self.source.filename,
                     name="clock_divider",
                     type_=DesignUnitType.entity,
-                    locations={(5, None)},
+                    locations={(5, 7)},
                 ),
                 VerilogDesignUnit(
                     owner=self.source.filename,
                     name="msgPkg",
                     type_=DesignUnitType.package,
-                    locations={(14, None)},
+                    locations={(15, 8)},
                 ),
             ],
         )
@@ -117,13 +118,19 @@ class TestVerilogSource(TestCase):
                     owner=Path(self.filename),
                     name=VerilogIdentifier("some_package"),
                     library=None,
-                    locations=(Location(line=2, column=6),),
+                    locations=(Location(line=2, column=7),),
                 ),
                 RequiredDesignUnit(
                     owner=Path(self.filename),
                     name=VerilogIdentifier("another_package"),
                     library=None,
-                    locations=(Location(line=3, column=6),),
+                    locations=(Location(line=3, column=8),),
+                ),
+                RequiredDesignUnit(
+                    owner=Path(self.filename),
+                    name=VerilogIdentifier("foo"),
+                    library=None,
+                    locations=(Location(line=12, column=14),),
                 ),
             ]
 

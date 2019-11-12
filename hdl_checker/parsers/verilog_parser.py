@@ -43,8 +43,8 @@ _COMMENT = r"(?:\/\*.*?\*\/|//[^(?:\r\n?|\n)]*)"
 _DESIGN_UNITS = re.compile(
     "|".join(
         [
-            r"\bmodule\s+(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
-            r"\bpackage\s+(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
+            r"(?<=\bmodule\b)\s*(?P<module_name>%s)" % _VERILOG_IDENTIFIER,
+            r"(?<=\bpackage\b)\s*(?P<package_name>%s)" % _VERILOG_IDENTIFIER,
             _COMMENT,
         ]
     ),
@@ -54,9 +54,7 @@ _DESIGN_UNITS = re.compile(
 _DEPENDENCIES = re.compile(
     "|".join(
         [
-            r"(?<=\bimport\b)\s+(?P<package>{0})\s*::\s*(?:{0}|\*)\s*;".format(
-                _VERILOG_IDENTIFIER
-            ),
+            r"(?P<package>\b{0})\s*::\s*(?:{0}|\*)".format(_VERILOG_IDENTIFIER),
             r"(?<=`include\b)\s*\"(?P<include>.*?)\"",
             _COMMENT,
         ]
@@ -86,9 +84,15 @@ class VerilogParser(BaseSourceFile):
         source's lines
         """
         content = self.getSourceContent()
+        lines = content.split("\n")
         for match in _DESIGN_UNITS.finditer(self.getSourceContent()):
             start = match.start()
-            yield match.groupdict(), content[:start].count("\n")
+            start_line = content[:start].count("\n")
+
+            total_chars_to_line_with_match = len("\n".join(lines[:start_line]))
+            start_char = match.start() - total_chars_to_line_with_match
+
+            yield match.groupdict(), {Location(start_line, start_char)}
 
     def _getDependencies(self):  # type: () -> Iterable[BaseDependencySpec]
         text = self.getSourceContent()
@@ -96,6 +100,7 @@ class VerilogParser(BaseSourceFile):
         for match in _DEPENDENCIES.finditer(text):
             include_name = match.groupdict().get("include", None)
 
+            # package 'std' seems to be built-in. Need to have a look a this
             if include_name is not None:
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
@@ -112,29 +117,31 @@ class VerilogParser(BaseSourceFile):
 
             import_name = match.groupdict().get("package", None)
 
-            if import_name is not None:
+            # package 'std' seems to be built-in. Need to have a look a this
+            #  if include_name is not None and include_name != 'std':
+            if import_name not in (None, "std"):
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
 
                 yield RequiredDesignUnit(
                     owner=self.filename,
-                    name=VerilogIdentifier(import_name),
+                    name=VerilogIdentifier(import_name),  # type: ignore
                     locations=(Location(line_number, column_number),),
                 )
 
     def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
-        for match, line_number in self._iterDesignUnitMatches():
+        for match, locations in self._iterDesignUnitMatches():
             if match["module_name"] is not None:
                 yield VerilogDesignUnit(
                     owner=self.filename,
                     name=match["module_name"],
                     type_=DesignUnitType.entity,
-                    locations={Location(line_number, None)},
+                    locations=locations,
                 )
             if match["package_name"] is not None:
                 yield VerilogDesignUnit(
                     owner=self.filename,
                     name=match["package_name"],
                     type_=DesignUnitType.package,
-                    locations={Location(line_number, None)},
+                    locations=locations,
                 )
