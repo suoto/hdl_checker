@@ -140,9 +140,6 @@ def getVunitSources(builder):
     if FileType.systemverilog in builder.file_types:
         _logger.debug("Builder supports Verilog, adding VUnit Verilog files")
         builder.addExternalLibrary(FileType.verilog, Identifier("vunit_lib", False))
-        builder.addIncludePath(
-            FileType.verilog, p.join(p.dirname(vunit.__file__), "verilog", "include")
-        )
         sources += _getSourcesFromVUnitModule(VUnit_Verilog)
 
     if not sources:

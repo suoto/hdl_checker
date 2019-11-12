@@ -26,6 +26,7 @@ from typing import Any, Dict, FrozenSet, Iterable, Optional, Set, Tuple
 from hdl_checker.database import Database  # pylint: disable=unused-import
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
 from hdl_checker.exceptions import SanityCheckError
+from hdl_checker.parsers.elements.dependency_spec import IncludedPath
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import (
@@ -56,8 +57,6 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
     _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
 
-    _include_paths = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
-
     @classmethod
     def addExternalLibrary(cls, lang, library_name):
         # type: (FileType, Identifier) -> None
@@ -68,14 +67,21 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         assert lang in cls._external_libraries, "Uknown language '%s'" % lang.value
         cls._external_libraries[lang].add(library_name)
 
-    @classmethod
-    def addIncludePath(cls, lang, path):
-        # type: (FileType, str) -> None
+    def _getIncludesForPath(self, path):
+        # type: (Path) -> Iterable[str]
         """
-        Adds an include path to be used by the builder where applicable
+        Resolves included path dependencies for path and generates a list of
+        include directories
         """
-        assert lang in cls._include_paths, "Uknown language '%s'" % lang.value
-        cls._include_paths[lang].add(path)
+        for included_file in {
+            x
+            for x in self._database.getDependenciesByPath(path)
+            if isinstance(x, IncludedPath)
+        }:
+            resolved = self._database.resolveIncludedPath(included_file)
+            if resolved:
+                # Remove the name of included file from the resolve path
+                yield str(resolved).replace(str(included_file.name), "")
 
     @abc.abstractproperty
     def builder_name(self):
@@ -302,7 +308,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             )
         )
 
-    def _buildAndParse(
+    def _buildAndGetDiagnostics(
         self, path, library, flags
     ):  # type: (Path, Identifier, BuildFlags) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
         """
@@ -424,7 +430,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         if build:
             with self._lock:
-                diagnostics, rebuilds = self._buildAndParse(
+                diagnostics, rebuilds = self._buildAndGetDiagnostics(
                     path, library, self._getFlags(path, scope)
                 )
 

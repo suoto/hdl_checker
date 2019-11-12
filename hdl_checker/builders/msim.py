@@ -206,28 +206,37 @@ class MSim(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
-        filetype = FileType.fromPath(path)
-        if filetype == FileType.vhdl:
-            return self._buildVhdl(path, library, flags)
-        if filetype in (FileType.verilog, FileType.systemverilog):
-            return self._buildVerilog(path, library, flags)
+        try:
+            filetype = FileType.fromPath(path)
+            if filetype == FileType.vhdl:
+                return self._buildVhdl(path, library, flags)
+            if filetype in (FileType.verilog, FileType.systemverilog):
+                return self._buildVerilog(path, library, flags)
 
-        self._logger.error(  # pragma: no cover
-            "Unknown file type %s for path '%s'", filetype, path
-        )
+            self._logger.error(  # pragma: no cover
+                "Unknown file type %s for path '%s'", filetype, path
+            )
+        except:
+            self._logger.exception("Failed to build %s", path)
+            raise
 
         return ""  # Just to satisfy pylint
 
-    def _getExtraFlags(self, lang):
-        # type: (FileType) -> Iterable[str]
+    def _getExtraFlags(self, path):
+        # type: (Path) -> Iterable[str]
         """
         Gets extra flags configured for the specific language
         """
+        self._logger.debug("Getting flags for %s", path)
+        lang = FileType.fromPath(path)
+        if lang is FileType.systemverilog:
+            lang = FileType.verilog
+
         libs = []  # type: List[str]
         for library in self._added_libraries | self._external_libraries[lang]:
             libs = ["-L", library.name]
-        for path in self._include_paths[lang]:
-            libs += ["+incdir+" + str(path)]
+        for incdir in self._getIncludesForPath(path):
+            libs += ["+incdir+" + incdir]
         return libs
 
     def _buildVhdl(self, path, library, flags=None):
@@ -265,7 +274,7 @@ class MSim(BaseBuilder):
         if flags:  # pragma: no cover
             cmd += flags
 
-        cmd += self._getExtraFlags(FileType.verilog)
+        cmd += self._getExtraFlags(path)
         cmd += [path.name]
 
         return runShellCommand(cmd)

@@ -790,14 +790,14 @@ with such.A("hdl_checker project") as it:
             # - {unit_type: '', 'unit_name': }
             # - {library_name: '', 'unit_name': }
             # - {rebuild_path: ''}
-            def _buildAndParse(_, path, library, forced=False):
+            def _buildAndGetDiagnostics(_, path, library, forced=False):
                 _logger.warning("%s, %s, %s", path, library, forced)
                 calls.append(str(path))
                 if ret_list:
                     return [], ret_list.pop()
                 return [], []
 
-            with patch.object(MockBuilder, "_buildAndParse", _buildAndParse):
+            with patch.object(MockBuilder, "_buildAndGetDiagnostics", _buildAndGetDiagnostics):
                 it.assertFalse(
                     list(it.project._getBuilderMessages(Path(test_filename)))
                 )
