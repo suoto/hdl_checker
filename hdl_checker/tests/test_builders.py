@@ -702,18 +702,14 @@ class TestMiscCases(TestCase):
 
         database.resolveIncludedPath = resolveIncludedPath
 
-        return_values = Queue()  # type: Queue[Tuple[str]]
-        calls = Queue()  # type: Queue[List[str]]
-
-        # vcom -version
-        return_values.put(("vcom 10.2c Compiler 2013.07 Jul 18 2013",))
+        calls = []  # type: List[List[str]]
 
         def shell(cmd_with_args, *args, **kwargs):
+            calls.append(cmd_with_args)
             _logger.debug("$ %s", cmd_with_args)
-            calls.put(cmd_with_args)
-            if return_values.empty():
-                return ("",)
-            return return_values.get(block=False)
+            if '-version' in cmd_with_args:
+                return ("vcom 10.2c Compiler 2013.07 Jul 18 2013",)
+            return ("",)
 
         if filetype is FileType.verilog:
             source = _source("no_messages.v")
@@ -726,11 +722,6 @@ class TestMiscCases(TestCase):
             records, rebuilds = builder.build(
                 source, Identifier("work"), BuildFlagScope.single
             )
-
-        list_of_calls = []
-        while not calls.empty():
-            list_of_calls.append(calls.get())
-            _logger.info("- %s", list_of_calls[-1])
 
         expected = [
             "vlog",
@@ -754,7 +745,7 @@ class TestMiscCases(TestCase):
             str(source),
         ]
 
-        self.assertEqual(expected, list_of_calls[-1])
+        self.assertEqual(expected, calls[-1])
 
         self.assertFalse(records)
         self.assertFalse(rebuilds)
