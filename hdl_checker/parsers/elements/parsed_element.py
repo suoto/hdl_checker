@@ -14,42 +14,34 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
+"Common characteristics of parsed elements"
 
-import logging
-from typing import Iterable, Optional, Set
 import abc
+import logging
+from typing import Iterable
 
-from hdl_checker.types import Location
+from hdl_checker.types import Location, LocationList, Range
 from hdl_checker.utils import HashableByKey
 
 _logger = logging.getLogger(__name__)
 
-LocationList = Iterable[Location]
-
 
 class ParsedElement(HashableByKey):
+    "Parsed elements base class"
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, locations=None):
-        # type: (Optional[LocationList]) -> None
-        set_of_locations = set()  # type: Set[Location]
-        for line_number, column_number in locations or []:
-            set_of_locations.add(
-                Location(
-                    None if line_number is None else int(line_number),
-                    None if column_number is None else int(column_number),
-                )
-            )
-
-        self._locations = tuple(set_of_locations)
+    def __init__(self, ranges):
+        # type: (Iterable[Range]) -> None
+        self._ranges = frozenset(ranges)
 
     @property
-    def locations(self):
-        return self._locations
+    def ranges(self):
+        "ranges this element was found"
+        return self._ranges
 
     @property
     def __hash_key__(self):
-        return (self.locations,)
+        return (self.ranges,)
 
     @abc.abstractmethod
     def __len__(self):
@@ -62,9 +54,13 @@ class ParsedElement(HashableByKey):
 
     def includes(self, position):
         # type: (Location) -> bool
+        """
+        Checks if the ranges the element was found countain a given
+        location
+        """
         name_length = len(self)
 
-        for location in self.locations:
+        for location in self.ranges:
             if position.line != location.line:
                 continue
 

@@ -17,7 +17,7 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import NamedTuple, Optional, Tuple, Union
+from typing import Iterable, NamedTuple, Optional, Tuple, Union
 
 from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -95,6 +95,7 @@ class MarkupKind(Enum):
 
 # A location on a source file
 Location = NamedTuple("Location", (("line", Optional[int]), ("column", Optional[int])))
+LocationList = Iterable[Location]
 
 # A location range within a source file
 Range = NamedTuple("Range", (("start", Location), ("end", Optional[Location])))

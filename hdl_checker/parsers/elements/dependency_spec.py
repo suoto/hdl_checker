@@ -16,19 +16,20 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Spec for a parsed dependency"
 
-from typing import Optional
+from typing import Iterable, Optional
 
 from .identifier import Identifier
-from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
+from .parsed_element import ParsedElement  # pylint: disable=unused-import
 
 from hdl_checker.path import Path  # pylint: disable=unused-import
+from hdl_checker.types import LocationList, Range  # pylint: disable=unused-import
 
 
 class BaseDependencySpec(ParsedElement):
     "Placeholder for a source dependency"
 
-    def __init__(self, owner, name, library=None, locations=None):
-        # type: (Path, Identifier, Optional[Identifier], Optional[LocationList]) -> None
+    def __init__(self, owner, name, ranges, library=None):
+        # type: (Path, Identifier, Iterable[Range], Optional[Identifier]) -> None
         assert isinstance(name, Identifier), "Incorrect arg: {}".format(name)
         assert library is None or isinstance(
             library, Identifier
@@ -37,7 +38,7 @@ class BaseDependencySpec(ParsedElement):
         self._owner = owner
         self._library = library
         self._name = name
-        super(BaseDependencySpec, self).__init__(locations)
+        super(BaseDependencySpec, self).__init__(ranges)
 
     @property
     def owner(self):
@@ -83,7 +84,7 @@ class BaseDependencySpec(ParsedElement):
             "owner": self.owner,
             "name": self.name,
             "library": self.library,
-            "locations": tuple(self.locations),
+            "ranges": tuple(self.ranges),
         }
 
     @classmethod
@@ -93,16 +94,16 @@ class BaseDependencySpec(ParsedElement):
             library=state.pop("library"),
             name=state.pop("name"),
             owner=state.pop("owner"),
-            locations=state.pop("locations"),
+            ranges=state.pop("ranges"),
         )
 
     def __repr__(self):
-        return "{}(name='{}', library='{}', owner={}, locations={})".format(
+        return "{}(name='{}', library='{}', owner={}, ranges={})".format(
             self.__class__.__name__,
             repr(self.name),
             repr(self.library),
             repr(self.owner),
-            repr(self.locations),
+            repr(self.ranges),
         )
 
 
@@ -116,8 +117,8 @@ class IncludedPath(BaseDependencySpec):
     actually the string that the source is including.
     """
 
-    def __init__(self, owner, name, locations=None):
-        # type: (Path, Identifier, Optional[LocationList]) -> None
+    def __init__(self, owner, name, ranges):
+        # type: (Path, Identifier, Iterable[Range]) -> None
         super(IncludedPath, self).__init__(
-            owner=owner, name=name, library=None, locations=locations
+            owner=owner, name=name, ranges=ranges, library=None
         )

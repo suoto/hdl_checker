@@ -17,7 +17,7 @@
 "Class defining a parsed design unit"
 
 import logging
-from typing import Optional, Union
+from typing import Union
 
 from .identifier import (  # pylint: disable=unused-import
     Identifier,
@@ -27,7 +27,7 @@ from .identifier import (  # pylint: disable=unused-import
 from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
 
 from hdl_checker.path import Path  # pylint: disable=unused-import
-from hdl_checker.types import DesignUnitType  # pylint: disable=unused-import
+from hdl_checker.types import DesignUnitType, Range  # pylint: disable=unused-import
 
 _logger = logging.getLogger(__name__)
 
@@ -37,24 +37,24 @@ class _DesignUnit(ParsedElement):
     Specifies a design unit (uses mostly VHDL nomenclature)
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
+    def __init__(self, owner, type_, name, range_):
+        # type: (Path, DesignUnitType, Identifier, Range) -> None
         self._owner = owner
         self._type = type_
         self._name = name
 
-        super(_DesignUnit, self).__init__(locations)
+        super(_DesignUnit, self).__init__({range_})
 
     def __len__(self):
         return len(self.name)
 
     def __repr__(self):
-        return '{}(name="{}", type={}, owner={}, locations={})'.format(
+        return '{}(name="{}", type={}, owner={}, range={})'.format(
             self.__class__.__name__,
             repr(self.name),
             repr(self.type_),
             repr(self.owner),
-            self.locations,
+            self.ranges,
         )
 
     def __str__(self):
@@ -67,7 +67,7 @@ class _DesignUnit(ParsedElement):
             "owner": self.owner,
             "type_": self.type_,
             "name": self.name,
-            "locations": tuple(self.locations),
+            "ranges": tuple(self.ranges),
         }
 
     @classmethod
@@ -78,7 +78,7 @@ class _DesignUnit(ParsedElement):
             state.pop("owner"),
             state.pop("type_"),
             state.pop("name"),
-            state.pop("locations", None),
+            state.pop("ranges", None),
         )
 
     @property
@@ -114,10 +114,10 @@ class VhdlDesignUnit(_DesignUnit):
     Specifies a design unit whose name is case insensitive
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
+    def __init__(self, owner, type_, name, range_):
+        # type: (Path, DesignUnitType, str, Range) -> None
         super(VhdlDesignUnit, self).__init__(
-            owner=owner, type_=type_, name=VhdlIdentifier(name), locations=locations
+            owner=owner, type_=type_, name=VhdlIdentifier(name), range_=range_
         )
 
 
@@ -126,10 +126,10 @@ class VerilogDesignUnit(_DesignUnit):
     Specifies a design unit whose name is case sensitive
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
+    def __init__(self, owner, type_, name, range_):
+        # type: (Path, DesignUnitType, str, Range) -> None
         super(VerilogDesignUnit, self).__init__(
-            owner=owner, type_=type_, name=VerilogIdentifier(name), locations=locations
+            owner=owner, type_=type_, name=VerilogIdentifier(name), range_=range_
         )
 
 

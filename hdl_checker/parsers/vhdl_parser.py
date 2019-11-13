@@ -22,10 +22,9 @@ from typing import Any, Dict, Generator, Iterable, Optional, Set, Tuple, Union
 from .elements.dependency_spec import RequiredDesignUnit
 from .elements.design_unit import VhdlDesignUnit
 from .elements.identifier import VhdlIdentifier
-from .elements.parsed_element import Location
 
 from hdl_checker.parsers.base_parser import BaseSourceFile
-from hdl_checker.types import DesignUnitType
+from hdl_checker.types import DesignUnitType, Location, Range
 
 # Design unit scanner
 _DESIGN_UNITS = re.compile(
@@ -33,7 +32,6 @@ _DESIGN_UNITS = re.compile(
         [
             r"(?<=\bpackage\b)\s+(?P<package_name>\w+)(?=\s+is\b)",
             r"(?<=\bentity\b)\s+(?P<entity_name>\w+)(?=\s+is\b)",
-            r"(?<=\blibrary)\s+(?P<library_name>[\w,\s]+)\b",
             r"(?<=\bcontext\b)\s+(?P<context_name>\w+)(?=\s+is\b)",
             r"(?P<comment>\s*--.*)",
         ]
@@ -69,32 +67,43 @@ class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
         self._keys = set()  # type: Set[int]
         self._libraries = {}  # type: Dict[int, Optional[VhdlIdentifier]]
         self._units = {}  # type: Dict[int, VhdlIdentifier]
-        self._locations = {}  # type: Dict[int, Set[Location]]
+        self._ranges = {}  # type: Dict[int, Set[Range]]
 
     def add(self, library, unit, line, column):
         #  type: (str, str, int, int) -> None
         """
         Adds a dependency definition to the list
         """
-        _library = None if library.lower() == "work" else VhdlIdentifier(library)
+        _library = None if library.lower() == "work" else VhdlIdentifier(library.strip())
         _unit = VhdlIdentifier(unit)
+        # Increment column to accoutn for leading whitespaces
+        column += len(unit) - len(unit.lstrip())
+        column += len(library) - len(library.lstrip())
+        unit = unit.strip()
 
         key = hash((_library, _unit))
         if key not in self._keys:
             self._keys.add(key)
             self._libraries[key] = _library
             self._units[key] = _unit
-            self._locations[key] = set()
+            self._ranges[key] = set()
 
-        self._locations[key].add(Location(line, column))
+        self._ranges[key].add(
+            Range(
+                start=Location(line, column),
+                end=Location(
+                    line, len(unit) + (len(library) if library is not None else 0)
+                ),
+            )
+        )
 
     def items(self):
-        #  type: () -> Iterable[Tuple[Optional[VhdlIdentifier], VhdlIdentifier, Set[Location]]]
+        #  type: () -> Iterable[Tuple[Optional[VhdlIdentifier], VhdlIdentifier, Set[Range]]]
         """
         Returns items added previously
         """
         for key in self._keys:
-            yield self._libraries[key], self._units[key], self._locations[key]
+            yield self._libraries[key], self._units[key], self._ranges[key]
 
 
 class VhdlParser(BaseSourceFile):
@@ -113,13 +122,16 @@ class VhdlParser(BaseSourceFile):
         lines = content.split("\n")
 
         for match in _DESIGN_UNITS.finditer(content):
+            if match.groupdict()["comment"] is not None:
+                continue
+
             start = match.start()
-            start_line = content[:start].count("\n")
+            line = content[:start].count("\n")
 
-            total_chars_to_line_with_match = len("\n".join(lines[:start_line]))
-            start_char = match.start() - total_chars_to_line_with_match
+            total_chars_to_line_with_match = len("\n".join(lines[:line]))
+            column = match.start() - total_chars_to_line_with_match
 
-            yield match.groupdict(), {Location(start_line, start_char)}
+            yield match.groupdict(), line, column
 
     def _getDependencies(self):  # type: () -> Generator[RequiredDesignUnit, None, None]
         library_names = {x.lower() for x in self.getLibraries()}
@@ -148,11 +160,11 @@ class VhdlParser(BaseSourceFile):
             dependencies.add(library, unit, line_number, column_number)
 
         # Done parsing, won't add any more locations, so generate the specs
-        for _library, name, locations in dependencies.items():
+        for _library, name, ranges in dependencies.items():
             # Remove references to 'work' (will treat library=None as work,
             # which also means not set in case of packages)
             yield RequiredDesignUnit(
-                owner=self.filename, name=name, library=_library, locations=locations
+                owner=self.filename, name=name, library=_library, ranges=ranges
             )
 
         # Package bodies need a package declaration; include those as
@@ -168,7 +180,14 @@ class VhdlParser(BaseSourceFile):
                 owner=self.filename,
                 name=VhdlIdentifier(package_body_name),
                 library=None,
-                locations={Location(line_number, column_number)},
+                ranges={
+                    Range(
+                        start=Location(line_number, column_number),
+                        end=Location(
+                            line_number, column_number + len(package_body_name)
+                        ),
+                    )
+                },
             )
 
     def _getLibraries(self):
@@ -194,26 +213,27 @@ class VhdlParser(BaseSourceFile):
         Parses the source file to find design units and dependencies
         """
 
-        for match, locations in self._iterDesignUnitMatches():
+        for match, line, column in self._iterDesignUnitMatches():
+            name = None
             if match["package_name"] is not None:
-                yield VhdlDesignUnit(
-                    owner=self.filename,
-                    name=match["package_name"],
-                    type_=DesignUnitType.package,
-                    locations=locations,
-                )
-
+                name = match["package_name"]
+                type_ = DesignUnitType.package
             elif match["entity_name"] is not None:
-                yield VhdlDesignUnit(
-                    owner=self.filename,
-                    name=match["entity_name"],
-                    type_=DesignUnitType.entity,
-                    locations=locations,
-                )
-            elif match["context_name"] is not None:
-                yield VhdlDesignUnit(
-                    owner=self.filename,
-                    name=match["context_name"],
-                    type_=DesignUnitType.context,
-                    locations=locations,
-                )
+                name = match["entity_name"]
+                type_ = DesignUnitType.entity
+            #  elif match["context_name"] is not None:
+            else:
+                name = match["context_name"]
+                type_ = DesignUnitType.context
+
+            # Comments will match the
+            assert name is not None, "wtf => {}".format(match)
+            yield VhdlDesignUnit(
+                owner=self.filename,
+                name=name,
+                type_=type_,
+                range_=Range(
+                    start=Location(line=line, column=column),
+                    end=Location(line=line, column=column + len(name)),
+                ),
+            )

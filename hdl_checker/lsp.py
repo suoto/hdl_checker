@@ -61,7 +61,7 @@ if six.PY2:
 
 
 def checkerDiagToLspDict(diag):
-    # type: (...) -> Any
+    # type: (CheckerDiagnostic) -> Any
     """
     Converts a CheckerDiagnostic object into the dictionary with into the LSP
     expects

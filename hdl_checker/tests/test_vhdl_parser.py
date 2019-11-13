@@ -24,6 +24,7 @@ import logging
 import os
 import os.path as p
 import time
+from typing import Iterable, Tuple
 
 import six
 
@@ -37,7 +38,7 @@ from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.vhdl_parser import VhdlParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
-from hdl_checker.types import DesignUnitType
+from hdl_checker.types import DesignUnitType, Location, Range
 
 _logger = logging.getLogger(__name__)
 
@@ -47,14 +48,37 @@ _FILENAME = p.join(TEST_SUPPORT_PATH, "source.vhd")
 such.unittest.TestCase.maxDiff = None
 
 
-def _DependencySpec(owner, name, library, locations=None):
+def _DependencySpec(owner, name, library, start):
+    # type: (Path, str, str, Iterable[Tuple[int, int]]) -> RequiredDesignUnit
+    _library = None
+    identifier_length = len(name)
+
     if library is not None:
-        library = Identifier(library, case_sensitive=False)
+        _library = Identifier(library, case_sensitive=False)
+        identifier_length += len(library)
+    else:
+        identifier_length += len('work')
+
     return RequiredDesignUnit(
         owner=owner,
         name=Identifier(name, case_sensitive=False),
-        library=library,
-        locations=locations,
+        library=_library,
+        ranges={
+            Range(Location(line, column), Location(line, column + identifier_length))
+            for line, column in start
+        },
+    )
+
+
+def _vhdlDesignUnit(owner, name, type_, start):
+    # type: (Path, str, DesignUnitType, Tuple[int, int]) -> VhdlDesignUnit
+    return VhdlDesignUnit(
+        owner=owner,
+        type_=type_,
+        name=name,
+        range_=Range(
+            Location(start[0], start[1]), Location(start[0], start[1] + len(name))
+        ),
     )
 
 
@@ -125,11 +149,11 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 design_units,
                 [
-                    VhdlDesignUnit(
+                    _vhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.entity,
                         name="clock_divider",
-                        locations={(14, 7)},
+                        start=(14, 7),
                     )
                 ],
             )
@@ -152,25 +176,25 @@ with such.A("VHDL source file object") as it:
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
-                        locations=[(1, 4)],
+                        start=[(1, 4)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
-                        locations=[(2, 5)],
+                        start=[(2, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="package_with_constants",
-                        locations=[(5, 5)],
+                        start=[(5, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="cherry_pick",
-                        locations=[(6, 6), (7, 4)],
+                        start=[(6, 6), (7, 4)],
                     ),
                 ],
             )
@@ -196,31 +220,31 @@ with such.A("VHDL source file object") as it:
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
-                        locations=[(3, 4)],
+                        start=[(3, 4)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
-                        locations=[(4, 5)],
+                        start=[(4, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="package_with_constants",
-                        locations=[(7, 5)],
+                        start=[(7, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library="some_library",
                         name="some_package",
-                        locations=[(1, 8)],
+                        start=[(1, 8)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="cherry_pick",
-                        locations=[(8, 6), (9, 4)],
+                        start=[(8, 6), (9, 4)],
                     ),
                 ],
             )
@@ -238,31 +262,31 @@ with such.A("VHDL source file object") as it:
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
-                        locations=[(2, 4)],
+                        start=[(2, 4)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
-                        locations=[(3, 5)],
+                        start=[(3, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="package_with_constants",
-                        locations=[(6, 5)],
+                        start=[(6, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="another_package",
-                        locations=[(0, 8)],
+                        start=[(0, 8)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="cherry_pick",
-                        locations=[(7, 6), (8, 4)],
+                        start=[(7, 6), (8, 4)],
                     ),
                 ],
             )
@@ -280,25 +304,25 @@ with such.A("VHDL source file object") as it:
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_1164",
-                        locations=[(2, 4)],
+                        start=[(2, 4)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library="ieee",
                         name="std_logic_arith",
-                        locations=[(3, 5)],
+                        start=[(3, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="package_with_constants",
-                        locations=[(6, 5)],
+                        start=[(6, 5)],
                     ),
                     _DependencySpec(
                         owner=Path(_FILENAME),
                         library=None,
                         name="cherry_pick",
-                        locations=[(7, 6), (8, 4)],
+                        start=[(7, 6), (8, 4)],
                     ),
                 ],
             )
@@ -360,11 +384,11 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
-                    VhdlDesignUnit(
+                    _vhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.package,
                         name="package_with_constants",
-                        locations={(7, 8)},
+                        start=(7, 8),
                     )
                 ],
             )
@@ -378,43 +402,43 @@ with such.A("VHDL source file object") as it:
                         name="std_logic_1164",
                         library="ieee",
                         owner=it.source.filename,
-                        locations={(1, 4)},
+                        start={(1, 4)},
                     ),
                     _DependencySpec(
                         name="std_logic_arith",
                         library="ieee",
                         owner=it.source.filename,
-                        locations={(2, 4)},
+                        start={(2, 4)},
                     ),
                     _DependencySpec(
                         name="std_logic_unsigned",
                         library="ieee",
                         owner=it.source.filename,
-                        locations={(3, 4)},
+                        start={(3, 4)},
                     ),
                     _DependencySpec(
                         name="foo",
                         library=None,
                         owner=it.source.filename,
-                        locations={(11, 42)},
+                        start={(11, 42)},
                     ),
                     _DependencySpec(
                         name="very_common_pkg",
                         library="basic_library",
                         owner=it.source.filename,
-                        locations={(13, 37)},
+                        start={(13, 37)},
                     ),
                     _DependencySpec(
                         name="package_with_constants",
                         library=None,
                         owner=it.source.filename,
-                        locations={(16, 0)},
+                        start={(16, 0)},
                     ),
                     _DependencySpec(
                         name="package_body_only",
                         library=None,
                         owner=it.source.filename,
-                        locations={(20, 0)},
+                        start={(20, 0)},
                     ),
                 ],
             )
@@ -454,11 +478,11 @@ with such.A("VHDL source file object") as it:
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
-                    VhdlDesignUnit(
+                    _vhdlDesignUnit(
                         owner=it.source.filename,
                         type_=DesignUnitType.context,
                         name="context_name",
-                        locations={(0, 7)},
+                        start=(0, 7),
                     )
                 ],
             )
@@ -472,19 +496,19 @@ with such.A("VHDL source file object") as it:
                         owner=it.source.filename,
                         name="pkg0",
                         library="lib0",
-                        locations={(2, 6)},
+                        start={(2, 6)},
                     ),
                     _DependencySpec(
                         owner=it.source.filename,
                         name="pkg1",
                         library="lib0",
-                        locations={(3, 6)},
+                        start={(3, 6)},
                     ),
                     _DependencySpec(
                         owner=it.source.filename,
                         name="all",
                         library="lib1",
-                        locations={(5, 6)},
+                        start={(5, 6)},
                     ),
                 ],
             )
