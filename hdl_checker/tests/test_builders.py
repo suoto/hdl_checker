@@ -32,7 +32,6 @@ import unittest2  # type: ignore
 from mock import MagicMock, patch
 
 from hdl_checker.tests import (
-    MockBuilder,
     SourceMock,
     TestCase,
     getTestTempPath,
@@ -48,7 +47,6 @@ from hdl_checker.builder_utils import (
     Fallback,
     MSim,
 )
-from hdl_checker.builders.base_builder import BaseBuilder
 from hdl_checker.database import Database
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.exceptions import SanityCheckError
@@ -584,8 +582,10 @@ class TestBuilder(TestCase):
             raise unittest2.SkipTest("XVHDL only test")
 
         line = (
-            "ERROR: [VRFC 10-113] /some/path/xsim.dir/some_library/some_package.vdb "
-            "needs to be re-saved since std.standard changed"
+            "ERROR: [VRFC 10-113] {} needs to be re-saved since std.standard "
+            "changed".format(
+                p.join("some", "path", "xsim.dir", "some_library", "some_package.vdb")
+            )
         )
 
         self.assertEqual(
@@ -688,7 +688,7 @@ class TestMiscCases(TestCase):
             )
 
         included_results = Queue()  # type: Queue[Optional[Path]]
-        included_results.put(Path("/library/some/"))
+        included_results.put(Path(p.join("", "library", "some", "")))
         included_results.put(None)
 
         def resolveIncludedPath(*_):
@@ -750,7 +750,7 @@ class TestMiscCases(TestCase):
             "-pedanticerrors",
             "-L",
             "work",
-            "+incdir+/library/some",
+            "+incdir+" + p.join("", "library", "some"),
             str(source),
         ]
 
