@@ -75,7 +75,7 @@ install:
   - python --version
 
 test_script:
-  - tox
+  - tox -- -v
 after_test:
   - 7z a tox.zip ".tox"
   - appveyor PushArtifact tox.zip
