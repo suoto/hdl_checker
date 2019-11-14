@@ -55,6 +55,9 @@ _DEPENDENCIES = re.compile(
     "|".join(
         [
             r"(?P<package>\b{0})\s*::\s*(?:{0}|\*)".format(_VERILOG_IDENTIFIER),
+            r"\bvirtual\s+class\s+(?P<class>\b{0})".format(
+                _VERILOG_IDENTIFIER
+            ),
             r"(?<=`include\b)\s*\"(?P<include>.*?)\"",
             _COMMENT,
         ]
@@ -115,17 +118,29 @@ class VerilogParser(BaseSourceFile):
             if self.filetype is FileType.verilog:
                 continue
 
-            import_name = match.groupdict().get("package", None)
+            name = match.groupdict().get("package", None)
 
             # package 'std' seems to be built-in. Need to have a look a this
             #  if include_name is not None and include_name != 'std':
-            if import_name not in (None, "std"):
+            if name not in (None, "std"):
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
 
                 yield RequiredDesignUnit(
                     owner=self.filename,
-                    name=VerilogIdentifier(import_name),  # type: ignore
+                    name=VerilogIdentifier(name),  # type: ignore
+                    locations=(Location(line_number, column_number),),
+                )
+
+            name = match.groupdict().get("class", None)
+
+            if name is not None:
+                line_number = text[: match.end()].count("\n")
+                column_number = len(text[: match.start()].split("\n")[-1])
+
+                yield RequiredDesignUnit(
+                    owner=self.filename,
+                    name=VerilogIdentifier(name),
                     locations=(Location(line_number, column_number),),
                 )
 
