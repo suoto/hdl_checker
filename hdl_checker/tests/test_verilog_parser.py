@@ -72,7 +72,7 @@ class TestVerilogSource(TestCase):
                 "   localparam foo::bar = std::randomize(cycles);",
                 "endmodule",
                 "",
-                "package msgPkg;",
+                "package \\m$gPkg! ;",
                 "  integer  errCnt  = 0;",
                 "  integer  warnCnt = 0;",
                 "endpackage",
@@ -96,7 +96,7 @@ class TestVerilogSource(TestCase):
                 ),
                 VerilogDesignUnit(
                     owner=self.source.filename,
-                    name="msgPkg",
+                    name="\\m$gPkg!",
                     type_=DesignUnitType.package,
                     locations={(15, 8)},
                 ),

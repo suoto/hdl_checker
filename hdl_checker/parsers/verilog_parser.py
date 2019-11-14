@@ -18,7 +18,8 @@
 
 import logging
 import re
-from typing import Any, Generator, Iterable
+import string
+from typing import Any, Generator, Iterable, List, Tuple, Type
 
 from .elements.dependency_spec import (
     BaseDependencySpec,
@@ -35,7 +36,10 @@ from hdl_checker.utils import readFile
 
 _logger = logging.getLogger(__name__)
 
-_VERILOG_IDENTIFIER = r"[a-zA-Z_][a-zA-Z0-9_$]+"
+_VERILOG_IDENTIFIER = "|".join(
+    [r"[a-zA-Z_][a-zA-Z0-9_$]+", r"\\[%s]+(?=\s)" % string.printable.replace(" ", "")]
+)
+
 _COMMENT = r"(?:\/\*.*?\*\/|//[^(?:\r\n?|\n)]*)"
 
 
@@ -55,7 +59,7 @@ _DEPENDENCIES = re.compile(
     "|".join(
         [
             r"(?P<package>\b{0})\s*::\s*(?:{0}|\*)".format(_VERILOG_IDENTIFIER),
-            r"\bvirtual\s+class\s+(?P<class>\b{0})".format(
+            r"(\bvirtual\b)?\s*\bclass\s+(?:static|automatic)?(?P<class>\b{0})".format(
                 _VERILOG_IDENTIFIER
             ),
             r"(?<=`include\b)\s*\"(?P<include>.*?)\"",
@@ -100,49 +104,38 @@ class VerilogParser(BaseSourceFile):
     def _getDependencies(self):  # type: () -> Iterable[BaseDependencySpec]
         text = self.getSourceContent()
 
+        match_groups = [
+            ("include", IncludedPath)
+        ]  # type: List[Tuple[str, Type[BaseDependencySpec]]]
+
+        # Only SystemVerilog has imports or classes
+        if self.filetype is FileType.systemverilog:
+            match_groups += [
+                ("package", RequiredDesignUnit),
+                ("class", RequiredDesignUnit),
+            ]
+
         for match in _DEPENDENCIES.finditer(text):
-            include_name = match.groupdict().get("include", None)
+            for match_group, klass in match_groups:
+                name = match.groupdict().get(match_group, None)
+                # package 'std' seems to be built-in. Need to have a look a
+                # this if include_name is not None and include_name != 'std':
+                if match_group == "package" and name == "std":
+                    continue
 
-            # package 'std' seems to be built-in. Need to have a look a this
-            if include_name is not None:
+                # package 'std' seems to be built-in. Need to have a look a this
+                if name is None:
+                    continue
+
                 line_number = text[: match.end()].count("\n")
                 column_number = len(text[: match.start()].split("\n")[-1])
 
-                yield IncludedPath(
-                    owner=self.filename,
-                    name=VerilogIdentifier(include_name),
-                    locations=(Location(line_number, column_number),),
-                )
-
-            # Only SystemVerilog has imports
-            if self.filetype is FileType.verilog:
-                continue
-
-            name = match.groupdict().get("package", None)
-
-            # package 'std' seems to be built-in. Need to have a look a this
-            #  if include_name is not None and include_name != 'std':
-            if name not in (None, "std"):
-                line_number = text[: match.end()].count("\n")
-                column_number = len(text[: match.start()].split("\n")[-1])
-
-                yield RequiredDesignUnit(
-                    owner=self.filename,
-                    name=VerilogIdentifier(name),  # type: ignore
-                    locations=(Location(line_number, column_number),),
-                )
-
-            name = match.groupdict().get("class", None)
-
-            if name is not None:
-                line_number = text[: match.end()].count("\n")
-                column_number = len(text[: match.start()].split("\n")[-1])
-
-                yield RequiredDesignUnit(
+                yield klass(
                     owner=self.filename,
                     name=VerilogIdentifier(name),
                     locations=(Location(line_number, column_number),),
                 )
+                break
 
     def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
         for match, locations in self._iterDesignUnitMatches():
