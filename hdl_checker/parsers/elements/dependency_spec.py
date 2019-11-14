@@ -121,3 +121,19 @@ class IncludedPath(BaseDependencySpec):
         super(IncludedPath, self).__init__(
             owner=owner, name=name, library=None, locations=locations
         )
+
+    def __jsonEncode__(self):
+        return {
+            "owner": self.owner,
+            "name": self.name,
+            "locations": tuple(self.locations),
+        }
+
+    @classmethod
+    def __jsonDecode__(cls, state):
+        """Returns an object of cls based on a given state"""
+        return cls(
+            name=state.pop("name"),
+            owner=state.pop("owner"),
+            locations=state.pop("locations"),
+        )
