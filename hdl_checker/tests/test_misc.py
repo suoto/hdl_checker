@@ -107,6 +107,7 @@ class TestReportingRelease(unittest2.TestCase):
         process_mock = Mock()
         stdout = b"""\
 7e5264355da66f71e8d1b80887ac6df55b9829ef        refs/tags/v0.6.2
+7e5264355da66f71e8d1b80887ac6df55b9829ef        refs/tags/v0.6.10
 a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/v0.6.3"""
 
         stderr = ""
@@ -115,7 +116,25 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/v0.6.3"""
         process_mock.configure_mock(**attrs)
         popen.return_value = process_mock
 
-        self.assertEqual(_getLatestReleaseVersion(), "0.6.3")
+        self.assertEqual(_getLatestReleaseVersion(), (0, 6, 10))
+
+    @patch("hdl_checker.utils.subp.Popen")
+    def test_TagExtractionFails(self, popen):
+        # Tests if the function doesn't throw any exceptions in case the
+        # reported format is different than what we expected
+        process_mock = Mock()
+        stdout = b"""\
+refs/tags/v0.6.2
+refs/tags/v0.6.10
+refs/tags/v0.6.3"""
+
+        stderr = ""
+
+        attrs = {"communicate.return_value": (stdout, stderr)}
+        process_mock.configure_mock(**attrs)
+        popen.return_value = process_mock
+
+        self.assertFalse(_getLatestReleaseVersion())
 
     @patch("hdl_checker.utils.REPO_URL", "localhost")
     def test_HandlesNoConnection(self, *_):
@@ -126,7 +145,7 @@ a65602477ef860b48bacfa90a96d8518eb51f030        refs/tags/v0.6.3"""
         self.assertIsNotNone(_getLatestReleaseVersion())
 
 
-@patch("hdl_checker.utils._getLatestReleaseVersion", return_value="1.0.0")
+@patch("hdl_checker.utils._getLatestReleaseVersion", return_value=(1, 0, 0))
 @patch("hdl_checker.__version__", "0.9.0")
 def test_ReportIfCurrentIsOlder(*_):
     func = MagicMock()
@@ -136,7 +155,17 @@ def test_ReportIfCurrentIsOlder(*_):
     )
 
 
-@patch("hdl_checker.utils._getLatestReleaseVersion", return_value="1.0.0")
+@patch("hdl_checker.utils._getLatestReleaseVersion", return_value=(1, 0, 10))
+@patch("hdl_checker.__version__", "1.0.9")
+def test_InterpretAsNumbersNotString(*_):
+    func = MagicMock()
+    onNewReleaseFound(func)
+    func.assert_called_once_with(
+        "HDL Checker version 1.0.10 is out! (current version is 1.0.9)"
+    )
+
+
+@patch("hdl_checker.utils._getLatestReleaseVersion", return_value=(1, 0, 0))
 @patch("hdl_checker.__version__", "1.0.0")
 def test_DontReportIfCurrentIsUpToDate(*_):
     func = MagicMock()
@@ -144,7 +173,7 @@ def test_DontReportIfCurrentIsUpToDate(*_):
     func.assert_not_called()
 
 
-@patch("hdl_checker.utils._getLatestReleaseVersion", return_value="1.0.0")
+@patch("hdl_checker.utils._getLatestReleaseVersion", return_value=(1, 0, 0))
 @patch("hdl_checker.__version__", "1.0.1")
 def test_DontReportIfCurrentIsNewer(*_):
     func = MagicMock()

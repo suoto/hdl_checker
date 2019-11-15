@@ -395,10 +395,13 @@ else:
 
 
 REPO_URL = "https://github.com/suoto/hdl_checker"
+_TAGS = re.compile(r"^\w+\s+refs\/tags\/v(?P<tag>(?:\d+\.){2}\d+)", flags=re.MULTILINE)
+
+VersionFormat = Tuple[int, ...]
 
 
 def _getLatestReleaseVersion():
-    # type: () -> Optional[str]
+    # type: () -> Optional[VersionFormat]
     """
     Return the latest tag from https://github.com/suoto/hdl_checker, striping
     the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to
@@ -425,11 +428,15 @@ def _getLatestReleaseVersion():
         )
         return None
 
-    tags = [x.decode() for x in stdout.splitlines()]
+    tags = tuple(
+        tuple(int(x) for x in tag.split(".")) for tag in _TAGS.findall(stdout.decode())
+    )
 
-    latest = sorted(tags[-1].split("/"))[-1]
+    if tags:
+        return sorted(tags)[-1]
 
-    return latest[1:]
+    _logger.warning("Unable to get version from '%s'", stdout)
+    return None
 
 
 _VERSION_FORMAT = re.compile(r"\d+\.\d+\.\d+")
@@ -452,14 +459,14 @@ def onNewReleaseFound(func):
 
     latest = _getLatestReleaseVersion()
 
-    if latest is None or not _VERSION_FORMAT.match(latest):
+    if not latest:
         return
 
     _logger.debug("Current version is %s, latest is %s", current, latest)
 
-    if latest > current:
+    if latest > tuple(int(x) for x in current.split(".")):
         func(
             "HDL Checker version {} is out! (current version is {})".format(
-                latest, current
+                ".".join(map(str, latest)), current
             )
         )
