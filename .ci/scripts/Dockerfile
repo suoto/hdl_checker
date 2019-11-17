@@ -22,9 +22,25 @@ ENV BUILDERS /builders
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
-RUN apt-get update -qq
-RUN apt-get install -qq python2 python3.7 python3.8 python3-pip wget git
-RUN apt-get install -qq gcc-multilib g++-multilib lib32z1 lib32stdc++6 lib32gcc1 libtcl8.6 libtinfo5
+ENV PACKAGES="python2      \
+              python2-dev  \
+              python3.7    \
+              python3.8    \
+              python3-pip  \
+              wget         \
+              git          \
+              gcc-multilib \
+              g++-multilib \
+              lib32z1      \
+              lib32stdc++6 \
+              lib32gcc1    \
+              libtcl8.6    \
+              libtinfo5"
+
+RUN apt-get update -qq            && \
+    apt-get install -qq $PACKAGES && \
+    apt-get clean                 && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install tox
 RUN pip3 install coverage==4.1
@@ -35,9 +51,9 @@ COPY msim $BUILDERS/msim
 COPY xvhdl $BUILDERS/xvhdl
 
 # Test installations
-RUN $BUILDERS/ghdl/bin/ghdl --version
-RUN $BUILDERS/msim/modelsim_ase/linuxaloem/vcom -version
-RUN $BUILDERS/xvhdl/bin/xvhdl -version
+RUN "$BUILDERS/ghdl/bin/ghdl" --version
+RUN "$BUILDERS/msim/modelsim_ase/linuxaloem/vcom" -version
+RUN "$BUILDERS/xvhdl/bin/xvhdl" -version
 
 VOLUME /hdl_checker
 WORKDIR /hdl_checker
