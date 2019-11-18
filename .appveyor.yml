@@ -54,9 +54,9 @@ environment:
     #   PYTHON: "C:\\Python37"
     #   BUILDER: msim
 
-    - PYTHON_VERSION: 37
-      PYTHON: "C:\\Python37"
-      TOXENV: py27-windows
+    # - PYTHON_VERSION: 37
+    #   PYTHON: "C:\\Python37"
+    #   TOXENV: py27-windows
 
     - PYTHON_VERSION: 37
       PYTHON: "C:\\Python37"
