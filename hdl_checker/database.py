@@ -759,11 +759,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     for x in self.getDesignUnitsByPath(current_path)
                 }
 
-                # Filter out dependencies that are on the 'use foo.all'
-                # because this only indicates that a source needs a given
-                # library to exist (which is handled by the builder).
-                # Also filter out dependencies that are provided natively by
-                # the builder.
+                # Filter out dependencies that are either
+                # - provided by the builder
+                # - on the 'use foo.all' format because this only indicates
+                #   that a source needs a given library to
+                #   exist (which is handled by the builder)
+                # - not a required design unit (e.g, included paths)
                 deps = {
                     (
                         dependency.library or self.getLibrary(dependency.owner),
@@ -771,6 +772,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     )
                     for dependency in self._dependencies_map[current_path]
                     if dependency.name.name != "all"
+                    and isinstance(dependency, RequiredDesignUnit)
                     and dependency.library not in builtin_libraries
                 }
 
