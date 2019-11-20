@@ -100,7 +100,7 @@ Please note that this will start one server per language
 
 ### Emacs
 
-#### Using [emacs-lsp/lsp-mode][emacs_lsp] (soon!)
+#### Using [emacs-lsp/lsp-mode][emacs_lsp]
 
 Add this to your Emacs config file
 
