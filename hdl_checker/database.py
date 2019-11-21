@@ -367,16 +367,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
     def getLibrary(self, path):
         # type: (Path) -> UnresolvedLibrary
         """
-        Gets the library the VHDL path is in, inferring and updating it if
-        needed.
-
-        Verilog and SystemVerilog have no concept of libraries and will return
-        None.
+        Gets the library the path is in, inferring and updating it if needed.
+        Any unit that can be used from VHDL code can be bound to a library,
+        even if Verilog and SystemVerilog don't have this concept.
         """
         self._parseSourceIfNeeded(path)
-        # Only VHDL has libraries
-        if FileType.fromPath(path) is not FileType.vhdl:
-            return None
+
         if path not in self.paths:
             # Add the path to the project but put it on a different library
             self._parseSourceIfNeeded(path)

@@ -198,7 +198,10 @@ class TestDatabase(TestCase):
                 Identifier("not_in_project", False),
             )
 
-            self.assertIsNone(self.database.getLibrary(_Path("some_sv.sv")))
+            self.assertEqual(
+                self.database.getLibrary(_Path("some_sv.sv")),
+                Identifier("not_in_project", False),
+            )
 
             meth.assert_called_once_with(Path(TEST_TEMP_PATH))
 
