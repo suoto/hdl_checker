@@ -391,7 +391,7 @@ else:
 
     def readFile(path):
         "Wrapper around open().read() that return \n for new lines"
-        return open(path, mode="r", newline="\n").read()
+        return open(path, mode="r", newline="\n", errors='replace').read()
 
 
 REPO_URL = "https://github.com/suoto/hdl_checker"
