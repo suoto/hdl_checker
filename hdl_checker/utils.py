@@ -439,7 +439,7 @@ def _getLatestReleaseVersion():
     return None
 
 
-_VERSION_FORMAT = re.compile(r"\d+\.\d+\.\d+")
+_VERSION_FORMAT = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def onNewReleaseFound(func):
