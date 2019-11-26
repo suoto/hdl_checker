@@ -285,6 +285,30 @@ def isGitRepo(path):
         return False
 
 
+def _isGitRepo(path):
+    # type: (Path) -> bool
+    "Checks if <path> is a git repository"
+    cmd = ["git", "-C", path.abspath, "status", "--short"]
+    try:
+        subp.check_call(cmd, stdout=subp.PIPE, stderr=subp.STDOUT)
+    except subp.CalledProcessError:
+        return False
+    return True
+
+
+def _gitLsFiles(path_to_repo, recurse_submodules=False):
+    # type: (Path, bool) -> Iterable[Path]
+    "Lists files from a git repository"
+    cmd = ["git", "-C", path_to_repo.abspath, "ls-files"]
+    if recurse_submodules:
+        cmd += ["--recurse-submodules"]
+
+    for line in subp.check_output(cmd, stderr=subp.STDOUT).decode().split("\n"):
+        if not line:
+            continue
+        yield Path(line, path_to_repo.abspath)
+
+
 def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
     # type: (Path, Iterable[Path]) -> Iterable[Path]
     """
@@ -294,9 +318,16 @@ def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
     code for paths outside the repo or if <path_to_repo> is not actually a git
     repo, in which cases paths will be included.
     """
+    files = _gitLsFiles(path_to_repo, recurse_submodules=True)
     base_cmd = ("git", "-C", path_to_repo.abspath, "check-ignore")
 
     for path in paths:
+        # If the file was found on git ls-files, it is part of the repo and
+        # there's no need to check if any git ignore rules match
+        if path in files:
+            yield path
+            continue
+
         cmd = base_cmd + (str(path),)
         try:
             if not subp.check_output(cmd, stderr=subp.STDOUT):
@@ -350,6 +381,26 @@ def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
             proc = None
 
 
-filterGitIgnoredPaths = (  # pylint: disable=invalid-name
-    _filterGitIgnoredPathsOnWin if ON_WINDOWS else _filterGitIgnoredPathsOnUnix
-)
+def filterGitIgnoredPaths(path_to_repo, paths):
+    # type: (Path, Iterable[Path]) -> Iterable[Path]
+    """
+    Filters out paths that are ignored by git; paths outside the repo are kept.
+    """
+    # If not on a git repo, nothing is ignored
+    if not _isGitRepo(path_to_repo):
+        for path in paths:
+            yield path
+        return
+
+    files = set(_gitLsFiles(path_to_repo, recurse_submodules=True))
+    paths = set(paths)
+
+    # Files found on git ls-files are part of the repo, no need to check if any
+    # git ignore rules match
+    for path in files.intersection(paths):
+        yield path
+
+    func = _filterGitIgnoredPathsOnWin if ON_WINDOWS else _filterGitIgnoredPathsOnUnix
+
+    for path in func(path_to_repo, paths - files):
+        yield path
