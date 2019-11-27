@@ -231,8 +231,6 @@ def main():
     logging.root.addHandler(file_handler)
     logging.root.setLevel(args.log_level)
 
-    print(" - Log file: " + args.log_file)
-
     cov = coverage.Coverage(config_file=".coveragerc")
     cov.start()
 
@@ -240,9 +238,6 @@ def main():
 
     cov.stop()
     cov.save()
-    #  for cmd in ('coverage combine',
-    #              'coverage html'):
-    #      _shell(cmd)
 
     if not passed:
         _logger.warning("Some tests failed!")

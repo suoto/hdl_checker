@@ -27,7 +27,7 @@ import os.path as p
 import six
 
 from mock import MagicMock, patch
-from webtest import TestApp  # type: ignore
+from webtest import TestApp  # type: ignore # pylint: disable=import-error
 
 from nose2.tools import such  # type: ignore
 
@@ -40,12 +40,7 @@ from hdl_checker.tests import (
 
 import hdl_checker
 import hdl_checker.handlers as handlers
-from hdl_checker.diagnostics import (
-    CheckerDiagnostic,
-    DiagType,
-    ObjectIsNeverUsed,
-    StaticCheckerDiag,
-)
+from hdl_checker.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 
