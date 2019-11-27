@@ -236,7 +236,8 @@ def rebuildProject():
     server = _getServerByProjectFile(project_file)
     server.clean()
     _logger.debug("Removing and recreating server object")
-    del servers[project_file]
+    root_dir = Path(p.dirname(project_file))
+    del servers[root_dir]
     _getServerByProjectFile(project_file)
 
 

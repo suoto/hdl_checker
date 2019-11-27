@@ -154,7 +154,7 @@ with such.A("hdl_checker bottle app") as it:
             it.app.post("/rebuild_project", {"project_file": project_file})
 
         # Check the object was removed from the servers list
-        servers.__delitem__.assert_called_once_with(project_file)
+        servers.__delitem__.assert_called_once_with(Path(p.dirname(project_file)))
         # Check the original server cleaned things up
         server.clean.assert_called_once()
 
