@@ -212,7 +212,7 @@ class ConfigParser(object):
 
         builder_name = self._parms.get("builder", None)
         if builder_name is not None:
-            data["builder_name"] = builder_name
+            data["builder"] = builder_name
 
         for filetype, flags in self._flags.items():
             flags_dict = {}

@@ -27,7 +27,7 @@ import time
 from contextlib import contextmanager
 from multiprocessing import Event
 from threading import Thread
-from typing import Any, Iterator, List
+from typing import Any, Iterator
 
 import mock
 import six
@@ -146,7 +146,7 @@ systemverilog work bar.sv some sv flag
             it.assertDictEqual(
                 config,
                 {
-                    "builder_name": BuilderName.msim.name,
+                    "builder": BuilderName.msim.name,
                     "vhdl": {
                         "flags": {
                             BuildFlagScope.all.value: (
