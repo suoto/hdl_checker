@@ -42,7 +42,10 @@ class GHDL(BaseBuilder):
 
     # Default build flags
     default_flags = {
-        BuildFlagScope.all: {FileType.vhdl: ("-fexplicit", "-frelaxed-rules")}
+        BuildFlagScope.all: {FileType.vhdl: ("-fexplicit", "-frelaxed-rules")},
+        BuildFlagScope.single: {
+            FileType.vhdl: ("--warn-runtime-error", "--warn-reserved", "--warn-unused")
+        },
     }
 
     # GHDL specific class properties
