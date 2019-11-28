@@ -25,11 +25,12 @@ import os.path as p
 import shutil
 from multiprocessing import Queue
 from tempfile import mkdtemp
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 
-import parameterized  # type: ignore
 import unittest2  # type: ignore
 from mock import MagicMock, patch
+
+import parameterized  # type: ignore
 
 from hdl_checker.tests import (
     SourceMock,
@@ -481,54 +482,65 @@ class TestBuilder(TestCase):
 
         if self.builder_name == "msim":
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text='Unknown identifier "some_lib".',
-                    line_number=3,
-                    error_code="vcom-1136",
-                    severity=DiagType.ERROR,
-                )
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text='Unknown identifier "some_lib".',
+                        line_number=3,
+                        error_code="vcom-1136",
+                        severity=DiagType.ERROR,
+                    )
+                }
             ]
         elif self.builder_name == "ghdl":
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text='no declaration for "some_lib"',
-                    line_number=3,
-                    column_number=4,
-                    severity=DiagType.ERROR,
-                )
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text='no declaration for "some_lib"',
+                        line_number=3,
+                        column_number=4,
+                        severity=DiagType.ERROR,
+                    ),
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text="entity 'source_with_error' was not analysed",
+                        line_number=17,
+                        column_number=13,
+                        severity=DiagType.ERROR,
+                    ),
+                }
             ]
         elif self.builder_name == "xvhdl":
             # XVHDL reports different errors depending on the version
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text="some_lib is not declared",
-                    line_number=3,
-                    error_code="VRFC 10-91",
-                    severity=DiagType.ERROR,
-                ),
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text="'some_lib' is not declared",
-                    line_number=3,
-                    error_code="VRFC 10-2989",
-                    severity=DiagType.ERROR,
-                ),
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text="some_lib is not declared",
+                        line_number=3,
+                        error_code="VRFC 10-91",
+                        severity=DiagType.ERROR,
+                    )
+                },
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text="'some_lib' is not declared",
+                        line_number=3,
+                        error_code="VRFC 10-2989",
+                        severity=DiagType.ERROR,
+                    )
+                },
             ]
 
         if not isinstance(self.builder, Fallback):
-            self.assertEqual(
-                len(records),
-                1,
-                "Expected only one record but got {}".format(len(records)),
-            )
-            self.assertIn(records.pop(), expected)
+            self.assertIn(records, expected)
         else:
             self.assertFalse(records)
 
@@ -707,7 +719,7 @@ class TestMiscCases(TestCase):
         def shell(cmd_with_args, *args, **kwargs):
             calls.append(cmd_with_args)
             _logger.debug("$ %s", cmd_with_args)
-            if '-version' in cmd_with_args:
+            if "-version" in cmd_with_args:
                 return ("vcom 10.2c Compiler 2013.07 Jul 18 2013",)
             return ("",)
 
