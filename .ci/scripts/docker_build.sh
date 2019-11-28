@@ -62,24 +62,9 @@ function setup_msim {
 
 }
 
-function setup_ghdl {
-  URL=http://downloads.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-x86_64-linux.tgz
-
-  installer=$(basename $URL)
-
-  download_if_needed "$DOWNLOAD_DIR/$installer" "$URL"
-  if [ ! -d "$CONTEXT/ghdl/bin" ]; then
-    mkdir -p "$CONTEXT/ghdl"
-    tar zxvf "$DOWNLOAD_DIR/$installer" --directory "$CONTEXT/ghdl"
-  fi
-
-}
-
 setup_msim
-setup_ghdl
 
 "$CONTEXT"/msim/modelsim_ase/linuxaloem/vsim -version
-"$CONTEXT/ghdl/bin/ghdl" --version
 
 docker build -t suoto/hdl_checker_test:"$DOCKER_TAG" -f "$DOCKERFILE" "$CONTEXT"
 

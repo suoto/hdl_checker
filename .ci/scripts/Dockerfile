@@ -22,20 +22,25 @@ ENV BUILDERS /builders
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
-ENV PACKAGES="python2      \
-              python2-dev  \
-              python3.7    \
-              python3.8    \
-              python3-pip  \
-              wget         \
-              git          \
-              gcc-multilib \
-              g++-multilib \
-              lib32z1      \
-              lib32stdc++6 \
-              lib32gcc1    \
-              libtcl8.6    \
-              libtinfo5"
+ENV PACKAGES="python2         \
+              ca-certificates \
+              g++-multilib    \
+              gcc             \
+              gcc-multilib    \
+              git             \
+              gnat            \
+              lib32gcc1       \
+              lib32stdc++6    \
+              lib32z1         \
+              libtcl8.6       \
+              libtinfo5       \
+              make            \
+              python2-dev     \
+              python3-pip     \
+              python3.7       \
+              python3.8       \
+              wget            \
+              zlib1g-dev"
 
 RUN apt-get update -qq            && \
     apt-get install -qq $PACKAGES && \
@@ -44,9 +49,27 @@ RUN apt-get update -qq            && \
 
 RUN pip3 install tox
 RUN pip3 install coverage==4.1
+
 WORKDIR $BUILDERS
 
-COPY ghdl $BUILDERS/ghdl
+# Build GHDL from source
+WORKDIR /tmp/
+RUN git clone --depth=1 --branch=v0.36 https://github.com/ghdl/ghdl
+WORKDIR /tmp/ghdl
+WORKDIR /tmp/ghdl/build
+
+RUN ../configure --prefix=$BUILDERS/ghdl && \
+    make -j                              && \
+    make install
+
+RUN apt-get purge -qq ca-certificates make zlib1g-dev && \
+    apt-get clean                                     && \
+    apt-get autoclean
+RUN rm -rf /tmp/ghdl
+
+RUN $BUILDERS/ghdl/bin/ghdl --version
+
+# ModelSim and XVHDL will be copied
 COPY msim $BUILDERS/msim
 COPY xvhdl $BUILDERS/xvhdl
 
