@@ -50,6 +50,7 @@ if six.PY3:
 
 else:
     JSONDecodeError = ValueError
+    FileNotFoundError = OSError  # pylint: disable=redefined-builtin
 
     def glob(pathname):
         "Alias for glob.iglob(pathname)"
@@ -281,19 +282,8 @@ def isGitRepo(path):
 
     try:
         return p.exists(subp.check_output(cmd, stderr=subp.STDOUT).decode().strip())
-    except subp.CalledProcessError:
+    except (subp.CalledProcessError, FileNotFoundError):
         return False
-
-
-def _isGitRepo(path):
-    # type: (Path) -> bool
-    "Checks if <path> is a git repository"
-    cmd = ["git", "-C", path.abspath, "status", "--short"]
-    try:
-        subp.check_call(cmd, stdout=subp.PIPE, stderr=subp.STDOUT)
-    except subp.CalledProcessError:
-        return False
-    return True
 
 
 def _gitLsFiles(path_to_repo, recurse_submodules=False):
@@ -386,12 +376,6 @@ def filterGitIgnoredPaths(path_to_repo, paths):
     """
     Filters out paths that are ignored by git; paths outside the repo are kept.
     """
-    # If not on a git repo, nothing is ignored
-    if not _isGitRepo(path_to_repo):
-        for path in paths:
-            yield path
-        return
-
     files = set(_gitLsFiles(path_to_repo, recurse_submodules=True))
     paths = set(paths)
 

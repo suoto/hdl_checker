@@ -632,21 +632,3 @@ class TestFilterGitIgnoredPaths(TestCase):
                 )
             ),
         )
-
-    @timeit
-    def test_FilterGitPathsOutOfGitRepo(self):
-        # type: (...) -> Any
-        """
-        If the base path is not a Git repo, filterGitIgnoredPaths should return
-        all paths
-        """
-        base_path = mkdtemp(prefix=__name__ + "_")
-        self.assertFalse(isGitRepo(Path(base_path)))
-
-        result = list(
-            filterGitIgnoredPaths(Path(base_path), (Path(x) for x in self.paths))
-        )
-
-        _logger.info("Result: %s", result)
-
-        self.assertCountEqual(result, (Path(x) for x in self.paths))
