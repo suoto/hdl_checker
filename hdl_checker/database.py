@@ -821,3 +821,18 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             )
 
         _logger.error("Iteration limit of %d reached", iteration_limit)
+
+    def getReferencesToDesignUnit(self, unit):
+        # type: (Union[tAnyDesignUnit, BaseDependencySpec]) -> Iterable[BaseDependencySpec]
+        """
+        Returns an iterable of BaseDependencySpec objects from all paths in the
+        database that refer to the given design unit. Search is done by
+        matching library and name.
+        """
+        library = self.getLibrary(unit.owner)
+
+        return (
+            dependency
+            for dependency in chain.from_iterable(self._dependencies_map.values())
+            if (library, unit.name) == (dependency.library, dependency.name)
+        )

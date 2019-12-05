@@ -24,6 +24,7 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import six
+
 from pyls import lsp as defines  # type: ignore
 from pyls._utils import debounce  # type: ignore
 from pyls.python_ls import PythonLanguageServer  # type: ignore
@@ -186,6 +187,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # type: (...) -> Any
         "Returns language server capabilities"
         return {
+            "referencesProvider": True,
             "definitionProvider": True,
             "hoverProvider": True,
             "textDocumentSync": defines.TextDocumentSyncKind.FULL,
@@ -335,6 +337,45 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
+    def references(self, doc_uri, position, exclude_declaration):
+        # type: (URI, Dict[str, int], bool) -> Any
+        element = self._getElementAtPosition(
+            Path(to_fs_path(doc_uri)),
+            Location(line=position["line"], column=position["character"]),
+        )
+
+        # Element not identified
+        if element is None:
+            return None
+
+        references = []  # type: List[Dict[str, Any]]
+
+        if not exclude_declaration:
+            for line, column in element.locations:
+                references += [
+                    {
+                        "uri": from_fs_path(str(element.owner)),
+                        "range": {
+                            "start": {"line": line, "character": column},
+                            "end": {"line": line, "character": column},
+                        },
+                    }
+                ]
+
+        for reference in self.checker.database.getReferencesToDesignUnit(element):
+            for line, column in reference.locations:
+                references += [
+                    {
+                        "uri": from_fs_path(str(reference.owner)),
+                        "range": {
+                            "start": {"line": line, "character": column},
+                            "end": {"line": line, "character": column},
+                        },
+                    }
+                ]
+
+        return references
+
     def m_workspace__did_change_configuration(self, settings=None):
         # type: (...) -> Any
         self._onConfigUpdate(settings or {})
@@ -414,7 +455,9 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # type: (Path, Location) -> Union[BaseDependencySpec, tAnyDesignUnit, None]
         """
         Gets design units and dependencies (in this order) of path and checks
-        if their definitions include position
+        if their definitions include position. Not every element is identified,
+        only those pertinent to the core functionality, e.g. design units and
+        dependencies.
         """
         for meth in (
             self.checker.database.getDesignUnitsByPath,

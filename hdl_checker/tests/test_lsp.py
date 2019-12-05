@@ -195,6 +195,7 @@ with such.A("LSP server") as it:
                     "textDocumentSync": 1,
                     "definitionProvider": True,
                     "hoverProvider": True,
+                    "referencesProvider": True,
                 }
             },
         )
@@ -473,6 +474,7 @@ class TestValidProject(TestCase):
                     "textDocumentSync": 1,
                     "definitionProvider": True,
                     "hoverProvider": True,
+                    "referencesProvider": True,
                 }
             },
         )

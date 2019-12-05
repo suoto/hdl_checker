@@ -335,6 +335,7 @@ with such.A("hdl_checker server") as it:
                         "textDocumentSync": 1,
                         "definitionProvider": True,
                         "hoverProvider": True,
+                        "referencesProvider": True,
                     }
                 },
             )
