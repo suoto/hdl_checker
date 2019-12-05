@@ -834,5 +834,5 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return (
             dependency
             for dependency in chain.from_iterable(self._dependencies_map.values())
-            if (library, unit.name) == (dependency.library, dependency.name)
+            if dependency.name == unit.name and dependency.library in (library, None)
         )

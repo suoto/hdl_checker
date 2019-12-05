@@ -758,6 +758,74 @@ class TestDatabase(TestCase):
             self.database.getLibrary(Path(path))
             meth.assert_called_once_with(PathNotInProjectFile(Path(path)))
 
+    def test_GetReferencesToDesignUnit(self):
+        # type: (...) -> Any
+        self.database._configFromSources(
+            {
+                _SourceMock(
+                    filename=_path("file_0.vhd"),
+                    library="file_0_library",
+                    design_units=[{"name": "package_0", "type": "package"}],
+                    dependencies=(("work", "some_other_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_1.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_1", "type": "package"}],
+                    dependencies=(("work", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_2.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_2", "type": "package"}],
+                    dependencies=(("some_dep_lib", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("file_3.vhd"),
+                    library=None,
+                    design_units=[{"name": "package_3", "type": "package"}],
+                    dependencies=(("some_dep_lib", "some_dependency"),),
+                ),
+                _SourceMock(
+                    filename=_path("some_dependency.vhd"),
+                    library=None,
+                    design_units=[{"name": "some_dependency", "type": "package"}],
+                ),
+            },
+            TEST_TEMP_PATH,
+        )
+
+        # A design unit from a file whose library hasn't been set
+        unit = VhdlDesignUnit(
+            owner=_Path("some_dependency.vhd"),
+            name="some_dependency",
+            type_=DesignUnitType.package,
+            locations={},
+        )
+
+        self.assertCountEqual(
+            self.database.getReferencesToDesignUnit(unit),
+            {
+                RequiredDesignUnit(
+                    name=Identifier("some_dependency"),
+                    library=None,
+                    owner=_Path("file_1.vhd"),
+                    locations=(Location(line=1, column=4),),
+                ),
+                RequiredDesignUnit(
+                    name=Identifier("some_dependency"),
+                    library=Identifier("some_dep_lib"),
+                    owner=_Path("file_2.vhd"),
+                    locations=(Location(line=1, column=4),),
+                ),
+                RequiredDesignUnit(
+                    name=Identifier("some_dependency"),
+                    library=Identifier("some_dep_lib"),
+                    owner=_Path("file_3.vhd"),
+                    locations=(Location(line=1, column=4),),
+                ),
+            },
+        )
 
 class TestDirectDependencies(TestCase):
     def setUp(self):

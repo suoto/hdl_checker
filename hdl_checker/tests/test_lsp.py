@@ -861,5 +861,98 @@ class TestValidProject(TestCase):
             [],
         )
 
+    @patch.object(
+        hdl_checker.database.Database,
+        "getReferencesToDesignUnit",
+        return_value=[
+            RequiredDesignUnit(
+                name=Identifier("clock_divider"),
+                library=Identifier("basic_library"),
+                owner=Path("some_path"),
+                locations=(Location(1, 2), Location(3, 4)),
+            )
+        ],
+    )
+    def test_ReferencesOfAValidElement(self, get_references):
+        path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
+
+        # Make sure we picked up an existing element
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(7, 7))
+        self.assertIsNotNone(unit)
+
+        self.assertCountEqual(
+            self.server.references(
+                doc_uri=uris.from_fs_path(path_to_foo),
+                position={"line": 7, "character": 7},
+                exclude_declaration=True,
+            ),
+            (
+                {
+                    "uri": uris.from_fs_path("some_path"),
+                    "range": {
+                        "start": {"line": 1, "character": 2},
+                        "end": {"line": 1, "character": 2},
+                    },
+                },
+                {
+                    "uri": uris.from_fs_path("some_path"),
+                    "range": {
+                        "start": {"line": 3, "character": 4},
+                        "end": {"line": 3, "character": 4},
+                    },
+                },
+            ),
+        )
+
+        get_references.assert_called_once()
+        get_references.reset_mock()
+
+        self.assertCountEqual(
+            self.server.references(
+                doc_uri=uris.from_fs_path(path_to_foo),
+                position={"line": 7, "character": 7},
+                exclude_declaration=False,
+            ),
+            (
+                {
+                    "uri": uris.from_fs_path(path_to_foo),
+                    "range": {
+                        "start": {"line": 7, "character": 7},
+                        "end": {"line": 7, "character": 7},
+                    },
+                },
+                {
+                    "uri": uris.from_fs_path("some_path"),
+                    "range": {
+                        "start": {"line": 1, "character": 2},
+                        "end": {"line": 1, "character": 2},
+                    },
+                },
+                {
+                    "uri": uris.from_fs_path("some_path"),
+                    "range": {
+                        "start": {"line": 3, "character": 4},
+                        "end": {"line": 3, "character": 4},
+                    },
+                },
+            ),
+        )
+
+    def test_ReferencesOfAnInvalidElement(self):
+        path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
+
+        # Make sure there's no element at this location
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(0, 0))
+        self.assertIsNone(unit)
+
+        for exclude_declaration in (True, False):
+            self.assertIsNone(
+                self.server.references(
+                    doc_uri=uris.from_fs_path(path_to_foo),
+                    position={"line": 0, "character": 0},
+                    exclude_declaration=exclude_declaration,
+                )
+            )
+
 
 it.createTests(globals())
