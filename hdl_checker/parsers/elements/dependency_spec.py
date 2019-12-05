@@ -97,7 +97,7 @@ class BaseDependencySpec(ParsedElement):
         )
 
     def __repr__(self):
-        return "{}(name='{}', library='{}', owner={}, locations={})".format(
+        return "{}(name={}, library={}, owner={}, locations={})".format(
             self.__class__.__name__,
             repr(self.name),
             repr(self.library),

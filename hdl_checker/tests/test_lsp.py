@@ -27,7 +27,6 @@ import logging
 import os
 import os.path as p
 import time
-from contextlib import contextmanager
 from tempfile import mkdtemp
 from threading import Event, Timer
 from typing import Any
@@ -646,99 +645,71 @@ class TestValidProject(TestCase):
                 it.fail("Expected foo.vhd but got %s" % path)
             return {DEP_A, DEP_B}
 
-        @contextmanager
-        def patchServer():
-            with patch.object(
+        patches = (
+            patch.object(
                 hdl_checker.database.Database,
                 "getDesignUnitsByPath",
                 getDesignUnitsByPath,
-            ):
-                with patch.object(
-                    hdl_checker.database.Database,
-                    "getDependenciesByPath",
-                    getDependenciesByPath,
-                ):
-                    yield
+            ),
+            patch.object(
+                hdl_checker.database.Database,
+                "getDependenciesByPath",
+                getDependenciesByPath,
+            ),
+        )
 
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-        with patchServer():
-            # Check locations outside return nothing
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(0, 0)))
+        for _patch in patches:
+            _patch.start()
 
-            # Check design units are found, ensure boundaries match
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 1)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(1, 2)), UNIT_A
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(1, 7)), UNIT_A
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 8)))
+        # Check locations outside return nothing
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(0, 0)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 3)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(3, 4)), UNIT_A
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(3, 9)), UNIT_A
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 10)))
+        # Check design units are found, ensure boundaries match
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 1)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(1, 2)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Location(1, 7)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 8)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 5)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(5, 6)), UNIT_B
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(5, 11)), UNIT_B
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 12)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 3)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(3, 4)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Location(3, 9)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 10)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 7)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(7, 8)), UNIT_B
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(7, 13)), UNIT_B
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 14)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 5)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(5, 6)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Location(5, 11)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 12)))
 
-            # Now check dependencies
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 9)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(9, 10)), DEP_A
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(9, 20)), DEP_A
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 21)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 7)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(7, 8)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Location(7, 13)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 14)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 11)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(11, 12)), DEP_A
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(11, 22)), DEP_A
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 23)))
+        # Now check dependencies
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 9)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(9, 10)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Location(9, 20)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 21)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 13)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(13, 14)), DEP_B
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(13, 24)), DEP_B
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 25)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 11)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(11, 12)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Location(11, 22)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 23)))
 
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 15)))
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(15, 16)), DEP_B
-            )
-            self.assertIs(
-                self.server._getElementAtPosition(path, Location(15, 26)), DEP_B
-            )
-            self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 27)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 13)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(13, 14)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Location(13, 24)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 25)))
+
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 15)))
+        self.assertIs(self.server._getElementAtPosition(path, Location(15, 16)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Location(15, 26)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 27)))
+
+        for _patch in patches:
+            _patch.stop()
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
