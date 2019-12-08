@@ -30,7 +30,7 @@ from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple
 
 import six
 
-from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH
+from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
     getBuilderByName,
     getVunitSources,
@@ -275,6 +275,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             "builder": self.builder,
             "config_file": self.config_file,
             "database": self.database,
+            "__version__": __version__,
         }
 
         _logger.debug("Saving state to '%s'", cache_fname)
@@ -306,7 +307,6 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         try:
             cache = json.load(open(cache_fname.name, "r"), object_hook=jsonObjectHook)
-            _logger.debug("Recovered cache from '%s'", cache_fname)
         except IOError:
             _logger.debug("Couldn't read cache file %s, skipping recovery", cache_fname)
             return
@@ -324,6 +324,15 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             )
             return
 
+        # Check the cache info and the current version match
+        cached_version = cache.get("__version__", None)
+        if __version__ != cached_version:
+            _logger.info(
+                "Cache versions mismatch: %s and %s", __version__, cached_version
+            )
+            return
+
+        _logger.debug("Recovered cache from '%s'", cache_fname)
         self._setState(cache)
         self._builder.setup()
 

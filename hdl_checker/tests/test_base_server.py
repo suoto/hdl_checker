@@ -232,6 +232,12 @@ with such.A("hdl_checker project") as it:
         def test():
             it.assertIsInstance(it.project.builder, Fallback)
 
+        @it.should("restore state from a saved cache")  # type: ignore
+        def test():
+            it.project._saveCache()
+            it.project._recoverCacheIfPossible()
+            it.assertIsNone(it.project.config_file)
+
         @it.should("still report static messages")  # type: ignore
         @patch(
             "hdl_checker.base_server.getStaticMessages",
@@ -319,19 +325,19 @@ with such.A("hdl_checker project") as it:
                 it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
-        @it.should("recover from cache")  # type: ignore
+        @it.should("restore state from a saved cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        @patch("hdl_checker.base_server.BaseServer._setState")
-        def test(set_state):
-            source = _SourceMock(
-                library="some_lib", design_units=[{"name": "target", "type": "entity"}]
-            )
+        def test():
+            it.project._saveCache()
+            it.project._recoverCacheIfPossible()
+            it.assertIsNotNone(it.project.config_file)
 
-            it.project.getMessagesByPath(source.filename)
+        @it.should("not reparse when setting the config file")  # type: ignore
+        @patchClassMap(MockBuilder=MockBuilder)
+        def test():
+            it.project._saveCache()
 
             _ = DummyServer(_Path(TEST_TEMP_PATH))
-
-            set_state.assert_called_once()
 
             # Setting the config file should not trigger reparsing
             with patch(
@@ -343,6 +349,22 @@ with such.A("hdl_checker project") as it:
                 it.assertEqual(it.project.config_file, old)
                 watched_file.assert_not_called()
                 it.assertIsNotNone(it.project.config_file)
+
+        @it.should("not recover cache if versions differ")  # type: ignore
+        @patchClassMap(MockBuilder=MockBuilder)
+        @patch("hdl_checker.base_server.json.load", return_value={"__version__": None})
+        def test(json_load):
+            source = _SourceMock(
+                library="some_lib", design_units=[{"name": "target", "type": "entity"}]
+            )
+
+            it.project.getMessagesByPath(source.filename)
+
+            # Set state must only be called when recovering from cache
+            with patch.object(it.project, "_setState") as set_state:
+                it.project._recoverCacheIfPossible()
+                json_load.assert_called_once()
+                set_state.assert_not_called()
 
         @it.should("clean up and reparse if the config file changes")  # type: ignore
         @linuxOnly
@@ -797,7 +819,9 @@ with such.A("hdl_checker project") as it:
                     return [], ret_list.pop()
                 return [], []
 
-            with patch.object(MockBuilder, "_buildAndGetDiagnostics", _buildAndGetDiagnostics):
+            with patch.object(
+                MockBuilder, "_buildAndGetDiagnostics", _buildAndGetDiagnostics
+            ):
                 it.assertFalse(
                     list(it.project._getBuilderMessages(Path(test_filename)))
                 )
