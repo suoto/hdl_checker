@@ -17,9 +17,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
-"hdl_checker main entry point"
+"hdl_checker module entry point"
 
-#  import sys
+import sys
 
-#  from hdl_checker.standalone import main
-#  sys.exit(main())
+from hdl_checker.server import main
+
+sys.exit(main())
