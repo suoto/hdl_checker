@@ -69,7 +69,7 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
-_HOW_LONG_IS_TOO_LONG = 15
+_HOW_LONG_IS_TOO_LONG = 30
 
 _SETTING_UP_A_PROJECT_URL = (
     "https://github.com/suoto/hdl_checker/wiki/Setting-up-a-project"
