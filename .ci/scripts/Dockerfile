@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-FROM ubuntu:19.04
+FROM suoto/xsim:2018.3
 
 ENV BUILDERS /builders
 
@@ -33,7 +33,6 @@ ENV PACKAGES="python2         \
               lib32stdc++6    \
               lib32z1         \
               libtcl8.6       \
-              libtinfo5       \
               make            \
               python2-dev     \
               python3-pip     \
@@ -62,21 +61,20 @@ RUN ../configure --prefix=$BUILDERS/ghdl && \
     make -j                              && \
     make install
 
-RUN apt-get purge -qq ca-certificates make zlib1g-dev && \
-    apt-get clean                                     && \
+RUN apt-get purge -qq make zlib1g-dev && \
+    apt-get clean                     && \
     apt-get autoclean
 RUN rm -rf /tmp/ghdl
 
 RUN $BUILDERS/ghdl/bin/ghdl --version
 
-# ModelSim and XVHDL will be copied
+# ModelSim will be copied
 COPY msim $BUILDERS/msim
-COPY xvhdl $BUILDERS/xvhdl
 
 # Test installations
 RUN "$BUILDERS/ghdl/bin/ghdl" --version
 RUN "$BUILDERS/msim/modelsim_ase/linuxaloem/vcom" -version
-RUN "$BUILDERS/xvhdl/bin/xvhdl" -version
+RUN "/xsim/bin/xvhdl" -version
 
 VOLUME /hdl_checker
 WORKDIR /hdl_checker
