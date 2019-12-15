@@ -22,8 +22,7 @@ ENV BUILDERS /builders
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
-ENV PACKAGES="python2         \
-              ca-certificates \
+ENV PACKAGES="ca-certificates \
               g++-multilib    \
               gcc             \
               gcc-multilib    \
@@ -34,10 +33,15 @@ ENV PACKAGES="python2         \
               lib32z1         \
               libtcl8.6       \
               make            \
-              python2-dev     \
+              python2.7       \
+              python2.7-dev   \
               python3-pip     \
+              python3.6       \
+              python3.6-dev   \
               python3.7       \
+              python3.7-dev   \
               python3.8       \
+              python3.8-dev   \
               wget            \
               zlib1g-dev"
 

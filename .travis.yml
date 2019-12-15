@@ -23,14 +23,18 @@ stages:
 
 branches:
   except:
-  - /.*?\b((?i:windows)|(?i:win)|(?i:appveyor))\b.*/
+    - /.*?\b((?i:windows)|(?i:win)|(?i:appveyor))\b.*/
 
 jobs:
   include:
     - name: Python 2.7
       script: ./run_tests.sh -e py27-linux -- -v
+    - name: Python 3.6
+      script: ./run_tests.sh -e py36-linux -- -v
     - name: Python 3.7
       script: ./run_tests.sh -e py37-linux -- -v
+    - name: Python 3.8
+      script: ./run_tests.sh -e py38-linux -- -v
 
 
     - stage: deploy
