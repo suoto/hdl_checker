@@ -152,10 +152,15 @@ class JsonSourceEntry(
         Creates a JsonSourceEntry from all supported formats:
             - str
             - [str, {"library": "<library_name>", "flags": BuildFlags}]
+            - {"path": str,               <- Mandatory
+               "library": <library_name>, <- Optional
+               "flags": <BuildFlags>,     <- Optional
+              }
         """
         path = iterable
         info = {}  # type: Dict[str, Union[None, str, BuildFlags]]
 
+        # Support both
         if not isinstance(path, six.string_types):
             path = iterable[0]
             info = iterable[1]
