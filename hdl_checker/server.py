@@ -66,7 +66,8 @@ def parseArguments():
         "--log-stream",
         action="store",
         help="[HTTP, LSP] Log file, defaults to stdout when in HTTP or a "
-        "temporary file named hdl_checker_log_pid<PID>.log when in LSP mode",
+        "temporary file named hdl_checker_log_pid<PID>.log when in LSP mode. "
+        "Use NONE to disable logging altogether",
     )
 
     parser.add_argument(
@@ -79,7 +80,8 @@ def parseArguments():
         "--stderr",
         action="store",
         help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
-        "named hdl_checker_stderr_pid<PID>.log",
+        "named hdl_checker_stderr_pid<PID>.log. "
+        "Use NONE to disable redirecting stderr altogether",
     )
 
     parser.add_argument(
@@ -111,8 +113,15 @@ def parseArguments():
         args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
-    args.log_stream = args.log_stream or getTemporaryFilename("log")
-    args.stderr = args.stderr or getTemporaryFilename("stderr")
+    if args.log_stream == "NONE":
+        args.log_stream = None
+    else:
+        args.log_stream = args.log_stream or getTemporaryFilename("log")
+
+    if args.stderr == "NONE":
+        args.stderr = None
+    else:
+        args.stderr = args.stderr or getTemporaryFilename("stderr")
 
     args.log_level = args.log_level or logging.INFO
 

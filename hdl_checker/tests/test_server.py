@@ -467,6 +467,56 @@ with such.A("hdl_checker server") as it:
                     "stderr file should not be {}".format(args.stderr),
                 )
 
+        @it.should("disable writing to log when passing --log-stream NONE")  # type: ignore
+        @disableVunit
+        def test():
+            from hdl_checker import server
+
+            # Check it works with LSP
+            with patch.object(
+                server.argparse._sys,
+                "argv",
+                [p.abspath(server.__file__), "--lsp", "--log-stream", "NONE"],
+            ):
+                args = server.parseArguments()
+
+            it.assertIsNone(args.log_stream)
+
+            # Check it works with HTTP server
+            with patch.object(
+                server.argparse._sys,
+                "argv",
+                [p.abspath(server.__file__), "--log-stream", "NONE"],
+            ):
+                args = server.parseArguments()
+
+            it.assertIsNone(args.log_stream)
+
+        @it.should("disable writing to stderr when passing --stderr NONE")  # type: ignore
+        @disableVunit
+        def test():
+            from hdl_checker import server
+
+            # Check it works with LSP
+            with patch.object(
+                server.argparse._sys,
+                "argv",
+                [p.abspath(server.__file__), "--lsp", "--stderr", "NONE"],
+            ):
+                args = server.parseArguments()
+
+            it.assertIsNone(args.stderr)
+
+            # Check it works with HTTP server
+            with patch.object(
+                server.argparse._sys,
+                "argv",
+                [p.abspath(server.__file__), "--stderr", "NONE"],
+            ):
+                args = server.parseArguments()
+
+            it.assertIsNone(args.stderr)
+
 
 @patch("hdl_checker.server.start_io_lang_server")
 @patch("hdl_checker.server._binaryStdio", return_value=("stdin", "stdout"))
