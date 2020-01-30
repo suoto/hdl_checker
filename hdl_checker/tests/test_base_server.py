@@ -65,6 +65,7 @@ from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import (
     BuildFlagScope,
+    ConfigFileOrigin,
     FileType,
     Location,
     RebuildLibraryUnit,
@@ -141,13 +142,41 @@ with such.A("hdl_checker project") as it:
         open(source, "w").write("")
 
         project = DummyServer(_Path(path))
-        project.setConfig(Path(config))
+        project.setConfig(_Path(config), origin=ConfigFileOrigin.generated)
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
 
         handle_ui_info.assert_called_once_with(
             hdl_checker.base_server._HOW_LONG_IS_TOO_LONG_MSG
         )
+
+        removeIfExists(path)
+
+    @it.should(  # type: ignore
+        "not warn when setup is taking too long if the user provides the config file"
+    )
+    @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
+    @patch.object(
+        hdl_checker.base_server.BaseServer, "configure", lambda *_: time.sleep(0.5)
+    )
+    @patch("hdl_checker.tests.DummyServer._handleUiInfo")
+    def test(handle_ui_info):
+
+        path = tempfile.mkdtemp()
+
+        config = p.join(path, "config.json")
+        source = p.join(path, "source.vhd")
+
+        # Make sure the files exist
+        open(config, "w").write("")
+        open(source, "w").write("")
+
+        project = DummyServer(_Path(path))
+        project.setConfig(Path(config), origin=ConfigFileOrigin.user)
+        # Get messages of anything to trigger reading the config
+        project.getMessagesByPath(Path(source))
+
+        handle_ui_info.assert_not_called()
 
         removeIfExists(path)
 
@@ -166,7 +195,7 @@ with such.A("hdl_checker project") as it:
         open(source, "w").write("")
 
         project = DummyServer(_Path(path))
-        project.setConfig(Path(config))
+        project.setConfig(Path(config), origin=ConfigFileOrigin.user)
         # Get messages of anything to trigger reading the config
         project.getMessagesByPath(Path(source))
 
@@ -220,7 +249,7 @@ with such.A("hdl_checker project") as it:
         def test():
             project = DummyServer(_Path("nonexisting"))
             with it.assertRaises(FileNotFoundError):
-                project.setConfig(str(it.project_file))
+                project.setConfig(str(it.project_file), origin=ConfigFileOrigin.user)
 
     with it.having("no project file at all"):
 
@@ -308,7 +337,7 @@ with such.A("hdl_checker project") as it:
                 }
             )
 
-            it.project.setConfig(it.config_file)
+            it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
 
         @it.should("use MockBuilder builder")  # type: ignore
         def test():
@@ -344,7 +373,7 @@ with such.A("hdl_checker project") as it:
                 "hdl_checker.base_server.WatchedFile.__init__", side_effect=[None]
             ) as watched_file:
                 old = it.project.config_file
-                it.project.setConfig(it.config_file)
+                it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
                 it.project._updateConfigIfNeeded()
                 it.assertEqual(it.project.config_file, old)
                 watched_file.assert_not_called()
@@ -430,7 +459,10 @@ with such.A("hdl_checker project") as it:
         @patch("hdl_checker.base_server.json.dump")
         def test(_):
             with PatchBuilder():
-                it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
+                it.project.setConfig(
+                    Path(p.join(TEST_PROJECT, "vimhdl.prj")),
+                    origin=ConfigFileOrigin.user,
+                )
                 it.project._updateConfigIfNeeded()
 
             entity_a = _SourceMock(
@@ -614,7 +646,10 @@ with such.A("hdl_checker project") as it:
 
             with PatchBuilder():
                 it.project = DummyServer(_Path(TEST_TEMP_PATH))
-                it.project.setConfig(Path(p.join(TEST_PROJECT, "vimhdl.prj")))
+                it.project.setConfig(
+                    Path(p.join(TEST_PROJECT, "vimhdl.prj")),
+                    origin=ConfigFileOrigin.user,
+                )
                 it.project._updateConfigIfNeeded()
                 handle_ui_info.assert_called_once_with("Added 10 sources")
 

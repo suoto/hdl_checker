@@ -24,7 +24,6 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import six
-
 from pyls import lsp as defines  # type: ignore
 from pyls._utils import debounce  # type: ignore
 from pyls.python_ls import PythonLanguageServer  # type: ignore
@@ -44,7 +43,7 @@ from hdl_checker.parsers.elements.design_unit import (
     tAnyDesignUnit,
 )
 from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import Location, MarkupKind
+from hdl_checker.types import ConfigFileOrigin, Location, MarkupKind
 from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
@@ -251,7 +250,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         path = self._getProjectFilePath(options)
 
         try:
-            self.checker.setConfig(path)
+            self.checker.setConfig(path, origin=ConfigFileOrigin.user)
             return
         except UnknownParameterError as exc:
             _logger.info("Failed to read config from %s: %s", path, exc)
@@ -274,7 +273,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # Write this to a file and tell the server to use it
         auto_project_file = getTemporaryFilename(AUTO_PROJECT_FILE_NAME)
         json.dump(config, open(auto_project_file, "w"))
-        self.checker.setConfig(auto_project_file)
+        self.checker.setConfig(auto_project_file, origin=ConfigFileOrigin.generated)
 
     def _getProjectFilePath(self, options=None):
         # type: (...) -> str

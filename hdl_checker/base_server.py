@@ -55,6 +55,7 @@ from hdl_checker.serialization import StateEncoder, jsonObjectHook
 from hdl_checker.static_check import getStaticMessages
 from hdl_checker.types import (
     BuildFlagScope,
+    ConfigFileOrigin,
     RebuildInfo,
     RebuildLibraryUnit,
     RebuildPath,
@@ -91,7 +92,9 @@ if six.PY2:
 else:
     JSONDecodeError = json.decoder.JSONDecodeError
 
-WatchedFile = NamedTuple("WatchedFile", (("path", Path), ("last_read", float)))
+WatchedFile = NamedTuple(
+    "WatchedFile", (("path", Path), ("last_read", float), ("origin", ConfigFileOrigin))
+)
 
 
 class BaseServer(object):  # pylint: disable=useless-object-inheritance
@@ -159,8 +162,8 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             for meth in self._cached_methods:
                 meth.cache_clear()
 
-    def setConfig(self, filename):
-        # type: (Union[Path, str]) -> None
+    def setConfig(self, filename, origin):
+        # type: (Union[Path, str], ConfigFileOrigin) -> None
         """
         Sets the configuration file. Calling this method will only trigger a
         configuration update if the given file name is different what was
@@ -177,7 +180,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         else:
             return
 
-        self.config_file = WatchedFile(path, mtime)
+        self.config_file = WatchedFile(path, mtime, origin)
         _logger.debug("Set config to %s", self.config_file)
 
     def _updateConfigIfNeeded(self):
@@ -199,14 +202,17 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             if self.config_file.last_read >= file_mtime:
                 return
 
-            # Don't let the user hanging if adding sources is taking too long. Also
-            # need to notify when adding is done.
+            # Don't let the user hanging if adding sources is taking too long
+            # when there's no config file. Also need to notify when adding is
+            # done.
             timer = Timer(
                 _HOW_LONG_IS_TOO_LONG,
                 self._handleUiInfo,
                 args=(_HOW_LONG_IS_TOO_LONG_MSG,),
             )
-            timer.start()
+
+            if self.config_file.origin is ConfigFileOrigin.generated:
+                timer.start()
 
             try:
                 config = json.load(open(str(self.config_file.path)))
@@ -215,7 +221,9 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
             self.configure(config)
 
-            self.config_file = WatchedFile(self.config_file.path, file_mtime)
+            self.config_file = WatchedFile(
+                self.config_file.path, file_mtime, self.config_file.origin
+            )
             _logger.debug("Updated config file to %s", self.config_file)
             timer.cancel()
 
@@ -362,7 +370,9 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             return
 
         # Force config file out of to date to trigger reparsing
-        self.config_file = WatchedFile(self.config_file.path, 0)
+        self.config_file = WatchedFile(
+            self.config_file.path, 0, self.config_file.origin
+        )
 
     def clean(self):
         # type: (...) -> Any

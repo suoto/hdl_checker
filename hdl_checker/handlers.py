@@ -27,10 +27,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import bottle  # type: ignore
 
 from hdl_checker import __version__ as version
-from hdl_checker import types as t  # pylint: disable=unused-import
 from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.path import Path
+from hdl_checker.types import ConfigFileOrigin
 from hdl_checker.utils import terminateProcess
 
 _logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ def _getServerByProjectFile(project_file):
         try:
             project = Server(root_dir=root_dir)
             if project_file is not None:
-                project.setConfig(project_file)
+                project.setConfig(project_file, origin=ConfigFileOrigin.user)
             _logger.debug("Created new project server for '%s'", project_file)
         except (IOError, OSError):
             _logger.info("Failed to create checker, reverting to fallback")

@@ -98,3 +98,8 @@ Location = NamedTuple("Location", (("line", Optional[int]), ("column", Optional[
 
 # A location range within a source file
 Range = NamedTuple("Range", (("start", Location), ("end", Optional[Location])))
+
+class ConfigFileOrigin(str, Enum):
+    "Specifies tracked design unit types"
+    user = "user"
+    generated = "generated"
