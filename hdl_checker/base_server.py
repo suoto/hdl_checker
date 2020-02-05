@@ -34,7 +34,7 @@ from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
     getBuilderByName,
     getVunitSources,
-    getWorkingBuilders,
+    getPreferredBuilder,
 )
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.database import Database
@@ -237,10 +237,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         if builder_name is not None:
             builder_cls = getBuilderByName(builder_name)
         else:
-            try:
-                builder_cls = list(getWorkingBuilders()).pop()
-            except IndexError:
-                builder_cls = Fallback
+            builder_cls = getPreferredBuilder()
 
         _logger.debug("Builder class: %s", builder_cls)
 

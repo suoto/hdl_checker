@@ -87,7 +87,7 @@ def getBuilderByName(name):
     return builder
 
 
-def getWorkingBuilders():
+def getPreferredBuilder():
     """
     Returns a generator with the names of builders that are actually working
     """
@@ -96,7 +96,10 @@ def getWorkingBuilders():
             continue
         if builder_class.isAvailable():
             _logger.debug("Builder %s worked", builder_class.builder_name)
-            yield builder_class
+            return builder_class
+
+    # If no compiler worked, use fallback
+    return Fallback
 
 
 def foundVunit():  # type: () -> bool
@@ -200,4 +203,5 @@ def _getSourcesFromVUnitModule(vunit_module):
 
 __all__ = ["MSim", "XVHDL", "GHDL", "Fallback"]
 
+# This holds the builders in order of preference
 AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback

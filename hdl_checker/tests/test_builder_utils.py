@@ -31,8 +31,8 @@ from hdl_checker.tests import TestCase, disableVunit, getTestTempPath
 from hdl_checker.builder_utils import (
     foundVunit,
     getBuilderByName,
+    getPreferredBuilder,
     getVunitSources,
-    getWorkingBuilders,
 )
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
@@ -62,16 +62,22 @@ class TestBuilderUtils(TestCase):
     def test_getWorkingBuilders(self):
         # Test no working builders
         _logger.info("Checking no builder works")
-        self.assertFalse(list(getWorkingBuilders()))
+        self.assertEqual(getPreferredBuilder(), Fallback)
 
         # Patch one builder
         with patch.object(MSim, "isAvailable", staticmethod(lambda: True)):
-            _logger.info("Checking MSim works")
-            self.assertCountEqual(list(getWorkingBuilders()), [MSim])
-            # Patch another builder
+            self.assertEqual(getPreferredBuilder(), MSim)
+            # Patch another builder with lower priority
             with patch.object(GHDL, "isAvailable", staticmethod(lambda: True)):
-                _logger.info("Checking MSim and GHDL work")
-                self.assertCountEqual(list(getWorkingBuilders()), [MSim, GHDL])
+                self.assertEqual(getPreferredBuilder(), MSim)
+
+        # Patch one builder
+        with patch.object(GHDL, "isAvailable", staticmethod(lambda: True)):
+            self.assertEqual(getPreferredBuilder(), GHDL)
+
+            # Patch another builder
+            with patch.object(MSim, "isAvailable", staticmethod(lambda: True)):
+                self.assertEqual(getPreferredBuilder(), MSim)
 
 
 class Library(object):  # pylint: disable=too-few-public-methods
@@ -121,7 +127,7 @@ class TestGetVunitSources(TestCase):
         builder.builder_name = "msim"
         builder.file_types = {FileType.vhdl}
 
-        self.maxDiff = None
+        self.maxDiff = None  # pylint: disable=attribute-defined-outside-init
         self.assertTrue(foundVunit(), "Need VUnit for this test")
         # Should only have VHDL files
         sources = list(getVunitSources(builder))

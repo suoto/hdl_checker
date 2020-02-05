@@ -284,8 +284,8 @@ class PatchBuilder(object):
         self.meth = meth
         self.patches = (
             mock.patch(
-                "hdl_checker.base_server.getWorkingBuilders",
-                side_effect=[iter((MockBuilder,))],
+                "hdl_checker.base_server.getPreferredBuilder",
+                side_effect=[MockBuilder,],
             ),
             mock.patch("hdl_checker.base_server.getBuilderByName", getBuilderByName),
             disableVunit,
