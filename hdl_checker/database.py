@@ -24,7 +24,6 @@ from itertools import chain
 from threading import RLock
 from typing import (
     Any,
-    DefaultDict,
     Dict,
     FrozenSet,
     Iterable,
@@ -86,7 +85,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         self._dependencies_map = {}  # type: Dict[Path, Set[BaseDependencySpec]]
         self._inferred_libraries = set()  # type: Set[Path]
         self._design_units = set()  # type: Set[tAnyDesignUnit]
-        self._diags = DefaultDict(set)  # type: Dict[Path, Set[CheckerDiagnostic]]
+        self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
 
         # Use this to know which methods should be cache
         self._cached_methods = {
@@ -231,6 +230,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         """
         _logger.debug("Adding diagnostic %s", diagnostic)
         assert diagnostic.filename is not None
+
+        if diagnostic.filename not in self._diags:
+            self._diags[diagnostic.filename] = set()
         self._diags[diagnostic.filename].add(diagnostic)
 
     def getDiagnosticsForPath(self, path):
