@@ -134,6 +134,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             self.addSource(
                 path=entry.path,
                 library=entry.library,
+                source_specific_flags=entry.source_specific_flags,
                 single_flags=entry.single_flags,
                 dependencies_flags=entry.dependencies_flags,
             )
@@ -141,21 +142,30 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         return cnt
 
-    def addSource(self, path, library, single_flags=None, dependencies_flags=None):
-        # type: (Path, Optional[str], Optional[BuildFlags], Optional[BuildFlags]) -> None
+    def addSource(
+        self,
+        path,  # type: Path
+        library,  # type: Optional[str]
+        source_specific_flags=None,  # type: Optional[BuildFlags]
+        single_flags=None,  # type: Optional[BuildFlags]
+        dependencies_flags=None,  # type: Optional[BuildFlags]
+    ):
+        # type: (...) -> None
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
         """
         _logger.info(
-            "Adding %s, library=%s, flags=(single=%s, dependencies=%s)",
+            "Adding %s, library=%s, flags=(source_specific=%s, single=%s, dependencies=%s)",
             path,
             library,
+            source_specific_flags,
             single_flags,
             dependencies_flags,
         )
         self._paths.add(path)
         self._flags_map[path] = {
+            BuildFlagScope.source_specific: tuple(source_specific_flags or ()),
             BuildFlagScope.single: tuple(single_flags or ()),
             BuildFlagScope.dependencies: tuple(dependencies_flags or ()),
         }
@@ -254,6 +264,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 "path": path,
                 "mtime": self._parse_timestamp[path],
                 "flags": {
+                    BuildFlagScope.source_specific.value: self._flags_map[path].get(
+                        BuildFlagScope.source_specific, ()
+                    ),
                     BuildFlagScope.single.value: self._flags_map[path].get(
                         BuildFlagScope.single, ()
                     ),
@@ -291,6 +304,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                 obj._library_map[path] = info.pop("library")
 
             obj._flags_map[path] = {}
+            obj._flags_map[path][BuildFlagScope.source_specific] = tuple(
+                info.get("flags", {}).pop(BuildFlagScope.source_specific.value, ())
+            )
             obj._flags_map[path][BuildFlagScope.single] = tuple(
                 info.get("flags", {}).pop(BuildFlagScope.single.value, ())
             )
@@ -309,7 +325,15 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
         """
-        return self._flags_map.get(path, {}).get(scope or BuildFlagScope.single, ())
+        scope_flags = self._flags_map.get(path, {}).get(
+            scope or BuildFlagScope.single, ()
+        )
+
+        source_specific_flags = self._flags_map.get(path, {}).get(
+            BuildFlagScope.source_specific, ()
+        )
+
+        return scope_flags + source_specific_flags
 
     @property
     def paths(self):

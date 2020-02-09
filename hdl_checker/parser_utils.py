@@ -176,6 +176,7 @@ SourceEntry = NamedTuple(
     (
         ("path", Path),
         ("library", Optional[str]),
+        ("source_specific_flags", BuildFlags),
         ("single_flags", BuildFlags),
         ("dependencies_flags", BuildFlags),
     ),
@@ -247,7 +248,8 @@ def _expand(config, ref_path):
             yield SourceEntry(
                 path,
                 source.library,
-                tuple(global_flags) + tuple(single_flags) + tuple(source.flags),
+                tuple(source.flags),
+                tuple(global_flags) + tuple(single_flags),
                 tuple(global_flags) + tuple(dependencies_flags),
             )
 

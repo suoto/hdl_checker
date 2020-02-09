@@ -82,6 +82,7 @@ class BuildFlagScope(Enum):
     fields extracted from the JSON config
     """
 
+    source_specific = "source_specific"
     single = "single"
     dependencies = "dependencies"
     all = "global"
@@ -98,6 +99,7 @@ Location = NamedTuple("Location", (("line", Optional[int]), ("column", Optional[
 
 # A location range within a source file
 Range = NamedTuple("Range", (("start", Location), ("end", Optional[Location])))
+
 
 class ConfigFileOrigin(str, Enum):
     "Specifies tracked design unit types"

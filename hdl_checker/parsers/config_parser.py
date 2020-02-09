@@ -216,7 +216,9 @@ class ConfigParser(object):
 
         for filetype, flags in self._flags.items():
             flags_dict = {}
-            for scope in BuildFlagScope:
+            for scope in (
+                x for x in BuildFlagScope if x is not BuildFlagScope.source_specific
+            ):
                 flags_dict[scope.value] = flags[scope]
             data.update({filetype.name: {"flags": flags_dict}})
 

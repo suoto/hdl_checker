@@ -32,7 +32,6 @@ from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Any
 
 import six
-
 from mock import patch
 
 from hdl_checker.tests import TestCase
@@ -73,6 +72,8 @@ class _ConfigDict(object):
         for lang in FileType:
             d[lang.value] = {"flags": {}}
             for scope in BuildFlagScope:
+                if scope is BuildFlagScope.source_specific:
+                    continue
                 d[lang.value]["flags"][scope.value] = tuple(self.flags[lang][scope])
         return d
 
@@ -306,73 +307,85 @@ class TestConfigHandlers(TestCase):
                 (
                     self._Path("src_0_0.vhd"),
                     None,
+                    (),
                     ("vhdl/0/glob", "vhdl/0/single"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
                     self._Path("src_0_1.v"),
                     None,
+                    (),
                     ("verilog/0/glob", "verilog/0/single"),
                     ("verilog/0/glob", "verilog/0/deps"),
                 ),
                 (
                     self._Path("src_0_2.sv"),
                     None,
+                    (),
                     ("systemverilog/0/glob", "systemverilog/0/single"),
                     ("systemverilog/0/glob", "systemverilog/0/deps"),
                 ),
                 (
                     self._Path("src_0_3.vhd"),
                     "l_0_3",
+                    (),
                     ("vhdl/0/glob", "vhdl/0/single"),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
                     self._Path("src_0_4.vhd"),
                     None,
-                    ("vhdl/0/glob", "vhdl/0/single", "f_0_4"),
+                    ("f_0_4",),
+                    ("vhdl/0/glob", "vhdl/0/single",),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
                     self._Path("src_0_5.vhd"),
                     "l_0_5",
-                    ("vhdl/0/glob", "vhdl/0/single", "f_0_5"),
+                    ("f_0_5",),
+                    ("vhdl/0/glob", "vhdl/0/single",),
                     ("vhdl/0/glob", "vhdl/0/deps"),
                 ),
                 (
                     self._Path("src_1_0.vhd"),
                     None,
+                    (),
                     ("vhdl/1/glob", "vhdl/1/single"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
                     self._Path("src_1_1.v"),
                     None,
+                    (),
                     ("verilog/1/glob", "verilog/1/single"),
                     ("verilog/1/glob", "verilog/1/deps"),
                 ),
                 (
                     self._Path("src_1_2.sv"),
                     None,
+                    (),
                     ("systemverilog/1/glob", "systemverilog/1/single"),
                     ("systemverilog/1/glob", "systemverilog/1/deps"),
                 ),
                 (
                     self._Path("src_1_3.vhd"),
                     "l_1_3",
+                    (),
                     ("vhdl/1/glob", "vhdl/1/single"),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
                     self._Path("src_1_4.vhd"),
                     None,
-                    ("vhdl/1/glob", "vhdl/1/single", "f_1_4"),
+                    ("f_1_4",),
+                    ("vhdl/1/glob", "vhdl/1/single",),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
                 (
                     self._Path("src_1_5.vhd"),
                     "l_1_5",
-                    ("vhdl/1/glob", "vhdl/1/single", "f_1_5"),
+                    ("f_1_5",),
+                    ("vhdl/1/glob", "vhdl/1/single",),
                     ("vhdl/1/glob", "vhdl/1/deps"),
                 ),
             ),
@@ -430,7 +443,7 @@ class TestExpandingPathNames(TestCase):
         self.assertCountEqual(
             flattenConfig(config, root_path=self.base_path),
             (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("some_vhd.vhd"),
                     self.join("dir_0", "some_v.v"),
@@ -452,7 +465,7 @@ class TestExpandingPathNames(TestCase):
 
         if six.PY3:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("some_vhd.vhd"),
                     self.join("dir_0", "some_vhd.vhd"),
@@ -463,7 +476,7 @@ class TestExpandingPathNames(TestCase):
             )
         else:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     #  self.join("some_vhd.vhd"),
                     self.join("dir_0", "some_vhd.vhd"),
@@ -485,7 +498,7 @@ class TestExpandingPathNames(TestCase):
 
         if six.PY3:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("some_sv.sv"),
                     self.join("dir_0", "some_sv.sv"),
@@ -496,7 +509,7 @@ class TestExpandingPathNames(TestCase):
             )
         else:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("dir_0", "some_sv.sv"),
                     self.join("dir_2", "some_sv.sv"),
@@ -517,7 +530,7 @@ class TestExpandingPathNames(TestCase):
 
         if six.PY3:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("some_vhd.vhd"),
                     self.join("some_v.v"),
@@ -538,7 +551,7 @@ class TestExpandingPathNames(TestCase):
             )
         else:
             expected = (
-                SourceEntry(Path(x), None, (), ())
+                SourceEntry(Path(x), None, (), (), ())
                 for x in (
                     self.join("dir_0", "some_vhd.vhd"),
                     self.join("dir_0", "some_v.v"),
