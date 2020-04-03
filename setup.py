@@ -64,6 +64,7 @@ setuptools.setup(
                                      'prettytable>=0.7.2',
                                      'python-language-server>=0.26.1',
                                      'requests==2.20.0',
+                                     'six>=1.10.0',
                                      'tabulate>=0.8.5',
                                      'typing>=3.7.4',
                                      'waitress>=0.9.0', ],
