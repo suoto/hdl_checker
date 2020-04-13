@@ -175,7 +175,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         # If the config file has been set previously, avoid refreshing if
         # possible
         if self.config_file is None or self.config_file.path != path:
-            _logger.info("Replacing %s with %s", self.config_file, path)
+            _logger.debug("Replacing %s with %s", self.config_file, path)
             mtime = 0.0
         else:
             return
@@ -349,7 +349,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         if p.exists(str(self.work_dir)) and p.exists(self._builder.work_folder):
             return
 
-        _logger.warning("Not all directories exist, forcing setup")
+        _logger.info("Not all directories exist, forcing setup")
         self.clean()
 
         os.makedirs(str(self.work_dir))

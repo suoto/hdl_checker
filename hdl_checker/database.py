@@ -183,7 +183,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Removes a path from the database. No error is raised if the path wasn't
         added previously. In this case, avoid clearning LRU caches
         """
-        _logger.info("Removing %s from database", path)
+        _logger.debug("Removing %s from database", path)
         clear_lru_caches = False
 
         with self._lock:
@@ -410,7 +410,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         elif path not in self._library_map:
             # Library is not defined, try to infer
-            _logger.info("Library for '%s' not set, inferring it", path)
+            _logger.debug("Library for '%s' not set, inferring it", path)
             library = self._inferLibraryForPath(path)
             if library is not None:
                 self._updatePathLibrary(path, library)
@@ -839,7 +839,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                         list(map(str, paths_to_build)),
                     )
                 else:
-                    _logger.info("Nothing more to do after %d steps", i)
+                    _logger.debug("Nothing more to do after %d steps", i)
                 return
 
             _logger.debug(

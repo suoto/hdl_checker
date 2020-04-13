@@ -161,7 +161,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         directory.
         """
         if self._checker is None:
-            _logger.info("Server was not initialized, using a temporary one")
+            _logger.debug("Server was not initialized, using a temporary one")
             root_dir = mkdtemp(prefix="temp_hdl_checker_pid{}_".format(getpid()))
             self._checker = Server(self.workspace, root_dir=TemporaryPath(root_dir))
         return self._checker
@@ -292,7 +292,6 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
     @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
     def lint(self, doc_uri, is_saved):
         # type: (URI, bool) -> Any
-        _logger.info("linting: %s", doc_uri)
         diags = set(self._getDiags(doc_uri, is_saved))
 
         # Separate the diagnostics in filename groups to publish diagnostics
@@ -328,7 +327,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # will involve dumping the modified contents into a temporary file
         path = Path(to_fs_path(doc_uri))
 
-        _logger.info("Linting %s (saved=%s)", repr(path), is_saved)
+        _logger.debug("Linting %s (saved=%s)", repr(path), is_saved)
 
         if is_saved:
             return self.checker.getMessagesByPath(path)

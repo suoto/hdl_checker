@@ -358,7 +358,7 @@ def logCalls(func):  # pragma: no cover
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
             result = func(self, *args, **kwargs)
-            _logger.info("%s => %s", _str, repr(result))
+            _logger.debug("%s => %s", _str, repr(result))
 
             return result
         except:
