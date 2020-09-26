@@ -158,6 +158,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         state["_added_libraries"] = list(self._added_libraries)
         del state["_build_info_cache"]
         del state["_lock"]
+        del state["_database"]
         return state
 
     @staticmethod

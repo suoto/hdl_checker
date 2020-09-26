@@ -295,6 +295,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         """
         self._database = state.pop("database")
         self._builder = state.pop("builder", Fallback)
+        self._builder._database = self._database
         config_file = state.pop("config_file", None)
         if config_file is None:
             self.config_file = None
