@@ -22,26 +22,38 @@
 # pylint: disable=function-redefined
 # pylint: disable=invalid-name
 
+import asyncio
 import json
 import logging
 import os
 import os.path as p
 import time
 from tempfile import mkdtemp
-from threading import Event, Timer
+from threading import Event, Thread, Timer
 from typing import Any
 
-import six
-from pyls import _utils  # type: ignore
-from pyls import lsp as defines
-from pyls import uris
-from pyls.workspace import Workspace  # type: ignore
-from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
-from tabulate import tabulate
-
 import parameterized  # type: ignore
+import six
 import unittest2  # type: ignore
 from mock import MagicMock, patch
+from pygls import features, uris
+from pygls.types import (
+    ClientCapabilities,
+    Diagnostic,
+    DiagnosticSeverity,
+    DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams,
+    HoverParams,
+    InitializeParams,
+    MessageType,
+    Position,
+    Range,
+    TextDocumentIdentifier,
+    TextDocumentItem,
+)
+from pygls.workspace import Workspace
+from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
+from tabulate import tabulate
 
 from nose2.tools import such  # type: ignore
 
@@ -67,23 +79,6 @@ from hdl_checker.tests import (  # isort:skip
 if six.PY3:
     unicode = str
 
-# Debouncing will hurt testing since it won't actually call the debounced
-# function if we call it too quickly.
-def _debounce(interval_s, keyed_by=None):  # pylint: disable=unused-argument
-    def wrapper(func):
-        def debounced(*args, **kwargs):
-            result = func(*args, **kwargs)
-            _logger.info("%s(%s, %s) returned %s", func.__name__, args, kwargs, result)
-            return result
-
-        return debounced
-
-    return wrapper
-
-
-# Mock debounce before it's applied
-_utils.debounce = _debounce
-
 from hdl_checker import lsp  # isort:skip
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
 from hdl_checker.utils import ON_WINDOWS  # isort:skip
@@ -95,6 +90,7 @@ LSP_MSG_TEMPLATE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "processId": None}
 
 LSP_MSG_EMPTY_RESPONSE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "result": None}
 
+LSP_REQUEST_TIMEOUT = 1
 MOCK_WAIT_TIMEOUT = 5
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
@@ -116,41 +112,40 @@ class MockWaitTimeout(Exception):
 class TestCheckerDiagToLspDict(unittest2.TestCase):
     @parameterized.parameterized.expand(
         [
-            (DiagType.INFO, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_WARNING, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_ERROR, defines.DiagnosticSeverity.Information),
-            (DiagType.WARNING, defines.DiagnosticSeverity.Warning),
-            (DiagType.ERROR, defines.DiagnosticSeverity.Error),
-            (DiagType.NONE, defines.DiagnosticSeverity.Error),
+            (DiagType.INFO, DiagnosticSeverity.Information),
+            (DiagType.STYLE_INFO, DiagnosticSeverity.Information),
+            (DiagType.STYLE_WARNING, DiagnosticSeverity.Information),
+            (DiagType.STYLE_ERROR, DiagnosticSeverity.Information),
+            (DiagType.WARNING, DiagnosticSeverity.Warning),
+            (DiagType.ERROR, DiagnosticSeverity.Error),
+            (DiagType.NONE, DiagnosticSeverity.Error),
         ]
     )
     def test_converting_to_lsp(self, diag_type, severity):
         # type: (...) -> Any
         _logger.info("Running %s and %s", diag_type, severity)
 
-        diag = CheckerDiagnostic(
-            checker="hdl_checker test",
-            text="some diag",
-            filename=Path("filename"),
-            line_number=0,
-            column_number=0,
-            error_code="error code",
-            severity=diag_type,
+        diag = lsp.checkerDiagToLspDict(
+            CheckerDiagnostic(
+                checker="hdl_checker test",
+                text="some diag",
+                filename=Path("filename"),
+                line_number=0,
+                column_number=0,
+                error_code="error code",
+                severity=diag_type,
+            )
         )
 
+        self.assertEqual(diag.code, "error code")
+        self.assertEqual(diag.source, "hdl_checker test")
+        self.assertEqual(diag.message, "some diag")
+        self.assertEqual(diag.severity, severity)
         self.assertEqual(
-            lsp.checkerDiagToLspDict(diag),
-            {
-                "source": "hdl_checker test",
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 0, "character": 0},
-                },
-                "message": "some diag",
-                "severity": severity,
-                "code": "error code",
-            },
+            diag.range,
+            Range(
+                start=Position(line=0, character=0), end=Position(line=0, character=0),
+            ),
         )
 
     def test_workspace_notify(self):
@@ -163,21 +158,17 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         workspace.show_message.reset_mock()
 
         server._handleUiInfo("some info")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with(
-            "some info", defines.MessageType.Info
-        )
+        workspace.show_message.assert_called_once_with("some info", MessageType.Info)
         workspace.show_message.reset_mock()
 
         server._handleUiWarning("some warning")  # pylint: disable=protected-access
         workspace.show_message.assert_called_once_with(
-            "some warning", defines.MessageType.Warning
+            "some warning", MessageType.Warning
         )
         workspace.show_message.reset_mock()
 
         server._handleUiError("some error")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with(
-            "some error", defines.MessageType.Error
-        )
+        workspace.show_message.assert_called_once_with("some error", MessageType.Error)
 
 
 such.unittest.TestCase.maxDiff = None
@@ -216,7 +207,7 @@ with such.A("LSP server") as it:
         _logger.debug("Shutting down server")
         msg = LSP_MSG_TEMPLATE.copy()
         msg.update({"method": "exit"})
-        it.server._endpoint.consume(msg)
+        #  it.server._endpoint.consume(msg)
 
         # Close the pipe from the server to stdout and empty any pending
         # messages
@@ -282,15 +273,13 @@ with such.A("LSP server") as it:
 
         # Initialization calls
         show_message.assert_called_with(
-            "Searching %s for HDL files..." % TEST_PROJECT, defines.MessageType.Info
+            "Searching %s for HDL files..." % TEST_PROJECT, MessageType.Info
         )
 
         show_message.reset_mock()
 
         it.server.showWarning("some warning")
-        show_message.assert_called_once_with(
-            "some warning", defines.MessageType.Warning
-        )
+        show_message.assert_called_once_with("some warning", MessageType.Warning)
 
         stopLspServer()
 
@@ -450,48 +439,88 @@ class TestValidProject(TestCase):
     params = {
         "rootUri": uris.from_fs_path(TEST_PROJECT),
         "initializationOptions": {"project_file": "config.json"},
+        "processId": 0,
     }
 
     def setUp(self):
+        _logger.fatal("############################################")
         setupTestSuport(TEST_TEMP_PATH)
 
         _logger.debug("Creating server")
-        tx_r, tx_w = os.pipe()
-        self.tx_stream_reader = JsonRpcStreamReader(os.fdopen(tx_r, "rb"))
 
-        rx_stream = MagicMock()
-        rx_stream.closed = False
+        # Client to Server pipe
+        csr, csw = os.pipe()
+        # Server to client pipe
+        scr, scw = os.pipe()
 
-        self.server = lsp.HdlCheckerLanguageServer(rx_stream, os.fdopen(tx_w, "wb"))
-
-        # Initialize server
-        _logger.info("Calling m_initialize")
-        self.assertEqual(
-            self.server.m_initialize(**(self.params or {})),
-            {
-                "capabilities": {
-                    "textDocumentSync": 1,
-                    "definitionProvider": True,
-                    "hoverProvider": True,
-                    "referencesProvider": True,
-                }
-            },
+        self.server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(self.server)
+        self.server.show_message = lambda *args, **kwargs: _logger.fatal(
+            "%s, %s", args, kwargs
         )
 
-        _logger.info("Calling m_initialized")
-        with patch("hdl_checker.lsp.onNewReleaseFound"):
-            self.assertIsNone(self.server.m_initialized())
+        server_thread = Thread(
+            target=self.server.start_io,
+            args=(os.fdopen(csr, "rb"), os.fdopen(scw, "wb")),
+        )
 
-    def teardown(self):
+        server_thread.daemon = True
+        server_thread.start()
+
+        # Add thread id to the server (just for testing)
+        self.server.thread_id = server_thread.ident
+
+        # Setup client
+        self.client = lsp.HdlCheckerLanguageServer(asyncio.new_event_loop())
+        self.client_diagnostics = []
+
+        @self.client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+        def dbg_publish(diag: Diagnostic):
+            _logger.info("Client received diagnostic: %s", diag)
+            self.client_diagnostics.append(diag)
+
+        client_thread = Thread(
+            target=self.client.start_io,
+            args=(os.fdopen(scr, "rb"), os.fdopen(csw, "wb")),
+        )
+
+        client_thread.daemon = True
+        client_thread.start()
+
+        self.client.lsp.send_request(
+            features.INITIALIZE,
+            InitializeParams(
+                process_id=0,
+                capabilities=ClientCapabilities(),
+                root_uri=uris.from_fs_path(TEST_PROJECT),
+                initialization_options={"project_file": "config.json"},
+            ),
+        ).result(timeout=LSP_REQUEST_TIMEOUT)
+
+        self.client.lsp.send_request(features.INITIALIZED).result(
+            timeout=LSP_REQUEST_TIMEOUT
+        )
+
+        #  _logger.info("Calling m_initialized")
+        #  with patch("hdl_checker.lsp.onNewReleaseFound"):
+        #      self.assertIsNone(self.server.m_initialized())
+
+    def tearDown(self):
         _logger.debug("Shutting down server")
-        msg = LSP_MSG_TEMPLATE.copy()
-        msg.update({"method": "exit"})
-        self.server._endpoint.consume(msg)
+        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
+            timeout=2
+        )
+        assert shutdown_response is None
+        self.client.lsp.notify(features.EXIT)
 
-        # Close the pipe from the server to stdout and empty any pending
-        # messages
-        self.tx_stream_reader.close()
-        self.tx_stream_reader.listen(_logger.fatal)
+        #  msg = LSP_MSG_TEMPLATE.copy()
+        #  msg.update({"method": "exit"})
+        #  self.server._endpoint.consume(msg)
+
+        #  # Close the pipe from the server to stdout and empty any pending
+        #  # messages
+        #  self.tx_stream_reader.close()
+        #  self.tx_stream_reader.listen(_logger.fatal)
 
         del self.server
 
@@ -502,7 +531,7 @@ class TestValidProject(TestCase):
         return self._checkLintFileOnMethod(source, "m_text_document__did_save")
 
     def _checkLintFileOnMethod(self, source, method):
-        with patch.object(self.server.workspace, "publish_diagnostics"):
+        with patch.object(self.server, "publish_diagnostics"):
             _logger.info("Sending %s request", method)
             getattr(self.server, method)(
                 textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
@@ -522,14 +551,36 @@ class TestValidProject(TestCase):
             "hdl_checker.lsp.Server.getMessagesByPath",
             return_value=[CheckerDiagnostic(filename=Path(source), text="some text")],
         ) as meth:
-            self.assertCountEqual(
-                self._checkLintFileOnOpen(source),
-                [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+
+            self.assertFalse(self.client_diagnostics)  # Shouldn't have prev diags
+            self.client.lsp.send_request(
+                features.TEXT_DOCUMENT_DID_OPEN,
+                DidOpenTextDocumentParams(
+                    TextDocumentItem(
+                        uris.from_fs_path(source),
+                        language_id="vhdl",
+                        version=0,
+                        text="",
+                    )
+                ),
+            ).result(timeout=LSP_REQUEST_TIMEOUT)
+
+            _logger.fatal("%s", self.client_diagnostics[0])
+            _logger.fatal("dir: %s", dir(self.client_diagnostics[0]))
+
+            self.assertItemsEqual(
+                [x.uri for x in self.client_diagnostics], [uris.from_fs_path(source),],
+            )
+
+            self.assertItemsEqual(
+                [(x.message,) for x in self.client_diagnostics.pop().diagnostics],
+                [("some text",)],
             )
 
             meth.assert_called_once_with(Path(source))
 
     def runTestBuildSequenceTable(self, tablefmt):
+        _logger.fatal("############################################")
         very_common_pkg = Path(
             p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
         )
@@ -550,9 +601,15 @@ class TestValidProject(TestCase):
             ),
         ]
 
-        self.assertEqual(
-            self.server._getBuildSequenceForHover(clk_en_generator), "\n".join(expected)
-        )
+        self.maxDiff = None
+        try:
+            got = self.server._getBuildSequenceForHover(clk_en_generator)
+            self.assertEqual(got, "\n".join(expected))
+        except:
+            _logger.error(
+                "Gotten\n\n%s\n\nExpected\n\n%s\n\n", got, "\n".join(expected)
+            )
+            raise
 
     @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 0)
     @patch(
@@ -718,7 +775,13 @@ class TestValidProject(TestCase):
     def test_HoverOnInvalidRange(self):
         path = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         self.assertIsNone(
-            self.server.hover(uris.from_fs_path(path), {"line": 0, "character": 0})
+            self.client.lsp.send_request(
+                features.HOVER,
+                HoverParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path)),
+                    Position(line=0, character=0),
+                ),
+            ).result(timeout=LSP_REQUEST_TIMEOUT)
         )
 
     @patch(
@@ -748,11 +811,16 @@ class TestValidProject(TestCase):
             ),
         ]
 
-        self.assertDictEqual(
-            self.server.hover(
-                uris.from_fs_path(path_to_foo), {"line": 7, "character": 7}
+        response = self.client.lsp.send_request(
+            features.HOVER,
+            HoverParams(
+                TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                Position(line=7, character=7),
             ),
-            {"contents": "\n".join(expected)},
+        ).result(timeout=LSP_REQUEST_TIMEOUT)
+
+        self.assertEqual(
+            response.contents, "\n".join(expected),
         )
 
     @patch(
@@ -763,11 +831,17 @@ class TestValidProject(TestCase):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
 
-        self.assertDictEqual(
-            self.server.hover(
-                uris.from_fs_path(path_to_foo), {"line": 32, "character": 32}
-            ),
-            {"contents": 'Path "%s", library "basic_library"' % clock_divider},
+        self.assertEqual(
+            self.client.lsp.send_request(
+                features.HOVER,
+                HoverParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(line=32, character=32),
+                ),
+            )
+            .result(timeout=LSP_REQUEST_TIMEOUT)
+            .contents,
+            'Path "%s", library "basic_library"' % clock_divider,
         )
 
     @patch(
