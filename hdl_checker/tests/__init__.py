@@ -28,15 +28,15 @@ import time
 from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import six
-
 import mock
+import six
 import unittest2  # type: ignore
 from parameterized import parameterized_class  # type: ignore
 
 from hdl_checker import exceptions
 from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.base_builder import BaseBuilder
+from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
@@ -490,3 +490,17 @@ def linuxOnly(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def toCheckerDiagnostic(uri, diags: Any) -> Iterable[CheckerDiagnostic]:
+    from pygls import uris
+    for diag in diags:
+        yield CheckerDiagnostic(
+            text=diag.message,
+            checker=diag.source,
+            filename=uris.to_fs_path(uri),
+            line_number=diag.range.start.line,
+            column_number=diag.range.start.character,
+            error_code=diag.code,
+            severity="Error",
+        )

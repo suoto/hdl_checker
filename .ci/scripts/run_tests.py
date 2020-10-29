@@ -222,6 +222,12 @@ def main():
     logging.getLogger("pyls").setLevel(logging.INFO)
     logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
     logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
+
+    logging.getLogger("pygls").setLevel(logging.INFO)
+    logging.getLogger("pygls.protocol").setLevel(logging.INFO)
+    logging.getLogger("pygls.server").setLevel(logging.INFO)
+    logging.getLogger("pygls.feature_manager").setLevel(logging.INFO)
+
     file_handler = logging.FileHandler(args.log_file)
     log_format = (
         "%(levelname)-7s | %(asctime)s | "

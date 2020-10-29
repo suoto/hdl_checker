@@ -26,7 +26,6 @@ import sys
 from threading import Timer
 
 import six
-#  from pyls.python_ls import start_io_lang_server  # type: ignore
 
 from hdl_checker import __version__ as version
 from hdl_checker import handlers, lsp
@@ -222,8 +221,9 @@ def run(args):
 
     if args.lsp:
         stdin, stdout = _binaryStdio()
-        lsp.server.start_io(stdin=stdin, stdout=stdout)
-        #  start_io_lang_server(stdin, stdout, True, lsp.HdlCheckerLanguageServer)
+        server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(server)
+        server.start_io(stdin=stdin, stdout=stdout)
     else:
         if args.attach_to_pid is not None:
             _attachPids(args.attach_to_pid, os.getpid())

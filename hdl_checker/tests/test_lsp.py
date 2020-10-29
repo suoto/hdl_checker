@@ -27,38 +27,38 @@ import json
 import logging
 import os
 import os.path as p
-import time
+from itertools import chain
 from tempfile import mkdtemp
-from threading import Event, Thread, Timer
-from typing import Any
+from threading import Thread
+from typing import Any, Union
 
 import parameterized  # type: ignore
 import six
 import unittest2  # type: ignore
-from mock import MagicMock, patch
+from mock import Mock, patch
 from pygls import features, uris
 from pygls.types import (
     ClientCapabilities,
-    Diagnostic,
     DiagnosticSeverity,
     DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
+    HoverAbstract,
     HoverParams,
     InitializeParams,
+    MarkupKind,
     MessageType,
     Position,
+    PublishDiagnosticsAbstract,
     Range,
+    TextDocumentClientCapabilities,
     TextDocumentIdentifier,
     TextDocumentItem,
 )
-from pygls.workspace import Workspace
-from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
 from tabulate import tabulate
 
 from nose2.tools import such  # type: ignore
 
 from hdl_checker import DEFAULT_LIBRARY
-from hdl_checker.base_server import WatchedFile
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import (
     DesignUnitType,
@@ -70,7 +70,7 @@ from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location
 
 from hdl_checker.tests import (  # isort:skip
-    assertCountEqual,
+    toCheckerDiagnostic,
     getTestTempPath,
     setupTestSuport,
     TestCase,
@@ -85,13 +85,35 @@ from hdl_checker.utils import ON_WINDOWS  # isort:skip
 
 _logger = logging.getLogger(__name__)
 
-JSONRPC_VERSION = "2.0"
-LSP_MSG_TEMPLATE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "processId": None}
+LSP_REQUEST_TIMEOUT = 2
 
-LSP_MSG_EMPTY_RESPONSE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "result": None}
-
-LSP_REQUEST_TIMEOUT = 1
-MOCK_WAIT_TIMEOUT = 5
+_CLIENT_CAPABILITIES = ClientCapabilities(
+    text_document=TextDocumentClientCapabilities(
+        synchronization=None,  # type: ignore
+        completion=None,  # type: ignore
+        hover=HoverAbstract(
+            dynamic_registration=False,
+            content_format=[MarkupKind.Markdown, MarkupKind.PlainText],
+        ),
+        signature_help=None,  # type:ignore
+        references=None,  # type:ignore
+        document_highlight=None,  # type:ignore
+        document_symbol=None,  # type:ignore
+        formatting=None,  # type:ignore
+        range_formatting=None,  # type:ignore
+        on_type_formatting=None,  # type:ignore
+        definition=None,  # type:ignore
+        type_definition=None,  # type:ignore
+        implementation=None,  # type:ignore
+        code_action=None,  # type:ignore
+        code_lens=None,  # type:ignore
+        document_link=None,  # type:ignore
+        color_provider=None,  # type:ignore
+        rename=None,  # type:ignore
+        publish_diagnostics=PublishDiagnosticsAbstract(related_information=True),
+        folding_range=None,  # type:ignore
+    )
+)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
@@ -100,13 +122,59 @@ if ON_WINDOWS:
     TEST_PROJECT = TEST_PROJECT.lower()
 
 
-class MockWaitTimeout(Exception):
-    def __init__(self, msg):
-        super(MockWaitTimeout, self).__init__(self)
-        self.msg = msg
+def _clientServerPair(initialize_params: InitializeParams):
+    setupTestSuport(TEST_TEMP_PATH)
+    _logger.debug("Creating server")
 
-    def __str__(self):
-        return self.msg
+    # Client to Server pipe
+    csr, csw = os.pipe()
+    # Server to client pipe
+    scr, scw = os.pipe()
+
+    server = lsp.HdlCheckerLanguageServer()
+    lsp.setupLanguageServerFeatures(server)
+
+    server_thread = Thread(
+        target=server.start_io, args=(os.fdopen(csr, "rb"), os.fdopen(scw, "wb")),
+    )
+
+    server_thread.daemon = True
+    server_thread.start()
+
+    # Add thread id to the server (just for testing)
+    server.thread_id = server_thread.ident  # type: ignore
+
+    # Setup client
+    client = lsp.HdlCheckerLanguageServer(asyncio.new_event_loop())
+    assert "messages" not in dir(client)
+    assert "diagnostics" not in dir(client)
+    client.messages = []  # type: ignore
+    client.diagnostics = []  # type: ignore
+
+    @client.feature(features.WINDOW_SHOW_MESSAGE)
+    def cb_show_message(msg):
+        _logger.debug("Showing message: %s", msg)
+        client.messages.append(msg)
+
+    @client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+    def client_cb_publish_diags(diag):
+        _logger.debug("Publishing diagnostic: %s", diag)
+        client.diagnostics.append(diag)
+
+    client_thread = Thread(
+        target=client.start_io, args=(os.fdopen(scr, "rb"), os.fdopen(csw, "wb")),
+    )
+
+    client_thread.daemon = True
+    client_thread.start()
+
+    client.lsp.send_request(features.INITIALIZE, initialize_params,).result(
+        timeout=LSP_REQUEST_TIMEOUT
+    )
+
+    client.lsp.send_request(features.INITIALIZED).result(timeout=LSP_REQUEST_TIMEOUT)
+
+    return client, server
 
 
 class TestCheckerDiagToLspDict(unittest2.TestCase):
@@ -148,9 +216,9 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
             ),
         )
 
-    def test_workspace_notify(self):
-        # type: (...) -> Any
-        workspace = MagicMock(spec=Workspace)
+    def test_workspace_notify(self) -> None:
+        workspace = Mock()
+        workspace.show_message = Mock()
 
         server = lsp.Server(
             workspace, root_dir=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
@@ -174,387 +242,112 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
 such.unittest.TestCase.maxDiff = None
 
 with such.A("LSP server") as it:
-    if six.PY2:
-        it.assertCountEqual = assertCountEqual(it)
-
-    def _initializeServer(server, params=None):
-        it.assertEqual(
-            server.m_initialize(**(params or {})),
-            {
-                "capabilities": {
-                    "textDocumentSync": 1,
-                    "definitionProvider": True,
-                    "hoverProvider": True,
-                    "referencesProvider": True,
-                }
-            },
-        )
-
-        with patch("hdl_checker.lsp.onNewReleaseFound"):
-            it.assertEqual(server.m_initialized(), None)
-
-    def startLspServer():
-        _logger.debug("Creating server")
-        tx_r, tx_w = os.pipe()
-        it.tx = JsonRpcStreamReader(os.fdopen(tx_r, "rb"))
-
-        it.rx = MagicMock()
-        it.rx.closed = False
-
-        it.server = lsp.HdlCheckerLanguageServer(it.rx, os.fdopen(tx_w, "wb"))
-
-    def stopLspServer():
-        _logger.debug("Shutting down server")
-        msg = LSP_MSG_TEMPLATE.copy()
-        msg.update({"method": "exit"})
-        #  it.server._endpoint.consume(msg)
-
-        # Close the pipe from the server to stdout and empty any pending
-        # messages
-        it.tx.close()
-        it.tx.listen(_logger.fatal)
-
-        del it.server
-
-    def _waitOnMockCall(meth):
-        event = Event()
-
-        timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
-        timer.start()
-
-        result = []
-        while not event.isSet():
-            if meth.mock_calls:
-                result = meth.mock_calls[0]
-                timer.cancel()
-                break
-
-            time.sleep(0.1)
-
-        if event.isSet():
-            _logger.error("Timed out waiting for %s", meth)
-            raise MockWaitTimeout("Timeout waiting for %s" % meth)
-
-        return result
-
-    def checkLintFileOnOpen(source):
-        return checkLintFileOnMethod(source, "m_text_document__did_open")
-
-    def checkLintFileOnSave(source):
-        return checkLintFileOnMethod(source, "m_text_document__did_save")
-
-    def checkLintFileOnMethod(source, method):
-        with patch.object(it.server.workspace, "publish_diagnostics"):
-            _logger.info("Sending %s request", method)
-            getattr(it.server, method)(
-                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
-            )
-
-            mock_call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-            doc_uri, diagnostics = mock_call[1]
-            _logger.info("doc_uri: %s", doc_uri)
-            _logger.info("diagnostics: %s", diagnostics)
-
-            it.assertEqual(doc_uri, uris.from_fs_path(source))
-            return diagnostics
 
     @it.has_setup
     def setup():
         setupTestSuport(TEST_TEMP_PATH)
-
-    @it.should("show info and warning messages")
-    @patch("pyls.workspace.Workspace.show_message")
-    def test(show_message):
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-        )
-
-        # Initialization calls
-        show_message.assert_called_with(
-            "Searching %s for HDL files..." % TEST_PROJECT, MessageType.Info
-        )
-
-        show_message.reset_mock()
-
-        it.server.showWarning("some warning")
-        show_message.assert_called_once_with("some warning", MessageType.Warning)
-
-        stopLspServer()
-
-    with it.having("root URI set but no project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        import hdl_checker
-
-        @it.should("search for files on initialization")  # type: ignore
-        @patch.object(WatchedFile, "__init__", return_value=None)
-        @patch.object(
-            hdl_checker.config_generators.base_generator.BaseGenerator, "generate"
-        )
-        @patch("hdl_checker.base_server.json.dump", spec=json.dump)
-        def test(dump, generate, watched_file):
-            _initializeServer(
-                it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-            )
-            watched_file.assert_called_once()
-            generate.assert_called_once()
-            # Will get called twice
-            dump.assert_called()
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    with it.having("an existing and valid old style project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            _initializeServer(
-                it.server,
-                params={
-                    "rootUri": uris.from_fs_path(TEST_PROJECT),
-                    "initializationOptions": {"project_file": "vimhdl.prj"},
-                },
-            )
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    with it.having("a non existing project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            it.project_file = "__some_project_file.prj"
-            it.assertFalse(p.exists(it.project_file))
-
-            _initializeServer(
-                it.server,
-                params={
-                    "rootUri": uris.from_fs_path(TEST_PROJECT),
-                    "initializationOptions": {"project_file": it.project_file},
-                },
-            )
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    @it.should("lint file with neither root URI nor project file set")  # type: ignore
-    def test():
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"initializationOptions": {"project_file": None}}
-        )
-
-        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-        checkLintFileOnOpen(source)
-
-        stopLspServer()
-
-    @it.should("lint file with no root URI but project file set")  # type: ignore
-    def test():
-        startLspServer()
-
-        _initializeServer(
-            it.server,
-            params={
-                "rootUri": None,
-                "initializationOptions": {
-                    "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
-                },
-            },
-        )
-
-        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-        checkLintFileOnOpen(source)
-
-        stopLspServer()
-
-
-class TestValidProject(TestCase):
-
-    params = {
-        "rootUri": uris.from_fs_path(TEST_PROJECT),
-        "initializationOptions": {"project_file": "config.json"},
-        "processId": 0,
-    }
-
-    def setUp(self):
-        _logger.fatal("############################################")
-        setupTestSuport(TEST_TEMP_PATH)
-
         _logger.debug("Creating server")
+        #  it.client, it.server = _clientServerPair(params)
+        it.server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(it.server)
 
-        # Client to Server pipe
-        csr, csw = os.pipe()
-        # Server to client pipe
-        scr, scw = os.pipe()
-
-        self.server = lsp.HdlCheckerLanguageServer()
-        lsp.setupLanguageServerFeatures(self.server)
-        self.server.show_message = lambda *args, **kwargs: _logger.fatal(
-            "%s, %s", args, kwargs
-        )
-
-        server_thread = Thread(
-            target=self.server.start_io,
-            args=(os.fdopen(csr, "rb"), os.fdopen(scw, "wb")),
-        )
-
-        server_thread.daemon = True
-        server_thread.start()
-
-        # Add thread id to the server (just for testing)
-        self.server.thread_id = server_thread.ident
-
-        # Setup client
-        self.client = lsp.HdlCheckerLanguageServer(asyncio.new_event_loop())
-        self.client_diagnostics = []
-
-        @self.client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
-        def dbg_publish(diag: Diagnostic):
-            _logger.info("Client received diagnostic: %s", diag)
-            self.client_diagnostics.append(diag)
-
-        client_thread = Thread(
-            target=self.client.start_io,
-            args=(os.fdopen(scr, "rb"), os.fdopen(csw, "wb")),
-        )
-
-        client_thread.daemon = True
-        client_thread.start()
-
-        self.client.lsp.send_request(
-            features.INITIALIZE,
-            InitializeParams(
-                process_id=0,
-                capabilities=ClientCapabilities(),
-                root_uri=uris.from_fs_path(TEST_PROJECT),
-                initialization_options={"project_file": "config.json"},
-            ),
-        ).result(timeout=LSP_REQUEST_TIMEOUT)
-
-        self.client.lsp.send_request(features.INITIALIZED).result(
-            timeout=LSP_REQUEST_TIMEOUT
-        )
-
-        #  _logger.info("Calling m_initialized")
-        #  with patch("hdl_checker.lsp.onNewReleaseFound"):
-        #      self.assertIsNone(self.server.m_initialized())
-
-    def tearDown(self):
+    @it.has_teardown
+    def teardown():
         _logger.debug("Shutting down server")
-        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
-            timeout=2
+        it.server.shutdown()
+        del it.server
+
+    def checkLintFileOnMethod(
+        params: Union[DidOpenTextDocumentParams, DidSaveTextDocumentParams]
+    ):
+        filename = uris.to_fs_path(params.textDocument.uri)
+        _logger.info("### file is %s", filename)
+        assert isinstance(
+            params, (DidOpenTextDocumentParams, DidSaveTextDocumentParams)
         )
-        assert shutdown_response is None
-        self.client.lsp.notify(features.EXIT)
+        if isinstance(params, DidOpenTextDocumentParams):
+            method = it.server.lsp.bf_text_document__did_open
+        else:
+            method = it.server.lsp.bf_text_document__did_save
 
-        #  msg = LSP_MSG_TEMPLATE.copy()
-        #  msg.update({"method": "exit"})
-        #  self.server._endpoint.consume(msg)
-
-        #  # Close the pipe from the server to stdout and empty any pending
-        #  # messages
-        #  self.tx_stream_reader.close()
-        #  self.tx_stream_reader.listen(_logger.fatal)
-
-        del self.server
-
-    def _checkLintFileOnOpen(self, source):
-        return self._checkLintFileOnMethod(source, "m_text_document__did_open")
-
-    def _checkLintFileOnSave(self, source):
-        return self._checkLintFileOnMethod(source, "m_text_document__did_save")
-
-    def _checkLintFileOnMethod(self, source, method):
-        with patch.object(self.server, "publish_diagnostics"):
-            _logger.info("Sending %s request", method)
-            getattr(self.server, method)(
-                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
-            )
-
-            mock_call = _waitOnMockCall(self.server.workspace.publish_diagnostics)
-            doc_uri, diagnostics = mock_call[1]
-            _logger.info("doc_uri: %s", doc_uri)
-            _logger.info("diagnostics: %s", diagnostics)
-
-            self.assertEqual(doc_uri, uris.from_fs_path(source))
-            return diagnostics
-
-    def test_LintFileOnOpening(self):
-        source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
         with patch(
             "hdl_checker.lsp.Server.getMessagesByPath",
-            return_value=[CheckerDiagnostic(filename=Path(source), text="some text")],
-        ) as meth:
+            return_value=[CheckerDiagnostic(filename=Path(filename), text="some text")],
+        ):
+            with patch.object(it.server.lsp, "publish_diagnostics"):
+                method(params)
 
-            self.assertFalse(self.client_diagnostics)  # Shouldn't have prev diags
-            self.client.lsp.send_request(
-                features.TEXT_DOCUMENT_DID_OPEN,
+                it.assertCountEqual(
+                    (
+                        chain.from_iterable(
+                            toCheckerDiagnostic(diag[0], diag[1])
+                            for diag in it.server.lsp.publish_diagnostics.call_args
+                            if diag
+                        )
+                    ),
+                    [
+                        CheckerDiagnostic(
+                            text="some text",
+                            filename=filename,
+                            line_number=0,
+                            column_number=0,
+                        ),
+                    ],
+                )
+            it.server.checker.getMessagesByPath.assert_called_once_with(Path(filename))
+
+    @it.should("show info and warning messages")
+    def test():
+        server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(server)
+        with patch.object(server.lsp, "show_message"):
+            server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=uris.from_fs_path(TEST_PROJECT),
+                )
+            )
+            server.lsp.bf_initialized()
+            server.lsp.show_message.assert_called_once_with(
+                "Searching %s for HDL files..." % TEST_PROJECT, MessageType.Info
+            )
+
+    with it.having("root URI set but no project file"):
+        import hdl_checker
+
+        @it.has_setup
+        def setup():
+            it.patches = (
+                patch.object(lsp.SimpleFinder, "generate",),
+                patch("hdl_checker.base_server.json.dump", spec=json.dump),
+            )
+            for _patch in it.patches:
+                _patch.start()
+            it.server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=uris.from_fs_path(TEST_PROJECT),
+                )
+            )
+            it.server.lsp.bf_initialized()
+
+        @it.has_teardown
+        def teardown():
+            for _patch in it.patches:
+                _patch.stop()
+
+        @it.should("search for files on initialization")  # type: ignore
+        def test():
+            lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
+            #  Will get called twice
+            hdl_checker.base_server.json.dump.assert_called()  # pylint: disable=no-member
+
+        @it.should("lint file when opening it")  # type: ignore
+        def test():
+            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
+            checkLintFileOnMethod(
                 DidOpenTextDocumentParams(
                     TextDocumentItem(
                         uris.from_fs_path(source),
@@ -563,21 +356,211 @@ class TestValidProject(TestCase):
                         text="",
                     )
                 ),
-            ).result(timeout=LSP_REQUEST_TIMEOUT)
-
-            _logger.fatal("%s", self.client_diagnostics[0])
-            _logger.fatal("dir: %s", dir(self.client_diagnostics[0]))
-
-            self.assertItemsEqual(
-                [x.uri for x in self.client_diagnostics], [uris.from_fs_path(source),],
             )
 
-            self.assertItemsEqual(
-                [(x.message,) for x in self.client_diagnostics.pop().diagnostics],
-                [("some text",)],
+    with it.having("an existing and valid old style project file"):
+
+        @it.has_setup
+        def setup():
+            it.server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=uris.from_fs_path(TEST_PROJECT),
+                    initialization_options={"project_file": "vimhdl.prj"},
+                )
+            )
+            it.server.lsp.bf_initialized()
+
+        @it.should("lint file when opening it")
+        def test():
+            source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+            checkLintFileOnMethod(
+                DidOpenTextDocumentParams(
+                    TextDocumentItem(
+                        uris.from_fs_path(source),
+                        language_id="vhdl",
+                        version=0,
+                        text="",
+                    )
+                ),
             )
 
-            meth.assert_called_once_with(Path(source))
+    with it.having("a non existing project file"):
+
+        @it.has_setup
+        def setup():
+            it.project_file = "__some_project_file.prj"
+            it.assertFalse(p.exists(it.project_file))
+            it.server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=uris.from_fs_path(TEST_PROJECT),
+                    initialization_options={"project_file": it.project_file},
+                )
+            )
+            it.server.lsp.bf_initialized()
+
+        @it.should("lint file when opening it")
+        def test():
+            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
+            checkLintFileOnMethod(
+                DidOpenTextDocumentParams(
+                    TextDocumentItem(
+                        uris.from_fs_path(source),
+                        language_id="vhdl",
+                        version=0,
+                        text="",
+                    )
+                ),
+            )
+
+    with it.having("neither root URI nor project file set"):
+
+        @it.has_setup
+        def setup():
+            it.server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=uris.from_fs_path(TEST_PROJECT),
+                    initialization_options={"project_file": None},
+                )
+            )
+            it.server.lsp.bf_initialized()
+
+        @it.should("lint file when opening it")
+        def test():
+            source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+            checkLintFileOnMethod(
+                DidOpenTextDocumentParams(
+                    TextDocumentItem(
+                        uris.from_fs_path(source),
+                        language_id="vhdl",
+                        version=0,
+                        text="",
+                    )
+                ),
+            )
+
+    with it.having("no root URI but project file set"):
+
+        @it.has_setup
+        def setup():
+            it.server.lsp.bf_initialize(
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=_CLIENT_CAPABILITIES,
+                    root_uri=None,
+                    initialization_options={
+                        "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
+                    },
+                )
+            )
+            it.server.lsp.bf_initialized()
+
+        @it.should("lint file when opening it")
+        def test():
+            it.assertFalse(it.client.diagnostics)
+            source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+            checkLintFileOnMethod(
+                DidOpenTextDocumentParams(
+                    TextDocumentItem(
+                        uris.from_fs_path(source),
+                        language_id="vhdl",
+                        version=0,
+                        text="",
+                    )
+                ),
+            )
+
+
+class TestValidProject(TestCase):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+
+        _logger.debug("Creating server")
+        self.server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(self.server)
+        self.server.lsp.publish_diagnostics = Mock()
+
+        self.server.lsp.bf_initialize(
+            InitializeParams(
+                process_id=0,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=uris.from_fs_path(TEST_PROJECT),
+                initialization_options={"project_file": "config.json"},
+            )
+        )
+        self.server.lsp.bf_initialized()
+
+    def tearDown(self):
+        _logger.debug("Shutting down server")
+        self.server.shutdown()
+        del self.server
+        #  shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
+        #      timeout=LSP_REQUEST_TIMEOUT
+        #  )
+        #  assert shutdown_response is None
+        #  self.client.lsp.notify(features.EXIT)
+
+        #  del self.server
+
+    def checkLintFileOnMethod(
+        self,
+        event: str,
+        params: Union[DidOpenTextDocumentParams, DidSaveTextDocumentParams],
+    ):
+        filename = uris.to_fs_path(params.textDocument.uri)
+        _logger.info("### file is %s", filename)
+        with patch(
+            "hdl_checker.lsp.Server.getMessagesByPath",
+            return_value=[CheckerDiagnostic(filename=Path(filename), text="some text")],
+        ) as meth:
+            self.client.lsp.send_request(event, params).result(
+                timeout=LSP_REQUEST_TIMEOUT
+            )
+
+            self.assertCountEqual(
+                list(
+                    chain.from_iterable(
+                        toCheckerDiagnostic(diag[0], diag[1])
+                        for diag in self.server.lsp.publish_diagnostics.call_args
+                        if diag
+                    )
+                ),
+                [
+                    CheckerDiagnostic(
+                        text="some text",
+                        filename=filename,
+                        line_number=0,
+                        column_number=0,
+                    ),
+                ],
+            )
+            meth.assert_called_once_with(Path(filename))
+
+    def test_LintFileOnOpening(self):
+        source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+        self.checkLintFileOnMethod(
+            features.TEXT_DOCUMENT_DID_OPEN,
+            DidOpenTextDocumentParams(
+                TextDocumentItem(
+                    uris.from_fs_path(source), language_id="vhdl", version=0, text="",
+                )
+            ),
+        )
+
+    def test_LintFileOnSaving(self):
+        source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+        self.checkLintFileOnMethod(
+            features.TEXT_DOCUMENT_DID_SAVE,
+            DidSaveTextDocumentParams(
+                text_document=TextDocumentIdentifier(uris.from_fs_path(source)),
+                text="Hello",
+            ),
+        )
 
     def runTestBuildSequenceTable(self, tablefmt):
         _logger.fatal("############################################")
@@ -694,12 +677,12 @@ class TestValidProject(TestCase):
 
         def getDesignUnitsByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
-                it.fail("Expected foo.vhd but got %s" % path)
+                self.fail("Expected foo.vhd but got %s" % path)
             return {UNIT_A, UNIT_B}
 
         def getDependenciesByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
-                it.fail("Expected foo.vhd but got %s" % path)
+                self.fail("Expected foo.vhd but got %s" % path)
             return {DEP_A, DEP_B}
 
         patches = (

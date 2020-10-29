@@ -24,7 +24,7 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import six
-from pygls import server
+from pygls.server import LanguageServer
 from pygls.features import (
     COMPLETION,
     EXIT,
@@ -40,7 +40,6 @@ from pygls.features import (
     WINDOW_SHOW_MESSAGE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
 )
-#  .server import LanguageServer
 from pygls.types import (
     CompletionItem,
     CompletionList,
@@ -143,7 +142,7 @@ class Server(BaseServer):
     """
 
     def __init__(self, lsp, root_dir):
-        # type: (server.LanguageServer, Path) -> None
+        # type: (LanguageServer, Path) -> None
         self._lsp = lsp
         super(Server, self).__init__(root_dir)
 
@@ -166,7 +165,7 @@ class Server(BaseServer):
             self._lsp.show_message(message, MessageType.Error)
 
 
-class HdlCheckerLanguageServer(server.LanguageServer):
+class HdlCheckerLanguageServer(LanguageServer):
     """ Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
     """
@@ -262,7 +261,7 @@ class HdlCheckerLanguageServer(server.LanguageServer):
         the root URI as provided by the workspace
         """
         path = DEFAULT_PROJECT_FILE
-        if options:
+        if options and options.project_file is not None:
             path = options.project_file
 
         # Project file will be related to the root path
@@ -521,15 +520,15 @@ class HdlCheckerLanguageServer(server.LanguageServer):
 
 
 def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
-    @server.feature(INITIALIZE)
     @logCalls
+    @server.feature(INITIALIZE)
     def initialize(params: InitializeParams) -> None:
         options = params.initializationOptions
         server._initialization_options = options
 
-    @server.feature(INITIALIZED)
     @logCalls
-    def initialized(*args, **kwargs):
+    @server.feature(INITIALIZED)
+    def initialized():
         """
         Enables processing of actions that were generated upon m_initialize and
         were delayed because the client might need further info (for example to
