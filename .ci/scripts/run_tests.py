@@ -67,6 +67,7 @@ def _setupLogging(stream, level):  # pragma: no cover
     color = False
 
     if stream is sys.stdout:
+
         class Stream(object):
             def isatty(self):
                 return True
@@ -94,19 +95,23 @@ def _setupLogging(stream, level):  # pragma: no cover
         except ImportError:
             color = False
 
+    formatter = logging.Formatter(
+        "%(levelname)-8s | %(asctime)s | %(threadName)s | "
+        + "%(name)s @ %(funcName)s():%(lineno)d "
+        + "|\t%(message)s",
+        datefmt="%H:%M:%S",
+    )
+
     if color:
+        #  RainbowLoggingHandler._fmt = '[%(asctime)s] %(threadName)s %(name)s %(funcName)s():%(lineno)d\t%(message)s'
         rainbow_stream_handler = RainbowLoggingHandler(_stream)
+        rainbow_stream_handler.setFormatter(formatter)
 
         logging.root.addHandler(rainbow_stream_handler)
         logging.root.setLevel(level)
     else:
         handler = logging.StreamHandler(_stream)
-        handler.formatter = logging.Formatter(
-            "%(levelname)-7s | %(asctime)s | "
-            + "%(name)s @ %(funcName)s():%(lineno)d %(threadName)s "
-            + "|\t%(message)s",
-            datefmt="%H:%M:%S",
-        )
+        handler.formatter = formatter
 
         logging.root.addHandler(handler)
         logging.root.setLevel(level)
@@ -173,7 +178,9 @@ def _getNoseCommandLineArgs(args):
     if args.debugger:
         argv += ["--debugger"]
     if args.fail_fast:
-        argv += ["--fail-fast", ]
+        argv += [
+            "--fail-fast",
+        ]
         # Need at least 2 verbose levels for this to work!
         argv += ["--verbose"] * (2 - len(args.verbose))
     if not args.log_to_stdout:
