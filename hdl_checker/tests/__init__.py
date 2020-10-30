@@ -32,6 +32,7 @@ import mock
 import six
 import unittest2  # type: ignore
 from parameterized import parameterized_class  # type: ignore
+from pygls import uris
 
 from hdl_checker import exceptions
 from hdl_checker.base_server import BaseServer
@@ -492,8 +493,7 @@ def linuxOnly(func):
     return wrapper
 
 
-def toCheckerDiagnostic(uri, diags: Any) -> Iterable[CheckerDiagnostic]:
-    from pygls import uris
+def toCheckerDiagnostic(uri: str, diags: Any) -> Iterable[CheckerDiagnostic]:
     for diag in diags:
         yield CheckerDiagnostic(
             text=diag.message,

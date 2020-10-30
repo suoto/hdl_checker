@@ -182,6 +182,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         self.config_file = WatchedFile(path, mtime, origin)
         _logger.debug("Set config to %s", self.config_file)
+        self._updateConfigIfNeeded()
 
     def _updateConfigIfNeeded(self):
         # type: (...) -> Any

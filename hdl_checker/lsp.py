@@ -23,8 +23,6 @@ from os import path as p
 from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-import six
-from pygls.server import LanguageServer
 from pygls.features import (
     COMPLETION,
     EXIT,
@@ -40,6 +38,7 @@ from pygls.features import (
     WINDOW_SHOW_MESSAGE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
 )
+from pygls.server import LanguageServer
 from pygls.types import (
     CompletionItem,
     CompletionList,
@@ -90,12 +89,6 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 
 URI = str
 
-if six.PY2:
-    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
-        IOError,
-        OSError,
-    )
-
 
 def _translateSeverity(severity: DiagType) -> DiagnosticSeverity:
     """
@@ -118,8 +111,8 @@ def _translateSeverity(severity: DiagType) -> DiagnosticSeverity:
 
 def checkerDiagToLspDict(diag: CheckerDiagnostic) -> Diagnostic:
     """
-    Converts a CheckerDiagnostic object into the dictionary with into the LSP
-    expects
+    Converts a CheckerDiagnostic object into pygls.Diagnostic type expected by
+    the publish_diagnostics LSP method
     """
     _logger.debug(diag)
     return Diagnostic(
@@ -271,7 +264,10 @@ class HdlCheckerLanguageServer(LanguageServer):
         return path
 
     def lint(self, uri: URI, is_saved: bool) -> None:
-        _logger.debug("Linting %s, %s", uri, is_saved)
+        """
+        Check a file for lint errors
+        """
+        _logger.debug("Linting %s (file was %s saved)", uri, "" if is_saved else "not")
         diags = set(self._getDiags(uri, is_saved))
 
         # Separate the diagnostics in filename groups to publish diagnostics
@@ -282,17 +278,17 @@ class HdlCheckerLanguageServer(LanguageServer):
         paths.add(Path(to_fs_path(uri)))
 
         for path in paths:
-            self.lsp.publish_diagnostics(
-                from_fs_path(str(path)),
-                list(
-                    checkerDiagToLspDict(diag)
-                    for diag in diags
-                    if diag.filename == path
-                ),
-            )
+            diags_to_publish = {
+                checkerDiagToLspDict(diag) for diag in diags if diag.filename == path
+            }
+            if diags_to_publish:
+                self.lsp.publish_diagnostics(
+                    from_fs_path(str(path)), tuple(diags_to_publish)
+                )
+            else:
+                _logger.debug("No diagnostics for %s", path)
 
-    def _getDiags(self, doc_uri, is_saved):
-        # type: (URI, bool) -> Iterable[CheckerDiagnostic]
+    def _getDiags(self, doc_uri: URI, is_saved: bool) -> Iterable[CheckerDiagnostic]:
         """
         Gets diags of the URI, wether from the saved file or from its contents;
         returns an iterable containing the diagnostics of the doc_uri and other
@@ -307,11 +303,8 @@ class HdlCheckerLanguageServer(LanguageServer):
         # will involve dumping the modified contents into a temporary file
         path = Path(to_fs_path(doc_uri))
 
-        _logger.debug("Linting %s (saved=%s)", repr(path), is_saved)
-
         if is_saved:
             return self.checker.getMessagesByPath(path)
-
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
@@ -520,15 +513,13 @@ class HdlCheckerLanguageServer(LanguageServer):
 
 
 def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
-    @logCalls
     @server.feature(INITIALIZE)
     def initialize(params: InitializeParams) -> None:
         options = params.initializationOptions
         server._initialization_options = options
 
-    @logCalls
     @server.feature(INITIALIZED)
-    def initialized():
+    def initialized(*_):
         """
         Enables processing of actions that were generated upon m_initialize and
         were delayed because the client might need further info (for example to
@@ -536,6 +527,11 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         """
         server.onConfigUpdate(server._initialization_options)
         onNewReleaseFound(server.showInfo)
+
+    @server.feature(TEXT_DOCUMENT_DID_SAVE)
+    def didSave(params: DidSaveTextDocumentParams):
+        """Text document did change notification."""
+        server.lint(params.textDocument.uri, True)
 
     @server.feature(TEXT_DOCUMENT_DID_CHANGE)
     def didChange(params: DidChangeTextDocumentParams):
@@ -547,21 +543,10 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         """Text document did change notification."""
         server.lint(params.textDocument.uri, True)
 
-    @server.feature(TEXT_DOCUMENT_DID_SAVE)
-    def didSave(params: DidSaveTextDocumentParams):
-        """Text document did change notification."""
-        server.lint(params.textDocument.uri, True)
-
     @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
     def didChangeConfiguration(settings: DidChangeConfigurationParams = None) -> None:
         server.onConfigUpdate(settings)
 
     @server.feature(HOVER)
-    def hover(params: HoverParams) -> Optional[Hover]:
+    def onHover(params: HoverParams) -> Optional[Hover]:
         return server.hover(params)
-
-    #  @server.feature(WINDOW_SHOW_MESSAGE)
-    #  def _show_message(server, *args, **kwargs):
-    #      #  _logger.fatal("%s, %s", args, kwargs)
-    #      #  assert False
-    #      server.show_message(*args, **kwargs)
