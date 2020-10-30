@@ -24,32 +24,21 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from pygls.features import (
-    COMPLETION,
-    EXIT,
     HOVER,
     INITIALIZE,
     INITIALIZED,
     REFERENCES,
-    SHUTDOWN,
     TEXT_DOCUMENT_DID_CHANGE,
-    TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DID_SAVE,
-    WINDOW_SHOW_MESSAGE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
 )
 from pygls.server import LanguageServer
 from pygls.types import (
-    CompletionItem,
-    CompletionList,
-    CompletionParams,
-    ConfigurationItem,
-    ConfigurationParams,
     Diagnostic,
     DiagnosticSeverity,
     DidChangeConfigurationParams,
     DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams,
     DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
     Hover,
@@ -58,11 +47,6 @@ from pygls.types import (
     MessageType,
     Position,
     Range,
-    Registration,
-    RegistrationParams,
-    TextDocumentSyncKind,
-    Unregistration,
-    UnregistrationParams,
 )
 from pyls.uris import from_fs_path, to_fs_path  # type: ignore
 from tabulate import tabulate
@@ -513,13 +497,17 @@ class HdlCheckerLanguageServer(LanguageServer):
 
 
 def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
+    """
+    Adds pygls features to an instance of HdlCheckerLanguageServer
+    """
+
     @server.feature(INITIALIZE)
-    def initialize(params: InitializeParams) -> None:
+    def initialize(params: InitializeParams) -> None:  # pylint: disable=unused-variable
         options = params.initializationOptions
         server._initialization_options = options
 
     @server.feature(INITIALIZED)
-    def initialized(*_):
+    def initialized(*_):  # pylint: disable=unused-variable
         """
         Enables processing of actions that were generated upon m_initialize and
         were delayed because the client might need further info (for example to
@@ -529,24 +517,30 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         onNewReleaseFound(server.showInfo)
 
     @server.feature(TEXT_DOCUMENT_DID_SAVE)
-    def didSave(params: DidSaveTextDocumentParams):
+    def didSave(params: DidSaveTextDocumentParams):  # pylint: disable=unused-variable
         """Text document did change notification."""
         server.lint(params.textDocument.uri, True)
 
     @server.feature(TEXT_DOCUMENT_DID_CHANGE)
-    def didChange(params: DidChangeTextDocumentParams):
+    def didChange(
+        params: DidChangeTextDocumentParams,
+    ):  # pylint: disable=unused-variable
         """Text document did change notification."""
         server.lint(params.textDocument.uri, False)
 
     @server.feature(TEXT_DOCUMENT_DID_OPEN)
-    def didOpen(params: DidOpenTextDocumentParams):
+    def didOpen(params: DidOpenTextDocumentParams):  # pylint: disable=unused-variable
         """Text document did change notification."""
         server.lint(params.textDocument.uri, True)
 
     @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
-    def didChangeConfiguration(settings: DidChangeConfigurationParams = None) -> None:
+    def didChangeConfiguration(  # pylint: disable=unused-variable
+        settings: DidChangeConfigurationParams = None,
+    ) -> None:
         server.onConfigUpdate(settings)
 
     @server.feature(HOVER)
-    def onHover(params: HoverParams) -> Optional[Hover]:
+    def onHover(  # pylint: disable=unused-variable
+        params: HoverParams,
+    ) -> Optional[Hover]:
         return server.hover(params)
