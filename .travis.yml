@@ -27,8 +27,6 @@ branches:
 
 jobs:
   include:
-    - name: Python 2.7
-      script: ./run_tests.sh -e py27-linux -- -v
     - name: Python 3.6
       script: ./run_tests.sh -e py36-linux -- -v
     - name: Python 3.7

@@ -33,6 +33,7 @@ import six
 import unittest2  # type: ignore
 from parameterized import parameterized_class  # type: ignore
 from pygls import uris
+from unittest2 import TestCase
 
 from hdl_checker import exceptions
 from hdl_checker.base_server import BaseServer
@@ -344,35 +345,35 @@ def assertSameFile(it):  # pylint: disable=invalid-name
     return wrapper
 
 
-def assertCountEqual(it):  # pylint: disable=invalid-name
+#  def assertCountEqual(it):  # pylint: disable=invalid-name
 
-    assert six.PY2, "Only needed on Python2"
+#      assert six.PY2, "Only needed on Python2"
 
-    def wrapper(first, second, msg=None):
-        temp = list(second)  # make a mutable copy
-        not_found = []
-        for elem in first:
-            try:
-                temp.remove(elem)
-            except ValueError:
-                not_found.append(elem)
+#      def wrapper(first, second, msg=None):
+#          temp = list(second)  # make a mutable copy
+#          not_found = []
+#          for elem in first:
+#              try:
+#                  temp.remove(elem)
+#              except ValueError:
+#                  not_found.append(elem)
 
-        error_details = []
+#          error_details = []
 
-        if not_found:
-            error_details += [
-                "Second list is missing item {}".format(x) for x in not_found
-            ]
+#          if not_found:
+#              error_details += [
+#                  "Second list is missing item {}".format(x) for x in not_found
+#              ]
 
-        error_details += ["First list is missing item {}".format(x) for x in temp]
+#          error_details += ["First list is missing item {}".format(x) for x in temp]
 
-        if error_details:
-            # Add user message at the top
-            error_details = [msg] + error_details
-            error_details += ["", "Lists {} and {} differ".format(first, second)]
-            it.fail("\n".join([str(x) for x in error_details]))
+#          if error_details:
+#              # Add user message at the top
+#              error_details = [msg] + error_details
+#              error_details += ["", "Lists {} and {} differ".format(first, second)]
+#              it.fail("\n".join([str(x) for x in error_details]))
 
-    return wrapper
+#      return wrapper
 
 
 def writeListToFile(filename, _list):  # pragma: no cover
@@ -455,22 +456,6 @@ def logIterable(msg, iterable, func):
     func(msg)
     for i, item in enumerate(iterable, 1):
         func("- {:2d} {}".format(i, item))
-
-
-if six.PY2:
-    from unittest2 import TestCase as _TestCase
-
-    class TestCase(_TestCase):
-        def __new__(cls, *args, **kwargs):
-            result = super(_TestCase, cls).__new__(  #  pylint: disable=bad-super-call
-                cls, *args, **kwargs
-            )
-            result.assertCountEqual = assertCountEqual(result)
-            return result
-
-
-else:
-    from unittest2 import TestCase
 
 
 def windowsOnly(func):

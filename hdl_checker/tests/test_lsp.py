@@ -32,7 +32,6 @@ from threading import Thread
 from typing import Any, List, Optional, Union
 
 import parameterized  # type: ignore
-import six
 import unittest2  # type: ignore
 from mock import Mock, patch
 from pygls import features, uris
@@ -77,9 +76,6 @@ from hdl_checker.tests import (  # isort:skip
     setupTestSuport,
     TestCase,
 )
-
-if six.PY3:
-    unicode = str
 
 from hdl_checker import lsp  # isort:skip
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType  # isort:skip

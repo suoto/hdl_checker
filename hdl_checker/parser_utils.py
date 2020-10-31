@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 import subprocess as subp
-from glob import iglob as _glob
+from glob import iglob as glob
 from typing import Any, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Type, Union
 
 import six
@@ -36,26 +36,6 @@ from hdl_checker.types import BuildFlags, BuildFlagScope, FileType
 from hdl_checker.utils import ON_WINDOWS, isFileReadable, toBytes
 
 _logger = logging.getLogger(__name__)
-
-if six.PY3:
-    JSONDecodeError = (  # pylint: disable=invalid-name
-        json.decoder.JSONDecodeError  # pylint: disable=no-member
-    )
-
-    # Python 2 iglob doesn't have the 'recursive' argument
-    def glob(pathname):
-        "Alias for glob.iglob(pathname, recursive=True)"
-        return _glob(pathname, recursive=True)
-
-
-else:
-    JSONDecodeError = ValueError
-    FileNotFoundError = OSError  # pylint: disable=redefined-builtin
-
-    def glob(pathname):
-        "Alias for glob.iglob(pathname)"
-        return _glob(pathname)
-
 
 PARSERS = {
     FileType.vhdl: VhdlParser,
@@ -118,7 +98,7 @@ def getIncludedConfigs(search_paths, root_dir="."):
             # Load the config from the file
             try:
                 config = json.load(open(path, "r"))
-            except JSONDecodeError:
+            except json.decoder.JSONDecodeError:
                 _logger.warning("Failed to decode file %s", path)
                 continue
 
@@ -232,7 +212,7 @@ def _expand(config, ref_path):
             else p.join(ref_path, source.path_expr)
         )
 
-        for _path in glob(path_expr):
+        for _path in glob(path_expr, recursive=True):
             path = Path(_path, ref_path)
 
             try:

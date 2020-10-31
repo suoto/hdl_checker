@@ -31,7 +31,6 @@ from pprint import pformat
 from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Any
 
-import six
 from mock import patch
 
 from hdl_checker.tests import TestCase
@@ -225,7 +224,7 @@ class TestConfigHandlers(TestCase):
 
     # glob needs an existing path or else it won't return anything. Paths on
     # this test don't exist, so need to mock that
-    @patch("hdl_checker.parser_utils.glob", lambda x: [x])
+    @patch("hdl_checker.parser_utils.glob", lambda x, recursive=True: [x])
     def test_FlattenConfigAndPreserveScopes(self):
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
@@ -463,26 +462,16 @@ class TestExpandingPathNames(TestCase):
 
         _logger.info("config:\n%s", pformat(config))
 
-        if six.PY3:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    self.join("some_vhd.vhd"),
-                    self.join("dir_0", "some_vhd.vhd"),
-                    self.join("dir_0", "dir_1", "some_vhd.vhd"),
-                    self.join("dir_2", "some_vhd.vhd"),
-                    self.join("dir_2", "dir_3", "some_vhd.vhd"),
-                )
+        expected = (
+            SourceEntry(Path(x), None, (), (), ())
+            for x in (
+                self.join("some_vhd.vhd"),
+                self.join("dir_0", "some_vhd.vhd"),
+                self.join("dir_0", "dir_1", "some_vhd.vhd"),
+                self.join("dir_2", "some_vhd.vhd"),
+                self.join("dir_2", "dir_3", "some_vhd.vhd"),
             )
-        else:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    #  self.join("some_vhd.vhd"),
-                    self.join("dir_0", "some_vhd.vhd"),
-                    self.join("dir_2", "some_vhd.vhd"),
-                )
-            )
+        )
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 
@@ -496,25 +485,16 @@ class TestExpandingPathNames(TestCase):
 
         _logger.info("config:\n%s", pformat(config))
 
-        if six.PY3:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    self.join("some_sv.sv"),
-                    self.join("dir_0", "some_sv.sv"),
-                    self.join("dir_0", "dir_1", "some_sv.sv"),
-                    self.join("dir_2", "some_sv.sv"),
-                    self.join("dir_2", "dir_3", "some_sv.sv"),
-                )
+        expected = (
+            SourceEntry(Path(x), None, (), (), ())
+            for x in (
+                self.join("some_sv.sv"),
+                self.join("dir_0", "some_sv.sv"),
+                self.join("dir_0", "dir_1", "some_sv.sv"),
+                self.join("dir_2", "some_sv.sv"),
+                self.join("dir_2", "dir_3", "some_sv.sv"),
             )
-        else:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    self.join("dir_0", "some_sv.sv"),
-                    self.join("dir_2", "some_sv.sv"),
-                )
-            )
+        )
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 
@@ -528,39 +508,26 @@ class TestExpandingPathNames(TestCase):
 
         _logger.info("config:\n%s", pformat(config))
 
-        if six.PY3:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    self.join("some_vhd.vhd"),
-                    self.join("some_v.v"),
-                    self.join("some_sv.sv"),
-                    self.join("dir_0", "some_vhd.vhd"),
-                    self.join("dir_0", "some_v.v"),
-                    self.join("dir_0", "some_sv.sv"),
-                    self.join("dir_0", "dir_1", "some_vhd.vhd"),
-                    self.join("dir_0", "dir_1", "some_v.v"),
-                    self.join("dir_0", "dir_1", "some_sv.sv"),
-                    self.join("dir_2", "some_vhd.vhd"),
-                    self.join("dir_2", "some_v.v"),
-                    self.join("dir_2", "some_sv.sv"),
-                    self.join("dir_2", "dir_3", "some_vhd.vhd"),
-                    self.join("dir_2", "dir_3", "some_v.v"),
-                    self.join("dir_2", "dir_3", "some_sv.sv"),
-                )
+        expected = (
+            SourceEntry(Path(x), None, (), (), ())
+            for x in (
+                self.join("some_vhd.vhd"),
+                self.join("some_v.v"),
+                self.join("some_sv.sv"),
+                self.join("dir_0", "some_vhd.vhd"),
+                self.join("dir_0", "some_v.v"),
+                self.join("dir_0", "some_sv.sv"),
+                self.join("dir_0", "dir_1", "some_vhd.vhd"),
+                self.join("dir_0", "dir_1", "some_v.v"),
+                self.join("dir_0", "dir_1", "some_sv.sv"),
+                self.join("dir_2", "some_vhd.vhd"),
+                self.join("dir_2", "some_v.v"),
+                self.join("dir_2", "some_sv.sv"),
+                self.join("dir_2", "dir_3", "some_vhd.vhd"),
+                self.join("dir_2", "dir_3", "some_v.v"),
+                self.join("dir_2", "dir_3", "some_sv.sv"),
             )
-        else:
-            expected = (
-                SourceEntry(Path(x), None, (), (), ())
-                for x in (
-                    self.join("dir_0", "some_vhd.vhd"),
-                    self.join("dir_0", "some_v.v"),
-                    self.join("dir_0", "some_sv.sv"),
-                    self.join("dir_2", "some_vhd.vhd"),
-                    self.join("dir_2", "some_v.v"),
-                    self.join("dir_2", "some_sv.sv"),
-                )
-            )
+        )
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 

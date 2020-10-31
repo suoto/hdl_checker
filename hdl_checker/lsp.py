@@ -50,7 +50,7 @@ from pygls.types import (
     Position,
     Range,
 )
-from pyls.uris import from_fs_path, to_fs_path  # type: ignore
+from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
 
 from hdl_checker import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
@@ -295,8 +295,10 @@ class HdlCheckerLanguageServer(LanguageServer):
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
-    def references(self, doc_uri, position, exclude_declaration):
-        # type: (URI, Dict[str, int], bool) -> Any
+    def references(
+        self, doc_uri: URI, position: Dict[str, int], exclude_declaration: bool
+    ) -> Optional[List[Dict[str, Any]]]:
+
         element = self._getElementAtPosition(
             Path(to_fs_path(doc_uri)),
             Location(line=position["line"], column=position["character"]),

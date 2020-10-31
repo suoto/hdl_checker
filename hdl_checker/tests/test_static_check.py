@@ -20,12 +20,8 @@
 import logging
 import re
 
-import six
-
 from nose2.tools import such  # type: ignore
 from nose2.tools.params import params  # type: ignore
-
-from hdl_checker.tests import assertCountEqual
 
 import hdl_checker.static_check as static_check
 from hdl_checker.diagnostics import DiagType, LibraryShouldBeOmited, StaticCheckerDiag
@@ -33,19 +29,6 @@ from hdl_checker.diagnostics import DiagType, LibraryShouldBeOmited, StaticCheck
 _logger = logging.getLogger(__name__)
 
 with such.A("hdl_checker project") as it:
-    # Workaround for Python 2.x and 3.x differences
-    if six.PY2:
-        # Can't use assertCountEqual for lists of unhashable types.
-        # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = assertCountEqual(it)
-
-    @it.has_setup
-    def setup():
-        pass
-
-    @it.has_teardown
-    def teardown():
-        pass
 
     @it.should("not repeat an object in the results")
     def test():
