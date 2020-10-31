@@ -30,7 +30,6 @@ from threading import Thread
 import requests
 from mock import patch
 from pygls import features, uris
-#  from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
 from pygls.types import ClientCapabilities, Diagnostic, InitializeParams
 
 from nose2.tools import such  # type: ignore
@@ -49,8 +48,17 @@ SERVER_LOG_LEVEL = os.environ.get("SERVER_LOG_LEVEL", "WARNING")
 
 HDL_CHECKER_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
 
-JSONRPC_VERSION = "2.0"
 CALL_TIMEOUT = 5
+
+# Static shutdown message to avoid havint to create a server/client pair
+LSP_SHUTDOWN = b"\r\n".join(
+    [
+        b"Content-Length: 102",
+        b"Content-Type: application/vscode-jsonrpc; charset=utf-8",
+        b"",
+        b'{"id": "e7389d0d-4d3c-432d-8506-68a1b2faca48", "jsonrpc": "2.0", "met     hod": "shutdown", "params": null}',
+    ]
+)
 
 
 def _path(*args):
@@ -372,6 +380,12 @@ with such.A("hdl_checker server") as it:
             it.assertEqual(response.capabilities.textDocumentSync, 2)
             it.assertEqual(response.capabilities.hoverProvider, True)
 
+            shutdown_response = client_server.client.lsp.send_request(
+                features.SHUTDOWN
+            ).result(2)
+            client_server.client.lsp.notify(features.EXIT)
+            it.assertIsNone(shutdown_response)
+
         @it.should("log to temporary files if files aren't specified")  # type: ignore
         @disableVunit
         def test():
@@ -413,19 +427,18 @@ with such.A("hdl_checker server") as it:
 
             _logger.info("Actual command: %s", actual_cmd)
 
-            server = subp.Popen(
+            proc = subp.Popen(
                 actual_cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE
             )
 
-            # Close stdin so the server exits
-            stdout, stderr = server.communicate("")
+            stdout, stderr = proc.communicate(LSP_SHUTDOWN, timeout=2)
 
             it.assertEqual(
                 stdout, b"", "stdout should be empty but got\n{}".format(stdout)
             )
 
             it.assertEqual(
-                stderr, b"", "stderr should be empty but got\n{}".format(stdout)
+                stderr, b"", "stderr should be empty but got\n{}".format(stderr)
             )
 
             # On Windows the Popen PID and the *actual* PID don't always match
@@ -436,12 +449,15 @@ with such.A("hdl_checker server") as it:
             expected = [
                 "Starting server. Our PID is {}, no parent PID to attach to. "
                 "Version string for hdl_checker is '{}'".format(
-                    server.pid, hdl_checker.__version__
+                    proc.pid, hdl_checker.__version__
                 ),
-                "Starting HdlCheckerLanguageServer IO language server",
+                #  "Starting HdlCheckerLanguageServer IO language server",
             ]
 
-            _logger.info("Log content: %s", log_content)
+            _logger.info(
+                "Log content:\n-----\n%s\n-----\n",
+                "\n".join(("> %s" % line for line in log_content)),
+            )
 
             if ON_WINDOWS:
                 log_content = log_content[1:]
