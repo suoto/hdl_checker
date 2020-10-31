@@ -62,10 +62,6 @@ def setupLogging(stream, level):  # pragma: no cover
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("pynvim").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
-    logging.getLogger("pyls").setLevel(logging.INFO)
-    logging.getLogger("pyls.config.config").setLevel(logging.WARNING)
-    logging.getLogger("pyls.python_ls").setLevel(logging.INFO)
-    logging.getLogger("pyls_jsonrpc.endpoint").setLevel(logging.INFO)
 
 
 # From here: http://stackoverflow.com/a/8536476/1672783

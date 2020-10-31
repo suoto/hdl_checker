@@ -60,7 +60,6 @@ setuptools.setup(
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
                                      'prettytable>=0.7.2',
-                                     'python-language-server>=0.26.1,<=0.30.1',
                                      'pygls',
                                      'requests>=2.20.0',
                                      'six>=1.10.0',
