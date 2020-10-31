@@ -89,15 +89,14 @@ _logger = logging.getLogger(__name__)
 
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
-LSP_REQUEST_TIMEOUT = 2
+LSP_REQUEST_TIMEOUT = 3
 
 _CLIENT_CAPABILITIES = ClientCapabilities(
     text_document=TextDocumentClientCapabilities(
         synchronization=None,  # type: ignore
         completion=None,  # type: ignore
         hover=HoverAbstract(
-            dynamic_registration=False,
-            content_format=[MarkupKind.Markdown, MarkupKind.PlainText],
+            dynamic_registration=False, content_format=[MarkupKind.PlainText,],
         ),
         signature_help=None,  # type:ignore
         references=None,  # type:ignore
@@ -251,23 +250,19 @@ class _LspHelper(unittest2.TestCase):
 
         _logger.info("Sending initialize request")
         self.client.lsp.send_request(features.INITIALIZE, params).result(
-            timeout=LSP_REQUEST_TIMEOUT
+            LSP_REQUEST_TIMEOUT
         )
 
         _logger.info("Sending initialized request")
-        self.client.lsp.send_request(features.INITIALIZED).result(
-            timeout=LSP_REQUEST_TIMEOUT
-        )
+        self.client.lsp.send_request(features.INITIALIZED).result(LSP_REQUEST_TIMEOUT)
         _logger.info("Client server setup complete")
 
     def tearDown(self):
-        if not getattr(self, 'client', None):
+        if not getattr(self, "client", None):
             return unittest2.skip("Won't run this on the helper")
         _logger.warning("Shutting down server")
-        self.assertIsNone(
-            self.client.lsp.send_request(features.SHUTDOWN).result(
-                timeout=LSP_REQUEST_TIMEOUT
-            )
+        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
+            LSP_REQUEST_TIMEOUT
         )
         self.client.lsp.notify(features.EXIT)
         _logger.debug(
@@ -275,6 +270,7 @@ class _LspHelper(unittest2.TestCase):
             self.server_thread.is_alive(),
             self.client_thread.is_alive(),
         )
+        self.assertIsNone(shutdown_response)
         del self.server
 
     def checkLintFileOnMethod(
@@ -315,9 +311,7 @@ class _LspHelper(unittest2.TestCase):
         with patch.object(
             self.server.checker, "getMessagesByPath", return_value=list(expected_diags),
         ):
-            self.client.lsp.send_request(method, params).result(
-                timeout=LSP_REQUEST_TIMEOUT
-            )
+            self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)
 
             self.assertTrue(
                 self.client_diagnostics, "Expected client to have diagnostics"
@@ -385,19 +379,19 @@ class _LspHelper(unittest2.TestCase):
         )
 
     def testLintFileOnOpen(self):
-        if not getattr(self, 'server', None):
+        if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
     def testLintFileWhenSaving(self):
-        if not getattr(self, 'server', None):
+        if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         )
 
     def testLintFileOnChange(self):
-        if not getattr(self, 'server', None):
+        if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(
             p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
@@ -562,7 +556,6 @@ class TestValidProject(_LspHelper):
             )
             raise
 
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 0)
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
@@ -570,13 +563,54 @@ class TestValidProject(_LspHelper):
     def test_ReportBuildSequencePlain(self):
         self.runTestBuildSequenceTable(tablefmt="plain")
 
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 1)
+    @patch(
+        "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
+        (Identifier("ieee"),),
+    )
+    def test_ReportBuildSequenceFallback(self):
+        with patch.object(self.server, "client_capabilities", None):
+            self.runTestBuildSequenceTable(tablefmt="plain")
+
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
     def test_ReportBuildSequenceMarkdown(self):
-        self.runTestBuildSequenceTable(tablefmt="github")
+        with patch.object(
+            self.server,
+            "client_capabilities",
+            ClientCapabilities(
+                text_document=TextDocumentClientCapabilities(
+                    synchronization=None,
+                    completion=None,
+                    hover=HoverAbstract(
+                        dynamic_registration=False,
+                        # This is what we really need
+                        content_format=[MarkupKind.Markdown,],
+                    ),
+                    signature_help=None,
+                    references=None,
+                    document_highlight=None,
+                    document_symbol=None,
+                    formatting=None,
+                    range_formatting=None,
+                    on_type_formatting=None,
+                    definition=None,
+                    type_definition=None,
+                    implementation=None,
+                    code_action=None,
+                    code_lens=None,
+                    document_link=None,
+                    color_provider=None,
+                    rename=None,
+                    publish_diagnostics=PublishDiagnosticsAbstract(
+                        related_information=True
+                    ),
+                    folding_range=None,
+                )
+            ),
+        ):
+            self.runTestBuildSequenceTable(tablefmt="github")
 
     @patch.object(
         hdl_checker.base_server.BaseServer,
@@ -724,14 +758,18 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_HoverOnInvalidRange(self):
-        path = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         self.assertIsNone(
-            self.server.hover(
+            self.client.lsp.send_request(
+                features.HOVER,
                 HoverParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path)),
+                    TextDocumentIdentifier(
+                        uris.from_fs_path(
+                            p.join(TEST_PROJECT, "another_library", "foo.vhd")
+                        )
+                    ),
                     Position(line=0, character=0),
                 ),
-            )
+            ).result(LSP_REQUEST_TIMEOUT)
         )
 
     @patch(
@@ -762,12 +800,15 @@ class TestValidProject(_LspHelper):
         ]
 
         self.assertEqual(
-            self.server.hover(
+            self.client.lsp.send_request(
+                features.HOVER,
                 HoverParams(
                     TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
                     Position(line=7, character=7),
-                )
-            ).contents,
+                ),
+            )
+            .result(LSP_REQUEST_TIMEOUT)
+            .contents,
             "\n".join(expected),
         )
 
@@ -780,12 +821,15 @@ class TestValidProject(_LspHelper):
         clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
 
         self.assertEqual(
-            self.server.hover(
+            self.client.lsp.send_request(
+                features.HOVER,
                 HoverParams(
                     TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
                     Position(line=32, character=32),
                 ),
-            ).contents,
+            )
+            .result(LSP_REQUEST_TIMEOUT)
+            .contents,
             'Path "%s", library "basic_library"' % clock_divider,
         )
 

@@ -35,6 +35,7 @@ from pygls.features import (
 )
 from pygls.server import LanguageServer
 from pygls.types import (
+    ClientCapabilities,
     Diagnostic,
     DiagnosticSeverity,
     DidChangeConfigurationParams,
@@ -44,6 +45,7 @@ from pygls.types import (
     Hover,
     HoverParams,
     InitializeParams,
+    MarkupKind,
     MessageType,
     Position,
     Range,
@@ -63,7 +65,7 @@ from hdl_checker.parsers.elements.design_unit import (
     tAnyDesignUnit,
 )
 from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import ConfigFileOrigin, Location, MarkupKind
+from hdl_checker.types import ConfigFileOrigin, Location
 from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
@@ -155,7 +157,8 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Default checker
         self.onConfigUpdate(None)
         self._global_diags: Set[CheckerDiagnostic] = set()
-        self._initialization_options: Optional[Any] = None
+        self.initialization_options: Optional[Any] = None
+        self.client_capabilities: Optional[ClientCapabilities] = None
 
     @property
     def checker(self) -> Server:
@@ -338,12 +341,13 @@ class HdlCheckerLanguageServer(LanguageServer):
         supported formats, i.e., 'markdown' is present inside
         TextDocumentClientCapabilities.hover.contentFormat
         """
-        return False
-        #  return MarkupKind.Markdown.value in (
-        #      self.config.capabilities.get("textDocument", {})
-        #      .get("hover", {})
-        #      .get("contentFormat", [])
-        #  )
+        try:
+            return (
+                MarkupKind.Markdown.value
+                in self.client_capabilities.textDocument.hover.contentFormat
+            )
+        except AttributeError:
+            return False
 
     def _format(self, text):
         """
@@ -504,7 +508,8 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
     @server.feature(INITIALIZE)
     def initialize(params: InitializeParams) -> None:  # pylint: disable=unused-variable
         options = params.initializationOptions
-        server._initialization_options = options
+        server.client_capabilities = params.capabilities
+        server.initialization_options = options
 
     @server.feature(INITIALIZED)
     def initialized(*_):  # pylint: disable=unused-variable
@@ -513,7 +518,7 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         were delayed because the client might need further info (for example to
         handle window/showMessage requests)
         """
-        server.onConfigUpdate(server._initialization_options)
+        server.onConfigUpdate(server.initialization_options)
         onNewReleaseFound(server.showInfo)
 
     @server.feature(TEXT_DOCUMENT_DID_SAVE)
