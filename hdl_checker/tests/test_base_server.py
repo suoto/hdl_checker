@@ -29,7 +29,6 @@ import time
 from pprint import pformat
 
 import six
-
 from mock import call, patch
 
 from nose2.tools import such  # type: ignore
@@ -337,12 +336,13 @@ with such.A("hdl_checker project") as it:
                 }
             )
 
-            it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
+            with PatchBuilder():
+                it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
 
         @it.should("use MockBuilder builder")  # type: ignore
         def test():
-            with PatchBuilder():
-                it.assertIsInstance(it.project.builder, MockBuilder)
+            # Just to make sure patch worked
+            it.assertEqual(it.project.builder.builder_name, MockBuilder.builder_name)
 
         @it.should("save cache after checking a source")  # type: ignore
         def test():
