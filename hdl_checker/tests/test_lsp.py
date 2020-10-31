@@ -374,19 +374,19 @@ class _LspHelper(unittest2.TestCase):
             ],
         )
 
-    def testLintFileOnOpen(self):
+    def test_LintFileOnOpen(self):
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-    def testLintFileWhenSaving(self):
+    def test_LintFileWhenSaving(self):
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         )
 
-    def testLintFileOnChange(self):
+    def test_LintFileOnChange(self):
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(
@@ -428,7 +428,7 @@ class TestRootUriNoProjectFile(_LspHelper):
             _patch.stop()
         super(TestRootUriNoProjectFile, self).tearDown()
 
-    def testSearchesForFilesOnInitialization(self):
+    def test_SearchesForFilesOnInitialization(self):
         lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
         #  Will get called twice
         hdl_checker.base_server.json.dump.assert_called()  # pylint: disable=no-member
