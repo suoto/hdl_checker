@@ -16,10 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 # pylint: disable=missing-docstring
-# pylint: disable=wrong-import-position
-# pylint: disable=no-self-use
 # pylint: disable=protected-access
-# pylint: disable=function-redefined
 # pylint: disable=invalid-name
 
 import asyncio
@@ -77,7 +74,6 @@ from hdl_checker.tests import (  # isort:skip
     toCheckerDiagnostic,
     getTestTempPath,
     setupTestSuport,
-    TestCase,
 )
 
 from hdl_checker import lsp  # isort:skip
@@ -160,7 +156,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
             ),
         )
 
-    def test_workspace_notify(self) -> None:
+    def test_workspace_notify(self) -> None:  # pylint: disable=no-self-use
         workspace = Mock()
         workspace.show_message = Mock()
 
@@ -258,7 +254,7 @@ class _LspHelper(unittest2.TestCase):
 
     def tearDown(self):
         if not getattr(self, "client", None):
-            return unittest2.skip("Won't run this on the helper")
+            return
         _logger.warning("Shutting down server")
         shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
             LSP_REQUEST_TIMEOUT
@@ -377,19 +373,19 @@ class _LspHelper(unittest2.TestCase):
             ],
         )
 
-    def test_LintFileOnOpen(self):
+    def test_LintFileOnOpen(self):  # pylint: disable=inconsistent-return-statements
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
-    def test_LintFileWhenSaving(self):
+    def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         )
 
-    def test_LintFileOnChange(self):
+    def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
         if not getattr(self, "server", None):
             return unittest2.skip("Won't run this on the helper")
         self._runDidOpenCheck(
@@ -431,7 +427,7 @@ class TestRootUriNoProjectFile(_LspHelper):
             _patch.stop()
         super(TestRootUriNoProjectFile, self).tearDown()
 
-    def test_SearchesForFilesOnInitialization(self):
+    def test_SearchesForFilesOnInitialization(self):  # pylint: disable=no-self-use
         lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
         #  Will get called twice
         hdl_checker.base_server.json.dump.assert_called()  # pylint: disable=no-member
@@ -990,3 +986,15 @@ class TestValidProject(_LspHelper):
                     )
                 )
             )
+
+    def test_changeConfiguration(self):
+        # pylint: disable=no-member
+        with patch.object(self.server, "onConfigUpdate"):
+            self.client.lsp.send_request(
+                features.WORKSPACE_DID_CHANGE_CONFIGURATION, {"foo": "bar"}
+            ).result(LSP_REQUEST_TIMEOUT)
+
+            self.assertIn(
+                "bar", {x[0].foo for x in self.server.onConfigUpdate.call_args if x},
+            )
+        # pylint: enable=no-member

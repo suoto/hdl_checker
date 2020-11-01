@@ -149,11 +149,10 @@ class Server(BaseServer):
 
 
 class HdlCheckerLanguageServer(LanguageServer):
-    """ Implementation of the Microsoft VSCode Language Server Protocol
+    """
+    Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
     """
-
-    # pylint: disable=too-many-public-methods,redefined-builtin
 
     def __init__(self, *args, **kwargs) -> None:
         self._checker: Optional[Server] = None
@@ -457,7 +456,9 @@ class HdlCheckerLanguageServer(LanguageServer):
         )
 
     @logCalls
-    def definitions(self, params: TextDocumentPositionParams) -> Optional[List[Location]]:
+    def definitions(
+        self, params: TextDocumentPositionParams
+    ) -> Optional[List[Location]]:
         dependency = self._getElementAtPosition(
             Path(to_fs_path(params.textDocument.uri)), params.position
         )
@@ -500,63 +501,64 @@ class HdlCheckerLanguageServer(LanguageServer):
 
 
 def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
-    """
-    Adds pygls features to an instance of HdlCheckerLanguageServer
-    """
+    """Adds pygls features to an instance of HdlCheckerLanguageServer"""
 
+    # pylint: disable=unused-variable
     @server.feature(INITIALIZE)
-    def initialize(params: InitializeParams) -> None:  # pylint: disable=unused-variable
+    def initialize(self: HdlCheckerLanguageServer, params: InitializeParams) -> None:
         options = params.initializationOptions
-        server.client_capabilities = params.capabilities
-        server.initialization_options = options
+        self.client_capabilities = params.capabilities
+        self.initialization_options = options
 
     @server.feature(INITIALIZED)
-    def initialized(*_):  # pylint: disable=unused-variable
+    def initialized(self: HdlCheckerLanguageServer, *_):
         """
         Enables processing of actions that were generated upon m_initialize and
         were delayed because the client might need further info (for example to
         handle window/showMessage requests)
         """
-        server.onConfigUpdate(server.initialization_options)
-        onNewReleaseFound(server.showInfo)
+        self.onConfigUpdate(self.initialization_options)
+        onNewReleaseFound(self.showInfo)
 
     @server.feature(TEXT_DOCUMENT_DID_SAVE)
-    def didSave(params: DidSaveTextDocumentParams):  # pylint: disable=unused-variable
+    def didSave(self: HdlCheckerLanguageServer, params: DidSaveTextDocumentParams):
         """Text document did change notification."""
-        server.lint(params.textDocument.uri, True)
+        self.lint(params.textDocument.uri, True)
 
     @server.feature(TEXT_DOCUMENT_DID_CHANGE)
     def didChange(
-        params: DidChangeTextDocumentParams,
-    ):  # pylint: disable=unused-variable
+        self: HdlCheckerLanguageServer, params: DidChangeTextDocumentParams,
+    ):
         """Text document did change notification."""
-        server.lint(params.textDocument.uri, False)
+        self.lint(params.textDocument.uri, False)
 
     @server.feature(TEXT_DOCUMENT_DID_OPEN)
-    def didOpen(params: DidOpenTextDocumentParams):  # pylint: disable=unused-variable
+    def didOpen(self: HdlCheckerLanguageServer, params: DidOpenTextDocumentParams):
         """Text document did change notification."""
-        server.lint(params.textDocument.uri, True)
+        self.lint(params.textDocument.uri, True)
 
     @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
-    def didChangeConfiguration(  # pylint: disable=unused-variable
-        settings: DidChangeConfigurationParams = None,
+    def didChangeConfiguration(
+        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams = None,
     ) -> None:
-        server.onConfigUpdate(settings)
+        self.onConfigUpdate(settings)
 
     @server.feature(HOVER)
-    def onHover(  # pylint: disable=unused-variable
-        params: HoverParams,
+    def onHover(
+        self: HdlCheckerLanguageServer, params: HoverParams,
     ) -> Optional[Hover]:
-        return server.hover(params)
+        return self.hover(params)
 
     @server.feature(REFERENCES)
-    def onReferences(  # pylint: disable=unused-variable
-        params: ReferenceParams,
+    def onReferences(
+        self: HdlCheckerLanguageServer, params: ReferenceParams,
     ) -> Optional[List[Location]]:
-        return server.references(params)
+        return self.references(params)
 
     @server.feature(DEFINITION)
-    def onDefinition(  # pylint: disable=unused-variable
-        params: TextDocumentPositionParams,
+    def onDefinition(
+        self: HdlCheckerLanguageServer, params: TextDocumentPositionParams,
     ) -> Optional[List[Location]]:
-        return server.definitions(params)
+        return self.definitions(params)
+
+    # pylint: enable=unused-variable
