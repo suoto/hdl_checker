@@ -25,11 +25,9 @@ import os
 import os.path as p
 import time
 
-import six
-
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import assertCountEqual, assertSameFile, writeListToFile
+from hdl_checker.tests import assertSameFile, writeListToFile
 
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import VhdlDesignUnit
@@ -61,11 +59,6 @@ def _DependencySpec(owner, name, library, locations=None):
 with such.A("VHDL source file object") as it:
 
     it.assertSameFile = assertSameFile(it)
-
-    if six.PY2:
-        # Can't use assertCountEqual for lists of unhashable types.
-        # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = assertCountEqual(it)
 
     with it.having("an entity code"):
 

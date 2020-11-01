@@ -17,6 +17,7 @@
 
 # pylint: disable=function-redefined, missing-docstring, protected-access
 
+import asyncio
 import logging
 import os
 import os.path as p
@@ -27,14 +28,13 @@ from multiprocessing import Event, Process, Queue
 from threading import Thread
 
 import requests
-from pyls import uris  # type: ignore
-from pyls.python_ls import PythonLanguageServer, start_io_lang_server  # type: ignore
-
 from mock import patch
+from pygls import features, uris
+from pygls.types import ClientCapabilities, Diagnostic, InitializeParams
 
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import TestCase, disableVunit, getTestTempPath
+from hdl_checker.tests import disableVunit, getTestTempPath
 
 import hdl_checker.lsp
 from hdl_checker import server
@@ -48,8 +48,17 @@ SERVER_LOG_LEVEL = os.environ.get("SERVER_LOG_LEVEL", "WARNING")
 
 HDL_CHECKER_BASE_PATH = p.abspath(p.join(p.dirname(__file__), "..", ".."))
 
-JSONRPC_VERSION = "2.0"
 CALL_TIMEOUT = 5
+
+# Static shutdown message to avoid havint to create a server/client pair
+LSP_SHUTDOWN = b"\r\n".join(
+    [
+        b"Content-Length: 102",
+        b"Content-Type: application/vscode-jsonrpc; charset=utf-8",
+        b"",
+        b'{"id": "e7389d0d-4d3c-432d-8506-68a1b2faca48", "jsonrpc": "2.0", "met     hod": "shutdown", "params": null}',
+    ]
+)
 
 
 def _path(*args):
@@ -89,33 +98,72 @@ class _ClientServer(
     """ A class to setup a client/server pair """
 
     def __init__(self):
+        #  # Client to Server pipe
+        #  csr, csw = os.pipe()
+        #  # Server to client pipe
+        #  scr, scw = os.pipe()
+
+        #  self.server_thread = Thread(
+        #      target=start_io_lang_server,
+        #      args=(
+        #          os.fdopen(csr, "rb"),
+        #          os.fdopen(scw, "wb"),
+        #          False,
+        #          hdl_checker.lsp.HdlCheckerLanguageServer,
+        #      ),
+        #  )
+
+        #  self.server_thread.daemon = True
+        #  self.server_thread.start()
+
+        #  # Object being tested is the server thread. Avoid both objects
+        #  # competing for the same cache by using the raw Python language server
+        #  self.client = PythonLanguageServer(
+        #      os.fdopen(scr, "rb"), os.fdopen(csw, "wb"), start_io_lang_server
+        #  )
+
+        #  self.client_thread = Thread(target=_startClient, args=[self.client])
+        #  self.client_thread.daemon = True
+        #  self.client_thread.start()
+
         # Client to Server pipe
         csr, csw = os.pipe()
         # Server to client pipe
         scr, scw = os.pipe()
 
-        self.server_thread = Thread(
-            target=start_io_lang_server,
-            args=(
-                os.fdopen(csr, "rb"),
-                os.fdopen(scw, "wb"),
-                False,
-                hdl_checker.lsp.HdlCheckerLanguageServer,
-            ),
+        self.server = hdl_checker.lsp.HdlCheckerLanguageServer()
+        hdl_checker.lsp.setupLanguageServerFeatures(self.server)
+        self.server.show_message = lambda *args, **kwargs: _logger.fatal(
+            "%s, %s", args, kwargs
         )
 
-        self.server_thread.daemon = True
-        self.server_thread.start()
-
-        # Object being tested is the server thread. Avoid both objects
-        # competing for the same cache by using the raw Python language server
-        self.client = PythonLanguageServer(
-            os.fdopen(scr, "rb"), os.fdopen(csw, "wb"), start_io_lang_server
+        server_thread = Thread(
+            target=self.server.start_io,
+            args=(os.fdopen(csr, "rb"), os.fdopen(scw, "wb")),
         )
 
-        self.client_thread = Thread(target=_startClient, args=[self.client])
-        self.client_thread.daemon = True
-        self.client_thread.start()
+        server_thread.daemon = True
+        server_thread.start()
+
+        # Add thread id to the server (just for testing)
+        self.server.thread_id = server_thread.ident
+
+        # Setup client
+        self.client = hdl_checker.lsp.HdlCheckerLanguageServer(asyncio.new_event_loop())
+        self.client_diagnostics = []
+
+        @self.client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+        def dbg_publish(diag: Diagnostic):
+            _logger.info("Client received diagnostic: %s", diag)
+            self.client_diagnostics.append(diag)
+
+        client_thread = Thread(
+            target=self.client.start_io,
+            args=(os.fdopen(scr, "rb"), os.fdopen(csw, "wb")),
+        )
+
+        client_thread.daemon = True
+        client_thread.start()
 
 
 such.unittest.TestCase.maxDiff = None
@@ -319,26 +367,24 @@ with such.A("hdl_checker server") as it:
         @disableVunit
         def test():
             client_server = _ClientServer()
-            response = client_server.client._endpoint.request(
-                "initialize",
-                {
-                    "rootPath": uris.from_fs_path(TEST_TEMP_PATH),
-                    "initializationOptions": {},
-                },
+            response = client_server.client.lsp.send_request(
+                features.INITIALIZE,
+                InitializeParams(
+                    process_id=1234,
+                    capabilities=ClientCapabilities(),
+                    root_uri=uris.from_fs_path(TEST_TEMP_PATH),
+                ),
             ).result(timeout=CALL_TIMEOUT)
 
             _logger.debug("Response: %s", response)
-            it.assertDictEqual(
-                response,
-                {
-                    "capabilities": {
-                        "textDocumentSync": 1,
-                        "definitionProvider": True,
-                        "hoverProvider": True,
-                        "referencesProvider": True,
-                    }
-                },
-            )
+            it.assertEqual(response.capabilities.textDocumentSync, 2)
+            it.assertEqual(response.capabilities.hoverProvider, True)
+
+            shutdown_response = client_server.client.lsp.send_request(
+                features.SHUTDOWN
+            ).result(2)
+            client_server.client.lsp.notify(features.EXIT)
+            it.assertIsNone(shutdown_response)
 
         @it.should("log to temporary files if files aren't specified")  # type: ignore
         @disableVunit
@@ -381,19 +427,18 @@ with such.A("hdl_checker server") as it:
 
             _logger.info("Actual command: %s", actual_cmd)
 
-            server = subp.Popen(
+            proc = subp.Popen(
                 actual_cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE
             )
 
-            # Close stdin so the server exits
-            stdout, stderr = server.communicate("")
+            stdout, stderr = proc.communicate(LSP_SHUTDOWN, timeout=2)
 
             it.assertEqual(
                 stdout, b"", "stdout should be empty but got\n{}".format(stdout)
             )
 
             it.assertEqual(
-                stderr, b"", "stderr should be empty but got\n{}".format(stdout)
+                stderr, b"", "stderr should be empty but got\n{}".format(stderr)
             )
 
             # On Windows the Popen PID and the *actual* PID don't always match
@@ -404,12 +449,15 @@ with such.A("hdl_checker server") as it:
             expected = [
                 "Starting server. Our PID is {}, no parent PID to attach to. "
                 "Version string for hdl_checker is '{}'".format(
-                    server.pid, hdl_checker.__version__
+                    proc.pid, hdl_checker.__version__
                 ),
-                "Starting HdlCheckerLanguageServer IO language server",
+                #  "Starting HdlCheckerLanguageServer IO language server",
             ]
 
-            _logger.info("Log content: %s", log_content)
+            _logger.info(
+                "Log content:\n-----\n%s\n-----\n",
+                "\n".join(("> %s" % line for line in log_content)),
+            )
 
             if ON_WINDOWS:
                 log_content = log_content[1:]
@@ -518,7 +566,7 @@ with such.A("hdl_checker server") as it:
             it.assertIsNone(args.stderr)
 
 
-@patch("hdl_checker.server.start_io_lang_server")
+@patch("hdl_checker.lsp.HdlCheckerLanguageServer.start_io")
 @patch("hdl_checker.server._binaryStdio", return_value=("stdin", "stdout"))
 @patch("hdl_checker.server._setupPipeRedirection")
 def test_StartLsp(redirection, binary_stdio, start_server):
@@ -532,9 +580,7 @@ def test_StartLsp(redirection, binary_stdio, start_server):
 
     redirection.assert_called_once_with(None, "stderr")
     binary_stdio.assert_called_once()
-    start_server.assert_called_once_with(
-        "stdin", "stdout", True, hdl_checker.lsp.HdlCheckerLanguageServer
-    )
+    start_server.assert_called_once_with(stdin="stdin", stdout="stdout")
 
 
 it.createTests(globals())

@@ -23,12 +23,38 @@ from os import path as p
 from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-import six
-from pyls import lsp as defines  # type: ignore
-from pyls._utils import debounce  # type: ignore
-from pyls.python_ls import PythonLanguageServer  # type: ignore
-from pyls.uris import from_fs_path, to_fs_path  # type: ignore
-from pyls.workspace import Workspace  # type: ignore
+from pygls.features import (
+    DEFINITION,
+    HOVER,
+    INITIALIZE,
+    INITIALIZED,
+    REFERENCES,
+    TEXT_DOCUMENT_DID_CHANGE,
+    TEXT_DOCUMENT_DID_OPEN,
+    TEXT_DOCUMENT_DID_SAVE,
+    WORKSPACE_DID_CHANGE_CONFIGURATION,
+)
+from pygls.server import LanguageServer
+from pygls.types import (
+    ClientCapabilities,
+    Diagnostic,
+    DiagnosticSeverity,
+    DidChangeConfigurationParams,
+    DidChangeTextDocumentParams,
+    DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams,
+    Hover,
+    HoverParams,
+    InitializeParams,
+    Location,
+    MarkupKind,
+    MessageType,
+    Position,
+    Range,
+    ReferenceParams,
+    TextDocumentPositionParams,
+)
+from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
 
 from hdl_checker import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
@@ -43,7 +69,7 @@ from hdl_checker.parsers.elements.design_unit import (
     tAnyDesignUnit,
 )
 from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import ConfigFileOrigin, Location, MarkupKind
+from hdl_checker.types import ConfigFileOrigin  # , Location
 from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
@@ -53,58 +79,44 @@ LINT_DEBOUNCE_S = 0.5  # 500 ms
 
 URI = str
 
-if six.PY2:
-    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
-        IOError,
-        OSError,
-    )
 
-
-def checkerDiagToLspDict(diag):
-    # type: (...) -> Any
+def _translateSeverity(severity: DiagType) -> DiagnosticSeverity:
     """
-    Converts a CheckerDiagnostic object into the dictionary with into the LSP
-    expects
+    Translate hdl_checker's DiagType into pygls's DiagnosticSeverity into LSP
+    severity
     """
-    _logger.debug(diag)
-
-    # Translate the error into LSP severity
-    severity = diag.severity
-
     if severity in (
         DiagType.STYLE_WARNING,
         DiagType.STYLE_ERROR,
         DiagType.INFO,
         DiagType.STYLE_INFO,
     ):
-        severity = defines.DiagnosticSeverity.Information
-    elif severity in (DiagType.WARNING,):
-        severity = defines.DiagnosticSeverity.Warning
-    elif severity in (DiagType.ERROR,):
-        severity = defines.DiagnosticSeverity.Error
-    else:
-        severity = defines.DiagnosticSeverity.Error
+        return DiagnosticSeverity.Information
+    if severity in (DiagType.WARNING,):
+        return DiagnosticSeverity.Warning
+    if severity in (DiagType.ERROR,):
+        return DiagnosticSeverity.Error
+    return DiagnosticSeverity.Error
 
-    result = {
-        "source": diag.checker,
-        "range": {
-            "start": {
-                "line": (diag.line_number or 0),
-                "character": (diag.column_number or 0),
-            },
-            "end": {
-                "line": (diag.line_number or 0),
-                "character": (diag.column_number or 0),
-            },
-        },
-        "message": diag.text,
-        "severity": severity,
-    }
 
-    if diag.error_code:
-        result["code"] = diag.error_code
-
-    return result
+def checkerDiagToLspDict(diag: CheckerDiagnostic) -> Diagnostic:
+    """
+    Converts a CheckerDiagnostic object into pygls.Diagnostic type expected by
+    the publish_diagnostics LSP method
+    """
+    _logger.debug(diag)
+    return Diagnostic(
+        range=Range(
+            start=Position(
+                line=diag.line_number or 0, character=diag.column_number or 0
+            ),
+            end=Position(line=diag.line_number or 0, character=diag.column_number or 0),
+        ),
+        message=diag.text,
+        severity=_translateSeverity(diag.severity),
+        code=diag.error_code if diag.error_code else None,
+        source=diag.checker,
+    )
 
 
 class Server(BaseServer):
@@ -112,122 +124,73 @@ class Server(BaseServer):
     HDL Checker project builder class
     """
 
-    def __init__(self, workspace, root_dir):
-        # type: (Workspace, Path) -> None
-        self._workspace = workspace
+    def __init__(self, lsp, root_dir):
+        # type: (LanguageServer, Path) -> None
+        self._lsp = lsp
         super(Server, self).__init__(root_dir)
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
-        _logger.debug("UI info: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:  # pragma: no cover
-            self._workspace.show_message(message, defines.MessageType.Info)
+        _logger.debug("UI info: %s (lsp=%s)", message, self._lsp)
+        if self._lsp:  # pragma: no cover
+            self._lsp.show_message(message, MessageType.Info)
 
     def _handleUiWarning(self, message):
         # type: (...) -> Any
-        _logger.debug("UI warning: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:  # pragma: no cover
-            self._workspace.show_message(message, defines.MessageType.Warning)
+        _logger.debug("UI warning: %s (lsp=%s)", message, self._lsp)
+        if self._lsp:  # pragma: no cover
+            self._lsp.show_message(message, MessageType.Warning)
 
     def _handleUiError(self, message):
         # type: (...) -> Any
-        _logger.debug("UI error: %s (workspace=%s)", message, self._workspace)
-        if self._workspace:  # pragma: no cover
-            self._workspace.show_message(message, defines.MessageType.Error)
+        _logger.debug("UI error: %s (lsp=%s)", message, self._lsp)
+        if self._lsp:  # pragma: no cover
+            self._lsp.show_message(message, MessageType.Error)
 
 
-class HdlCheckerLanguageServer(PythonLanguageServer):
-    """ Implementation of the Microsoft VSCode Language Server Protocol
+class HdlCheckerLanguageServer(LanguageServer):
+    """
+    Implementation of the Microsoft VSCode Language Server Protocol
     https://github.com/Microsoft/language-server-protocol/blob/master/versions/protocol-1-x.md
     """
 
-    # pylint: disable=too-many-public-methods,redefined-builtin
-
-    def __init__(self, *args, **kwargs):
-        # type: (...) -> None
-        self._checker = None  # type: Optional[Server]
+    def __init__(self, *args, **kwargs) -> None:
+        self._checker: Optional[Server] = None
         super(HdlCheckerLanguageServer, self).__init__(*args, **kwargs)
         # Default checker
-        self._onConfigUpdate({"project_file": None})
-        self._global_diags = set()  # type: Set[CheckerDiagnostic]
-        self._initialization_options = {}  # type: Dict[str, Any]
+        self.onConfigUpdate(None)
+        self._global_diags: Set[CheckerDiagnostic] = set()
+        self.initialization_options: Optional[Any] = None
+        self.client_capabilities: Optional[ClientCapabilities] = None
 
     @property
-    def checker(self):
-        # type: () -> Server
+    def checker(self) -> Server:
         """
         Returns a valid checker, either the one configured during
-        HdlCheckerLanguageServer._onConfigUpdate or a new one using a temporary
+        HdlCheckerLanguageServer.onConfigUpdate or a new one using a temporary
         directory.
         """
         if self._checker is None:
             _logger.debug("Server was not initialized, using a temporary one")
             root_dir = mkdtemp(prefix="temp_hdl_checker_pid{}_".format(getpid()))
-            self._checker = Server(self.workspace, root_dir=TemporaryPath(root_dir))
+            self._checker = Server(self, root_dir=TemporaryPath(root_dir))
         return self._checker
 
-    def showInfo(self, msg):
-        # type: (str) -> None
+    def showInfo(self, msg: str) -> None:
         """
-        Shorthand for self.workspace.show_message(msg, defines.MessageType.Info)
+        Shorthand for self.show_message(msg, MessageType.Info)
         """
         _logger.info("[INFO] %s", msg)
-        self.workspace.show_message(msg, defines.MessageType.Info)
+        self.show_message(msg, MessageType.Info)
 
-    def showWarning(self, msg):
-        # type: (str) -> None
+    def showWarning(self, msg: str) -> None:
         """
-        Shorthand for self.workspace.show_message(msg, defines.MessageType.Warning)
+        Shorthand for self.show_message(msg, MessageType.Warning)
         """
         _logger.info("[WARNING] %s", msg)
-        self.workspace.show_message(msg, defines.MessageType.Warning)
+        self.show_message(msg, MessageType.Warning)
 
-    def capabilities(self):
-        # type: (...) -> Any
-        "Returns language server capabilities"
-        return {
-            "referencesProvider": True,
-            "definitionProvider": True,
-            "hoverProvider": True,
-            "textDocumentSync": defines.TextDocumentSyncKind.FULL,
-        }
-
-    @logCalls
-    def m_initialized(self, **_kwargs):
-        """
-        Enables processing of actions that were generated upon m_initialize and
-        were delayed because the client might need further info (for example to
-        handle window/showMessage requests)
-        """
-        self._onConfigUpdate(self._initialization_options)
-        onNewReleaseFound(self.showInfo)
-        return super(HdlCheckerLanguageServer, self).m_initialized(**_kwargs)
-
-    @logCalls
-    def m_initialize(
-        self,
-        processId=None,
-        rootUri=None,
-        rootPath=None,
-        initializationOptions=None,
-        **_kwargs
-    ):
-        # type: (...) -> Any
-        """
-        Initializes the language server
-        """
-        result = super(HdlCheckerLanguageServer, self).m_initialize(
-            processId=processId,
-            rootUri=rootUri,
-            rootPath=rootPath,
-            initializationOptions={},
-            **_kwargs
-        )
-        self._initialization_options = initializationOptions
-        return result
-
-    def _onConfigUpdate(self, options):
-        # type: (...) -> Any
+    def onConfigUpdate(self, options: Optional[Any]) -> None:
         """
         Updates the checker server from options if the 'project_file' key is
         present. Please not that this is run from both initialize and
@@ -240,11 +203,11 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             return
 
         root_dir = to_fs_path(self.workspace.root_uri)
-        self._checker = Server(self.workspace, root_dir=Path(root_dir))
+        self._checker = Server(self, root_dir=Path(root_dir))
 
-        _logger.debug("Updating from %s", options)
+        _logger.debug("Updating from %s, workspace=%s", options, self.workspace)
 
-        # Clear previous diagnostics
+        # Clear previus diagnostics
         self._global_diags = set()
 
         path = self._getProjectFilePath(options)
@@ -275,13 +238,14 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         json.dump(config, open(auto_project_file, "w"))
         self.checker.setConfig(auto_project_file, origin=ConfigFileOrigin.generated)
 
-    def _getProjectFilePath(self, options=None):
-        # type: (...) -> str
+    def _getProjectFilePath(self, options: Optional[Any] = None) -> str:
         """
         Tries to get 'project_file' from the options dict and combine it with
         the root URI as provided by the workspace
         """
-        path = (options or {}).get("project_file", DEFAULT_PROJECT_FILE)
+        path = DEFAULT_PROJECT_FILE
+        if options and options.project_file is not None:
+            path = options.project_file
 
         # Project file will be related to the root path
         if self.workspace:
@@ -289,30 +253,32 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
 
         return path
 
-    @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
-    def lint(self, doc_uri, is_saved):
-        # type: (URI, bool) -> Any
-        diags = set(self._getDiags(doc_uri, is_saved))
+    def lint(self, uri: URI, is_saved: bool) -> None:
+        """
+        Check a file for lint errors
+        """
+        _logger.debug("Linting %s (file was %s saved)", uri, "" if is_saved else "not")
+        diags = set(self._getDiags(uri, is_saved))
 
         # Separate the diagnostics in filename groups to publish diagnostics
         # referring to all paths
         paths = {diag.filename for diag in diags}
-        # Add doc_uri to the set to trigger clearing diagnostics when it's not
+        # Add text_doc.uri to the set to trigger clearing diagnostics when it's not
         # present
-        paths.add(Path(to_fs_path(doc_uri)))
+        paths.add(Path(to_fs_path(uri)))
 
         for path in paths:
-            self.workspace.publish_diagnostics(
-                from_fs_path(str(path)),
-                list(
-                    checkerDiagToLspDict(diag)
-                    for diag in diags
-                    if diag.filename == path
-                ),
-            )
+            diags_to_publish = {
+                checkerDiagToLspDict(diag) for diag in diags if diag.filename == path
+            }
+            if diags_to_publish:
+                self.lsp.publish_diagnostics(
+                    from_fs_path(str(path)), tuple(diags_to_publish)
+                )
+            else:
+                _logger.debug("No diagnostics for %s", path)
 
-    def _getDiags(self, doc_uri, is_saved):
-        # type: (URI, bool) -> Iterable[CheckerDiagnostic]
+    def _getDiags(self, doc_uri: URI, is_saved: bool) -> Iterable[CheckerDiagnostic]:
         """
         Gets diags of the URI, wether from the saved file or from its contents;
         returns an iterable containing the diagnostics of the doc_uri and other
@@ -327,56 +293,47 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         # will involve dumping the modified contents into a temporary file
         path = Path(to_fs_path(doc_uri))
 
-        _logger.debug("Linting %s (saved=%s)", repr(path), is_saved)
-
         if is_saved:
             return self.checker.getMessagesByPath(path)
-
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
-    def references(self, doc_uri, position, exclude_declaration):
-        # type: (URI, Dict[str, int], bool) -> Any
+    def references(self, params: ReferenceParams) -> Optional[List[Location]]:
+        "Tries to find references for the selected element"
+
         element = self._getElementAtPosition(
-            Path(to_fs_path(doc_uri)),
-            Location(line=position["line"], column=position["character"]),
+            Path(to_fs_path(params.textDocument.uri)), params.position
         )
 
         # Element not identified
         if element is None:
             return None
 
-        references = []  # type: List[Dict[str, Any]]
+        references: List[Location] = []
 
-        if not exclude_declaration:
+        if params.context.includeDeclaration:
             for line, column in element.locations:
                 references += [
-                    {
-                        "uri": from_fs_path(str(element.owner)),
-                        "range": {
-                            "start": {"line": line, "character": column},
-                            "end": {"line": line, "character": column},
-                        },
-                    }
+                    Location(
+                        uri=from_fs_path(str(element.owner)),
+                        range=Range(
+                            start=Position(line, column), end=Position(line, column)
+                        ),
+                    )
                 ]
 
         for reference in self.checker.database.getReferencesToDesignUnit(element):
             for line, column in reference.locations:
                 references += [
-                    {
-                        "uri": from_fs_path(str(reference.owner)),
-                        "range": {
-                            "start": {"line": line, "character": column},
-                            "end": {"line": line, "character": column},
-                        },
-                    }
+                    Location(
+                        uri=from_fs_path(str(reference.owner)),
+                        range=Range(
+                            start=Position(line, column), end=Position(line, column)
+                        ),
+                    )
                 ]
 
         return references
-
-    def m_workspace__did_change_configuration(self, settings=None):
-        # type: (...) -> Any
-        self._onConfigUpdate(settings or {})
 
     @property
     def _use_markdown_for_hover(self):
@@ -385,11 +342,13 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         supported formats, i.e., 'markdown' is present inside
         TextDocumentClientCapabilities.hover.contentFormat
         """
-        return MarkupKind.Markdown.value in (
-            self.config.capabilities.get("textDocument", {})
-            .get("hover", {})
-            .get("contentFormat", [])
-        )
+        try:
+            return (
+                MarkupKind.Markdown.value
+                in self.client_capabilities.textDocument.hover.contentFormat
+            )
+        except AttributeError:
+            return False
 
     def _format(self, text):
         """
@@ -400,8 +359,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
 
         return text
 
-    def _getBuildSequenceForHover(self, path):
-        # type: (Path) -> str
+    def _getBuildSequenceForHover(self, path: Path) -> str:
         """
         Return a formatted text with the build sequence for the given path
         """
@@ -435,7 +393,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         )
 
     def _getDependencyInfoForHover(self, dependency):
-        # type: (BaseDependencySpec) -> Optional[str]
+        # type: (BaseDependencySpec) -> str
         """
         Report which source defines a given dependency when the user hovers
         over its name
@@ -449,8 +407,9 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             dependency.library, dependency.name
         )
 
-    def _getElementAtPosition(self, path, position):
-        # type: (Path, Location) -> Union[BaseDependencySpec, tAnyDesignUnit, None]
+    def _getElementAtPosition(
+        self, path: Path, position: Position
+    ) -> Union[BaseDependencySpec, tAnyDesignUnit, None]:
         """
         Gets design units and dependencies (in this order) of path and checks
         if their definitions include position. Not every element is identified,
@@ -462,35 +421,46 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             self.checker.database.getDependenciesByPath,
         ):  # type: Callable
             for element in meth(path):
-                if element.includes(position):
+                if element.includes(position.line, position.character):
                     return element
 
         return None
 
-    def hover(self, doc_uri, position):
-        # type: (URI, Dict[str, int]) -> Any
-        path = Path(to_fs_path(doc_uri))
+    def hover(self, params: HoverParams) -> Optional[Hover]:
+        path = Path(to_fs_path(params.textDocument.uri))
         # Check if the element under the cursor matches something we know
-        element = self._getElementAtPosition(
-            path, Location(line=position["line"], column=position["character"])
-        )
+        element = self._getElementAtPosition(path, params.position)
 
         _logger.debug("Getting info from %s", element)
 
+        if not isinstance(
+            element, (VerilogDesignUnit, VhdlDesignUnit, BaseDependencySpec)
+        ):
+            return None
+
         if isinstance(element, (VerilogDesignUnit, VhdlDesignUnit)):
-            return {"contents": self._getBuildSequenceForHover(path)}
+            contents = self._getBuildSequenceForHover(path)
+        else:
+            contents = self._getDependencyInfoForHover(element)
 
-        if isinstance(element, BaseDependencySpec):
-            return {"contents": self._getDependencyInfoForHover(element)}
-
-        return None
+        return Hover(
+            contents=contents,
+            range=Range(
+                start=Position(
+                    line=params.position.line, character=params.position.character
+                ),
+                end=Position(
+                    line=params.position.line, character=params.position.character
+                ),
+            ),
+        )
 
     @logCalls
-    def definitions(self, doc_uri, position):
-        # type: (...) -> Any
-        doc_path = Path(to_fs_path(doc_uri))
+    def definitions(
+        self, params: TextDocumentPositionParams
+    ) -> Optional[List[Location]]:
         dependency = self._getElementAtPosition(
-            doc_path, Location(line=position["line"], column=position["character"])
+            Path(to_fs_path(params.textDocument.uri)), params.position
         )
 
         if not isinstance(dependency, BaseDependencySpec):
@@ -510,7 +480,7 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
         target_path, _ = info
         target_uri = from_fs_path(str(target_path))
 
-        locations = []  # type: List[Dict[str, Any]]
+        locations: List[Location] = []
 
         # Get the design unit that has matched the dependency to extract the
         # location where it's defined
@@ -518,13 +488,77 @@ class HdlCheckerLanguageServer(PythonLanguageServer):
             if unit.name == dependency.name and unit.locations:
                 for line, column in unit.locations:
                     locations += [
-                        {
-                            "uri": target_uri,
-                            "range": {
-                                "start": {"line": line, "character": column},
-                                "end": {"line": line, "character": column + len(unit)},
-                            },
-                        }
+                        Location(
+                            target_uri,
+                            Range(
+                                Position(line, column),
+                                Position(line, column + len(unit)),
+                            ),
+                        )
                     ]
 
         return locations
+
+
+def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
+    """Adds pygls features to an instance of HdlCheckerLanguageServer"""
+
+    # pylint: disable=unused-variable
+    @server.feature(INITIALIZE)
+    def initialize(self: HdlCheckerLanguageServer, params: InitializeParams) -> None:
+        options = params.initializationOptions
+        self.client_capabilities = params.capabilities
+        self.initialization_options = options
+
+    @server.feature(INITIALIZED)
+    def initialized(self: HdlCheckerLanguageServer, *_):
+        """
+        Enables processing of actions that were generated upon m_initialize and
+        were delayed because the client might need further info (for example to
+        handle window/showMessage requests)
+        """
+        self.onConfigUpdate(self.initialization_options)
+        onNewReleaseFound(self.showInfo)
+
+    @server.feature(TEXT_DOCUMENT_DID_SAVE)
+    def didSave(self: HdlCheckerLanguageServer, params: DidSaveTextDocumentParams):
+        """Text document did change notification."""
+        self.lint(params.textDocument.uri, True)
+
+    @server.feature(TEXT_DOCUMENT_DID_CHANGE)
+    def didChange(
+        self: HdlCheckerLanguageServer, params: DidChangeTextDocumentParams,
+    ):
+        """Text document did change notification."""
+        self.lint(params.textDocument.uri, False)
+
+    @server.feature(TEXT_DOCUMENT_DID_OPEN)
+    def didOpen(self: HdlCheckerLanguageServer, params: DidOpenTextDocumentParams):
+        """Text document did change notification."""
+        self.lint(params.textDocument.uri, True)
+
+    @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
+    def didChangeConfiguration(
+        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams = None,
+    ) -> None:
+        self.onConfigUpdate(settings)
+
+    @server.feature(HOVER)
+    def onHover(
+        self: HdlCheckerLanguageServer, params: HoverParams,
+    ) -> Optional[Hover]:
+        return self.hover(params)
+
+    @server.feature(REFERENCES)
+    def onReferences(
+        self: HdlCheckerLanguageServer, params: ReferenceParams,
+    ) -> Optional[List[Location]]:
+        return self.references(params)
+
+    @server.feature(DEFINITION)
+    def onDefinition(
+        self: HdlCheckerLanguageServer, params: TextDocumentPositionParams,
+    ) -> Optional[List[Location]]:
+        return self.definitions(params)
+
+    # pylint: enable=unused-variable

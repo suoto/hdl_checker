@@ -28,8 +28,6 @@ from pprint import pformat
 from threading import RLock, Timer
 from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
 
-import six
-
 from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
     getBuilderByName,
@@ -82,16 +80,6 @@ _HOW_LONG_IS_TOO_LONG_MSG = (
     "[{0}]({0})".format(_SETTING_UP_A_PROJECT_URL)
 )
 
-_PYTHON_27_WARNING_MSG = (
-    "Python 2.7 is no longer going to be supported in future "
-    "releases. Please consider using Python 3.x."
-)
-
-if six.PY2:
-    JSONDecodeError = ValueError
-else:
-    JSONDecodeError = json.decoder.JSONDecodeError
-
 WatchedFile = NamedTuple(
     "WatchedFile", (("path", Path), ("last_read", float), ("origin", ConfigFileOrigin))
 )
@@ -130,9 +118,6 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             for x in dir(self)
             if hasattr(getattr(self, x), "cache_clear")
         }
-
-        if six.PY2:
-            self._handleUiWarning(_PYTHON_27_WARNING_MSG)
 
     @property
     def builder(self):
@@ -182,6 +167,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
         self.config_file = WatchedFile(path, mtime, origin)
         _logger.debug("Set config to %s", self.config_file)
+        self._updateConfigIfNeeded()
 
     def _updateConfigIfNeeded(self):
         # type: (...) -> Any
@@ -216,7 +202,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
 
             try:
                 config = json.load(open(str(self.config_file.path)))
-            except JSONDecodeError:
+            except json.decoder.JSONDecodeError:
                 config = ConfigParser(self.config_file.path).parse()
 
             self.configure(config)

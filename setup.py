@@ -29,9 +29,7 @@ License :: OSI Approved :: GNU General Public License v3 (GPLv3)
 Operating System :: Microsoft :: Windows
 Operating System :: POSIX :: Linux
 Programming Language :: Python
-Programming Language :: Python :: 2
 Programming Language :: Python :: 3
-Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3.5
 Programming Language :: Python :: 3.6
 Programming Language :: Python :: 3.7
@@ -62,8 +60,8 @@ setuptools.setup(
                                      'future>=0.14.0',
                                      'futures; python_version<"3.2"',
                                      'prettytable>=0.7.2',
-                                     'python-language-server>=0.26.1',
-                                     'requests==2.20.0',
+                                     'pygls',
+                                     'requests>=2.20.0',
                                      'six>=1.10.0',
                                      'tabulate>=0.8.5',
                                      'typing>=3.7.4',

@@ -28,15 +28,17 @@ import time
 from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import six
-
 import mock
+import six
 import unittest2  # type: ignore
 from parameterized import parameterized_class  # type: ignore
+from pygls import uris
+from unittest2 import TestCase
 
 from hdl_checker import exceptions
 from hdl_checker.base_server import BaseServer
 from hdl_checker.builders.base_builder import BaseBuilder
+from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
@@ -343,35 +345,35 @@ def assertSameFile(it):  # pylint: disable=invalid-name
     return wrapper
 
 
-def assertCountEqual(it):  # pylint: disable=invalid-name
+#  def assertCountEqual(it):  # pylint: disable=invalid-name
 
-    assert six.PY2, "Only needed on Python2"
+#      assert six.PY2, "Only needed on Python2"
 
-    def wrapper(first, second, msg=None):
-        temp = list(second)  # make a mutable copy
-        not_found = []
-        for elem in first:
-            try:
-                temp.remove(elem)
-            except ValueError:
-                not_found.append(elem)
+#      def wrapper(first, second, msg=None):
+#          temp = list(second)  # make a mutable copy
+#          not_found = []
+#          for elem in first:
+#              try:
+#                  temp.remove(elem)
+#              except ValueError:
+#                  not_found.append(elem)
 
-        error_details = []
+#          error_details = []
 
-        if not_found:
-            error_details += [
-                "Second list is missing item {}".format(x) for x in not_found
-            ]
+#          if not_found:
+#              error_details += [
+#                  "Second list is missing item {}".format(x) for x in not_found
+#              ]
 
-        error_details += ["First list is missing item {}".format(x) for x in temp]
+#          error_details += ["First list is missing item {}".format(x) for x in temp]
 
-        if error_details:
-            # Add user message at the top
-            error_details = [msg] + error_details
-            error_details += ["", "Lists {} and {} differ".format(first, second)]
-            it.fail("\n".join([str(x) for x in error_details]))
+#          if error_details:
+#              # Add user message at the top
+#              error_details = [msg] + error_details
+#              error_details += ["", "Lists {} and {} differ".format(first, second)]
+#              it.fail("\n".join([str(x) for x in error_details]))
 
-    return wrapper
+#      return wrapper
 
 
 def writeListToFile(filename, _list):  # pragma: no cover
@@ -456,22 +458,6 @@ def logIterable(msg, iterable, func):
         func("- {:2d} {}".format(i, item))
 
 
-if six.PY2:
-    from unittest2 import TestCase as _TestCase
-
-    class TestCase(_TestCase):
-        def __new__(cls, *args, **kwargs):
-            result = super(_TestCase, cls).__new__(  #  pylint: disable=bad-super-call
-                cls, *args, **kwargs
-            )
-            result.assertCountEqual = assertCountEqual(result)
-            return result
-
-
-else:
-    from unittest2 import TestCase
-
-
 def windowsOnly(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -490,3 +476,16 @@ def linuxOnly(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def toCheckerDiagnostic(uri: str, diags: Any) -> Iterable[CheckerDiagnostic]:
+    for diag in diags:
+        yield CheckerDiagnostic(
+            text=diag.message,
+            checker=diag.source,
+            filename=uris.to_fs_path(uri),
+            line_number=diag.range.start.line,
+            column_number=diag.range.start.character,
+            error_code=diag.code,
+            severity="Error",
+        )

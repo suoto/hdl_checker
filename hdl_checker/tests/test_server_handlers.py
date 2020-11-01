@@ -24,15 +24,13 @@ import logging
 import os
 import os.path as p
 
-import six
-
 from mock import MagicMock, patch
+
 from webtest import TestApp  # type: ignore # pylint: disable=import-error
 
 from nose2.tools import such  # type: ignore
 
 from hdl_checker.tests import (
-    assertCountEqual,
     disableVunit,
     getTestTempPath,
     setupTestSuport,
@@ -60,9 +58,6 @@ def _path(*args):
 
 
 with such.A("hdl_checker bottle app") as it:
-    # Workaround for Python 2.x and 3.x differences
-    if six.PY2:
-        it.assertCountEqual = assertCountEqual(it)
 
     @it.has_setup
     def setup():

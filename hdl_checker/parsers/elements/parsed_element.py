@@ -60,14 +60,14 @@ class ParsedElement(HashableByKey):
         if a given location is within the element's text
         """
 
-    def includes(self, position):
-        # type: (Location) -> bool
+    def includes(self, line, column):
+        # type: (int, int) -> bool
         name_length = len(self)
 
         for location in self.locations:
-            if position.line != location.line:
+            if line != location.line:
                 continue
 
-            if location.column <= position.column < location.column + name_length:
+            if location.column <= column < location.column + name_length:
                 return True
         return False

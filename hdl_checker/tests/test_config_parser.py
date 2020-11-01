@@ -30,11 +30,10 @@ from threading import Thread
 from typing import Any, Iterator
 
 import mock
-import six
 
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import assertCountEqual, getTestTempPath, setupTestSuport
+from hdl_checker.tests import getTestTempPath, setupTestSuport
 
 from hdl_checker.builder_utils import BuilderName
 from hdl_checker.exceptions import UnknownParameterError
@@ -63,11 +62,6 @@ def fileWithContent(content):  # type: (bytes) -> Iterator[str]
 such.unittest.TestCase.maxDiff = None
 
 with such.A("config parser object") as it:
-
-    if six.PY2:
-        # Can't use assertCountEqual for lists of unhashable types.
-        # Workaround for https://bugs.python.org/issue10242
-        it.assertCountEqual = assertCountEqual(it)
 
     @it.has_setup
     def setup():

@@ -27,9 +27,6 @@ import six
 
 _logger = logging.getLogger(__name__)
 
-if six.PY2:
-    FileNotFoundError = OSError  # pylint: disable=redefined-builtin
-
 
 class Path(object):
     "Path helper class to speed up comparing different paths"

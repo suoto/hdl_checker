@@ -16,37 +16,50 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 # pylint: disable=missing-docstring
-# pylint: disable=wrong-import-position
-# pylint: disable=no-self-use
 # pylint: disable=protected-access
-# pylint: disable=function-redefined
 # pylint: disable=invalid-name
 
+import asyncio
 import json
 import logging
 import os
 import os.path as p
-import time
 from tempfile import mkdtemp
-from threading import Event, Timer
-from typing import Any
-
-import six
-from pyls import _utils  # type: ignore
-from pyls import lsp as defines
-from pyls import uris
-from pyls.workspace import Workspace  # type: ignore
-from pyls_jsonrpc.streams import JsonRpcStreamReader  # type: ignore
-from tabulate import tabulate
+from threading import Thread
+from typing import Any, List, Optional, Union
 
 import parameterized  # type: ignore
 import unittest2  # type: ignore
-from mock import MagicMock, patch
+from mock import Mock, patch
+from pygls import features, uris
+from pygls.server import LanguageServer
+from pygls.types import (
+    ClientCapabilities,
+    DiagnosticSeverity,
+    DidChangeTextDocumentParams,
+    DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams,
+    HoverAbstract,
+    HoverParams,
+    InitializeParams,
+    MarkupKind,
+    MessageType,
+    Position,
+    PublishDiagnosticsAbstract,
+    Range,
+    ReferenceContext,
+    ReferenceParams,
+    TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent,
+    TextDocumentIdentifier,
+    TextDocumentItem,
+    TextDocumentPositionParams,
+    VersionedTextDocumentIdentifier,
+)
+from tabulate import tabulate
 
-from nose2.tools import such  # type: ignore
-
+import hdl_checker
 from hdl_checker import DEFAULT_LIBRARY
-from hdl_checker.base_server import WatchedFile
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import (
     DesignUnitType,
@@ -58,31 +71,10 @@ from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location
 
 from hdl_checker.tests import (  # isort:skip
-    assertCountEqual,
+    toCheckerDiagnostic,
     getTestTempPath,
     setupTestSuport,
-    TestCase,
 )
-
-if six.PY3:
-    unicode = str
-
-# Debouncing will hurt testing since it won't actually call the debounced
-# function if we call it too quickly.
-def _debounce(interval_s, keyed_by=None):  # pylint: disable=unused-argument
-    def wrapper(func):
-        def debounced(*args, **kwargs):
-            result = func(*args, **kwargs)
-            _logger.info("%s(%s, %s) returned %s", func.__name__, args, kwargs, result)
-            return result
-
-        return debounced
-
-    return wrapper
-
-
-# Mock debounce before it's applied
-_utils.debounce = _debounce
 
 from hdl_checker import lsp  # isort:skip
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
@@ -90,72 +82,83 @@ from hdl_checker.utils import ON_WINDOWS  # isort:skip
 
 _logger = logging.getLogger(__name__)
 
-JSONRPC_VERSION = "2.0"
-LSP_MSG_TEMPLATE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "processId": None}
-
-LSP_MSG_EMPTY_RESPONSE = {"jsonrpc": JSONRPC_VERSION, "id": 1, "result": None}
-
-MOCK_WAIT_TIMEOUT = 5
-
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
+LSP_REQUEST_TIMEOUT = 3
+
+_CLIENT_CAPABILITIES = ClientCapabilities(
+    text_document=TextDocumentClientCapabilities(
+        synchronization=None,  # type: ignore
+        completion=None,  # type: ignore
+        hover=HoverAbstract(
+            dynamic_registration=False, content_format=[MarkupKind.PlainText,],
+        ),
+        signature_help=None,  # type:ignore
+        references=None,  # type:ignore
+        document_highlight=None,  # type:ignore
+        document_symbol=None,  # type:ignore
+        formatting=None,  # type:ignore
+        range_formatting=None,  # type:ignore
+        on_type_formatting=None,  # type:ignore
+        definition=None,  # type:ignore
+        type_definition=None,  # type:ignore
+        implementation=None,  # type:ignore
+        code_action=None,  # type:ignore
+        code_lens=None,  # type:ignore
+        document_link=None,  # type:ignore
+        color_provider=None,  # type:ignore
+        rename=None,  # type:ignore
+        publish_diagnostics=PublishDiagnosticsAbstract(related_information=True),
+        folding_range=None,  # type:ignore
+    )
+)
 
 if ON_WINDOWS:
     TEST_PROJECT = TEST_PROJECT.lower()
 
 
-class MockWaitTimeout(Exception):
-    def __init__(self, msg):
-        super(MockWaitTimeout, self).__init__(self)
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
-
-
 class TestCheckerDiagToLspDict(unittest2.TestCase):
     @parameterized.parameterized.expand(
         [
-            (DiagType.INFO, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_INFO, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_WARNING, defines.DiagnosticSeverity.Information),
-            (DiagType.STYLE_ERROR, defines.DiagnosticSeverity.Information),
-            (DiagType.WARNING, defines.DiagnosticSeverity.Warning),
-            (DiagType.ERROR, defines.DiagnosticSeverity.Error),
-            (DiagType.NONE, defines.DiagnosticSeverity.Error),
+            (DiagType.INFO, DiagnosticSeverity.Information),
+            (DiagType.STYLE_INFO, DiagnosticSeverity.Information),
+            (DiagType.STYLE_WARNING, DiagnosticSeverity.Information),
+            (DiagType.STYLE_ERROR, DiagnosticSeverity.Information),
+            (DiagType.WARNING, DiagnosticSeverity.Warning),
+            (DiagType.ERROR, DiagnosticSeverity.Error),
+            (DiagType.NONE, DiagnosticSeverity.Error),
         ]
     )
     def test_converting_to_lsp(self, diag_type, severity):
         # type: (...) -> Any
         _logger.info("Running %s and %s", diag_type, severity)
 
-        diag = CheckerDiagnostic(
-            checker="hdl_checker test",
-            text="some diag",
-            filename=Path("filename"),
-            line_number=0,
-            column_number=0,
-            error_code="error code",
-            severity=diag_type,
+        diag = lsp.checkerDiagToLspDict(
+            CheckerDiagnostic(
+                checker="hdl_checker test",
+                text="some diag",
+                filename=Path("filename"),
+                line_number=0,
+                column_number=0,
+                error_code="error code",
+                severity=diag_type,
+            )
         )
 
+        self.assertEqual(diag.code, "error code")
+        self.assertEqual(diag.source, "hdl_checker test")
+        self.assertEqual(diag.message, "some diag")
+        self.assertEqual(diag.severity, severity)
         self.assertEqual(
-            lsp.checkerDiagToLspDict(diag),
-            {
-                "source": "hdl_checker test",
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 0, "character": 0},
-                },
-                "message": "some diag",
-                "severity": severity,
-                "code": "error code",
-            },
+            diag.range,
+            Range(
+                start=Position(line=0, character=0), end=Position(line=0, character=0),
+            ),
         )
 
-    def test_workspace_notify(self):
-        # type: (...) -> Any
-        workspace = MagicMock(spec=Workspace)
+    def test_workspace_notify(self) -> None:  # pylint: disable=no-self-use
+        workspace = Mock()
+        workspace.show_message = Mock()
 
         server = lsp.Server(
             workspace, root_dir=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
@@ -163,373 +166,361 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         workspace.show_message.reset_mock()
 
         server._handleUiInfo("some info")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with(
-            "some info", defines.MessageType.Info
-        )
+        workspace.show_message.assert_called_once_with("some info", MessageType.Info)
         workspace.show_message.reset_mock()
 
         server._handleUiWarning("some warning")  # pylint: disable=protected-access
         workspace.show_message.assert_called_once_with(
-            "some warning", defines.MessageType.Warning
+            "some warning", MessageType.Warning
         )
         workspace.show_message.reset_mock()
 
         server._handleUiError("some error")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with(
-            "some error", defines.MessageType.Error
-        )
+        workspace.show_message.assert_called_once_with("some error", MessageType.Error)
 
 
-such.unittest.TestCase.maxDiff = None
-
-with such.A("LSP server") as it:
-    if six.PY2:
-        it.assertCountEqual = assertCountEqual(it)
-
-    def _initializeServer(server, params=None):
-        it.assertEqual(
-            server.m_initialize(**(params or {})),
-            {
-                "capabilities": {
-                    "textDocumentSync": 1,
-                    "definitionProvider": True,
-                    "hoverProvider": True,
-                    "referencesProvider": True,
-                }
-            },
-        )
-
-        with patch("hdl_checker.lsp.onNewReleaseFound"):
-            it.assertEqual(server.m_initialized(), None)
-
-    def startLspServer():
-        _logger.debug("Creating server")
-        tx_r, tx_w = os.pipe()
-        it.tx = JsonRpcStreamReader(os.fdopen(tx_r, "rb"))
-
-        it.rx = MagicMock()
-        it.rx.closed = False
-
-        it.server = lsp.HdlCheckerLanguageServer(it.rx, os.fdopen(tx_w, "wb"))
-
-    def stopLspServer():
-        _logger.debug("Shutting down server")
-        msg = LSP_MSG_TEMPLATE.copy()
-        msg.update({"method": "exit"})
-        it.server._endpoint.consume(msg)
-
-        # Close the pipe from the server to stdout and empty any pending
-        # messages
-        it.tx.close()
-        it.tx.listen(_logger.fatal)
-
-        del it.server
-
-    def _waitOnMockCall(meth):
-        event = Event()
-
-        timer = Timer(MOCK_WAIT_TIMEOUT, event.set)
-        timer.start()
-
-        result = []
-        while not event.isSet():
-            if meth.mock_calls:
-                result = meth.mock_calls[0]
-                timer.cancel()
-                break
-
-            time.sleep(0.1)
-
-        if event.isSet():
-            _logger.error("Timed out waiting for %s", meth)
-            raise MockWaitTimeout("Timeout waiting for %s" % meth)
-
-        return result
-
-    def checkLintFileOnOpen(source):
-        return checkLintFileOnMethod(source, "m_text_document__did_open")
-
-    def checkLintFileOnSave(source):
-        return checkLintFileOnMethod(source, "m_text_document__did_save")
-
-    def checkLintFileOnMethod(source, method):
-        with patch.object(it.server.workspace, "publish_diagnostics"):
-            _logger.info("Sending %s request", method)
-            getattr(it.server, method)(
-                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
-            )
-
-            mock_call = _waitOnMockCall(it.server.workspace.publish_diagnostics)
-            doc_uri, diagnostics = mock_call[1]
-            _logger.info("doc_uri: %s", doc_uri)
-            _logger.info("diagnostics: %s", diagnostics)
-
-            it.assertEqual(doc_uri, uris.from_fs_path(source))
-            return diagnostics
-
-    @it.has_setup
-    def setup():
+class _LspHelper(unittest2.TestCase):
+    def _createClientServerPair(self, params: Optional[InitializeParams]):
+        # pylint: disable=attribute-defined-outside-init
         setupTestSuport(TEST_TEMP_PATH)
-
-    @it.should("show info and warning messages")
-    @patch("pyls.workspace.Workspace.show_message")
-    def test(show_message):
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-        )
-
-        # Initialization calls
-        show_message.assert_called_with(
-            "Searching %s for HDL files..." % TEST_PROJECT, defines.MessageType.Info
-        )
-
-        show_message.reset_mock()
-
-        it.server.showWarning("some warning")
-        show_message.assert_called_once_with(
-            "some warning", defines.MessageType.Warning
-        )
-
-        stopLspServer()
-
-    with it.having("root URI set but no project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        import hdl_checker
-
-        @it.should("search for files on initialization")  # type: ignore
-        @patch.object(WatchedFile, "__init__", return_value=None)
-        @patch.object(
-            hdl_checker.config_generators.base_generator.BaseGenerator, "generate"
-        )
-        @patch("hdl_checker.base_server.json.dump", spec=json.dump)
-        def test(dump, generate, watched_file):
-            _initializeServer(
-                it.server, params={"rootUri": uris.from_fs_path(TEST_PROJECT)}
-            )
-            watched_file.assert_called_once()
-            generate.assert_called_once()
-            # Will get called twice
-            dump.assert_called()
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    with it.having("an existing and valid old style project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            _initializeServer(
-                it.server,
-                params={
-                    "rootUri": uris.from_fs_path(TEST_PROJECT),
-                    "initializationOptions": {"project_file": "vimhdl.prj"},
-                },
-            )
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    with it.having("a non existing project file"):
-
-        @it.has_setup
-        def setup():
-            startLspServer()
-
-        @it.has_teardown
-        def teardown():
-            stopLspServer()
-
-        @it.should("respond capabilities upon initialization")  # type: ignore
-        def test():
-            it.project_file = "__some_project_file.prj"
-            it.assertFalse(p.exists(it.project_file))
-
-            _initializeServer(
-                it.server,
-                params={
-                    "rootUri": uris.from_fs_path(TEST_PROJECT),
-                    "initializationOptions": {"project_file": it.project_file},
-                },
-            )
-
-        @it.should("lint file when opening it")  # type: ignore
-        def test():
-            source = p.join(TEST_PROJECT, "another_library", "foo.vhd")
-
-            with patch(
-                "hdl_checker.lsp.Server.getMessagesByPath",
-                return_value=[
-                    CheckerDiagnostic(filename=Path(source), text="some text")
-                ],
-            ) as meth:
-                it.assertCountEqual(
-                    checkLintFileOnOpen(source),
-                    [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
-                )
-                meth.assert_called_once_with(Path(source))
-
-    @it.should("lint file with neither root URI nor project file set")  # type: ignore
-    def test():
-        startLspServer()
-
-        _initializeServer(
-            it.server, params={"initializationOptions": {"project_file": None}}
-        )
-
-        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-        checkLintFileOnOpen(source)
-
-        stopLspServer()
-
-    @it.should("lint file with no root URI but project file set")  # type: ignore
-    def test():
-        startLspServer()
-
-        _initializeServer(
-            it.server,
-            params={
-                "rootUri": None,
-                "initializationOptions": {
-                    "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
-                },
-            },
-        )
-
-        source = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
-        checkLintFileOnOpen(source)
-
-        stopLspServer()
-
-
-class TestValidProject(TestCase):
-
-    params = {
-        "rootUri": uris.from_fs_path(TEST_PROJECT),
-        "initializationOptions": {"project_file": "config.json"},
-    }
-
-    def setUp(self):
-        setupTestSuport(TEST_TEMP_PATH)
-
         _logger.debug("Creating server")
-        tx_r, tx_w = os.pipe()
-        self.tx_stream_reader = JsonRpcStreamReader(os.fdopen(tx_r, "rb"))
 
-        rx_stream = MagicMock()
-        rx_stream.closed = False
+        # Client to Server pipe
+        csr, csw = os.pipe()
+        # Server to client pipe
+        scr, scw = os.pipe()
 
-        self.server = lsp.HdlCheckerLanguageServer(rx_stream, os.fdopen(tx_w, "wb"))
+        # Setup server
+        self.server = lsp.HdlCheckerLanguageServer()
+        lsp.setupLanguageServerFeatures(self.server)
 
-        # Initialize server
-        _logger.info("Calling m_initialize")
-        self.assertEqual(
-            self.server.m_initialize(**(self.params or {})),
-            {
-                "capabilities": {
-                    "textDocumentSync": 1,
-                    "definitionProvider": True,
-                    "hoverProvider": True,
-                    "referencesProvider": True,
-                }
-            },
+        self.server_diagnostics = []  # type: ignore
+
+        @self.server.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+        def server_cb_publish_diags(diag):  # pylint: disable=unused-variable
+            _logger.fatal("Publishing diagnostic: %s", diag)
+            self.server_diagnostics.append(diag)
+
+        self.server_thread = Thread(
+            target=self.server.start_io,
+            args=(os.fdopen(csr, "rb"), os.fdopen(scw, "wb")),
         )
 
-        _logger.info("Calling m_initialized")
-        with patch("hdl_checker.lsp.onNewReleaseFound"):
-            self.assertIsNone(self.server.m_initialized())
+        self.server_thread.daemon = True
+        self.server_thread.name = "server"
+        self.server_thread.start()
 
-    def teardown(self):
-        _logger.debug("Shutting down server")
-        msg = LSP_MSG_TEMPLATE.copy()
-        msg.update({"method": "exit"})
-        self.server._endpoint.consume(msg)
+        # Add thread id to the server (just for testing)
+        self.server.thread_id = self.server_thread.ident  # type: ignore
 
-        # Close the pipe from the server to stdout and empty any pending
-        # messages
-        self.tx_stream_reader.close()
-        self.tx_stream_reader.listen(_logger.fatal)
+        # Setup client (client doesn't need the HDL checker stuff)
+        self.client = LanguageServer(asyncio.new_event_loop())
+        self.client_messages = []  # type: ignore
+        self.client_diagnostics = []  # type: ignore
 
+        @self.client.feature(features.WINDOW_SHOW_MESSAGE)
+        def _show_message(*args):  # pylint: disable=unused-variable
+            type_ = DiagnosticSeverity(args[0][0])
+            msg = args[0][1]
+            _logger.warning("[Client] [%s]: %s", type_, msg)
+            self.client_messages.append((type_, msg))
+
+        @self.client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+        def client_cb_publish_diags(diag):  # pylint: disable=unused-variable
+            _logger.warning("Publishing diagnostic: %s", diag)
+            self.client_diagnostics.append(diag)
+
+        self.client_thread = Thread(
+            target=self.client.start_io,
+            args=(os.fdopen(scr, "rb"), os.fdopen(csw, "wb")),
+        )
+
+        self.client_thread.daemon = True
+        self.client_thread.name = "client"
+        self.client_thread.start()
+
+        if params is None:
+            _logger.info("No parameters given, won't initialize server")
+            return
+
+        _logger.info("Sending initialize request")
+        self.client.lsp.send_request(features.INITIALIZE, params).result(
+            LSP_REQUEST_TIMEOUT
+        )
+
+        _logger.info("Sending initialized request")
+        self.client.lsp.send_request(features.INITIALIZED).result(LSP_REQUEST_TIMEOUT)
+        _logger.info("Client server setup complete")
+
+    def tearDown(self):
+        if not getattr(self, "client", None):
+            return
+        _logger.warning("Shutting down server")
+        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
+            LSP_REQUEST_TIMEOUT
+        )
+        self.client.lsp.notify(features.EXIT)
+        _logger.debug(
+            "Threads status: server: %s, client: %s",
+            self.server_thread.is_alive(),
+            self.client_thread.is_alive(),
+        )
+        self.assertIsNone(shutdown_response)
         del self.server
 
-    def _checkLintFileOnOpen(self, source):
-        return self._checkLintFileOnMethod(source, "m_text_document__did_open")
+    def checkLintFileOnMethod(
+        self,
+        params: Union[
+            DidOpenTextDocumentParams,
+            DidSaveTextDocumentParams,
+            DidChangeTextDocumentParams,
+        ],
+        expected_diags=List[CheckerDiagnostic],
+    ):
+        """
+        Generic method to check diagnostics reported are correct
+        """
+        filename = uris.to_fs_path(params.textDocument.uri)
+        _logger.info("Checking lint of file %s, event is %s", filename, type(params))
+        assert isinstance(
+            params,
+            (
+                DidOpenTextDocumentParams,
+                DidSaveTextDocumentParams,
+                DidChangeTextDocumentParams,
+            ),
+        )
 
-    def _checkLintFileOnSave(self, source):
-        return self._checkLintFileOnMethod(source, "m_text_document__did_save")
+        if isinstance(params, DidOpenTextDocumentParams):
+            method = features.TEXT_DOCUMENT_DID_OPEN
+        elif isinstance(params, DidSaveTextDocumentParams):
+            method = features.TEXT_DOCUMENT_DID_SAVE
+        else:
+            method = features.TEXT_DOCUMENT_DID_CHANGE
 
-    def _checkLintFileOnMethod(self, source, method):
-        with patch.object(self.server.workspace, "publish_diagnostics"):
-            _logger.info("Sending %s request", method)
-            getattr(self.server, method)(
-                textDocument={"uri": unicode(uris.from_fs_path(source)), "text": None}
+        self.assertFalse(
+            self.client_diagnostics, "Client shoult not have diagnostics by now"
+        )
+
+        _logger.info("Patching %s with %s", "getMessagesByPath", list(expected_diags))
+        with patch.object(
+            self.server.checker, "getMessagesByPath", return_value=list(expected_diags),
+        ):
+            self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)
+
+            self.assertTrue(
+                self.client_diagnostics, "Expected client to have diagnostics"
             )
+            diags: List[CheckerDiagnostic] = []
+            while self.client_diagnostics:
+                diag = self.client_diagnostics.pop()
+                diags += list(toCheckerDiagnostic(diag[0], diag[1]))
 
-            mock_call = _waitOnMockCall(self.server.workspace.publish_diagnostics)
-            doc_uri, diagnostics = mock_call[1]
-            _logger.info("doc_uri: %s", doc_uri)
-            _logger.info("diagnostics: %s", diagnostics)
+            _logger.info("Expected: %d => %s", len(expected_diags), expected_diags)
+            _logger.info("Got:      %d => %s", len(diags), diags)
+            self.assertFalse(set(expected_diags) - set(diags))
 
-            self.assertEqual(doc_uri, uris.from_fs_path(source))
-            return diagnostics
+    def _runDidOpenCheck(self, source: Optional[Path]):
+        self.checkLintFileOnMethod(
+            DidOpenTextDocumentParams(
+                TextDocumentItem(
+                    uris.from_fs_path(source), language_id="vhdl", version=0, text="",
+                )
+            ),
+            [
+                CheckerDiagnostic(
+                    text="testing clk en gen",
+                    filename=source,
+                    line_number=0,
+                    column_number=0,
+                ),
+            ],
+        )
 
-    def test_LintFileOnOpening(self):
-        source = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
-        with patch(
-            "hdl_checker.lsp.Server.getMessagesByPath",
-            return_value=[CheckerDiagnostic(filename=Path(source), text="some text")],
-        ) as meth:
-            self.assertCountEqual(
-                self._checkLintFileOnOpen(source),
-                [lsp.checkerDiagToLspDict(CheckerDiagnostic(text="some text"))],
+    def _runDidSaveCheck(self, source: Optional[Path]):
+        self.checkLintFileOnMethod(
+            DidSaveTextDocumentParams(
+                text_document=TextDocumentIdentifier(uris.from_fs_path(source)),
+                text="Hello",
+            ),
+            [
+                CheckerDiagnostic(
+                    text="testing clk en gen",
+                    filename=source,
+                    line_number=0,
+                    column_number=0,
+                ),
+            ],
+        )
+
+    def _runDidChangeCheck(self, source: Optional[Path]):
+        self.checkLintFileOnMethod(
+            DidChangeTextDocumentParams(
+                VersionedTextDocumentIdentifier(uris.from_fs_path(source), version=1,),
+                [
+                    TextDocumentContentChangeEvent(
+                        range=Range(Position(0, 0), Position(1, 1))
+                    ),
+                ],
+            ),
+            [
+                CheckerDiagnostic(
+                    text="post change diag",
+                    filename=source,
+                    line_number=1,
+                    column_number=2,
+                ),
+            ],
+        )
+
+    def test_LintFileOnOpen(self):  # pylint: disable=inconsistent-return-statements
+        if not getattr(self, "server", None):
+            return unittest2.skip("Won't run this on the helper")
+        self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
+
+    def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
+        if not getattr(self, "server", None):
+            return unittest2.skip("Won't run this on the helper")
+        self._runDidSaveCheck(
+            p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+        )
+
+    def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
+        if not getattr(self, "server", None):
+            return unittest2.skip("Won't run this on the helper")
+        self._runDidOpenCheck(
+            p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+        )
+        self._runDidChangeCheck(
+            p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+        )
+
+
+class TestRootUriNoProjectFile(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+
+        self.patches = (
+            patch.object(
+                hdl_checker.config_generators.base_generator.BaseGenerator, "generate",
+            ),
+            patch("hdl_checker.base_server.json.dump", spec=json.dump),
+        )
+
+        for _patch in self.patches:
+            _patch.start()
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1234,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=uris.from_fs_path(TEST_PROJECT),
             )
+        )
 
-            meth.assert_called_once_with(Path(source))
+        self.maxDiff = None
+
+    def tearDown(self):
+        _logger.warning("Shutting down server")
+        for _patch in self.patches:
+            _patch.stop()
+        super(TestRootUriNoProjectFile, self).tearDown()
+
+    def test_SearchesForFilesOnInitialization(self):  # pylint: disable=no-self-use
+        lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
+        #  Will get called twice
+        hdl_checker.base_server.json.dump.assert_called()  # pylint: disable=no-member
+
+
+class TestOldStyleProjectFile(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1235,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=uris.from_fs_path(TEST_PROJECT),
+                initialization_options={"project_file": "vimhdl.prj"},
+            ),
+        )
+
+        self.maxDiff = None
+
+
+class TestNonExistingProjectFile(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+        self.project_file = "__some_project_file.prj"
+        self.assertFalse(p.exists(self.project_file))
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1236,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=uris.from_fs_path(TEST_PROJECT),
+                initialization_options={"project_file": self.project_file},
+            ),
+        )
+
+
+class TestNoRootNoProjectFile(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+        self.project_file = "__some_project_file.prj"
+        self.assertFalse(p.exists(self.project_file))
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1236,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=None,
+                initialization_options={"project_file": None},
+            ),
+        )
+
+
+class TestNoRootWithProjectFile(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+        self.project_file = "__some_project_file.prj"
+        self.assertFalse(p.exists(self.project_file))
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1237,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=None,
+                initialization_options={
+                    "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
+                },
+            ),
+        )
+
+
+class TestValidProject(_LspHelper):
+    def setUp(self):
+        setupTestSuport(TEST_TEMP_PATH)
+        _logger.debug("Creating server")
+        self.project_file = "__some_project_file.prj"
+        self.assertFalse(p.exists(self.project_file))
+
+        self._createClientServerPair(
+            InitializeParams(
+                process_id=1238,
+                capabilities=_CLIENT_CAPABILITIES,
+                root_uri=uris.from_fs_path(TEST_PROJECT),
+                initialization_options={"project_file": "config.json"},
+            ),
+        )
 
     def runTestBuildSequenceTable(self, tablefmt):
+        _logger.fatal("############################################")
         very_common_pkg = Path(
             p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
         )
@@ -550,11 +541,16 @@ class TestValidProject(TestCase):
             ),
         ]
 
-        self.assertEqual(
-            self.server._getBuildSequenceForHover(clk_en_generator), "\n".join(expected)
-        )
+        self.maxDiff = None
+        try:
+            got = self.server._getBuildSequenceForHover(clk_en_generator)
+            self.assertEqual(got, "\n".join(expected))
+        except:
+            _logger.error(
+                "Gotten\n\n%s\n\nExpected\n\n%s\n\n", got, "\n".join(expected)
+            )
+            raise
 
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 0)
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
@@ -562,13 +558,54 @@ class TestValidProject(TestCase):
     def test_ReportBuildSequencePlain(self):
         self.runTestBuildSequenceTable(tablefmt="plain")
 
-    @patch("hdl_checker.lsp.HdlCheckerLanguageServer._use_markdown_for_hover", 1)
+    @patch(
+        "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
+        (Identifier("ieee"),),
+    )
+    def test_ReportBuildSequenceFallback(self):
+        with patch.object(self.server, "client_capabilities", None):
+            self.runTestBuildSequenceTable(tablefmt="plain")
+
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
     def test_ReportBuildSequenceMarkdown(self):
-        self.runTestBuildSequenceTable(tablefmt="github")
+        with patch.object(
+            self.server,
+            "client_capabilities",
+            ClientCapabilities(
+                text_document=TextDocumentClientCapabilities(
+                    synchronization=None,
+                    completion=None,
+                    hover=HoverAbstract(
+                        dynamic_registration=False,
+                        # This is what we really need
+                        content_format=[MarkupKind.Markdown,],
+                    ),
+                    signature_help=None,
+                    references=None,
+                    document_highlight=None,
+                    document_symbol=None,
+                    formatting=None,
+                    range_formatting=None,
+                    on_type_formatting=None,
+                    definition=None,
+                    type_definition=None,
+                    implementation=None,
+                    code_action=None,
+                    code_lens=None,
+                    document_link=None,
+                    color_provider=None,
+                    rename=None,
+                    publish_diagnostics=PublishDiagnosticsAbstract(
+                        related_information=True
+                    ),
+                    folding_range=None,
+                )
+            ),
+        ):
+            self.runTestBuildSequenceTable(tablefmt="github")
 
     @patch.object(
         hdl_checker.base_server.BaseServer,
@@ -606,7 +643,7 @@ class TestValidProject(TestCase):
             'Path "some_path", library "some_library"',
         )
 
-    def test_ReportDesignUnitAccordingToPosition(self):
+    def test_ReportDesignUnitAccordingToPosition(self) -> None:
         UNIT_A = VhdlDesignUnit(
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             type_=DesignUnitType.entity,
@@ -637,12 +674,12 @@ class TestValidProject(TestCase):
 
         def getDesignUnitsByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
-                it.fail("Expected foo.vhd but got %s" % path)
+                self.fail("Expected foo.vhd but got %s" % path)
             return {UNIT_A, UNIT_B}
 
         def getDependenciesByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
-                it.fail("Expected foo.vhd but got %s" % path)
+                self.fail("Expected foo.vhd but got %s" % path)
             return {DEP_A, DEP_B}
 
         patches = (
@@ -664,49 +701,49 @@ class TestValidProject(TestCase):
             _patch.start()
 
         # Check locations outside return nothing
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(0, 0)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(0, 0)))
 
         # Check design units are found, ensure boundaries match
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 1)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(1, 2)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(1, 7)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 8)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 1)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(1, 2)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(1, 7)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 8)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 3)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(3, 4)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(3, 9)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 10)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 3)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(3, 4)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(3, 9)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 10)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 5)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(5, 6)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(5, 11)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 12)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 5)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(5, 6)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(5, 11)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 12)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 7)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(7, 8)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(7, 13)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 14)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 7)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(7, 8)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(7, 13)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 14)))
 
         # Now check dependencies
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 9)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(9, 10)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(9, 20)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 21)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 9)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(9, 10)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(9, 20)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 21)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 11)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(11, 12)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(11, 22)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 23)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 11)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(11, 12)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(11, 22)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 23)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 13)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(13, 14)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(13, 24)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 25)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 13)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(13, 14)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(13, 24)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 25)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 15)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(15, 16)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(15, 26)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 27)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 15)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(15, 16)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(15, 26)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 27)))
 
         for _patch in patches:
             _patch.stop()
@@ -716,9 +753,18 @@ class TestValidProject(TestCase):
         (Identifier("ieee"),),
     )
     def test_HoverOnInvalidRange(self):
-        path = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         self.assertIsNone(
-            self.server.hover(uris.from_fs_path(path), {"line": 0, "character": 0})
+            self.client.lsp.send_request(
+                features.HOVER,
+                HoverParams(
+                    TextDocumentIdentifier(
+                        uris.from_fs_path(
+                            p.join(TEST_PROJECT, "another_library", "foo.vhd")
+                        )
+                    ),
+                    Position(line=0, character=0),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
         )
 
     @patch(
@@ -748,11 +794,17 @@ class TestValidProject(TestCase):
             ),
         ]
 
-        self.assertDictEqual(
-            self.server.hover(
-                uris.from_fs_path(path_to_foo), {"line": 7, "character": 7}
-            ),
-            {"contents": "\n".join(expected)},
+        self.assertEqual(
+            self.client.lsp.send_request(
+                features.HOVER,
+                HoverParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(line=7, character=7),
+                ),
+            )
+            .result(LSP_REQUEST_TIMEOUT)
+            .contents,
+            "\n".join(expected),
         )
 
     @patch(
@@ -763,11 +815,17 @@ class TestValidProject(TestCase):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
 
-        self.assertDictEqual(
-            self.server.hover(
-                uris.from_fs_path(path_to_foo), {"line": 32, "character": 32}
-            ),
-            {"contents": 'Path "%s", library "basic_library"' % clock_divider},
+        self.assertEqual(
+            self.client.lsp.send_request(
+                features.HOVER,
+                HoverParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(line=32, character=32),
+                ),
+            )
+            .result(LSP_REQUEST_TIMEOUT)
+            .contents,
+            'Path "%s", library "basic_library"' % clock_divider,
         )
 
     @patch(
@@ -778,58 +836,60 @@ class TestValidProject(TestCase):
         source = p.join(TEST_PROJECT, "basic_library", "use_entity_a_and_b.vhd")
         target = p.join(TEST_PROJECT, "basic_library", "two_entities_one_file.vhd")
 
-        definitions = self.server.definitions(
-            uris.from_fs_path(source), {"line": 1, "character": 9}
+        definitions = {
+            (
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.DEFINITION,
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(source)), Position(1, 9),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        }
+
+        self.assertIn(
+            (uris.from_fs_path(target), 1, 7, 1, 15), definitions,
         )
 
         self.assertIn(
-            {
-                "uri": uris.from_fs_path(target),
-                "range": {
-                    "start": {"line": 1, "character": 7},
-                    "end": {"line": 1, "character": 15},
-                },
-            },
-            definitions,
-        )
-
-        self.assertIn(
-            {
-                "uri": uris.from_fs_path(target),
-                "range": {
-                    "start": {"line": 4, "character": 7},
-                    "end": {"line": 4, "character": 15},
-                },
-            },
-            definitions,
+            (uris.from_fs_path(target), 4, 7, 4, 15), definitions,
         )
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
-    def test_GetDefinitionBuiltInLibrary(self):
+    def test_GetDefinitionBuiltInLibrary(self) -> None:
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-        self.assertEqual(
+        self.assertFalse(
             self.server.definitions(
-                uris.from_fs_path(path_to_foo), {"line": 3, "character": 15}
-            ),
-            [],
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(3, 15),
+                )
+            )
         )
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
-    def test_GetDefinitionNotKnown(self):
+    def test_GetDefinitionNotKnown(self) -> None:
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-        self.assertEqual(
+        self.assertFalse(
             self.server.definitions(
-                uris.from_fs_path(path_to_foo), {"line": 0, "character": 0}
-            ),
-            [],
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(0, 0),
+                )
+            )
         )
 
     @patch.object(
@@ -844,86 +904,97 @@ class TestValidProject(TestCase):
             )
         ],
     )
-    def test_ReferencesOfAValidElement(self, get_references):
+    def test_ReferencesOfAValidElement(self, get_references) -> Any:
+        # We'll pass the path to foo.vhd but we're patching the
+        # getReferencesToDesignUnit to return "some_path"
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure we picked up an existing element
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(7, 7))
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(7, 7))
         self.assertIsNotNone(unit)
 
-        self.assertCountEqual(
-            self.server.references(
-                doc_uri=uris.from_fs_path(path_to_foo),
-                position={"line": 7, "character": 7},
-                exclude_declaration=True,
-            ),
+        references = [
             (
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 1, "character": 2},
-                        "end": {"line": 1, "character": 2},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 3, "character": 4},
-                        "end": {"line": 3, "character": 4},
-                    },
-                },
-            ),
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.REFERENCES,
+                ReferenceParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(7, 7),
+                    ReferenceContext(include_declaration=False),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        ]
+
+        self.assertCountEqual(
+            references,
+            {
+                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+            },
         )
 
         get_references.assert_called_once()
         get_references.reset_mock()
 
-        self.assertCountEqual(
-            self.server.references(
-                doc_uri=uris.from_fs_path(path_to_foo),
-                position={"line": 7, "character": 7},
-                exclude_declaration=False,
-            ),
+        references = [
             (
-                {
-                    "uri": uris.from_fs_path(path_to_foo),
-                    "range": {
-                        "start": {"line": 7, "character": 7},
-                        "end": {"line": 7, "character": 7},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 1, "character": 2},
-                        "end": {"line": 1, "character": 2},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 3, "character": 4},
-                        "end": {"line": 3, "character": 4},
-                    },
-                },
-            ),
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.REFERENCES,
+                ReferenceParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(7, 7),
+                    ReferenceContext(include_declaration=True),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        ]
+
+        self.assertCountEqual(
+            references,
+            {
+                (uris.from_fs_path(path_to_foo), 7, 7, 7, 7),
+                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+            },
         )
 
     def test_ReferencesOfAnInvalidElement(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure there's no element at this location
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(0, 0))
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(0, 0))
         self.assertIsNone(unit)
 
-        for exclude_declaration in (True, False):
+        for include_declaration in (False, True):
             self.assertIsNone(
                 self.server.references(
-                    doc_uri=uris.from_fs_path(path_to_foo),
-                    position={"line": 0, "character": 0},
-                    exclude_declaration=exclude_declaration,
+                    ReferenceParams(
+                        TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                        Position(0, 0),
+                        ReferenceContext(include_declaration=include_declaration),
+                    )
                 )
             )
 
+    def test_changeConfiguration(self):
+        # pylint: disable=no-member
+        with patch.object(self.server, "onConfigUpdate"):
+            self.client.lsp.send_request(
+                features.WORKSPACE_DID_CHANGE_CONFIGURATION, {"foo": "bar"}
+            ).result(LSP_REQUEST_TIMEOUT)
 
-it.createTests(globals())
+            self.assertIn(
+                "bar", {x[0].foo for x in self.server.onConfigUpdate.call_args if x},
+            )
+        # pylint: enable=no-member

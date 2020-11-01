@@ -28,9 +28,7 @@ import tempfile
 import time
 from pprint import pformat
 
-import six
-
-from mock import call, patch
+from mock import patch
 
 from nose2.tools import such  # type: ignore
 
@@ -40,7 +38,6 @@ from hdl_checker.tests import (
     MockBuilder,
     PatchBuilder,
     SourceMock,
-    assertCountEqual,
     assertSameFile,
     getTestTempPath,
     linuxOnly,
@@ -79,12 +76,6 @@ _logger = logging.getLogger(__name__)
 TEST_TEMP_PATH = getTestTempPath(__name__)
 TEST_PROJECT = p.join(TEST_TEMP_PATH, "test_project")
 
-if six.PY2:
-    FileNotFoundError = (  # pylint: disable=redefined-builtin,invalid-name
-        IOError,
-        OSError,
-    )
-
 
 class _SourceMock(SourceMock):
     base_path = TEST_TEMP_PATH
@@ -119,9 +110,6 @@ def _makeConfigFromDict(dict_):
 such.unittest.TestCase.maxDiff = None
 
 with such.A("hdl_checker project") as it:
-    if six.PY2:
-        it.assertCountEqual = assertCountEqual(it)
-
     it.assertSameFile = assertSameFile(it)
 
     @it.should("warn when setup is taking too long")
@@ -337,12 +325,13 @@ with such.A("hdl_checker project") as it:
                 }
             )
 
-            it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
+            with PatchBuilder():
+                it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
 
         @it.should("use MockBuilder builder")  # type: ignore
         def test():
-            with PatchBuilder():
-                it.assertIsInstance(it.project.builder, MockBuilder)
+            # Just to make sure patch worked
+            it.assertEqual(it.project.builder.builder_name, MockBuilder.builder_name)
 
         @it.should("save cache after checking a source")  # type: ignore
         def test():
@@ -433,23 +422,10 @@ with such.A("hdl_checker project") as it:
             # Try to recreate
             project = DummyServer(root_dir)
 
-            if six.PY2:
-                it.assertIn(
-                    call(
-                        "Unable to recover cache from '{}': "
-                        "No JSON object could be decoded".format(cache_filename)
-                    ),
-                    handle_ui_warning.mock_calls,
-                )
-                it.assertIn(
-                    call(hdl_checker.base_server._PYTHON_27_WARNING_MSG),
-                    handle_ui_warning.mock_calls,
-                )
-            else:
-                handle_ui_warning.assert_called_once_with(
-                    "Unable to recover cache from '{}': "
-                    "Expecting value: line 1 column 1 (char 0)".format(cache_filename)
-                )
+            handle_ui_warning.assert_called_once_with(
+                "Unable to recover cache from '{}': "
+                "Expecting value: line 1 column 1 (char 0)".format(cache_filename)
+            )
 
             it.assertIsInstance(project.builder, Fallback)
 
