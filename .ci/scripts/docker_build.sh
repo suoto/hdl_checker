@@ -50,6 +50,7 @@ function setup_msim {
   download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
 
   if [ ! -f "$CONTEXT/msim/modelsim_ase/linuxaloem/vsim" ]; then
+    chmod +x "$DOWNLOAD_DIR/$installer"
     "$DOWNLOAD_DIR/$installer" --mode unattended \
           --modelsim_edition modelsim_ase        \
           --accept_eula 1                        \

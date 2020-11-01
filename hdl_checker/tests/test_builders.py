@@ -509,7 +509,7 @@ class TestBuilder(TestCase):
                         builder_name=self.builder_name,
                         text="entity 'source_with_error' was not analysed",
                         line_number=17,
-                        column_number=13,
+                        column_number=34,
                         severity=DiagType.ERROR,
                     ),
                 }

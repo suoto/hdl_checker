@@ -57,7 +57,7 @@ WORKDIR $BUILDERS
 
 # Build GHDL from source
 WORKDIR /tmp/
-RUN git clone --depth=1 --branch=v0.36 https://github.com/ghdl/ghdl
+RUN git clone --depth=1 --branch=v0.37.0 https://github.com/ghdl/ghdl
 WORKDIR /tmp/ghdl
 WORKDIR /tmp/ghdl/build
 
