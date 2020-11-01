@@ -50,10 +50,13 @@ from pygls.types import (
     Position,
     PublishDiagnosticsAbstract,
     Range,
+    ReferenceContext,
+    ReferenceParams,
     TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent,
     TextDocumentIdentifier,
     TextDocumentItem,
+    TextDocumentPositionParams,
     VersionedTextDocumentIdentifier,
 )
 from tabulate import tabulate
@@ -644,7 +647,7 @@ class TestValidProject(_LspHelper):
             'Path "some_path", library "some_library"',
         )
 
-    def test_ReportDesignUnitAccordingToPosition(self):
+    def test_ReportDesignUnitAccordingToPosition(self) -> None:
         UNIT_A = VhdlDesignUnit(
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             type_=DesignUnitType.entity,
@@ -702,49 +705,49 @@ class TestValidProject(_LspHelper):
             _patch.start()
 
         # Check locations outside return nothing
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(0, 0)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(0, 0)))
 
         # Check design units are found, ensure boundaries match
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 1)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(1, 2)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(1, 7)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(1, 8)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 1)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(1, 2)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(1, 7)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 8)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 3)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(3, 4)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(3, 9)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(3, 10)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 3)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(3, 4)), UNIT_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(3, 9)), UNIT_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 10)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 5)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(5, 6)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(5, 11)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(5, 12)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 5)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(5, 6)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(5, 11)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 12)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 7)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(7, 8)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(7, 13)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(7, 14)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 7)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(7, 8)), UNIT_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(7, 13)), UNIT_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 14)))
 
         # Now check dependencies
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 9)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(9, 10)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(9, 20)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(9, 21)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 9)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(9, 10)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(9, 20)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 21)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 11)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(11, 12)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Location(11, 22)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(11, 23)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 11)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(11, 12)), DEP_A)
+        self.assertIs(self.server._getElementAtPosition(path, Position(11, 22)), DEP_A)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 23)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 13)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(13, 14)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(13, 24)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(13, 25)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 13)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(13, 14)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(13, 24)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 25)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 15)))
-        self.assertIs(self.server._getElementAtPosition(path, Location(15, 16)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Location(15, 26)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Location(15, 27)))
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 15)))
+        self.assertIs(self.server._getElementAtPosition(path, Position(15, 16)), DEP_B)
+        self.assertIs(self.server._getElementAtPosition(path, Position(15, 26)), DEP_B)
+        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 27)))
 
         for _patch in patches:
             _patch.stop()
@@ -837,58 +840,60 @@ class TestValidProject(_LspHelper):
         source = p.join(TEST_PROJECT, "basic_library", "use_entity_a_and_b.vhd")
         target = p.join(TEST_PROJECT, "basic_library", "two_entities_one_file.vhd")
 
-        definitions = self.server.definitions(
-            uris.from_fs_path(source), {"line": 1, "character": 9}
+        definitions = {
+            (
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.DEFINITION,
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(source)), Position(1, 9),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        }
+
+        self.assertIn(
+            (uris.from_fs_path(target), 1, 7, 1, 15), definitions,
         )
 
         self.assertIn(
-            {
-                "uri": uris.from_fs_path(target),
-                "range": {
-                    "start": {"line": 1, "character": 7},
-                    "end": {"line": 1, "character": 15},
-                },
-            },
-            definitions,
-        )
-
-        self.assertIn(
-            {
-                "uri": uris.from_fs_path(target),
-                "range": {
-                    "start": {"line": 4, "character": 7},
-                    "end": {"line": 4, "character": 15},
-                },
-            },
-            definitions,
+            (uris.from_fs_path(target), 4, 7, 4, 15), definitions,
         )
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
-    def test_GetDefinitionBuiltInLibrary(self):
+    def test_GetDefinitionBuiltInLibrary(self) -> None:
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-        self.assertEqual(
+        self.assertFalse(
             self.server.definitions(
-                uris.from_fs_path(path_to_foo), {"line": 3, "character": 15}
-            ),
-            [],
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(3, 15),
+                )
+            )
         )
 
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
     )
-    def test_GetDefinitionNotKnown(self):
+    def test_GetDefinitionNotKnown(self) -> None:
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
-        self.assertEqual(
+        self.assertFalse(
             self.server.definitions(
-                uris.from_fs_path(path_to_foo), {"line": 0, "character": 0}
-            ),
-            [],
+                TextDocumentPositionParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(0, 0),
+                )
+            )
         )
 
     @patch.object(
@@ -903,83 +908,85 @@ class TestValidProject(_LspHelper):
             )
         ],
     )
-    def test_ReferencesOfAValidElement(self, get_references):
+    def test_ReferencesOfAValidElement(self, get_references) -> Any:
+        # We'll pass the path to foo.vhd but we're patching the
+        # getReferencesToDesignUnit to return "some_path"
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure we picked up an existing element
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(7, 7))
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(7, 7))
         self.assertIsNotNone(unit)
 
-        self.assertCountEqual(
-            self.server.references(
-                doc_uri=uris.from_fs_path(path_to_foo),
-                position={"line": 7, "character": 7},
-                exclude_declaration=True,
-            ),
+        references = [
             (
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 1, "character": 2},
-                        "end": {"line": 1, "character": 2},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 3, "character": 4},
-                        "end": {"line": 3, "character": 4},
-                    },
-                },
-            ),
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.REFERENCES,
+                ReferenceParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(7, 7),
+                    ReferenceContext(include_declaration=False),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        ]
+
+        self.assertCountEqual(
+            references,
+            {
+                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+            },
         )
 
         get_references.assert_called_once()
         get_references.reset_mock()
 
-        self.assertCountEqual(
-            self.server.references(
-                doc_uri=uris.from_fs_path(path_to_foo),
-                position={"line": 7, "character": 7},
-                exclude_declaration=False,
-            ),
+        references = [
             (
-                {
-                    "uri": uris.from_fs_path(path_to_foo),
-                    "range": {
-                        "start": {"line": 7, "character": 7},
-                        "end": {"line": 7, "character": 7},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 1, "character": 2},
-                        "end": {"line": 1, "character": 2},
-                    },
-                },
-                {
-                    "uri": uris.from_fs_path("some_path"),
-                    "range": {
-                        "start": {"line": 3, "character": 4},
-                        "end": {"line": 3, "character": 4},
-                    },
-                },
-            ),
+                x.uri,
+                x.range.start.line,
+                x.range.start.character,
+                x.range.end.line,
+                x.range.end.character,
+            )
+            for x in self.client.lsp.send_request(
+                features.REFERENCES,
+                ReferenceParams(
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    Position(7, 7),
+                    ReferenceContext(include_declaration=True),
+                ),
+            ).result(LSP_REQUEST_TIMEOUT)
+        ]
+
+        self.assertCountEqual(
+            references,
+            {
+                (uris.from_fs_path(path_to_foo), 7, 7, 7, 7),
+                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+            },
         )
 
     def test_ReferencesOfAnInvalidElement(self):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure there's no element at this location
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Location(0, 0))
+        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(0, 0))
         self.assertIsNone(unit)
 
-        for exclude_declaration in (True, False):
+        for include_declaration in (False, True):
             self.assertIsNone(
                 self.server.references(
-                    doc_uri=uris.from_fs_path(path_to_foo),
-                    position={"line": 0, "character": 0},
-                    exclude_declaration=exclude_declaration,
+                    ReferenceParams(
+                        TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                        Position(0, 0),
+                        ReferenceContext(include_declaration=include_declaration),
+                    )
                 )
             )

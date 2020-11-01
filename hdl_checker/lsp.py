@@ -24,6 +24,7 @@ from tempfile import mkdtemp
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from pygls.features import (
+    DEFINITION,
     HOVER,
     INITIALIZE,
     INITIALIZED,
@@ -45,10 +46,13 @@ from pygls.types import (
     Hover,
     HoverParams,
     InitializeParams,
+    Location,
     MarkupKind,
     MessageType,
     Position,
     Range,
+    ReferenceParams,
+    TextDocumentPositionParams,
 )
 from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
@@ -65,7 +69,7 @@ from hdl_checker.parsers.elements.design_unit import (
     tAnyDesignUnit,
 )
 from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import ConfigFileOrigin, Location
+from hdl_checker.types import ConfigFileOrigin  # , Location
 from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
@@ -295,43 +299,39 @@ class HdlCheckerLanguageServer(LanguageServer):
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
-    def references(
-        self, doc_uri: URI, position: Dict[str, int], exclude_declaration: bool
-    ) -> Optional[List[Dict[str, Any]]]:
+    def references(self, params: ReferenceParams) -> Optional[List[Location]]:
+        "Tries to find references for the selected element"
 
         element = self._getElementAtPosition(
-            Path(to_fs_path(doc_uri)),
-            Location(line=position["line"], column=position["character"]),
+            Path(to_fs_path(params.textDocument.uri)), params.position
         )
 
         # Element not identified
         if element is None:
             return None
 
-        references = []  # type: List[Dict[str, Any]]
+        references: List[Location] = []
 
-        if not exclude_declaration:
+        if params.context.includeDeclaration:
             for line, column in element.locations:
                 references += [
-                    {
-                        "uri": from_fs_path(str(element.owner)),
-                        "range": {
-                            "start": {"line": line, "character": column},
-                            "end": {"line": line, "character": column},
-                        },
-                    }
+                    Location(
+                        uri=from_fs_path(str(element.owner)),
+                        range=Range(
+                            start=Position(line, column), end=Position(line, column)
+                        ),
+                    )
                 ]
 
         for reference in self.checker.database.getReferencesToDesignUnit(element):
             for line, column in reference.locations:
                 references += [
-                    {
-                        "uri": from_fs_path(str(reference.owner)),
-                        "range": {
-                            "start": {"line": line, "character": column},
-                            "end": {"line": line, "character": column},
-                        },
-                    }
+                    Location(
+                        uri=from_fs_path(str(reference.owner)),
+                        range=Range(
+                            start=Position(line, column), end=Position(line, column)
+                        ),
+                    )
                 ]
 
         return references
@@ -408,8 +408,9 @@ class HdlCheckerLanguageServer(LanguageServer):
             dependency.library, dependency.name
         )
 
-    def _getElementAtPosition(self, path, position):
-        # type: (Path, Location) -> Union[BaseDependencySpec, tAnyDesignUnit, None]
+    def _getElementAtPosition(
+        self, path: Path, position: Position
+    ) -> Union[BaseDependencySpec, tAnyDesignUnit, None]:
         """
         Gets design units and dependencies (in this order) of path and checks
         if their definitions include position. Not every element is identified,
@@ -421,7 +422,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             self.checker.database.getDependenciesByPath,
         ):  # type: Callable
             for element in meth(path):
-                if element.includes(position):
+                if element.includes(position.line, position.character):
                     return element
 
         return None
@@ -429,9 +430,7 @@ class HdlCheckerLanguageServer(LanguageServer):
     def hover(self, params: HoverParams) -> Optional[Hover]:
         path = Path(to_fs_path(params.textDocument.uri))
         # Check if the element under the cursor matches something we know
-        element = self._getElementAtPosition(
-            path, Location(line=params.position.line, column=params.position.character)
-        )
+        element = self._getElementAtPosition(path, params.position)
 
         _logger.debug("Getting info from %s", element)
 
@@ -458,11 +457,9 @@ class HdlCheckerLanguageServer(LanguageServer):
         )
 
     @logCalls
-    def definitions(self, doc_uri, position):
-        # type: (...) -> Any
-        doc_path = Path(to_fs_path(doc_uri))
+    def definitions(self, params: TextDocumentPositionParams) -> Optional[List[Location]]:
         dependency = self._getElementAtPosition(
-            doc_path, Location(line=position["line"], column=position["character"])
+            Path(to_fs_path(params.textDocument.uri)), params.position
         )
 
         if not isinstance(dependency, BaseDependencySpec):
@@ -482,7 +479,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         target_path, _ = info
         target_uri = from_fs_path(str(target_path))
 
-        locations = []  # type: List[Dict[str, Any]]
+        locations: List[Location] = []
 
         # Get the design unit that has matched the dependency to extract the
         # location where it's defined
@@ -490,13 +487,13 @@ class HdlCheckerLanguageServer(LanguageServer):
             if unit.name == dependency.name and unit.locations:
                 for line, column in unit.locations:
                     locations += [
-                        {
-                            "uri": target_uri,
-                            "range": {
-                                "start": {"line": line, "character": column},
-                                "end": {"line": line, "character": column + len(unit)},
-                            },
-                        }
+                        Location(
+                            target_uri,
+                            Range(
+                                Position(line, column),
+                                Position(line, column + len(unit)),
+                            ),
+                        )
                     ]
 
         return locations
@@ -551,3 +548,15 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         params: HoverParams,
     ) -> Optional[Hover]:
         return server.hover(params)
+
+    @server.feature(REFERENCES)
+    def onReferences(  # pylint: disable=unused-variable
+        params: ReferenceParams,
+    ) -> Optional[List[Location]]:
+        return server.references(params)
+
+    @server.feature(DEFINITION)
+    def onDefinition(  # pylint: disable=unused-variable
+        params: TextDocumentPositionParams,
+    ) -> Optional[List[Location]]:
+        return server.definitions(params)
