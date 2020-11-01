@@ -34,7 +34,7 @@ from pygls.types import ClientCapabilities, Diagnostic, InitializeParams
 
 from nose2.tools import such  # type: ignore
 
-from hdl_checker.tests import TestCase, disableVunit, getTestTempPath
+from hdl_checker.tests import disableVunit, getTestTempPath
 
 import hdl_checker.lsp
 from hdl_checker import server
@@ -566,23 +566,21 @@ with such.A("hdl_checker server") as it:
             it.assertIsNone(args.stderr)
 
 
-#  #  @patch("hdl_checker.server.start_io_lang_server")
-#  @patch("hdl_checker.server._binaryStdio", return_value=("stdin", "stdout"))
-#  @patch("hdl_checker.server._setupPipeRedirection")
-#  def test_StartLsp(binary_stdio, start_server):
-#      args = type(
-#          "args",
-#          (object,),
-#          {"lsp": True, "stderr": "stderr", "log_stream": None, "attach_to_pid": None},
-#      )
+@patch("hdl_checker.lsp.HdlCheckerLanguageServer.start_io")
+@patch("hdl_checker.server._binaryStdio", return_value=("stdin", "stdout"))
+@patch("hdl_checker.server._setupPipeRedirection")
+def test_StartLsp(redirection, binary_stdio, start_server):
+    args = type(
+        "args",
+        (object,),
+        {"lsp": True, "stderr": "stderr", "log_stream": None, "attach_to_pid": None},
+    )
 
-#      server.run(args)
+    server.run(args)
 
-#      redirection.assert_called_once_with(None, "stderr")
-#      binary_stdio.assert_called_once()
-#      start_server.assert_called_once_with(
-#          "stdin", "stdout", True, hdl_checker.lsp.HdlCheckerLanguageServer
-#      )
+    redirection.assert_called_once_with(None, "stderr")
+    binary_stdio.assert_called_once()
+    start_server.assert_called_once_with(stdin="stdin", stdout="stdout")
 
 
 it.createTests(globals())
