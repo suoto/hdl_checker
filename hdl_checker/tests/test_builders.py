@@ -27,10 +27,9 @@ from multiprocessing import Queue
 from tempfile import mkdtemp
 from typing import Any, List, Optional
 
+import parameterized  # type: ignore
 import unittest2  # type: ignore
 from mock import MagicMock, patch
-
-import parameterized  # type: ignore
 
 from hdl_checker.tests import (
     SourceMock,
@@ -110,6 +109,10 @@ class TestBuilder(TestCase):
         # Add the builder path to the environment so we can call it
         if self.builder_path:
             _logger.info("Adding '%s' to the system path", self.builder_path)
+            self.assertTrue(
+                p.exists(self.builder_path),
+                "Path for builder '%s' does not exists" % self.builder_name,
+            )
             self.patch = patch.dict(
                 "os.environ",
                 {"PATH": os.pathsep.join([self.builder_path, os.environ["PATH"]])},
@@ -145,7 +148,7 @@ class TestBuilder(TestCase):
         self.builder._createLibraryIfNeeded(Identifier("random_lib"))
 
     def test_BuilderDoesNothingWhenCreatingBuiltinLibraries(
-        self
+        self,
     ):  # pylint: disable=invalid-name
         # type: (...) -> Any
         self.builder._createLibraryIfNeeded(Identifier("ieee"))
