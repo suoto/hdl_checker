@@ -70,6 +70,25 @@ from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import Location
 
+
+# Debouncing will hurt testing since it won't actually call the debounced
+# function if we call it too quickly.
+def noDebounce(interval_s, keyed_by=None):  # pylint: disable=unused-argument
+    def wrapper(func):
+        def debounced(*args, **kwargs):
+            result = func(*args, **kwargs)
+            _logger.info("%s(%s, %s) returned %s", func.__name__, args, kwargs, result)
+            return result
+
+        return debounced
+
+    return wrapper
+
+
+# This has to come before import hdl_checker.lsp
+hdl_checker.utils.debounce = noDebounce
+
+# pylint: disable=wrong-import-position
 from hdl_checker.tests import (  # isort:skip
     toCheckerDiagnostic,
     getTestTempPath,

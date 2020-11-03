@@ -21,7 +21,7 @@ import logging
 from os import getpid
 from os import path as p
 from tempfile import mkdtemp
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Iterable, List, Optional, Set, Tuple, Union
 
 from pygls.features import (
     DEFINITION,
@@ -70,7 +70,12 @@ from hdl_checker.parsers.elements.design_unit import (
 )
 from hdl_checker.path import Path, TemporaryPath
 from hdl_checker.types import ConfigFileOrigin  # , Location
-from hdl_checker.utils import getTemporaryFilename, logCalls, onNewReleaseFound
+from hdl_checker.utils import (
+    debounce,
+    getTemporaryFilename,
+    logCalls,
+    onNewReleaseFound,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -253,6 +258,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         return path
 
+    @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
     def lint(self, uri: URI, is_saved: bool) -> None:
         """
         Check a file for lint errors

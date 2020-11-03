@@ -18,6 +18,7 @@
 
 import abc
 import functools
+import inspect
 import logging
 import os
 import os.path as p
@@ -27,6 +28,7 @@ import shutil
 import signal
 import subprocess as subp
 import sys
+import threading
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Timer
@@ -387,7 +389,7 @@ else:
 
     def readFile(path):
         "Wrapper around open().read() that return \n for new lines"
-        return open(path, mode="r", newline="\n", errors='replace').read()
+        return open(path, mode="r", newline="\n", errors="replace").read()
 
 
 REPO_URL = "https://github.com/suoto/hdl_checker"
@@ -466,3 +468,43 @@ def onNewReleaseFound(func):
                 ".".join(map(str, latest)), current
             )
         )
+
+
+# Copied from pyls (see
+# https://github.com/palantir/python-language-server/blob/d81c7ba14d54b8e52192b0e00cbb4dacbb6f414d/pyls/_utils.py#L22-L47)
+def debounce(interval_s, keyed_by=None):
+    """Debounce calls to this function until interval_s seconds have passed."""
+
+    def wrapper(func):
+        timers = {}
+        lock = threading.Lock()
+
+        @functools.wraps(func)
+        def debounced(*args, **kwargs):
+            _logger.fatal(
+                "%s(%s, %s) original and using %s",
+                func.__name__,
+                args,
+                kwargs,
+                interval_s,
+            )
+            call_args = inspect.getcallargs(func, *args, **kwargs)
+            key = call_args[keyed_by] if keyed_by else None
+
+            def run():
+                with lock:
+                    del timers[key]
+                return func(*args, **kwargs)
+
+            with lock:
+                old_timer = timers.get(key)
+                if old_timer:
+                    old_timer.cancel()
+
+                timer = threading.Timer(interval_s, run)
+                timers[key] = timer
+                timer.start()
+
+        return debounced
+
+    return wrapper
