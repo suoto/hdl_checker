@@ -322,6 +322,12 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
         """ Implement this attribute to use it for hashing and comparing"""
 
     def __hash__(self):
+        """
+        Returns the hash of the field.
+
+        Args:
+            self: (todo): write your description
+        """
         try:
             return hash(self.__hash_key__)
         except:  # pragma: no cover
@@ -352,6 +358,12 @@ def logCalls(func):  # pragma: no cover
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
+        """
+        Decorator toil.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Callable
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
@@ -476,11 +488,22 @@ def debounce(interval_s, keyed_by=None):
     """Debounce calls to this function until interval_s seconds have passed."""
 
     def wrapper(func):
+        """
+        Decorator to run a function.
+
+        Args:
+            func: (callable): write your description
+        """
         timers = {}
         lock = threading.Lock()
 
         @functools.wraps(func)
         def debounced(*args, **kwargs):
+            """
+            Run a function.
+
+            Args:
+            """
             _logger.fatal(
                 "%s(%s, %s) original and using %s",
                 func.__name__,
@@ -492,6 +515,11 @@ def debounce(interval_s, keyed_by=None):
             key = call_args[keyed_by] if keyed_by else None
 
             def run():
+                """
+                Decorator for the given function.
+
+                Args:
+                """
                 with lock:
                     del timers[key]
                 return func(*args, **kwargs)

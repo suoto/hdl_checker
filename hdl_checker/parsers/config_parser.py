@@ -75,6 +75,13 @@ class ConfigParser(object):
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
     def __init__(self, filename):  # type: (Path) -> None
+        """
+        Initialize a filename.
+
+        Args:
+            self: (todo): write your description
+            filename: (str): write your description
+        """
         self._logger.debug("Creating config parser for filename '%s'", filename)
 
         self._parms = {"builder": None}  # type: Dict[str, Union[str, None]]

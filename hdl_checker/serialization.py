@@ -70,6 +70,13 @@ class StateEncoder(json.JSONEncoder):
     """
 
     def default(self, o):  # pylint: disable=method-hidden
+        """
+        Default encoder.
+
+        Args:
+            self: (todo): write your description
+            o: (todo): write your description
+        """
         if hasattr(o, "__jsonEncode__"):
             dct = o.__jsonEncode__()
             # Set a __class__ entry into the dict so we can use it to get from

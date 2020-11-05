@@ -51,12 +51,25 @@ _logger = logging.getLogger(__name__)
 
 
 def json_dump(obj, stream):
+    """
+    Serialize obj ascii stream.
+
+    Args:
+        obj: (todo): write your description
+        stream: (str): write your description
+    """
     _logger.info("JSON dump: %s:\n%s", stream, pformat(obj))
     json.dump(obj, stream)
 
 
 class _ConfigDict(object):
     def __init__(self):
+        """
+        Initialize this language
+
+        Args:
+            self: (todo): write your description
+        """
         self.sources = []
         self.flags = {}
         self.include = []
@@ -66,6 +79,12 @@ class _ConfigDict(object):
                 self.flags[lang][scope] = []
 
     def toDict(self):
+        """
+        Returns a dict representation of this model.
+
+        Args:
+            self: (todo): write your description
+        """
         d = {"sources": tuple(self.sources), "include": tuple(self.include)}
 
         for lang in FileType:
@@ -81,6 +100,12 @@ class TestConfigHandlers(TestCase):
     maxDiff = None
 
     def setUp(self):
+        """
+        Sets the path to the worker.
+
+        Args:
+            self: (todo): write your description
+        """
         self.base_path = mkdtemp()
 
         def _path(*args):
@@ -97,6 +122,12 @@ class TestConfigHandlers(TestCase):
         self._Path = _Path
 
     def test_DirectInclusion(self):
+        """
+        Test for at least - available at least - level
+
+        Args:
+            self: (todo): write your description
+        """
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
         incl_2 = self._path("incl_2.json")
@@ -127,6 +158,12 @@ class TestConfigHandlers(TestCase):
         )
 
     def test_RecursiveInclusion(self):
+        """
+        Dump the test config.
+
+        Args:
+            self: (todo): write your description
+        """
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
 
@@ -147,6 +184,12 @@ class TestConfigHandlers(TestCase):
         )
 
     def test_IgnoresNonExistingFiles(self):
+        """
+        Downloads ::
+
+        Args:
+            self: (todo): write your description
+        """
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
 
@@ -161,6 +204,12 @@ class TestConfigHandlers(TestCase):
         self.assertCountEqual(result, ((self.base_path, {"name": "incl_1"}),))
 
     def test_IgnoresJsonDecodingErrors(self):
+        """
+        Searches for the current config files in the config file.
+
+        Args:
+            self: (todo): write your description
+        """
         search_paths = (self._path("incl_0.json"),)
 
         open(self._path("incl_0.json"), "w").write("hello")
@@ -171,6 +220,12 @@ class TestConfigHandlers(TestCase):
         self.assertCountEqual(result, ())
 
     def test_IncludesRelativePaths(self):
+        """
+        Test if cloned config files.
+
+        Args:
+            self: (todo): write your description
+        """
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
         incl_2 = self._path("incl_2.json")
@@ -197,6 +252,12 @@ class TestConfigHandlers(TestCase):
         )
 
     def test_IncludeFolderShouldUseConfigFileIfPossible(self):
+        """
+        Gets the test configuration files in the folder *
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         folder = mkdtemp()
         config_file = p.join(folder, DEFAULT_PROJECT_FILE)
@@ -211,6 +272,12 @@ class TestConfigHandlers(TestCase):
         self.assertCountEqual(result, [(folder, {"foo": "bar"})])
 
     def test_IncludeFolderShouldSearch(self):
+        """
+        Perform a given search folder.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         folder = mkdtemp()
 
@@ -226,6 +293,12 @@ class TestConfigHandlers(TestCase):
     # this test don't exist, so need to mock that
     @patch("hdl_checker.parser_utils.glob", lambda x, recursive=True: [x])
     def test_FlattenConfigAndPreserveScopes(self):
+        """
+        Generate a copy of config dicts.
+
+        Args:
+            self: (todo): write your description
+        """
         incl_0 = self._path("incl_0.json")
         incl_1 = self._path("incl_1.json")
         #  incl_2 = self._path("incl_2.json")
@@ -395,9 +468,21 @@ class TestExpandingPathNames(TestCase):
     maxDiff = None
 
     def join(self, *args):
+        """
+        Join a path.
+
+        Args:
+            self: (todo): write your description
+        """
         return p.join(self.base_path, *args)
 
     def setUp(self):
+        """
+        Sets the working directory.
+
+        Args:
+            self: (todo): write your description
+        """
         self.base_path = mkdtemp(prefix=__name__ + "_")
 
         # Create some files
@@ -428,6 +513,12 @@ class TestExpandingPathNames(TestCase):
             self.assertTrue(p.exists(path))
 
     def test_ExpandWithFileWildcards(self):
+        """
+        Test out the config file with the config file name.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Any
         config = {
             "sources": [
@@ -533,7 +624,18 @@ class TestExpandingPathNames(TestCase):
 
 
 def timeit(f):
+    """
+    A decorator.
+
+    Args:
+        f: (todo): write your description
+    """
     def wrapper(*args, **kwargs):
+        """
+        Decor function to logger.
+
+        Args:
+        """
         start = time.time()
         result = f(*args, **kwargs)
         end = time.time()
@@ -545,10 +647,22 @@ def timeit(f):
 
 class TestFilterGitIgnoredPaths(TestCase):
     def join(self, *args):
+        """
+        Join a path.
+
+        Args:
+            self: (todo): write your description
+        """
         return p.join(self.base_path, *args)
 
     @timeit
     def setUp(self):
+        """
+        Sets up the working copy of the repo.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Any
         self.base_path = mkdtemp(prefix=__name__ + "_")
 
@@ -592,6 +706,12 @@ class TestFilterGitIgnoredPaths(TestCase):
 
     @timeit
     def test_FilterGitPaths(self):
+        """
+        Sets up paths to - only *
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Any
         self.assertTrue(isGitRepo(Path(self.base_path)))
 

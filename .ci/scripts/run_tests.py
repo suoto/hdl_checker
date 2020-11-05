@@ -50,6 +50,12 @@ _logger = logging.getLogger(__name__)
 
 
 def _shell(cmd):
+    """
+    Run a shell command.
+
+    Args:
+        cmd: (str): write your description
+    """
     _logger.info("$ %s", cmd)
     for line in os.popen(cmd).read().split("\n"):
         if line and not line.isspace():
@@ -70,9 +76,21 @@ def _setupLogging(stream, level):  # pragma: no cover
 
         class Stream(object):
             def isatty(self):
+                """
+                Return true if this isatty
+
+                Args:
+                    self: (todo): write your description
+                """
                 return True
 
             def write(self, *args, **kwargs):
+                """
+                Write data to sys.
+
+                Args:
+                    self: (todo): write your description
+                """
                 return sys.stdout.write(*args, **kwargs)
 
         _stream = Stream()
@@ -118,6 +136,11 @@ def _setupLogging(stream, level):  # pragma: no cover
 
 
 def _parseArguments():
+    """
+    Parse command line arguments.
+
+    Args:
+    """
     parser = argparse.ArgumentParser()
 
     # Options
@@ -172,6 +195,11 @@ def _parseArguments():
 
 
 def _getNoseCommandLineArgs(args):
+    """
+    Get command line arguments.
+
+    Args:
+    """
     argv = []
 
     argv += args.verbose
@@ -190,6 +218,11 @@ def _getNoseCommandLineArgs(args):
 
 
 def runTestsForEnv(args):
+    """
+    Run nose command.
+
+    Args:
+    """
     nose_base_args = _getNoseCommandLineArgs(args)
     nose_args = list(nose_base_args)
 
@@ -217,6 +250,11 @@ def runTestsForEnv(args):
 
 
 def main():
+    """
+    The main function.
+
+    Args:
+    """
     args = _parseArguments()
     if args.log_to_stdout:
         _setupLogging(sys.stdout, args.log_level)

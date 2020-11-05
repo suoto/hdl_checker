@@ -65,6 +65,12 @@ class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
     """
 
     def __init__(self):
+        """
+        Initialize the internal data.
+
+        Args:
+            self: (todo): write your description
+        """
         #  type: (...) -> None
         self._keys = set()  # type: Set[int]
         self._libraries = {}  # type: Dict[int, Optional[VhdlIdentifier]]
@@ -122,6 +128,12 @@ class VhdlParser(BaseSourceFile):
             yield match.groupdict(), {Location(start_line, start_char)}
 
     def _getDependencies(self):  # type: () -> Generator[RequiredDesignUnit, None, None]
+        """
+        Return a dict of dependencies.
+
+        Args:
+            self: (todo): write your description
+        """
         library_names = {x.lower() for x in self.getLibraries()}
         library_names.add("work")
 

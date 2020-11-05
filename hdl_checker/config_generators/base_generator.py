@@ -35,6 +35,12 @@ class BaseGenerator:
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):  # type: () -> None
+        """
+        Initialize the logger.
+
+        Args:
+            self: (todo): write your description
+        """
         self._logger = logging.getLogger(self.__class__.__name__)
         self._sources = set()  # type: Set[SourceSpec]
 

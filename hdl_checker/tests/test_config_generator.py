@@ -41,6 +41,12 @@ class TestConfigGenerator(TestCase):
     maxDiff = None
 
     def setUp(self):
+        """
+        Set the dummy environment
+
+        Args:
+            self: (todo): write your description
+        """
         self.app = TestApp(handlers.app)
 
         self.dummy_test_path = mkdtemp(prefix=__name__ + "_")
@@ -70,6 +76,12 @@ class TestConfigGenerator(TestCase):
             open(p.join(self.dummy_test_path, path), "w").write("")
 
     def teardown(self):
+        """
+        Teardown directory.
+
+        Args:
+            self: (todo): write your description
+        """
         # Create a dummy arrangement of sources
         removeDirIfExists(self.dummy_test_path)
 
@@ -78,6 +90,12 @@ class TestConfigGenerator(TestCase):
         lambda path: "nonreadable" not in path,
     )
     def test_run_simple_config_gen(self):
+        """
+        Generate a simple test suite.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         finder = SimpleFinder([self.dummy_test_path])
 

@@ -120,6 +120,12 @@ _VUNIT_FLAGS = {
 
 
 def _isHeader(path):
+    """
+    Determine if path is a header.
+
+    Args:
+        path: (str): write your description
+    """
     # type: (Path) -> bool
     ext = path.name.split(".")[-1].lower()
     return ext in ("vh", "svh")

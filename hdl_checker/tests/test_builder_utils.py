@@ -54,12 +54,24 @@ def _path(*args):
 
 class TestBuilderUtils(TestCase):
     def test_getBuilderByName(self):
+        """
+        Get the name of the element
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertEqual(getBuilderByName("msim"), MSim)
         self.assertEqual(getBuilderByName("xvhdl"), XVHDL)
         self.assertEqual(getBuilderByName("ghdl"), GHDL)
         self.assertEqual(getBuilderByName("other"), Fallback)
 
     def test_getWorkingBuilders(self):
+        """
+        Determineers
+
+        Args:
+            self: (todo): write your description
+        """
         # Test no working builders
         _logger.info("Checking no builder works")
         self.assertEqual(getPreferredBuilder(), Fallback)
@@ -82,40 +94,93 @@ class TestBuilderUtils(TestCase):
 
 class Library(object):  # pylint: disable=too-few-public-methods
     def __init__(self, name):
+        """
+        Initialize a new instance.
+
+        Args:
+            self: (todo): write your description
+            name: (str): write your description
+        """
         self._name = name
 
     @property
     def name(self):
+        """
+        The name of the name
+
+        Args:
+            self: (todo): write your description
+        """
         return self._name
 
 
 class SourceFile(object):
     def __init__(self, name, library, vhdl_standard="2008"):
+        """
+        Initialize library.
+
+        Args:
+            self: (todo): write your description
+            name: (str): write your description
+            library: (str): write your description
+            vhdl_standard: (todo): write your description
+        """
         self._name = name
         self._library = Library(library)
         self._vhdl_standard = vhdl_standard
 
     @property
     def name(self):
+        """
+        The name of the name
+
+        Args:
+            self: (todo): write your description
+        """
         return self._name
 
     @property
     def library(self):
+        """
+        The library object : return :
+
+        Args:
+            self: (todo): write your description
+        """
         return self._library
 
     @property
     def vhdl_standard(self):
+        """
+        Return the vhdl vhdl vhdl vhdl vh : vhdl : obj : vh : vhdl :
+
+        Args:
+            self: (todo): write your description
+        """
         return self._vhdl_standard
 
 
 class TestGetVunitSources(TestCase):
     def test_VunitNotFound(self):
+        """
+        Perform a test is run.
+
+        Args:
+            self: (todo): write your description
+        """
         builder = MagicMock()
         with disableVunit:
             self.assertFalse(list(getVunitSources(builder)))
 
     @patch("vunit.VUnit.get_source_files")
     def test_VhdlBuilder(self, get_source_files):
+        """
+        Generate a source file.
+
+        Args:
+            self: (todo): write your description
+            get_source_files: (todo): write your description
+        """
         get_source_files.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),
@@ -145,6 +210,14 @@ class TestGetVunitSources(TestCase):
     @patch("hdl_checker.builder_utils.findRtlSourcesByPath")
     @patch("vunit.verilog.VUnit.get_source_files")
     def test_SystemverilogOnlyBuilder(self, get_source_files, find_rtl_sources):
+        """
+        Test the test test files.
+
+        Args:
+            self: (todo): write your description
+            get_source_files: (todo): write your description
+            find_rtl_sources: (todo): write your description
+        """
         get_source_files.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),
@@ -180,6 +253,13 @@ class TestGetVunitSources(TestCase):
 
     @patch("hdl_checker.builder_utils._getSourcesFromVUnitModule")
     def test_VerilogOnlyBuilder(self, meth):
+        """
+        Perform a test test on the test.
+
+        Args:
+            self: (todo): write your description
+            meth: (todo): write your description
+        """
         builder = MagicMock()
         builder.builder_name = "msim"
         builder.file_types = {FileType.verilog}
@@ -194,6 +274,15 @@ class TestGetVunitSources(TestCase):
     def test_VhdlAndSystemverilogOnlyBuilder(
         self, vhdl_method, sv_method, find_rtl_sources
     ):
+        """
+        Test for a vhdlogogogogOnly
+
+        Args:
+            self: (todo): write your description
+            vhdl_method: (todo): write your description
+            sv_method: (todo): write your description
+            find_rtl_sources: (str): write your description
+        """
         vhdl_method.side_effect = [
             [
                 SourceFile(name=_path("path_0.vhd"), library="libary_0"),

@@ -42,6 +42,13 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, filename):
+        """
+        Initialize a designmodel.
+
+        Args:
+            self: (todo): write your description
+            filename: (str): write your description
+        """
         # type: (Path, ) -> None
         assert isinstance(filename, Path), "Invalid type: {}".format(filename)
         self.filename = filename
@@ -81,6 +88,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return obj
 
     def __repr__(self):
+        """
+        Return a string representation of this operator.
+
+        Args:
+            self: (todo): write your description
+        """
         return "{}(filename={}, design_units={}, dependencies={})".format(
             self.__class__.__name__,
             self.filename,
@@ -90,6 +103,12 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
     @property
     def __hash_key__(self):
+        """
+        Return the key for the hash.
+
+        Args:
+            self: (todo): write your description
+        """
         return (self.filename, self._content)
 
     def _changed(self):
