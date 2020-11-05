@@ -46,6 +46,15 @@ such.unittest.TestCase.maxDiff = None
 
 
 def _DependencySpec(owner, name, library, locations=None):
+    """
+    Make a dependency object.
+
+    Args:
+        owner: (str): write your description
+        name: (str): write your description
+        library: (todo): write your description
+        locations: (list): write your description
+    """
     if library is not None:
         library = Identifier(library, case_sensitive=False)
     return RequiredDesignUnit(
@@ -64,6 +73,11 @@ with such.A("VHDL source file object") as it:
 
         @it.has_setup
         def setup():
+            """
+            Creates the code file.
+
+            Args:
+            """
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
             it._code = [
@@ -103,15 +117,30 @@ with such.A("VHDL source file object") as it:
 
         @it.has_teardown
         def teardown():
+            """
+            Delete the teardown.
+
+            Args:
+            """
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
         @it.should("parse a file without errors")
         def test():
+            """
+            Cli test.
+
+            Args:
+            """
             it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return its entities")  # type: ignore
         def test():
+            """
+            Create a design of a design.
+
+            Args:
+            """
             design_units = list(it.source.getDesignUnits())
             _logger.info("Design units: %s", design_units)
             it.assertNotEqual(design_units, None, "No design_units units found")
@@ -129,6 +158,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("parse its libraries")  # type: ignore
         def test():
+            """
+            Run the test files
+
+            Args:
+            """
             libraries = it.source.getLibraries()
             _logger.info("Libraries found: %s", ", ".join([repr(x) for x in libraries]))
 
@@ -138,6 +172,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return its dependencies")  # type: ignore
         def test():
+            """
+            Generate test test
+
+            Args:
+            """
             it.assertCountEqual(
                 it.source.getDependencies(),
                 [
@@ -170,10 +209,20 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return source modification time")  # type: ignore
         def test():
+            """
+            Test if the test
+
+            Args:
+            """
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
         @it.should("return updated dependencies")  # type: ignore
         def test():
+            """
+            Lists all files.
+
+            Args:
+            """
             code = list(it._code)
 
             code.insert(0, "library some_library;")
@@ -220,6 +269,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("handle implicit libraries")  # type: ignore
         def test():
+            """
+            * test test files.
+
+            Args:
+            """
             code = list(it._code)
             code.insert(0, "    use work.another_package;")
             writeListToFile(_FILENAME, code)
@@ -262,6 +316,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("handle libraries without packages")  # type: ignore
         def test():
+            """
+            * test test files.
+
+            Args:
+            """
             code = list(it._code)
             code.insert(0, "library remove_me;")
             writeListToFile(_FILENAME, code)
@@ -300,6 +359,11 @@ with such.A("VHDL source file object") as it:
             "report as equal after recovering from cache via json"
         )
         def test():
+            """
+            Test state to json. json.
+
+            Args:
+            """
             state = json.dumps(it.source, cls=StateEncoder)
             _logger.info("State before: %s", state)
             recovered = json.loads(state, object_hook=jsonObjectHook)
@@ -309,6 +373,11 @@ with such.A("VHDL source file object") as it:
 
         @it.has_setup
         def setup():
+            """
+            Generate the mtime.
+
+            Args:
+            """
             it._code = [
                 "library ieee;",
                 "use ieee.std_logic_1164.all;",
@@ -341,15 +410,30 @@ with such.A("VHDL source file object") as it:
 
         @it.has_teardown
         def teardown():
+            """
+            Delete the teardown.
+
+            Args:
+            """
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
         @it.should("parse a file without errors")  # type: ignore
         def test():
+            """
+            Cli test.
+
+            Args:
+            """
             it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return the names of the packages found")  # type: ignore
         def test():
+            """
+            Test if all packages in a given package.
+
+            Args:
+            """
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
@@ -364,6 +448,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return its dependencies")  # type: ignore
         def test():  # type: () -> None
+            """
+            Run dependency
+
+            Args:
+            """
             it.assertCountEqual(
                 it.source.getDependencies(),
                 [
@@ -414,12 +503,22 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return source modification time")  # type: ignore
         def test():
+            """
+            Test if the test
+
+            Args:
+            """
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
     with it.having("a context code"):
 
         @it.has_setup
         def setup():
+            """
+            Generate the mtime and mtime.
+
+            Args:
+            """
             it._code = [
                 "context context_name is",
                 "  library lib0;",
@@ -435,15 +534,30 @@ with such.A("VHDL source file object") as it:
 
         @it.has_teardown
         def teardown():
+            """
+            Delete the teardown.
+
+            Args:
+            """
             if os.path.exists(_FILENAME):
                 os.remove(_FILENAME)
 
         @it.should("create the object with no errors")  # type: ignore
         def test():
+            """
+            Cli test.
+
+            Args:
+            """
             it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return the names of the packages found")  # type: ignore
         def test():
+            """
+            Execute a test.
+
+            Args:
+            """
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
@@ -458,6 +572,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return its dependencies")  # type: ignore
         def test():  # type: () -> None
+            """
+            Run dependency.
+
+            Args:
+            """
             it.assertCountEqual(
                 it.source.getDependencies(),
                 [
@@ -484,6 +603,11 @@ with such.A("VHDL source file object") as it:
 
         @it.should("return source modification time")  # type: ignore
         def test():
+            """
+            Test if the test
+
+            Args:
+            """
             it.assertEqual(os.path.getmtime(_FILENAME), it.source.getmtime())
 
 

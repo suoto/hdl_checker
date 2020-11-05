@@ -56,6 +56,12 @@ class DummyServer(BaseServer):
     _server_index = 0
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the server.
+
+        Args:
+            self: (todo): write your description
+        """
         _logger.info("Creating server %d", DummyServer._server_index)
         self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
         self._ui_handler = logging.getLogger("server %d/UI" % DummyServer._server_index)
@@ -63,18 +69,45 @@ class DummyServer(BaseServer):
         super(DummyServer, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
+        """
+        Handle a message handler.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         self._msg_queue.put(("info", message))
         self._ui_handler.info("[UI INFO]: %s", message)
 
     def _handleUiWarning(self, message):
+        """
+        Handle an incoming message.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         self._msg_queue.put(("warning", message))
         self._ui_handler.info("[UI WARNING]: %s", message)
 
     def _handleUiError(self, message):
+        """
+        Handle the message handler.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         self._msg_queue.put(("error", message))
         self._ui_handler.info("[UI ERROR]: %s", message)
 
     def getUiMessages(self):
+        """
+        Get all message messages from the queue.
+
+        Args:
+            self: (todo): write your description
+        """
         while not self._msg_queue.empty():
             yield self._msg_queue.get()
 
@@ -90,6 +123,16 @@ class SourceMock(object):
         dependencies=None,  # type: Iterable[MockDep]
         filename=None,  # type: Optional[str]
     ):
+        """
+        Initialize the design.
+
+        Args:
+            self: (todo): write your description
+            design_units: (str): write your description
+            library: (str): write your description
+            dependencies: (todo): write your description
+            filename: (str): write your description
+        """
 
         self._design_units = list(design_units or [])
 
@@ -132,13 +175,31 @@ class SourceMock(object):
 
     @property
     def filename(self):
+        """
+        Return the filename.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: () -> Path
         return self._filename
 
     def getLibraries(self):
+        """
+        Returns a list of all libraries.
+
+        Args:
+            self: (todo): write your description
+        """
         return removeDuplicates([x.library for x in self._dependencies])
 
     def _createMockFile(self):
+        """
+        Creates the library.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: () -> None
         self._logger.debug("Creating mock file: %s", self)
         libs = self.getLibraries()
@@ -182,6 +243,12 @@ class SourceMock(object):
             fd.write("\n".join(lines))
 
     def __repr__(self):
+        """
+        Return a representation of this representation.
+
+        Args:
+            self: (todo): write your description
+        """
         return (
             "{}(library='{}', design_units={}, dependencies={}, "
             "filename={}".format(
@@ -194,15 +261,39 @@ class SourceMock(object):
         )
 
     def getmtime(self):
+        """
+        Return the modification time of this file.
+
+        Args:
+            self: (todo): write your description
+        """
         return p.getmtime(self.filename)
 
     def getDesignUnits(self):
+        """
+        : return value of the design design designs.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._design_units
 
     def getDependencies(self):
+        """
+        Returns the list of dependencies.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._dependencies
 
     def getRawSourceContent(self):
+        """
+        Returns the content of the file.
+
+        Args:
+            self: (todo): write your description
+        """
         return open(self.filename).read()
 
 
@@ -212,6 +303,13 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     file_types = (FileType.vhdl,)
 
     def __init__(self, work_folder, *args, **kwargs):
+        """
+        Init work_folder.
+
+        Args:
+            self: (todo): write your description
+            work_folder: (str): write your description
+        """
         # type: (...) -> None
         self._work_folder = work_folder  # type: Path
         if not p.exists(self._work_folder.name):
@@ -220,28 +318,75 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
         super(MockBuilder, self).__init__(work_folder, *args, **kwargs)
 
     def _makeRecords(self, _):  # pragma: no cover
+        """
+        Returns a list of tuples of the given type.
+
+        Args:
+            self: (todo): write your description
+            _: (todo): write your description
+        """
         return []
 
     def _shouldIgnoreLine(self, line):  # pragma: no cover
+        """
+        Determine if a line is a line.
+
+        Args:
+            self: (todo): write your description
+            line: (str): write your description
+        """
         return True
 
     def _checkEnvironment(self):
+        """
+        Checks if the environment is available.
+
+        Args:
+            self: (todo): write your description
+        """
         return
 
     @staticmethod
     def isAvailable():
+        """
+        Returns true if the given function?
+
+        Args:
+        """
         return True
 
     def _buildSource(self, path, library, flags=None):
+        """
+        Builds the list of source files.
+
+        Args:
+            self: (todo): write your description
+            path: (str): write your description
+            library: (todo): write your description
+            flags: (int): write your description
+        """
         self._logger.debug(
             "Building path=%s, library=%s, flags=%s", path, library, flags
         )
         return [], []
 
     def _createLibrary(self, library):  # pylint: disable=unused-argument
+        """
+        Create a new : class : ~library.
+
+        Args:
+            self: (todo): write your description
+            library: (todo): write your description
+        """
         pass
 
     def _parseBuiltinLibraries(self):
+        """
+        Parse the string of the string representation.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Any
         return (
             Identifier("ieee", case_sensitive=False),
@@ -254,6 +399,12 @@ class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     builder_name = "FailingBuilder"
 
     def _checkEnvironment(self):
+        """
+        Checks that the environment.
+
+        Args:
+            self: (todo): write your description
+        """
         raise exceptions.SanityCheckError(self.builder_name, "Fake error")
 
 
@@ -262,6 +413,13 @@ disableVunit = mock.patch("hdl_checker.builder_utils.foundVunit", lambda: False)
 
 class PatchBuilder(object):
     def __init__(self, meth=None):
+        """
+        Initialize a meth instance.
+
+        Args:
+            self: (todo): write your description
+            meth: (todo): write your description
+        """
         def getBuilderByName(name):
             "Returns the builder class given a string name"
             from hdl_checker.builders.msim import MSim
@@ -294,14 +452,32 @@ class PatchBuilder(object):
         )
 
     def __enter__(self):
+        """
+        Enter all patches.
+
+        Args:
+            self: (todo): write your description
+        """
         _logger.info("Starting patches")
         list(x.start() for x in self.patches)
 
     def __exit__(self, *args, **kwargs):
+        """
+        Exit all registered handlers.
+
+        Args:
+            self: (todo): write your description
+        """
         _logger.info("Stopping patches")
         list(x.stop() for x in self.patches)
 
     def __call__(self, *args, **kwargs):
+        """
+        Call the given method.
+
+        Args:
+            self: (todo): write your description
+        """
         self.__enter__()
         try:
             if self.meth is not None:
@@ -325,7 +501,21 @@ def sanitizePath(*args):
 
 
 def assertSameFile(it):  # pylint: disable=invalid-name
+    """
+    Asserts is none if the same.
+
+    Args:
+        it: (todo): write your description
+    """
     def wrapper(first, second, msg=None):
+        """
+        Wrapper function.
+
+        Args:
+            first: (todo): write your description
+            second: (todo): write your description
+            msg: (str): write your description
+        """
         try:
             os.stat(first)
         except TypeError:
@@ -399,6 +589,12 @@ else:
 
 
 def parametrizeClassWithBuilders(cls):
+    """
+    Creates classetrized class from a class from parameter.
+
+    Args:
+        cls: (todo): write your description
+    """
     cls.assertSameFile = assertSameFile(cls)
 
     keys = ["builder_name", "builder_path"]
@@ -410,6 +606,12 @@ def parametrizeClassWithBuilders(cls):
 
 
 def getTestTempPath(name):
+    """
+    Gets the path from the path.
+
+    Args:
+        name: (str): write your description
+    """
     # type: (str) -> str
     name = name.replace(".", "_")
     path = p.abspath(p.join(os.environ["TOX_ENV_DIR"], "tmp", name))
@@ -452,6 +654,14 @@ def setupTestSuport(path):
 
 
 def logIterable(msg, iterable, func):
+    """
+    Log an iterable.
+
+    Args:
+        msg: (str): write your description
+        iterable: (todo): write your description
+        func: (callable): write your description
+    """
     # type: (str, Iterable[Any], Callable) -> None
     func(msg)
     for i, item in enumerate(iterable, 1):
@@ -459,8 +669,19 @@ def logIterable(msg, iterable, func):
 
 
 def windowsOnly(func):
+    """
+    Decorator for functions that the function.
+
+    Args:
+        func: (todo): write your description
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """
+        Decorator to wrap () function.
+
+        Args:
+        """
         if not ON_WINDOWS:
             return unittest2.skip("Windows only test")
         return func(*args, **kwargs)
@@ -469,8 +690,19 @@ def windowsOnly(func):
 
 
 def linuxOnly(func):
+    """
+    Decorator to mark functions.
+
+    Args:
+        func: (todo): write your description
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """
+        Decorator for the wrapped function.
+
+        Args:
+        """
         if not ON_LINUX:
             return unittest2.skip("Linux only test")
         return func(*args, **kwargs)
@@ -479,6 +711,13 @@ def linuxOnly(func):
 
 
 def toCheckerDiagnostic(uri: str, diags: Any) -> Iterable[CheckerDiagnostic]:
+    """
+    Yields a list of the given uri.
+
+    Args:
+        uri: (str): write your description
+        diags: (todo): write your description
+    """
     for diag in diags:
         yield CheckerDiagnostic(
             text=diag.message,

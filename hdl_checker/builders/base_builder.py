@@ -98,6 +98,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
     def __init__(self, work_folder, database):
+        """
+        Initialize the workdir.
+
+        Args:
+            self: (todo): write your description
+            work_folder: (str): write your description
+            database: (str): write your description
+        """
         # type: (Path, Database) -> None
         # Shell accesses must be atomic
         self._lock = Lock()

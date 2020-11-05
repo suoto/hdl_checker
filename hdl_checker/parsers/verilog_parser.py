@@ -77,6 +77,12 @@ class VerilogParser(BaseSourceFile):
     """
 
     def _getSourceContent(self):
+        """
+        Get the content of the file.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> Any
         # Remove multiline comments
         content = readFile(str(self.filename))
@@ -102,6 +108,12 @@ class VerilogParser(BaseSourceFile):
             yield match.groupdict(), {Location(start_line, start_char)}
 
     def _getDependencies(self):  # type: () -> Iterable[BaseDependencySpec]
+        """
+        Extract dependencies.
+
+        Args:
+            self: (todo): write your description
+        """
         text = self.getSourceContent()
 
         match_groups = [
@@ -138,6 +150,12 @@ class VerilogParser(BaseSourceFile):
                 break
 
     def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
+        """
+        Yields all matches.
+
+        Args:
+            self: (todo): write your description
+        """
         for match, locations in self._iterDesignUnitMatches():
             if match["module_name"] is not None:
                 yield VerilogDesignUnit(

@@ -96,6 +96,13 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, root_dir):  # type: (Path) -> None
+        """
+        Initialize the database.
+
+        Args:
+            self: (todo): write your description
+            root_dir: (str): write your description
+        """
         # Root dir is the absolute path to use when any path passed on is
         # relative
         self.root_dir = root_dir
@@ -138,6 +145,12 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         return self._database
 
     def __hash__(self):
+        """
+        Return the hash of the hash.
+
+        Args:
+            self: (todo): write your description
+        """
         # Just to allow lru_cache to work
         return hash(0)
 

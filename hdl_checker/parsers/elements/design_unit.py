@@ -38,6 +38,16 @@ class _DesignUnit(ParsedElement):
     """
 
     def __init__(self, owner, type_, name, locations=None):
+        """
+        Initialize this type.
+
+        Args:
+            self: (todo): write your description
+            owner: (todo): write your description
+            type_: (todo): write your description
+            name: (str): write your description
+            locations: (str): write your description
+        """
         # type: (Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
         self._owner = owner
         self._type = type_
@@ -46,9 +56,21 @@ class _DesignUnit(ParsedElement):
         super(_DesignUnit, self).__init__(locations)
 
     def __len__(self):
+        """
+        Returns the length of the field.
+
+        Args:
+            self: (todo): write your description
+        """
         return len(self.name)
 
     def __repr__(self):
+        """
+        Return a human - qualified representation.
+
+        Args:
+            self: (todo): write your description
+        """
         return '{}(name="{}", type={}, owner={}, locations={})'.format(
             self.__class__.__name__,
             repr(self.name),
@@ -58,11 +80,23 @@ class _DesignUnit(ParsedElement):
         )
 
     def __str__(self):
+        """
+        Return a human - readable object.
+
+        Args:
+            self: (todo): write your description
+        """
         return "{}(name='{}', type={}, owner='{}')".format(
             self.__class__.__name__, self.name.display_name, self.type_, str(self.owner)
         )
 
     def __jsonEncode__(self):
+        """
+        Returns a json - serializable representation.
+
+        Args:
+            self: (todo): write your description
+        """
         return {
             "owner": self.owner,
             "type_": self.type_,
@@ -101,6 +135,12 @@ class _DesignUnit(ParsedElement):
 
     @property
     def __hash_key__(self):
+        """
+        Returns the key for the : attr : field.
+
+        Args:
+            self: (todo): write your description
+        """
         return (
             self.owner,
             self.type_,
@@ -115,6 +155,16 @@ class VhdlDesignUnit(_DesignUnit):
     """
 
     def __init__(self, owner, type_, name, locations=None):
+        """
+        Initialize vhdl.
+
+        Args:
+            self: (todo): write your description
+            owner: (todo): write your description
+            type_: (todo): write your description
+            name: (str): write your description
+            locations: (str): write your description
+        """
         # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VhdlDesignUnit, self).__init__(
             owner=owner, type_=type_, name=VhdlIdentifier(name), locations=locations
@@ -127,6 +177,16 @@ class VerilogDesignUnit(_DesignUnit):
     """
 
     def __init__(self, owner, type_, name, locations=None):
+        """
+        Initialize an object.
+
+        Args:
+            self: (todo): write your description
+            owner: (todo): write your description
+            type_: (todo): write your description
+            name: (str): write your description
+            locations: (str): write your description
+        """
         # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
         super(VerilogDesignUnit, self).__init__(
             owner=owner, type_=type_, name=VerilogIdentifier(name), locations=locations

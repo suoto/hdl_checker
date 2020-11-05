@@ -59,6 +59,13 @@ class XVHDL(BaseBuilder):
     file_types = {FileType.vhdl}
 
     def _shouldIgnoreLine(self, line):
+        """
+        Determine if a line.
+
+        Args:
+            self: (todo): write your description
+            line: (str): write your description
+        """
         # type: (str) -> bool
         if "ignored due to previous errors" in line:
             return True
@@ -73,6 +80,12 @@ class XVHDL(BaseBuilder):
         return not (line.startswith("ERROR") or line.startswith("WARNING"))
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize workdir
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         self._version = ""
         super(XVHDL, self).__init__(*args, **kwargs)
@@ -81,6 +94,13 @@ class XVHDL(BaseBuilder):
         open(self._xvhdlini, "w").close()
 
     def _makeRecords(self, line):
+        """
+        Make all records and yield records.
+
+        Args:
+            self: (todo): write your description
+            line: (str): write your description
+        """
         # type: (str) -> Iterable[BuilderDiag]
         for match in _STDOUT_MESSAGE_SCANNER.finditer(line):
 
@@ -121,6 +141,12 @@ class XVHDL(BaseBuilder):
         )
 
     def _checkEnvironment(self):
+        """
+        Check if the working directories.
+
+        Args:
+            self: (todo): write your description
+        """
         stdout = runShellCommand(
             ["xvhdl", "--nolog", "--version"], cwd=self._work_folder
         )
@@ -133,6 +159,11 @@ class XVHDL(BaseBuilder):
 
     @staticmethod
     def isAvailable():
+        """
+        Returns true if a temporary directory is locked
+
+        Args:
+        """
         try:
             temp_dir = tempfile.mkdtemp()
             runShellCommand(["xvhdl", "--nolog", "--version"], cwd=temp_dir)
@@ -143,6 +174,13 @@ class XVHDL(BaseBuilder):
             shutil.rmtree(temp_dir)
 
     def _createLibrary(self, library):
+        """
+        Create a work_folder file.
+
+        Args:
+            self: (todo): write your description
+            library: (todo): write your description
+        """
         # type: (Identifier) -> None
         with open(self._xvhdlini, mode="w") as fd:
             content = "\n".join(
@@ -154,6 +192,15 @@ class XVHDL(BaseBuilder):
             fd.write(content)
 
     def _buildSource(self, path, library, flags=None):
+        """
+        Builds a list.
+
+        Args:
+            self: (todo): write your description
+            path: (str): write your description
+            library: (todo): write your description
+            flags: (int): write your description
+        """
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         cmd = [
             "xvhdl",
@@ -170,6 +217,13 @@ class XVHDL(BaseBuilder):
         return runShellCommand(cmd, cwd=self._work_folder)
 
     def _searchForRebuilds(self, line):
+        """
+        Search for all matching search results.
+
+        Args:
+            self: (todo): write your description
+            line: (str): write your description
+        """
         rebuilds = []
 
         for match in _ITER_REBUILD_UNITS(line):

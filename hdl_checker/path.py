@@ -32,6 +32,14 @@ class Path(object):
     "Path helper class to speed up comparing different paths"
 
     def __init__(self, name, base_path=None):
+        """
+        Initialize the path.
+
+        Args:
+            self: (todo): write your description
+            name: (str): write your description
+            base_path: (str): write your description
+        """
         # type: (Union[Path, str], Union[Path, str, None]) -> None
         assert isinstance(
             name, (Path, six.string_types)
@@ -86,9 +94,21 @@ class Path(object):
         return self._name
 
     def __str__(self):
+        """
+        Return the string representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         return self.name
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         # type: () -> str
         return "{}({})".format(self.__class__.__name__, repr(self.name))
 
@@ -100,6 +120,12 @@ class Path(object):
         return stat(self.name)
 
     def __hash__(self):
+        """
+        Return the hash of the name.
+
+        Args:
+            self: (todo): write your description
+        """
         return hash(self.name)
 
     def __eq__(self, other):

@@ -88,11 +88,21 @@ def _path(*args):
 
 
 def _Path(*args):
+    """
+    Return the path to the given arguments.
+
+    Args:
+    """
     # type: (str) -> Path
     return Path(_path(*args))
 
 
 def patchClassMap(**kwargs):
+    """
+    Returns a new dictionary with the given name.
+
+    Args:
+    """
     class_map = hdl_checker.serialization.CLASS_MAP.copy()
     for name, value in kwargs.items():
         class_map.update({name: value})
@@ -101,6 +111,12 @@ def patchClassMap(**kwargs):
 
 
 def _makeConfigFromDict(dict_):
+    """
+    Create a dictionary of a dictionary.
+
+    Args:
+        dict_: (dict): write your description
+    """
     # type: (...) -> str
     filename = p.join(TEST_TEMP_PATH, "mock.prj")
     json.dump(dict_, open(filename, "w"))
@@ -119,6 +135,12 @@ with such.A("hdl_checker project") as it:
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
     def test(handle_ui_info):
+        """
+        Test if ui
+
+        Args:
+            handle_ui_info: (todo): write your description
+        """
 
         path = tempfile.mkdtemp()
 
@@ -149,6 +171,12 @@ with such.A("hdl_checker project") as it:
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
     def test(handle_ui_info):
+        """
+        Test if ui
+
+        Args:
+            handle_ui_info: (todo): write your description
+        """
 
         path = tempfile.mkdtemp()
 
@@ -173,6 +201,12 @@ with such.A("hdl_checker project") as it:
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
     def test(handle_ui_info):
+        """
+        Test if ui
+
+        Args:
+            handle_ui_info: (todo): write your description
+        """
         path = tempfile.mkdtemp()
 
         config = p.join(path, "config.json")
@@ -197,6 +231,12 @@ with such.A("hdl_checker project") as it:
         return_value=[Identifier("builtin")],
     )
     def test(parse_builtins):
+        """
+        Parse a python module.
+
+        Args:
+            parse_builtins: (todo): write your description
+        """
         # type: (...) -> None
         root = tempfile.mkdtemp()
         server = DummyServer(Path(root))
@@ -230,11 +270,21 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
+            """
+            Setup the project.
+
+            Args:
+            """
             it.project_file = Path("non_existing_file")
             it.assertFalse(p.exists(it.project_file.name))
 
         @it.should("raise exception when trying to instantiate")  # type: ignore
         def test():
+            """
+            Set the project configuration
+
+            Args:
+            """
             project = DummyServer(_Path("nonexisting"))
             with it.assertRaises(FileNotFoundError):
                 project.setConfig(str(it.project_file), origin=ConfigFileOrigin.user)
@@ -243,14 +293,29 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
+            """
+            Setup the project
+
+            Args:
+            """
             it.project = DummyServer(Path(TEST_PROJECT))
 
         @it.should("use fallback to Fallback builder")  # type: ignore
         def test():
+            """
+            Run the test. test.
+
+            Args:
+            """
             it.assertIsInstance(it.project.builder, Fallback)
 
         @it.should("restore state from a saved cache")  # type: ignore
         def test():
+            """
+            Synchronize of the project.
+
+            Args:
+            """
             it.project._saveCache()
             it.project._recoverCacheIfPossible()
             it.assertIsNone(it.project.config_file)
@@ -261,6 +326,12 @@ with such.A("hdl_checker project") as it:
             return_value=[CheckerDiagnostic(text="some text")],
         )
         def test(meth):
+            """
+            Test if the project.
+
+            Args:
+                meth: (todo): write your description
+            """
 
             _logger.info("Files: %s", it.project.database._paths)
 
@@ -283,6 +354,11 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
+            """
+            Sets up the system.
+
+            Args:
+            """
             setupTestSuport(TEST_TEMP_PATH)
 
             it.project = DummyServer(_Path(TEST_TEMP_PATH))
@@ -330,11 +406,21 @@ with such.A("hdl_checker project") as it:
 
         @it.should("use MockBuilder builder")  # type: ignore
         def test():
+            """
+            Perform the test.
+
+            Args:
+            """
             # Just to make sure patch worked
             it.assertEqual(it.project.builder.builder_name, MockBuilder.builder_name)
 
         @it.should("save cache after checking a source")  # type: ignore
         def test():
+            """
+            Convert a source to a source file.
+
+            Args:
+            """
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
@@ -346,6 +432,11 @@ with such.A("hdl_checker project") as it:
         @it.should("restore state from a saved cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
+            """
+            Runs the current project.
+
+            Args:
+            """
             it.project._saveCache()
             it.project._recoverCacheIfPossible()
             it.assertIsNotNone(it.project.config_file)
@@ -353,6 +444,11 @@ with such.A("hdl_checker project") as it:
         @it.should("not reparse when setting the config file")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
+            """
+            Save the test is run.
+
+            Args:
+            """
             it.project._saveCache()
 
             _ = DummyServer(_Path(TEST_TEMP_PATH))
@@ -372,6 +468,12 @@ with such.A("hdl_checker project") as it:
         @patchClassMap(MockBuilder=MockBuilder)
         @patch("hdl_checker.base_server.json.load", return_value={"__version__": None})
         def test(json_load):
+            """
+            Synchronously json files.
+
+            Args:
+                json_load: (todo): write your description
+            """
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
@@ -388,6 +490,11 @@ with such.A("hdl_checker project") as it:
         @linuxOnly
         @patchClassMap(MockBuilder=MockBuilder)
         def test():
+            """
+            Configure a test.
+
+            Args:
+            """
             # Make sure everything is up to date prior to running
             with patch.object(it.project, "configure") as configure:
                 it.project._updateConfigIfNeeded()
@@ -411,6 +518,12 @@ with such.A("hdl_checker project") as it:
         @it.should("warn when failing to recover from cache")  # type: ignore
         @patch("hdl_checker.tests.DummyServer._handleUiWarning")
         def test(handle_ui_warning):
+            """
+            Test if ui.
+
+            Args:
+                handle_ui_warning: (todo): write your description
+            """
             it.project._saveCache()
             # Copy parameters of the object we're checking against
             root_dir = it.project.root_dir
@@ -434,6 +547,12 @@ with such.A("hdl_checker project") as it:
         # serializable
         @patch("hdl_checker.base_server.json.dump")
         def test(_):
+            """
+            Generate a project object.
+
+            Args:
+                _: (int): write your description
+            """
             with PatchBuilder():
                 it.project.setConfig(
                     Path(p.join(TEST_PROJECT, "vimhdl.prj")),
@@ -490,6 +609,15 @@ with such.A("hdl_checker project") as it:
             def build(  # pylint: disable=unused-argument
                 path, library, scope, forced=False
             ):
+                """
+                Builds a list of the - scope library.
+
+                Args:
+                    path: (str): write your description
+                    library: (todo): write your description
+                    scope: (todo): write your description
+                    forced: (bool): write your description
+                """
                 _logger.debug("Building library=%s, path=%s", library, path)
                 path_diags = diags.get(str(path), [])
                 if path_diags:
@@ -530,6 +658,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("Resolve dependency to path")  # type: ignore
         def test():
+            """
+            Generate the test.
+
+            Args:
+            """
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
             clock_divider = RequiredDesignUnit(
@@ -551,6 +684,11 @@ with such.A("hdl_checker project") as it:
             "Resolve dependency to path when it's defined on the same file"
         )
         def test():
+            """
+            Generate the test.
+
+            Args:
+            """
             path = _Path(TEST_PROJECT, "basic_library", "package_with_functions.vhd")
 
             clock_divider = RequiredDesignUnit(
@@ -567,6 +705,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("Not resolve dependencies whose library is built in")  # type: ignore
         def test():
+            """
+            Generate a project path.
+
+            Args:
+            """
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
             numeric_std = RequiredDesignUnit(
@@ -586,6 +729,11 @@ with such.A("hdl_checker project") as it:
             "hdl_checker.base_server.getBuilderByName", new=lambda name: FailingBuilder
         )
         def test():
+            """
+            Generate the project.
+
+            Args:
+            """
             cache_content = {"builder": FailingBuilder.builder_name}
 
             cache_path = it.project._getCacheFilename()
@@ -616,6 +764,12 @@ with such.A("hdl_checker project") as it:
         @it.has_setup
         @patch("hdl_checker.tests.DummyServer._handleUiInfo")
         def setup(handle_ui_info):
+            """
+            Setup uiport.
+
+            Args:
+                handle_ui_info: (todo): write your description
+            """
             setupTestSuport(TEST_TEMP_PATH)
 
             removeIfExists(p.join(TEST_TEMP_PATH, WORK_PATH, CACHE_NAME))
@@ -638,10 +792,20 @@ with such.A("hdl_checker project") as it:
 
         @it.should("use mock builder")  # type: ignore
         def test():
+            """
+            Run the test.
+
+            Args:
+            """
             it.assertIsInstance(it.project.builder, MockBuilder)
 
         @it.should("get messages for an absolute path")  # type: ignore
         def test():
+            """
+            Generate the test files.
+
+            Args:
+            """
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
@@ -661,6 +825,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get messages for relative path")  # type: ignore
         def test():
+            """
+            Generate the project
+
+            Args:
+            """
             filename = p.relpath(
                 p.join(TEST_PROJECT, "another_library", "foo.vhd"),
                 str(it.project.root_dir),
@@ -683,6 +852,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get messages with text")  # type: ignore
         def test():
+            """
+            Create a test files
+
+            Args:
+            """
             it.assertTrue(it.project.database.paths)
 
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
@@ -727,6 +901,11 @@ with such.A("hdl_checker project") as it:
             "get messages with text for file outside the project file"
         )
         def test():
+            """
+            Generates a test case
+
+            Args:
+            """
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["entity some_entity is end;"])
 
@@ -751,6 +930,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get updated messages")  # type: ignore
         def test():
+            """
+            Writes a test code to a string
+
+            Args:
+            """
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
             code = open(str(filename), "r").read().split("\n")
@@ -778,6 +962,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get messages by path of a different source")  # type: ignore
         def test():
+            """
+            Generate the test
+
+            Args:
+            """
             filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
 
             it.assertCountEqual(
@@ -797,6 +986,11 @@ with such.A("hdl_checker project") as it:
             "get messages from a source outside the project file"
         )
         def test():
+            """
+            Generate the test files
+
+            Args:
+            """
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["library some_lib;"])
 
@@ -816,6 +1010,13 @@ with such.A("hdl_checker project") as it:
             )
 
         def basicRebuildTest(test_filename, rebuilds):
+            """
+            Return a list of test files.
+
+            Args:
+                test_filename: (str): write your description
+                rebuilds: (str): write your description
+            """
             calls = []
             ret_list = list(reversed(rebuilds))
 
@@ -824,6 +1025,15 @@ with such.A("hdl_checker project") as it:
             # - {library_name: '', 'unit_name': }
             # - {rebuild_path: ''}
             def _buildAndGetDiagnostics(_, path, library, forced=False):
+                """
+                Builds a list of gragnostics.
+
+                Args:
+                    _: (todo): write your description
+                    path: (str): write your description
+                    library: (todo): write your description
+                    forced: (bool): write your description
+                """
                 _logger.warning("%s, %s, %s", path, library, forced)
                 calls.append(str(path))
                 if ret_list:
@@ -842,6 +1052,13 @@ with such.A("hdl_checker project") as it:
             return calls
 
         def _RebuildLibraryUnit(name, library):
+            """
+            Convert a sequence name.
+
+            Args:
+                name: (str): write your description
+                library: (todo): write your description
+            """
             return RebuildLibraryUnit(
                 name=Identifier(name), library=Identifier(library)
             )
@@ -850,6 +1067,11 @@ with such.A("hdl_checker project") as it:
             "rebuild sources when needed within the same library"
         )
         def test():
+            """
+            Runs a project.
+
+            Args:
+            """
             it.project.database._clearLruCaches()
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [
@@ -876,6 +1098,11 @@ with such.A("hdl_checker project") as it:
             "rebuild sources when changing a package on different libraries"
         )
         def test():
+            """
+            Generate the test test files.
+
+            Args:
+            """
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [[_RebuildLibraryUnit(library="another_library", name="foo")]]
 
@@ -895,10 +1122,21 @@ with such.A("hdl_checker project") as it:
             )
 
         def _RebuildPath(path):
+            """
+            Takes a path and returns a path.
+
+            Args:
+                path: (str): write your description
+            """
             return RebuildPath(Path(path))
 
         @it.should("rebuild sources with path as a hint")  # type: ignore
         def test():
+            """
+            Generate the project.
+
+            Args:
+            """
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             abs_path = p.join(
@@ -928,10 +1166,22 @@ with such.A("hdl_checker project") as it:
             )
 
         def _RebuildUnit(name, type_):
+            """
+            Creates a new : class : class : ~. sequence. sequence. sequence. sequence.
+
+            Args:
+                name: (str): write your description
+                type_: (todo): write your description
+            """
             return RebuildUnit(name=Identifier(name), type_=Identifier(type_))
 
         @it.should("rebuild package if needed")  # type: ignore
         def test():
+            """
+            Generate the test.
+
+            Args:
+            """
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
@@ -954,6 +1204,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("rebuild a combination of all")  # type: ignore
         def test():
+            """
+            Create a test test.
+
+            Args:
+            """
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
@@ -989,6 +1244,12 @@ with such.A("hdl_checker project") as it:
         @it.should("give up trying to rebuild after 20 attempts")  # type: ignore
         @patch("hdl_checker.tests.DummyServer._handleUiError")
         def test(handle_ui_error):
+            """
+            Test for testing.
+
+            Args:
+                handle_ui_error: (todo): write your description
+            """
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }

@@ -28,6 +28,12 @@ class Fallback(BaseBuilder):
     file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize version
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         self._version = "<undefined>"
         super(Fallback, self).__init__(*args, **kwargs)
@@ -35,20 +41,61 @@ class Fallback(BaseBuilder):
     # Since Fallback._buildSource returns nothing,
     # Fallback._makeRecords is never called
     def _makeRecords(self, _):  # pragma: no cover
+        """
+        Returns a list of tuples of the given type.
+
+        Args:
+            self: (todo): write your description
+            _: (todo): write your description
+        """
         return []
 
     def _shouldIgnoreLine(self, line):  # pragma: no cover
+        """
+        Determine if a line is a line.
+
+        Args:
+            self: (todo): write your description
+            line: (str): write your description
+        """
         return True
 
     def _checkEnvironment(self):
+        """
+        Checks if the environment is available.
+
+        Args:
+            self: (todo): write your description
+        """
         return
 
     @staticmethod
     def isAvailable():
+        """
+        Returns true if the given function?
+
+        Args:
+        """
         return True
 
     def _buildSource(self, path, library, flags=None):  # pragma: no cover
+        """
+        Builds the list of the given path.
+
+        Args:
+            self: (todo): write your description
+            path: (str): write your description
+            library: (todo): write your description
+            flags: (int): write your description
+        """
         return [], []
 
     def _createLibrary(self, library):  # pragma: no cover
+        """
+        Create a new : class : ~library.
+
+        Args:
+            self: (todo): write your description
+            library: (todo): write your description
+        """
         pass

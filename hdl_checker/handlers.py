@@ -44,19 +44,46 @@ class Server(BaseServer):
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the queue
+
+        Args:
+            self: (todo): write your description
+        """
         # type: (...) -> None
         self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
         super(Server, self).__init__(*args, **kwargs)
 
     def _handleUiInfo(self, message):
+        """
+        Handle a message.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         # type: (...) -> Any
         self._msg_queue.put(("info", message))
 
     def _handleUiWarning(self, message):
+        """
+        Handle a message.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         # type: (...) -> Any
         self._msg_queue.put(("warning", message))
 
     def _handleUiError(self, message):
+        """
+        Handle a message.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         # type: (...) -> Any
         self._msg_queue.put(("error", message))
 
@@ -104,6 +131,11 @@ def _exceptionWrapper(func):
     """
 
     def _wrapper(*args, **kwargs):
+        """
+        Wraps a function with the wrapped function.
+
+        Args:
+        """
         try:
             return func(*args, **kwargs)
         except:  # pragma: no cover

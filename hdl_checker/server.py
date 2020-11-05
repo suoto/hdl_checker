@@ -232,6 +232,11 @@ def run(args):
 
 
 def main():
+    """
+    Main entry point.
+
+    Args:
+    """
     return run(parseArguments())
 
 

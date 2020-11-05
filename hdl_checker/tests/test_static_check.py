@@ -32,6 +32,11 @@ with such.A("hdl_checker project") as it:
 
     @it.should("not repeat an object in the results")
     def test():
+        """
+        Run test for test.
+
+        Args:
+        """
         text = ["", "library ieee;", "", "library ieee;", ""]
 
         it.assertDictEqual(
@@ -48,6 +53,13 @@ with such.A("hdl_checker project") as it:
         [" process(clk)"],
     )
     def test(case, parm):
+        """
+        Create a case.
+
+        Args:
+            case: (todo): write your description
+            parm: (int): write your description
+        """
         _logger.info("Running test case '%s'", case)
         text = ["library foo;"] + parm + ["library bar;"]
 
@@ -63,6 +75,13 @@ with such.A("hdl_checker project") as it:
         " -- FIXME: something to fix",
     )
     def test(case, parm):
+        """
+        Generate the case.
+
+        Args:
+            case: (todo): write your description
+            parm: (int): write your description
+        """
         _logger.info("Running test case '%s'", case)
         expected = re.sub(r"\s*--\s*", "", parm)
 
@@ -110,6 +129,11 @@ with such.A("hdl_checker project") as it:
 
     @it.should("get misc checks")  # type: ignore
     def test():
+        """
+        Run test.
+
+        Args:
+        """
         text = [
             "entity foo is",
             "    port (",
@@ -131,6 +155,11 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
+            """
+            Generate a new environment.
+
+            Args:
+            """
             it.text = [
                 "library ieee;",
                 "    use ieee.std_logic_1164.all;",
@@ -162,6 +191,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get VHDL objects from an entity-architecture pair")  # type: ignore
         def test():
+            """
+            Generate test.
+
+            Args:
+            """
             it.assertDictEqual(
                 {
                     "DIVIDER_A": {"end": 18, "lnum": 8, "start": 8, "type": "generic"},
@@ -184,6 +218,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get misc checks")  # type: ignore
         def test():
+            """
+            Run test test objects.
+
+            Args:
+            """
             objects = static_check._getObjectsFromText(it.text)
 
             it.assertCountEqual(
@@ -193,6 +232,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get unused VHDL objects")  # type: ignore
         def test():
+            """
+            Run test test.
+
+            Args:
+            """
             objects = static_check._getObjectsFromText(it.text)
             it.assertCountEqual(
                 ["basic_library", "DIVIDER_A", "DIVIDER_B", "clk_in_b", "clk_out_b"],
@@ -203,6 +247,11 @@ with such.A("hdl_checker project") as it:
 
         @it.has_setup
         def setup():
+            """
+            Set up the text
+
+            Args:
+            """
             it.text = [
                 "library ieee;",
                 "package very_common_pkg is",
@@ -214,6 +263,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get VHDL objects from a package-package body pair")  # type: ignore
         def test():
+            """
+            Run test test.
+
+            Args:
+            """
 
             it.assertDictEqual(
                 {"ieee": {"end": 12, "lnum": 0, "start": 8, "type": "library"}},
@@ -222,6 +276,11 @@ with such.A("hdl_checker project") as it:
 
         @it.should("get unused VHDL objects")  # type: ignore
         def test():
+            """
+            Test for test test.
+
+            Args:
+            """
             objects = static_check._getObjectsFromText(it.text)
             it.assertCountEqual(
                 ["ieee"], static_check._getUnusedObjects(it.text, objects)

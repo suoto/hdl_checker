@@ -42,6 +42,13 @@ class SimpleFinder(BaseGenerator):
     """
 
     def __init__(self, paths):  # type: (List[str]) -> None
+        """
+        Initialize the paths.
+
+        Args:
+            self: (todo): write your description
+            paths: (str): write your description
+        """
         super(SimpleFinder, self).__init__()
         self._logger.debug("Search paths: %s", paths)
         self._paths = {Path(x) for x in paths}
@@ -71,6 +78,12 @@ class SimpleFinder(BaseGenerator):
                 yield source_path
 
     def _populate(self):  # type: (...) -> None
+        """
+        Populates self.
+
+        Args:
+            self: (todo): write your description
+        """
         for path in self._findSources():
             library = self._getLibrary(path)
             self._addSource(
