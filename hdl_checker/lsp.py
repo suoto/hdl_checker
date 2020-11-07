@@ -62,7 +62,11 @@ from hdl_checker.base_server import BaseServer
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
 from hdl_checker.exceptions import UnknownParameterError
-from hdl_checker.parsers.elements.dependency_spec import BaseDependencySpec
+from hdl_checker.parsers.elements.dependency_spec import (
+    BaseDependencySpec,
+    IncludedPath,
+    RequiredDesignUnit,
+)
 from hdl_checker.parsers.elements.design_unit import (
     VerilogDesignUnit,
     VhdlDesignUnit,
@@ -403,10 +407,14 @@ class HdlCheckerLanguageServer(LanguageServer):
         Report which source defines a given dependency when the user hovers
         over its name
         """
-        # If that doesn't match, check for dependencies
-        info = self.checker.resolveDependencyToPath(dependency)
-        if info is not None:
-            return self._format('Path "{}", library "{}"'.format(info[0], info[1]))
+        if isinstance(dependency, RequiredDesignUnit):
+            info = self.checker.resolveDependencyToPath(dependency)
+            if info is not None:
+                return self._format('Path "{}", library "{}"'.format(info[0], info[1]))
+        elif isinstance(dependency, IncludedPath):
+            info = self.checker.database.resolveIncludedPath(dependency)
+            if info is not None:
+                return self._format('Path "{}"'.format(info))
 
         return "Couldn't find a source defining '{}.{}'".format(
             dependency.library, dependency.name
@@ -473,7 +481,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             return []
 
         # Work out where this dependency refers to
-        info = self.checker.resolveDependencyToPath(dependency)
+        info = self.checker.resolveDependency(dependency)
 
         if info is None:
             _logger.debug("Unable to resolve %s to a path", dependency)
@@ -484,6 +492,11 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Make the response
         target_path, _ = info
         target_uri = from_fs_path(str(target_path))
+
+        # Included paths are dependencies but they're referred to by path, so
+        # we return a definition to point to the beginning of the file
+        if isinstance(dependency, IncludedPath):
+            return [Location(target_uri, Range(Position(0, 0), Position(0, 0),),)]
 
         locations: List[Location] = []
 

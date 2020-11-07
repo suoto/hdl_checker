@@ -31,8 +31,8 @@ from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple
 from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
     getBuilderByName,
-    getVunitSources,
     getPreferredBuilder,
+    getVunitSources,
 )
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.database import Database
@@ -44,6 +44,7 @@ from hdl_checker.diagnostics import (
 )
 from hdl_checker.parsers.config_parser import ConfigParser
 from hdl_checker.parsers.elements.dependency_spec import (
+    BaseDependencySpec,
     IncludedPath,
     RequiredDesignUnit,
 )
@@ -522,14 +523,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             if dependency.library in self.builder.builtin_libraries:
                 continue
             # Required design units will be translated directly into a path
-            resolved = (
-                isinstance(dependency, RequiredDesignUnit)
-                and self.resolveDependencyToPath(dependency)
-            ) or (
-                isinstance(dependency, IncludedPath)
-                and self.database.resolveIncludedPath(dependency)
-            )
-            if not resolved:
+            if not self.resolveDependency(dependency):
                 for location in dependency.locations:
                     diags.add(UnresolvedDependency(dependency, location))
 
@@ -616,4 +610,15 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
             ):
                 return path, library
 
+        return None
+
+    def resolveDependency(
+        self, dependency: BaseDependencySpec
+    ) -> Optional[Tuple[Path, Optional[Identifier]]]:
+        """Resolves RequiredDesignUnit and IncludedPath dependencies"""
+        if isinstance(dependency, RequiredDesignUnit):
+            return self.resolveDependencyToPath(dependency)
+        elif isinstance(dependency, IncludedPath):
+            return (self.database.resolveIncludedPath(dependency), None)
+        _logger.info("Could not resolve %s (%s)", dependency, type(dependency))
         return None
