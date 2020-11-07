@@ -258,7 +258,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         return path
 
-    @debounce(LINT_DEBOUNCE_S, keyed_by="doc_uri")
+    @debounce(LINT_DEBOUNCE_S, keyed_by="uri")
     def lint(self, uri: URI, is_saved: bool) -> None:
         """
         Check a file for lint errors
