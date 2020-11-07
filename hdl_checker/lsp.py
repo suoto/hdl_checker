@@ -274,15 +274,14 @@ class HdlCheckerLanguageServer(LanguageServer):
         paths.add(Path(to_fs_path(uri)))
 
         for path in paths:
-            diags_to_publish = {
-                checkerDiagToLspDict(diag) for diag in diags if diag.filename == path
-            }
-            if diags_to_publish:
-                self.lsp.publish_diagnostics(
-                    from_fs_path(str(path)), tuple(diags_to_publish)
-                )
-            else:
-                _logger.debug("No diagnostics for %s", path)
+            self.lsp.publish_diagnostics(
+                from_fs_path(str(path)),
+                tuple(
+                    checkerDiagToLspDict(diag)
+                    for diag in diags
+                    if diag.filename == path
+                ),
+            )
 
     def _getDiags(self, doc_uri: URI, is_saved: bool) -> Iterable[CheckerDiagnostic]:
         """
