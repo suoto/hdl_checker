@@ -113,9 +113,9 @@ with such.A("hdl_checker project") as it:
     it.assertSameFile = assertSameFile(it)
 
     @it.should("warn when setup is taking too long")
-    @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
+    @patch("hdl_checker.core._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.base_server.BaseServer, "configure", lambda *_: time.sleep(0.5)
+        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
     def test(handle_ui_info):
@@ -135,7 +135,7 @@ with such.A("hdl_checker project") as it:
         project.getMessagesByPath(Path(source))
 
         handle_ui_info.assert_called_once_with(
-            hdl_checker.base_server._HOW_LONG_IS_TOO_LONG_MSG
+            hdl_checker.core._HOW_LONG_IS_TOO_LONG_MSG
         )
 
         removeIfExists(path)
@@ -143,9 +143,9 @@ with such.A("hdl_checker project") as it:
     @it.should(  # type: ignore
         "not warn when setup is taking too long if the user provides the config file"
     )
-    @patch("hdl_checker.base_server._HOW_LONG_IS_TOO_LONG", 0.1)
+    @patch("hdl_checker.core._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.base_server.BaseServer, "configure", lambda *_: time.sleep(0.5)
+        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
     def test(handle_ui_info):
@@ -257,7 +257,7 @@ with such.A("hdl_checker project") as it:
 
         @it.should("still report static messages")  # type: ignore
         @patch(
-            "hdl_checker.base_server.getStaticMessages",
+            "hdl_checker.core.getStaticMessages",
             return_value=[CheckerDiagnostic(text="some text")],
         )
         def test(meth):
@@ -339,7 +339,7 @@ with such.A("hdl_checker project") as it:
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
 
-            with patch("hdl_checker.base_server.json.dump", spec=json.dump) as func:
+            with patch("hdl_checker.core.json.dump", spec=json.dump) as func:
                 it.project.getMessagesByPath(source.filename)
                 func.assert_called_once()
 
@@ -359,7 +359,7 @@ with such.A("hdl_checker project") as it:
 
             # Setting the config file should not trigger reparsing
             with patch(
-                "hdl_checker.base_server.WatchedFile.__init__", side_effect=[None]
+                "hdl_checker.core.WatchedFile.__init__", side_effect=[None]
             ) as watched_file:
                 old = it.project.config_file
                 it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
@@ -370,7 +370,7 @@ with such.A("hdl_checker project") as it:
 
         @it.should("not recover cache if versions differ")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        @patch("hdl_checker.base_server.json.load", return_value={"__version__": None})
+        @patch("hdl_checker.core.json.load", return_value={"__version__": None})
         def test(json_load):
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
@@ -432,7 +432,7 @@ with such.A("hdl_checker project") as it:
         @it.should("get builder messages by path")  # type: ignore
         # Avoid saving to cache because the patched method is not JSON
         # serializable
-        @patch("hdl_checker.base_server.json.dump")
+        @patch("hdl_checker.core.json.dump")
         def test(_):
             with PatchBuilder():
                 it.project.setConfig(
@@ -583,7 +583,7 @@ with such.A("hdl_checker project") as it:
         )
         @linuxOnly
         @patch(
-            "hdl_checker.base_server.getBuilderByName", new=lambda name: FailingBuilder
+            "hdl_checker.core.getBuilderByName", new=lambda name: FailingBuilder
         )
         def test():
             cache_content = {"builder": FailingBuilder.builder_name}

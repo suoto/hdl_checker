@@ -36,7 +36,7 @@ from pygls import uris
 from unittest2 import TestCase
 
 from hdl_checker import exceptions
-from hdl_checker.base_server import BaseServer
+from hdl_checker.core import HdlCheckerCore
 from hdl_checker.builders.base_builder import BaseBuilder
 from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
@@ -51,8 +51,8 @@ _logger = logging.getLogger(__name__)
 MockDep = Union[Tuple[str], Tuple[str, str]]
 
 
-class DummyServer(BaseServer):
-    "Class for testing BaseServer"
+class DummyServer(HdlCheckerCore):
+    "Class for testing HdlCheckerCore"
     _server_index = 0
 
     def __init__(self, *args, **kwargs):
@@ -286,10 +286,10 @@ class PatchBuilder(object):
         self.meth = meth
         self.patches = (
             mock.patch(
-                "hdl_checker.base_server.getPreferredBuilder",
+                "hdl_checker.core.getPreferredBuilder",
                 side_effect=[MockBuilder,],
             ),
-            mock.patch("hdl_checker.base_server.getBuilderByName", getBuilderByName),
+            mock.patch("hdl_checker.core.getBuilderByName", getBuilderByName),
             disableVunit,
         )
 

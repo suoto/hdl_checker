@@ -58,7 +58,7 @@ from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
 
 from hdl_checker import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
-from hdl_checker.base_server import BaseServer
+from hdl_checker.core import HdlCheckerCore
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
 from hdl_checker.exceptions import UnknownParameterError
@@ -128,7 +128,7 @@ def checkerDiagToLspDict(diag: CheckerDiagnostic) -> Diagnostic:
     )
 
 
-class Server(BaseServer):
+class Server(HdlCheckerCore):
     """
     HDL Checker project builder class
     """

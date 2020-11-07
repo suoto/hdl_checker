@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import bottle  # type: ignore
 
 from hdl_checker import __version__ as version
-from hdl_checker.base_server import BaseServer
+from hdl_checker.core import HdlCheckerCore
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.path import Path
 from hdl_checker.types import ConfigFileOrigin
@@ -38,7 +38,7 @@ _logger = logging.getLogger(__name__)
 app = bottle.Bottle()  # pylint: disable=invalid-name
 
 
-class Server(BaseServer):
+class Server(HdlCheckerCore):
     """
     HDL Checker project builder class
     """

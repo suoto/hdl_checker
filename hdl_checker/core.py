@@ -86,7 +86,7 @@ WatchedFile = NamedTuple(
 )
 
 
-class BaseServer(object):  # pylint: disable=useless-object-inheritance
+class HdlCheckerCore:
     """
     HDL Checker project builder class
     """
@@ -282,7 +282,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         """
         self._database = state.pop("database")
         self._builder = state.pop("builder", Fallback)
-        self._builder._database = self._database
+        self._builder._database = self._database  #  pylint: disable=protected-access
         config_file = state.pop("config_file", None)
         if config_file is None:
             self.config_file = None
@@ -618,7 +618,7 @@ class BaseServer(object):  # pylint: disable=useless-object-inheritance
         """Resolves RequiredDesignUnit and IncludedPath dependencies"""
         if isinstance(dependency, RequiredDesignUnit):
             return self.resolveDependencyToPath(dependency)
-        elif isinstance(dependency, IncludedPath):
+        if isinstance(dependency, IncludedPath):
             return (self.database.resolveIncludedPath(dependency), None)
         _logger.info("Could not resolve %s (%s)", dependency, type(dependency))
         return None

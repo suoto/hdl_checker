@@ -424,7 +424,7 @@ class TestRootUriNoProjectFile(_LspHelper):
             patch.object(
                 hdl_checker.config_generators.base_generator.BaseGenerator, "generate",
             ),
-            patch("hdl_checker.base_server.json.dump", spec=json.dump),
+            patch("hdl_checker.core.json.dump", spec=json.dump),
         )
 
         for _patch in self.patches:
@@ -449,7 +449,7 @@ class TestRootUriNoProjectFile(_LspHelper):
     def test_SearchesForFilesOnInitialization(self):  # pylint: disable=no-self-use
         lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
         #  Will get called twice
-        hdl_checker.base_server.json.dump.assert_called()  # pylint: disable=no-member
+        hdl_checker.core.json.dump.assert_called()  # pylint: disable=no-member
 
 
 class TestOldStyleProjectFile(_LspHelper):
@@ -627,7 +627,7 @@ class TestValidProject(_LspHelper):
             self.runTestBuildSequenceTable(tablefmt="github")
 
     @patch.object(
-        hdl_checker.base_server.BaseServer,
+        hdl_checker.core.HdlCheckerCore,
         "resolveDependencyToPath",
         lambda self, _: None,
     )
@@ -645,7 +645,7 @@ class TestValidProject(_LspHelper):
         )
 
     @patch.object(
-        hdl_checker.base_server.BaseServer,
+        hdl_checker.core.HdlCheckerCore,
         "resolveDependencyToPath",
         lambda self, _: (Path("some_path"), Identifier("some_library")),
     )
