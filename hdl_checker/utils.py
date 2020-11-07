@@ -378,18 +378,9 @@ def getMostCommonItem(items):
     return max(items, key=data.get)
 
 
-if six.PY2:
-
-    def readFile(path):
-        "Wrapper around open().read() that return \n for new lines"
-        return open(path, mode="rU").read()
-
-
-else:
-
-    def readFile(path):
-        "Wrapper around open().read() that return \n for new lines"
-        return open(path, mode="r", newline="\n", errors="replace").read()
+def readFile(path):
+    "Wrapper around open().read() that return \n for new lines"
+    return open(path, mode="r", newline="\n", errors="replace").read()
 
 
 REPO_URL = "https://github.com/suoto/hdl_checker"
@@ -481,15 +472,10 @@ def debounce(interval_s, keyed_by=None):
 
         @functools.wraps(func)
         def debounced(*args, **kwargs):
-            _logger.fatal(
-                "%s(%s, %s) original and using %s",
-                func.__name__,
-                args,
-                kwargs,
-                interval_s,
-            )
-            call_args = inspect.getcallargs(func, *args, **kwargs)
-            key = call_args[keyed_by] if keyed_by else None
+            if keyed_by:
+                key = inspect.signature(func).bind(*args, **kwargs).arguments[keyed_by]
+            else:
+                key = None
 
             def run():
                 with lock:

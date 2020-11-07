@@ -411,14 +411,15 @@ class HdlCheckerLanguageServer(LanguageServer):
             info = self.checker.resolveDependencyToPath(dependency)
             if info is not None:
                 return self._format('Path "{}", library "{}"'.format(info[0], info[1]))
-        elif isinstance(dependency, IncludedPath):
+            return "Couldn't find a source defining '{}.{}'".format(
+                dependency.library, dependency.name
+            )
+
+        if isinstance(dependency, IncludedPath):
             info = self.checker.database.resolveIncludedPath(dependency)
             if info is not None:
                 return self._format('Path "{}"'.format(info))
-
-        return "Couldn't find a source defining '{}.{}'".format(
-            dependency.library, dependency.name
-        )
+        return "Couldn't find a source defining '{}'".format(dependency.name)
 
     def _getElementAtPosition(
         self, path: Path, position: Position
@@ -492,6 +493,10 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Make the response
         target_path, _ = info
         target_uri = from_fs_path(str(target_path))
+
+        if not target_path:
+            _logger.debug("Unable to resolve %s to a path", dependency)
+            return []
 
         # Included paths are dependencies but they're referred to by path, so
         # we return a definition to point to the beginning of the file
