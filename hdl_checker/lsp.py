@@ -58,8 +58,8 @@ from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
 
 from hdl_checker import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
-from hdl_checker.core import HdlCheckerCore
 from hdl_checker.config_generators.simple_finder import SimpleFinder
+from hdl_checker.core import HdlCheckerCore
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
 from hdl_checker.exceptions import UnknownParameterError
 from hdl_checker.parsers.elements.dependency_spec import (
@@ -310,7 +310,7 @@ class HdlCheckerLanguageServer(LanguageServer):
     def references(self, params: ReferenceParams) -> Optional[List[Location]]:
         "Tries to find references for the selected element"
 
-        element = self._getElementAtPosition(
+        element = self.getElementAtPosition(
             Path(to_fs_path(params.textDocument.uri)), params.position
         )
 
@@ -368,7 +368,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         return text
 
-    def _getBuildSequenceForHover(self, path: Path) -> str:
+    def getBuildSequenceForHover(self, path: Path) -> str:
         """
         Return a formatted text with the build sequence for the given path
         """
@@ -401,7 +401,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             ),
         )
 
-    def _getDependencyInfoForHover(self, dependency):
+    def getDependencyInfoForHover(self, dependency):
         # type: (BaseDependencySpec) -> str
         """
         Report which source defines a given dependency when the user hovers
@@ -421,7 +421,7 @@ class HdlCheckerLanguageServer(LanguageServer):
                 return self._format('Path "{}"'.format(info))
         return "Couldn't find a source defining '{}'".format(dependency.name)
 
-    def _getElementAtPosition(
+    def getElementAtPosition(
         self, path: Path, position: Position
     ) -> Union[BaseDependencySpec, tAnyDesignUnit, None]:
         """
@@ -441,9 +441,13 @@ class HdlCheckerLanguageServer(LanguageServer):
         return None
 
     def hover(self, params: HoverParams) -> Optional[Hover]:
+        """
+        Handles HoverParams and produces a Hover object if a known element is
+        found within the given location
+        """
         path = Path(to_fs_path(params.textDocument.uri))
         # Check if the element under the cursor matches something we know
-        element = self._getElementAtPosition(path, params.position)
+        element = self.getElementAtPosition(path, params.position)
 
         _logger.debug("Getting info from %s", element)
 
@@ -453,9 +457,9 @@ class HdlCheckerLanguageServer(LanguageServer):
             return None
 
         if isinstance(element, (VerilogDesignUnit, VhdlDesignUnit)):
-            contents = self._getBuildSequenceForHover(path)
+            contents = self.getBuildSequenceForHover(path)
         else:
-            contents = self._getDependencyInfoForHover(element)
+            contents = self.getDependencyInfoForHover(element)
 
         return Hover(
             contents=contents,
@@ -473,7 +477,10 @@ class HdlCheckerLanguageServer(LanguageServer):
     def definitions(
         self, params: TextDocumentPositionParams
     ) -> Optional[List[Location]]:
-        dependency = self._getElementAtPosition(
+        """
+        Returns known definitions found in the given location
+        """
+        dependency = self.getElementAtPosition(
             Path(to_fs_path(params.textDocument.uri)), params.position
         )
 

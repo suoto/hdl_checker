@@ -16,21 +16,18 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 # pylint: disable=missing-docstring
-# pylint: disable=protected-access
-# pylint: disable=invalid-name
 
 import asyncio
 import json
 import logging
 import os
 import os.path as p
-from tempfile import mkdtemp
+import time
 from threading import Thread
 from typing import Any, List, Optional, Union
 
-import parameterized  # type: ignore
 import unittest2  # type: ignore
-from mock import Mock, patch
+from mock import patch
 from pygls import features, uris
 from pygls.server import LanguageServer
 from pygls.types import (
@@ -43,7 +40,6 @@ from pygls.types import (
     HoverParams,
     InitializeParams,
     MarkupKind,
-    MessageType,
     Position,
     PublishDiagnosticsAbstract,
     Range,
@@ -58,8 +54,11 @@ from pygls.types import (
 )
 from tabulate import tabulate
 
-import hdl_checker
+# pylint: disable=wrong-import-position
+from hdl_checker.tests import getTestTempPath, setupTestSuport, toCheckerDiagnostic
+
 from hdl_checker import DEFAULT_LIBRARY
+from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import (
     DesignUnitType,
@@ -67,8 +66,9 @@ from hdl_checker.parsers.elements.design_unit import (
     VhdlDesignUnit,
 )
 from hdl_checker.parsers.elements.identifier import Identifier
-from hdl_checker.path import Path, TemporaryPath
+from hdl_checker.path import Path
 from hdl_checker.types import Location
+from hdl_checker.utils import ON_WINDOWS
 
 
 # Debouncing will hurt testing since it won't actually call the debounced
@@ -86,18 +86,10 @@ def noDebounce(interval_s, keyed_by=None):  # pylint: disable=unused-argument
 
 
 # This has to come before import hdl_checker.lsp
+import hdl_checker  # isort:skip
+
 hdl_checker.utils.debounce = noDebounce
-
-# pylint: disable=wrong-import-position
-from hdl_checker.tests import (  # isort:skip
-    toCheckerDiagnostic,
-    getTestTempPath,
-    setupTestSuport,
-)
-
 from hdl_checker import lsp  # isort:skip
-from hdl_checker.diagnostics import CheckerDiagnostic, DiagType  # isort:skip
-from hdl_checker.utils import ON_WINDOWS  # isort:skip
 
 _logger = logging.getLogger(__name__)
 
@@ -136,68 +128,6 @@ if ON_WINDOWS:
     TEST_PROJECT = TEST_PROJECT.lower()
 
 
-class TestCheckerDiagToLspDict(unittest2.TestCase):
-    @parameterized.parameterized.expand(
-        [
-            (DiagType.INFO, DiagnosticSeverity.Information),
-            (DiagType.STYLE_INFO, DiagnosticSeverity.Information),
-            (DiagType.STYLE_WARNING, DiagnosticSeverity.Information),
-            (DiagType.STYLE_ERROR, DiagnosticSeverity.Information),
-            (DiagType.WARNING, DiagnosticSeverity.Warning),
-            (DiagType.ERROR, DiagnosticSeverity.Error),
-            (DiagType.NONE, DiagnosticSeverity.Error),
-        ]
-    )
-    def test_converting_to_lsp(self, diag_type, severity):
-        # type: (...) -> Any
-        _logger.info("Running %s and %s", diag_type, severity)
-
-        diag = lsp.checkerDiagToLspDict(
-            CheckerDiagnostic(
-                checker="hdl_checker test",
-                text="some diag",
-                filename=Path("filename"),
-                line_number=0,
-                column_number=0,
-                error_code="error code",
-                severity=diag_type,
-            )
-        )
-
-        self.assertEqual(diag.code, "error code")
-        self.assertEqual(diag.source, "hdl_checker test")
-        self.assertEqual(diag.message, "some diag")
-        self.assertEqual(diag.severity, severity)
-        self.assertEqual(
-            diag.range,
-            Range(
-                start=Position(line=0, character=0), end=Position(line=0, character=0),
-            ),
-        )
-
-    def test_workspace_notify(self) -> None:  # pylint: disable=no-self-use
-        workspace = Mock()
-        workspace.show_message = Mock()
-
-        server = lsp.Server(
-            workspace, root_dir=TemporaryPath(mkdtemp(prefix="hdl_checker_"))
-        )
-        workspace.show_message.reset_mock()
-
-        server._handleUiInfo("some info")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with("some info", MessageType.Info)
-        workspace.show_message.reset_mock()
-
-        server._handleUiWarning("some warning")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with(
-            "some warning", MessageType.Warning
-        )
-        workspace.show_message.reset_mock()
-
-        server._handleUiError("some error")  # pylint: disable=protected-access
-        workspace.show_message.assert_called_once_with("some error", MessageType.Error)
-
-
 class _LspHelper(unittest2.TestCase):
     def _createClientServerPair(self, params: Optional[InitializeParams]):
         # pylint: disable=attribute-defined-outside-init
@@ -216,8 +146,8 @@ class _LspHelper(unittest2.TestCase):
         self.server_diagnostics = []  # type: ignore
 
         @self.server.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
-        def server_cb_publish_diags(diag):  # pylint: disable=unused-variable
-            _logger.fatal("Publishing diagnostic: %s", diag)
+        def serverPublishDiagnosticsHandler(diag):  # pylint: disable=unused-variable
+            _logger.info("Publishing diagnostic: %s", diag)
             self.server_diagnostics.append(diag)
 
         self.server_thread = Thread(
@@ -238,15 +168,15 @@ class _LspHelper(unittest2.TestCase):
         self.client_diagnostics = []  # type: ignore
 
         @self.client.feature(features.WINDOW_SHOW_MESSAGE)
-        def _show_message(*args):  # pylint: disable=unused-variable
+        def clientShowMessageHandler(*args):  # pylint: disable=unused-variable
             type_ = DiagnosticSeverity(args[0][0])
             msg = args[0][1]
-            _logger.warning("[Client] [%s]: %s", type_, msg)
+            _logger.info("[Client] [%s]: %s", type_, msg)
             self.client_messages.append((type_, msg))
 
         @self.client.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
-        def client_cb_publish_diags(diag):  # pylint: disable=unused-variable
-            _logger.warning("Publishing diagnostic: %s", diag)
+        def clientPublishDiagnosticsHandler(diag):  # pylint: disable=unused-variable
+            _logger.info("Publishing diagnostic: %s", diag)
             self.client_diagnostics.append(diag)
 
         self.client_thread = Thread(
@@ -271,21 +201,35 @@ class _LspHelper(unittest2.TestCase):
         self.client.lsp.send_request(features.INITIALIZED).result(LSP_REQUEST_TIMEOUT)
         _logger.info("Client server setup complete")
 
-    def tearDown(self):
-        if not getattr(self, "client", None):
-            return
-        _logger.warning("Shutting down server")
+    def tearDown(self):  # pylint:disable=inconsistent-return-statements
+        if self.__class__ is _LspHelper:
+            self.assertIsNone(getattr(self, "server", None))
+            self.assertIsNone(getattr(self, "client", None))
+            return unittest2.skip("Won't run this on %s" % self.__class__)
+        _logger.info("Shutting down server")
         shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
             LSP_REQUEST_TIMEOUT
         )
         self.client.lsp.notify(features.EXIT)
-        _logger.debug(
-            "Threads status: server: %s, client: %s",
-            self.server_thread.is_alive(),
-            self.client_thread.is_alive(),
-        )
+
+        for i in range(100):
+            _logger.debug(
+                "[%d] server alive: %s, client alive: %s",
+                i,
+                self.server_thread.is_alive(),
+                self.client_thread.is_alive(),
+            )
+            time.sleep(0.1)
+            if not self.server_thread.is_alive():
+                return
+
+        self.fail("Timeout waiting for server thread to complete")
+        self.client.shutdown()
+
         self.assertIsNone(shutdown_response)
-        del self.server
+
+        self.server_thread.join()
+        self.client_thread.join()
 
     def checkLintFileOnMethod(
         self,
@@ -393,20 +337,20 @@ class _LspHelper(unittest2.TestCase):
         )
 
     def test_LintFileOnOpen(self):  # pylint: disable=inconsistent-return-statements
-        if not getattr(self, "server", None):
-            return unittest2.skip("Won't run this on the helper")
+        if self.__class__ is _LspHelper:
+            return unittest2.skip("Won't run this on %s" % self.__class__)
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
     def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
-        if not getattr(self, "server", None):
-            return unittest2.skip("Won't run this on the helper")
+        if self.__class__ is _LspHelper:
+            return unittest2.skip("Won't run this on %s" % self.__class__)
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         )
 
     def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
-        if not getattr(self, "server", None):
-            return unittest2.skip("Won't run this on the helper")
+        if self.__class__ is _LspHelper:
+            return unittest2.skip("Won't run this on %s" % self.__class__)
         self._runDidOpenCheck(
             p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
         )
@@ -438,15 +382,15 @@ class TestRootUriNoProjectFile(_LspHelper):
             )
         )
 
-        self.maxDiff = None
-
     def tearDown(self):
-        _logger.warning("Shutting down server")
+        _logger.info("Shutting down server")
         for _patch in self.patches:
             _patch.stop()
         super(TestRootUriNoProjectFile, self).tearDown()
 
-    def test_SearchesForFilesOnInitialization(self):  # pylint: disable=no-self-use
+    def test_SearchesForFilesOnInitialization(
+        self,
+    ):  # pylint: disable=no-self-use,invalid-name
         lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
         #  Will get called twice
         hdl_checker.core.json.dump.assert_called()  # pylint: disable=no-member
@@ -465,8 +409,6 @@ class TestOldStyleProjectFile(_LspHelper):
                 initialization_options={"project_file": "vimhdl.prj"},
             ),
         )
-
-        self.maxDiff = None
 
 
 class TestNonExistingProjectFile(_LspHelper):
@@ -539,7 +481,7 @@ class TestValidProject(_LspHelper):
         )
 
     def runTestBuildSequenceTable(self, tablefmt):
-        _logger.fatal("############################################")
+        _logger.debug("############################################")
         very_common_pkg = Path(
             p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
         )
@@ -560,9 +502,8 @@ class TestValidProject(_LspHelper):
             ),
         ]
 
-        self.maxDiff = None
         try:
-            got = self.server._getBuildSequenceForHover(clk_en_generator)
+            got = self.server.getBuildSequenceForHover(clk_en_generator)
             self.assertEqual(got, "\n".join(expected))
         except:
             _logger.error(
@@ -580,7 +521,7 @@ class TestValidProject(_LspHelper):
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
-    )
+    )  # pylint: disable=invalid-name
     def test_ReportBuildSequenceFallback(self):
         with patch.object(self.server, "client_capabilities", None):
             self.runTestBuildSequenceTable(tablefmt="plain")
@@ -588,7 +529,7 @@ class TestValidProject(_LspHelper):
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
-    )
+    )  # pylint: disable=invalid-name
     def test_ReportBuildSequenceMarkdown(self):
         with patch.object(
             self.server,
@@ -630,8 +571,8 @@ class TestValidProject(_LspHelper):
         hdl_checker.core.HdlCheckerCore,
         "resolveDependencyToPath",
         lambda self, _: None,
-    )
-    def test_DependencyInfoForPathNotFound(self):
+    )  # pylint: disable=invalid-name
+    def test_DependencyInfoForPathNotFound(self):  # pylint: disable=invalid-name
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
         dependency = RequiredDesignUnit(
             name=Identifier("clock_divider"),
@@ -640,7 +581,7 @@ class TestValidProject(_LspHelper):
             locations=(),
         )
         self.assertEqual(
-            self.server._getDependencyInfoForHover(dependency),
+            self.server.getDependencyInfoForHover(dependency),
             "Couldn't find a source defining 'basic_library.clock_divider'",
         )
 
@@ -658,33 +599,35 @@ class TestValidProject(_LspHelper):
             locations=(),
         )
         self.assertEqual(
-            self.server._getDependencyInfoForHover(dependency),
+            self.server.getDependencyInfoForHover(dependency),
             'Path "some_path", library "some_library"',
         )
 
-    def test_ReportDesignUnitAccordingToPosition(self) -> None:
-        UNIT_A = VhdlDesignUnit(
+    def test_ReportDesignUnitAccordingToPosition(  # pylint: disable=invalid-name
+        self,
+    ) -> None:
+        unit_a = VhdlDesignUnit(
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             type_=DesignUnitType.entity,
             name="unit_a",
             locations=(Location(line=1, column=2), Location(line=3, column=4)),
         )
 
-        UNIT_B = VerilogDesignUnit(
+        unit_b = VerilogDesignUnit(
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             type_=DesignUnitType.package,
             name="unit_b",
             locations=(Location(line=5, column=6), Location(line=7, column=8)),
         )
 
-        DEP_A = RequiredDesignUnit(
+        dep_a = RequiredDesignUnit(
             name=Identifier("dep_a"),
             library=Identifier("lib_a"),
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             locations=(Location(line=9, column=10), Location(line=11, column=12)),
         )
 
-        DEP_B = RequiredDesignUnit(
+        dep_b = RequiredDesignUnit(
             name=Identifier("dep_a"),
             library=Identifier("lib_a"),
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
@@ -694,12 +637,12 @@ class TestValidProject(_LspHelper):
         def getDesignUnitsByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
                 self.fail("Expected foo.vhd but got %s" % path)
-            return {UNIT_A, UNIT_B}
+            return {unit_a, unit_b}
 
         def getDependenciesByPath(self, path):  # pylint: disable=unused-argument
             if path != Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")):
                 self.fail("Expected foo.vhd but got %s" % path)
-            return {DEP_A, DEP_B}
+            return {dep_a, dep_b}
 
         patches = (
             patch.object(
@@ -720,49 +663,49 @@ class TestValidProject(_LspHelper):
             _patch.start()
 
         # Check locations outside return nothing
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(0, 0)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(0, 0)))
 
         # Check design units are found, ensure boundaries match
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 1)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(1, 2)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Position(1, 7)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(1, 8)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(1, 1)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(1, 2)), unit_a)
+        self.assertIs(self.server.getElementAtPosition(path, Position(1, 7)), unit_a)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(1, 8)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 3)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(3, 4)), UNIT_A)
-        self.assertIs(self.server._getElementAtPosition(path, Position(3, 9)), UNIT_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(3, 10)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(3, 3)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(3, 4)), unit_a)
+        self.assertIs(self.server.getElementAtPosition(path, Position(3, 9)), unit_a)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(3, 10)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 5)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(5, 6)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Position(5, 11)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(5, 12)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(5, 5)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(5, 6)), unit_b)
+        self.assertIs(self.server.getElementAtPosition(path, Position(5, 11)), unit_b)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(5, 12)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 7)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(7, 8)), UNIT_B)
-        self.assertIs(self.server._getElementAtPosition(path, Position(7, 13)), UNIT_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(7, 14)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(7, 7)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(7, 8)), unit_b)
+        self.assertIs(self.server.getElementAtPosition(path, Position(7, 13)), unit_b)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(7, 14)))
 
         # Now check dependencies
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 9)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(9, 10)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Position(9, 20)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(9, 21)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(9, 9)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(9, 10)), dep_a)
+        self.assertIs(self.server.getElementAtPosition(path, Position(9, 20)), dep_a)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(9, 21)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 11)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(11, 12)), DEP_A)
-        self.assertIs(self.server._getElementAtPosition(path, Position(11, 22)), DEP_A)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(11, 23)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(11, 11)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(11, 12)), dep_a)
+        self.assertIs(self.server.getElementAtPosition(path, Position(11, 22)), dep_a)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(11, 23)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 13)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(13, 14)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Position(13, 24)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(13, 25)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(13, 13)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(13, 14)), dep_b)
+        self.assertIs(self.server.getElementAtPosition(path, Position(13, 24)), dep_b)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(13, 25)))
 
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 15)))
-        self.assertIs(self.server._getElementAtPosition(path, Position(15, 16)), DEP_B)
-        self.assertIs(self.server._getElementAtPosition(path, Position(15, 26)), DEP_B)
-        self.assertIsNone(self.server._getElementAtPosition(path, Position(15, 27)))
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(15, 15)))
+        self.assertIs(self.server.getElementAtPosition(path, Position(15, 16)), dep_b)
+        self.assertIs(self.server.getElementAtPosition(path, Position(15, 26)), dep_b)
+        self.assertIsNone(self.server.getElementAtPosition(path, Position(15, 27)))
 
         for _patch in patches:
             _patch.stop()
@@ -850,7 +793,7 @@ class TestValidProject(_LspHelper):
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
-    )
+    )  # pylint: disable=invalid-name
     def test_GetDefinitionMatchingDependency(self):
         source = p.join(TEST_PROJECT, "basic_library", "use_entity_a_and_b.vhd")
         target = p.join(TEST_PROJECT, "basic_library", "two_entities_one_file.vhd")
@@ -882,7 +825,7 @@ class TestValidProject(_LspHelper):
     @patch(
         "hdl_checker.builders.base_builder.BaseBuilder.builtin_libraries",
         (Identifier("ieee"),),
-    )
+    )  # pylint: disable=invalid-name
     def test_GetDefinitionBuiltInLibrary(self) -> None:
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
@@ -929,7 +872,7 @@ class TestValidProject(_LspHelper):
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure we picked up an existing element
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(7, 7))
+        unit = self.server.getElementAtPosition(Path(path_to_foo), Position(7, 7))
         self.assertIsNotNone(unit)
 
         references = [
@@ -988,11 +931,11 @@ class TestValidProject(_LspHelper):
             },
         )
 
-    def test_ReferencesOfAnInvalidElement(self):
+    def test_ReferencesOfAnInvalidElement(self):  # pylint: disable=invalid-name
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure there's no element at this location
-        unit = self.server._getElementAtPosition(Path(path_to_foo), Position(0, 0))
+        unit = self.server.getElementAtPosition(Path(path_to_foo), Position(0, 0))
         self.assertIsNone(unit)
 
         for include_declaration in (False, True):
