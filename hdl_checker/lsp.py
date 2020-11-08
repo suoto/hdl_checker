@@ -183,6 +183,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             _logger.debug("Server was not initialized, using a temporary one")
             root_dir = mkdtemp(prefix="temp_hdl_checker_pid{}_".format(getpid()))
             self._checker = Server(self, root_dir=TemporaryPath(root_dir))
+            _logger.debug("Temporary server %s is ready", self._checker)
         return self._checker
 
     def showInfo(self, msg: str) -> None:

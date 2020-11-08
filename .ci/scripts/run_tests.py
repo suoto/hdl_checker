@@ -96,7 +96,7 @@ def _setupLogging(stream, level):  # pragma: no cover
             color = False
 
     formatter = logging.Formatter(
-        "%(levelname)-8s | %(asctime)s | %(threadName)s | "
+        "%(levelname)-8s | %(asctime)s | %(threadName)-10s | "
         + "%(name)s @ %(funcName)s():%(lineno)d "
         + "|\t%(message)s",
         datefmt="%H:%M:%S",

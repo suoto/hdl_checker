@@ -185,6 +185,7 @@ class _LspHelper(unittest2.TestCase):
             self.assertIsNone(getattr(self, "server", None))
             self.assertIsNone(getattr(self, "client", None))
             return unittest2.skip("Won't run this on %s" % self.__class__)
+        _logger.info("#" * 100)
         _logger.info("Shutting down server")
         shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
             LSP_REQUEST_TIMEOUT
@@ -192,6 +193,8 @@ class _LspHelper(unittest2.TestCase):
         self.client.lsp.notify(features.EXIT)
 
         for i in range(100):
+            if not self.server_thread.is_alive():
+                return
             _logger.debug(
                 "[%d] server alive: %s, client alive: %s",
                 i,
@@ -199,8 +202,6 @@ class _LspHelper(unittest2.TestCase):
                 self.client_thread.is_alive(),
             )
             time.sleep(0.1)
-            if not self.server_thread.is_alive():
-                return
 
         self.fail("Timeout waiting for server thread to complete")
         self.client.shutdown()
@@ -322,11 +323,13 @@ class _LspHelper(unittest2.TestCase):
     def test_LintFileOnOpen(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
             return unittest2.skip("Won't run this on %s" % self.__class__)
+        _logger.info("#" * 100)
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
     def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
             return unittest2.skip("Won't run this on %s" % self.__class__)
+        _logger.info("#" * 100)
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
         )
@@ -334,6 +337,7 @@ class _LspHelper(unittest2.TestCase):
     def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
             return unittest2.skip("Won't run this on %s" % self.__class__)
+        _logger.info("#" * 100)
         self._runDidOpenCheck(
             p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
         )
@@ -344,6 +348,7 @@ class _LspHelper(unittest2.TestCase):
 
 class TestRootUriNoProjectFile(_LspHelper):
     def setUp(self):
+        _logger.info("#" * 100)
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
 
@@ -366,6 +371,7 @@ class TestRootUriNoProjectFile(_LspHelper):
         )
 
     def tearDown(self):
+        _logger.info("#" * 100)
         _logger.info("Shutting down server")
         for _patch in self.patches:
             _patch.stop()
@@ -374,6 +380,7 @@ class TestRootUriNoProjectFile(_LspHelper):
     def test_SearchesForFilesOnInitialization(
         self,
     ):  # pylint: disable=no-self-use,invalid-name
+        _logger.info("#" * 100)
         lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
         #  Will get called twice
         hdl_checker.core.json.dump.assert_called()  # pylint: disable=no-member
@@ -381,6 +388,7 @@ class TestRootUriNoProjectFile(_LspHelper):
 
 class TestOldStyleProjectFile(_LspHelper):
     def setUp(self):
+        _logger.info("#" * 100)
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
 
@@ -396,6 +404,7 @@ class TestOldStyleProjectFile(_LspHelper):
 
 class TestNonExistingProjectFile(_LspHelper):
     def setUp(self):
+        _logger.info("#" * 100)
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
         self.project_file = "__some_project_file.prj"
@@ -413,6 +422,7 @@ class TestNonExistingProjectFile(_LspHelper):
 
 class TestNoRootNoProjectFile(_LspHelper):
     def setUp(self):
+        _logger.info("#" * 100)
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
         self.project_file = "__some_project_file.prj"
@@ -449,6 +459,7 @@ class TestNoRootWithProjectFile(_LspHelper):
 
 class TestValidProject(_LspHelper):
     def setUp(self):
+        _logger.info("#" * 100)
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
         self.project_file = "__some_project_file.prj"
@@ -499,6 +510,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_ReportBuildSequencePlain(self):
+        _logger.info("#" * 100)
         self.runTestBuildSequenceTable(tablefmt="plain")
 
     @patch(
@@ -506,6 +518,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )  # pylint: disable=invalid-name
     def test_ReportBuildSequenceFallback(self):
+        _logger.info("#" * 100)
         with patch.object(self.server, "client_capabilities", None):
             self.runTestBuildSequenceTable(tablefmt="plain")
 
@@ -514,6 +527,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )  # pylint: disable=invalid-name
     def test_ReportBuildSequenceMarkdown(self):
+        _logger.info("#" * 100)
         with patch.object(
             self.server,
             "client_capabilities",
@@ -556,6 +570,7 @@ class TestValidProject(_LspHelper):
         lambda self, _: None,
     )  # pylint: disable=invalid-name
     def test_DependencyInfoForPathNotFound(self):  # pylint: disable=invalid-name
+        _logger.info("#" * 100)
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
         dependency = RequiredDesignUnit(
             name=Identifier("clock_divider"),
@@ -574,6 +589,7 @@ class TestValidProject(_LspHelper):
         lambda self, _: (Path("some_path"), Identifier("some_library")),
     )
     def test_ReportDependencyInfo(self):
+        _logger.info("#" * 100)
         path = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
         dependency = RequiredDesignUnit(
             name=Identifier("clock_divider"),
@@ -589,6 +605,7 @@ class TestValidProject(_LspHelper):
     def test_ReportDesignUnitAccordingToPosition(  # pylint: disable=invalid-name
         self,
     ) -> None:
+        _logger.info("#" * 100)
         unit_a = VhdlDesignUnit(
             owner=Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")),
             type_=DesignUnitType.entity,
@@ -698,6 +715,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_HoverOnInvalidRange(self):
+        _logger.info("#" * 100)
         self.assertIsNone(
             self.client.lsp.send_request(
                 features.HOVER,
@@ -717,6 +735,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_HoverOnDesignUnit(self):
+        _logger.info("#" * 100)
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         very_common_pkg = p.join(TEST_PROJECT, "basic_library", "very_common_pkg.vhd")
         package_with_constants = p.join(
@@ -757,6 +776,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_HoverOnDependency(self):
+        _logger.info("#" * 100)
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
         clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
 
@@ -778,6 +798,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )  # pylint: disable=invalid-name
     def test_GetDefinitionMatchingDependency(self):
+        _logger.info("#" * 100)
         source = p.join(TEST_PROJECT, "basic_library", "use_entity_a_and_b.vhd")
         target = p.join(TEST_PROJECT, "basic_library", "two_entities_one_file.vhd")
 
@@ -810,6 +831,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )  # pylint: disable=invalid-name
     def test_GetDefinitionBuiltInLibrary(self) -> None:
+        _logger.info("#" * 100)
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         self.assertFalse(
@@ -826,6 +848,7 @@ class TestValidProject(_LspHelper):
         (Identifier("ieee"),),
     )
     def test_GetDefinitionNotKnown(self) -> None:
+        _logger.info("#" * 100)
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         self.assertFalse(
@@ -850,6 +873,7 @@ class TestValidProject(_LspHelper):
         ],
     )
     def test_ReferencesOfAValidElement(self, get_references) -> Any:
+        _logger.info("#" * 100)
         # We'll pass the path to foo.vhd but we're patching the
         # getReferencesToDesignUnit to return "some_path"
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
@@ -915,6 +939,7 @@ class TestValidProject(_LspHelper):
         )
 
     def test_ReferencesOfAnInvalidElement(self):  # pylint: disable=invalid-name
+        _logger.info("#" * 100)
         path_to_foo = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
         # Make sure there's no element at this location
@@ -933,6 +958,7 @@ class TestValidProject(_LspHelper):
             )
 
     def test_changeConfiguration(self):
+        _logger.info("#" * 100)
         # pylint: disable=no-member
         with patch.object(self.server, "onConfigUpdate"):
             self.client.lsp.send_request(
