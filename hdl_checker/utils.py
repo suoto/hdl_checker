@@ -474,10 +474,11 @@ def debounce(interval_s, keyed_by=None):
 
         @functools.wraps(func)
         def debounced(*args, **kwargs):
-            if keyed_by:
-                key = inspect.signature(func).bind(*args, **kwargs).arguments[keyed_by]
-            else:
-                key = None
+            key = (
+                inspect.signature(func).bind(*args, **kwargs).arguments[keyed_by]
+                if keyed_by
+                else None
+            )
 
             # Could not find a way to disable debouncing whilist testing, so
             # we'll use a module var
