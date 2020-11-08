@@ -642,20 +642,22 @@ class TestBuilder(TestCase):
         with patch.object(
             self.builder, "_searchForRebuilds", return_value=[rebuild_info]
         ):
-            self.builder._database.getDependenciesByPath = MagicMock(
+            with patch.object(
+                self.builder._database,
+                "getDependenciesByPath",
                 return_value=[
                     RequiredDesignUnit(
                         owner=Path(""),
                         name=Identifier("very_common_pkg"),
                         library=Identifier("work"),
                     )
-                ]
-            )
+                ],
+            ):
 
-            self.assertCountEqual(
-                self.builder._getRebuilds(_source("source.vhd"), "", library),
-                {expected},
-            )
+                self.assertCountEqual(
+                    self.builder._getRebuilds(_source("source.vhd"), "", library),
+                    {expected},
+                )
 
 
 class TestMiscCases(TestCase):
@@ -707,7 +709,9 @@ class TestMiscCases(TestCase):
         included_results.put(None)
 
         def resolveIncludedPath(*_):
-            return included_results.get(block=False)
+            result = included_results.get(block=False)
+            _logger.info("Returning %s", result)
+            return result
 
         database.getDependenciesByPath.return_value = [
             includedPath(name="resolved/include"),
@@ -719,7 +723,7 @@ class TestMiscCases(TestCase):
 
         calls = []  # type: List[List[str]]
 
-        def shell(cmd_with_args, *args, **kwargs):
+        def shell(cmd_with_args, *_, **__):
             calls.append(cmd_with_args)
             _logger.debug("$ %s", cmd_with_args)
             if "-version" in cmd_with_args:
