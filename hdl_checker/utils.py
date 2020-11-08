@@ -461,6 +461,8 @@ def onNewReleaseFound(func):
         )
 
 
+ENABLE_DEBOUNCE = True
+
 # Copied from pyls (see
 # https://github.com/palantir/python-language-server/blob/d81c7ba14d54b8e52192b0e00cbb4dacbb6f414d/pyls/_utils.py#L22-L47)
 def debounce(interval_s, keyed_by=None):
@@ -476,6 +478,11 @@ def debounce(interval_s, keyed_by=None):
                 key = inspect.signature(func).bind(*args, **kwargs).arguments[keyed_by]
             else:
                 key = None
+
+            # Could not find a way to disable debouncing whilist testing, so
+            # we'll use a module var
+            if not ENABLE_DEBOUNCE:
+                return func(*args, **kwargs)
 
             def run():
                 with lock:

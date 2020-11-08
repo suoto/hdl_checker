@@ -54,10 +54,10 @@ from pygls.types import (
 )
 from tabulate import tabulate
 
-# pylint: disable=wrong-import-position
 from hdl_checker.tests import getTestTempPath, setupTestSuport, toCheckerDiagnostic
 
-from hdl_checker import DEFAULT_LIBRARY
+import hdl_checker
+from hdl_checker import DEFAULT_LIBRARY, lsp
 from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.design_unit import (
@@ -69,27 +69,6 @@ from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import Location
 from hdl_checker.utils import ON_WINDOWS
-
-
-# Debouncing will hurt testing since it won't actually call the debounced
-# function if we call it too quickly.
-def noDebounce(interval_s, keyed_by=None):  # pylint: disable=unused-argument
-    def wrapper(func):
-        def debounced(*args, **kwargs):
-            result = func(*args, **kwargs)
-            _logger.info("%s(%s, %s) returned %s", func.__name__, args, kwargs, result)
-            return result
-
-        return debounced
-
-    return wrapper
-
-
-# This has to come before import hdl_checker.lsp
-import hdl_checker  # isort:skip
-
-hdl_checker.utils.debounce = noDebounce
-from hdl_checker import lsp  # isort:skip
 
 _logger = logging.getLogger(__name__)
 
@@ -269,7 +248,11 @@ class _LspHelper(unittest2.TestCase):
         with patch.object(
             self.server.checker, "getMessagesByPath", return_value=list(expected_diags),
         ):
-            self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)
+            hdl_checker.utils.ENABLE_DEBOUNCE = False
+            try:
+                self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)
+            finally:
+                hdl_checker.utils.ENABLE_DEBOUNCE = True
 
             self.assertTrue(
                 self.client_diagnostics, "Expected client to have diagnostics"
