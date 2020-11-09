@@ -44,8 +44,9 @@ jobs:
       deploy:
         provider: pypi
         user: suoto
+        server: https://test.pypi.org/legacy/
         on:
-          tags: true
+          branch: test_updating_deploy_dist
         password:
           secure: Tme84ruGpdQ9N+U2ABVtpy7S9Ac+k/fF++a+P7AKE3ZT4krlwgfRvF3EgLAiJR+CuQiXRHLjMPXhDYKf/aJAFY70iOYWOJ5IaSWOwXQxRY/nFmP6ibm84AozFT+RPBHO5gQ9o/2ge59gSxY07QkpjUkUBLmHtxTgCXPlP6m7tI3AB31cmNmhagg719kEE5MWD/8XR/kXcdYzWd0pudTwTrbP2pnTZk70DFlYWQzXJWG9lf5stbD8rvBsJp8HCSQN+q4NqzddXm5YSZqhcxiPlZJrQbRsYy5HJmqowQp1Fm+XS4c6Mox8JZP3p06Ie44nzg2a/NeMBKwWbgtrG4D5wBZWryo2yozKPda/Dva7bWCYjox/kgeDY7y0hDRWgK5gcbjS1M3t7viJmmK21eUNnAyIQN4IXCpwxOx3Y8tX43is01Hn9YPTJDBZIbW1uRt9zCsd1v8pVd4GuvEcWMOPhcLbvPVUwNTSPwz2OR71uP05QcwqK6wFQGzHi2e3jEeBtIKZ8h+SQIUEuQkKMmfG3PIFO1Kv8vnCU+2E2nHwGv3QHJvT7VwhR2UGlN2z+098X/q5Xe98lJ1iWIFdzh+95cojMLEY8hFKYScqIhc22yTV42buLIu4sJxHzzhPc0KxETKJAaSzt8qBHBNii9gkc5xXZEuluCpyaAZCiLPkjY8=
 
