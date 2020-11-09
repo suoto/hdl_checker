@@ -14,6 +14,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 ---
 language: python
+dist: focal
 
 services:
   - docker
@@ -36,7 +37,6 @@ jobs:
 
 
     - stage: deploy
-      dist: focal
       before_install: skip
       before_script: skip
       install: skip  # no tests, no depedencies needed
