@@ -7,7 +7,7 @@ env:
   PY_COLORS: 1
 
 jobs:
-  Python3.6:
+  Python36:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
