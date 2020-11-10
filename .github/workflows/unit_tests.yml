@@ -1,0 +1,20 @@
+---
+name: Unit tests
+
+on: [push, pull_request]
+
+env:
+  PY_COLORS: 1
+
+jobs:
+  Python3.6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Get Docker image
+        run: docker pull suoto/hdl_checker_test:latest
+      - name: Run tests
+        with:
+          python-version: 3.6
+        run: |
+          ./run_tests.sh -e py36-linux -- -v
