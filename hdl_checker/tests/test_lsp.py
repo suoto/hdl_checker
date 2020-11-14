@@ -22,7 +22,6 @@ import json
 import logging
 import os
 import os.path as p
-import time
 from threading import Thread
 from typing import Any, List, Optional, Union
 
@@ -191,23 +190,12 @@ class _LspHelper(unittest2.TestCase):
             LSP_REQUEST_TIMEOUT
         )
         self.client.lsp.notify(features.EXIT)
-
-        for i in range(100):
-            if not self.server_thread.is_alive():
-                return
-            _logger.debug(
-                "[%d] server alive: %s, client alive: %s",
-                i,
-                self.server_thread.is_alive(),
-                self.client_thread.is_alive(),
-            )
-            time.sleep(0.1)
-
-        self.fail("Timeout waiting for server thread to complete")
-        self.client.shutdown()
-
         self.assertIsNone(shutdown_response)
-
+        # pygls server has cleanup routines run when the interpreter is
+        # exiting, at which point the client will be long gone. This results in
+        # RuntimeError: cannot schedule new futures after shutdown. To work
+        # around this, we're accessing its itnernal event to force it to exit
+        self.client._stop_event.set()
         self.server_thread.join()
         self.client_thread.join()
 
