@@ -217,21 +217,23 @@ def _expand(config, ref_path):
 
             try:
                 filetype = FileType.fromPath(path)
+
+                single_flags = flags[filetype][0]
+                dependencies_flags = flags[filetype][1]
+                global_flags = flags[filetype][2]
+
+                yield SourceEntry(
+                    path,
+                    source.library,
+                    tuple(source.flags),
+                    tuple(global_flags) + tuple(single_flags),
+                    tuple(global_flags) + tuple(dependencies_flags),
+                )
+
             except UnknownTypeExtension:
-                _logger.warning("Won't include non RTL file '%s'", path)
-                continue
-
-            single_flags = flags[filetype][0]
-            dependencies_flags = flags[filetype][1]
-            global_flags = flags[filetype][2]
-
-            yield SourceEntry(
-                path,
-                source.library,
-                tuple(source.flags),
-                tuple(global_flags) + tuple(single_flags),
-                tuple(global_flags) + tuple(dependencies_flags),
-            )
+                if p.exists(path.abspath) and p.isfile(path.abspath):
+                    _logger.info("Including non-RTL path: '%s'", path)
+                    yield SourceEntry(path, source.library, (), (), ())
 
 
 def findRtlSourcesByPath(path):

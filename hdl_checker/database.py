@@ -42,6 +42,7 @@ from hdl_checker.diagnostics import (  # pylint: disable=unused-import
     PathLibraryIsNotUnique,
     PathNotInProjectFile,
 )
+from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.parser_utils import flattenConfig, getSourceParserFromPath
 from hdl_checker.parsers.elements.dependency_spec import (
     BaseDependencySpec,
@@ -443,9 +444,15 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         """
         _logger.debug("Parsing %s", path)
 
-        src_parser = getSourceParserFromPath(path)
-        design_units = src_parser.getDesignUnits()
-        dependencies = src_parser.getDependencies()
+        try:
+            src_parser = getSourceParserFromPath(path)
+            design_units = src_parser.getDesignUnits()
+            dependencies = src_parser.getDependencies()
+        except UnknownTypeExtension:
+            # Not a file extension we know how to parse, leave design units and
+            # dependencies empty
+            design_units = set()
+            dependencies = set()
 
         with self._lock:
             # Update the timestamp

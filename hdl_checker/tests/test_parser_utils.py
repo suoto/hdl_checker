@@ -511,6 +511,7 @@ class TestExpandingPathNames(TestCase):
         expected = (
             SourceEntry(Path(x), None, (), (), ())
             for x in (
+                self.join("README.md"),
                 self.join("some_vhd.vhd"),
                 self.join("some_v.v"),
                 self.join("some_sv.sv"),
