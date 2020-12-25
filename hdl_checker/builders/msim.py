@@ -20,7 +20,7 @@ import os
 import os.path as p
 import re
 from shutil import copyfile
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Mapping, Optional
 
 from .base_builder import BaseBuilder
 
@@ -184,14 +184,16 @@ class MSim(BaseBuilder):
             for match in self._BuilderLibraryScanner.finditer(line):
                 yield Identifier(match.groupdict()["library_name"], False)
 
-    def _searchForRebuilds(self, line):
-        rebuilds = []
-        for match in self._iter_rebuild_units(line):
+    def _searchForRebuilds(self, path, line):
+        # type: (Path, str) -> Iterable[Mapping[str, str]]
+        if line.startswith("** Warning: ") and "Waiting for lock by" in line:
+            yield {"rebuild_path": path.abspath}
+        for match in MSim._iter_rebuild_units(line):
             mdict = match.groupdict()
             library_name = mdict["lib_name_0"] or mdict["lib_name_1"]
             unit_name = mdict["unit_name_0"] or mdict["unit_name_1"]
             if None not in (library_name, unit_name):
-                rebuilds.append({"library_name": library_name, "unit_name": unit_name})
+                yield {"library_name": library_name, "unit_name": unit_name}
             else:  # pragma: no cover
                 _msg = "Something wrong while parsing '%s'. " "Match is '%s'" % (
                     line,
@@ -199,8 +201,6 @@ class MSim(BaseBuilder):
                 )
                 self._logger.error(_msg)
                 assert 0, _msg
-
-        return rebuilds
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]

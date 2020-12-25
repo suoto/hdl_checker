@@ -561,7 +561,7 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"library_name": "foo_lib", "unit_name": "bar_component"}],
-            self.builder._searchForRebuilds(line),
+            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
     def test_MsimRecompileMsg1(self):
@@ -576,7 +576,19 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"library_name": "foo_lib", "unit_name": "bar_component"}],
-            self.builder._searchForRebuilds(line),
+            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
+        )
+
+    def test_MsimRecompileMsg2(self):
+        # type: (...) -> Any
+        if not isinstance(self.builder, MSim):
+            raise unittest2.SkipTest("ModelSim only test")
+
+        line = '** Warning: (vcom-6) -- Waiting for lock by "user@host, pid = 4661". Lockfile is'
+
+        self.assertEqual(
+            [{"rebuild_path": p.abspath("foo.vhd")}],
+            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
     def test_GhdlRecompileMsg(self):
@@ -588,7 +600,7 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"unit_type": "package", "unit_name": "leon3"}],
-            self.builder._searchForRebuilds(line),
+            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
     def test_XvhdlRecompileMsg0(self):
@@ -605,7 +617,7 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"library_name": "some_library", "unit_name": "some_package"}],
-            self.builder._searchForRebuilds(line),
+            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
     # Rebuild formats are:

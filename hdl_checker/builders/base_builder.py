@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 from threading import Lock
-from typing import Any, Dict, FrozenSet, Iterable, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, Mapping, Optional, Set, Tuple
 
 from hdl_checker.database import Database  # pylint: disable=unused-import
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
@@ -202,18 +202,21 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         Gets info on what should be rebuilt to satisfy the builder
         """
         try:
-            parse_results = self._searchForRebuilds(line)
+            parse_results = self._searchForRebuilds(path, line)
         except NotImplementedError:  # pragma: no cover
             return set()
 
         rebuilds = set()  # type: Set[RebuildInfo]
         for rebuild in parse_results:
-            unit_type = rebuild.get("unit_type", None)  # type: str
-            library_name = rebuild.get("library_name", None)  # type: str
-            unit_name = rebuild.get("unit_name", None)  # type: str
-            rebuild_path = rebuild.get("rebuild_path", None)  # type: str
+            unit_type = rebuild.get("unit_type", None)  # type: Optional[str]
+            library_name = rebuild.get("library_name", None)  # type: Optional[str]
+            unit_name = rebuild.get("unit_name", None)  # type: Optional[str]
+            rebuild_path = rebuild.get("rebuild_path", None)  # type: Optional[str]
 
-            if None not in (unit_type, unit_name):
+            if library_name == "work":
+                library_name = library.name
+
+            if unit_name is not None and unit_type is not None:
                 for dependency in self._database.getDependenciesByPath(path):
                     if dependency.name.name == rebuild["unit_name"]:
                         rebuilds.add(
@@ -222,9 +225,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                             )
                         )
                         break
-            elif None not in (library_name, unit_name):
-                if library_name == "work":
-                    library_name = library.name
+            elif library_name is not None and unit_name is not None:
                 rebuilds.add(
                     RebuildLibraryUnit(Identifier(unit_name), Identifier(library_name))
                 )
@@ -237,8 +238,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return rebuilds
 
-    def _searchForRebuilds(self, line):  # pragma: no cover
-        # type: (...) -> Any
+    def _searchForRebuilds(self, path, line):  # pragma: no cover
+        # type: (Path, str) -> Iterable[Mapping[str, str]]
         """
         Finds units that the builders is telling us to rebuild
         """

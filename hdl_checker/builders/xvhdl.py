@@ -20,7 +20,7 @@ import os.path as p
 import re
 import shutil
 import tempfile
-from typing import Iterable, Optional
+from typing import Iterable, Mapping, Optional
 
 from .base_builder import BaseBuilder
 
@@ -169,13 +169,11 @@ class XVHDL(BaseBuilder):
         cmd += [path.name]
         return runShellCommand(cmd, cwd=self._work_folder)
 
-    def _searchForRebuilds(self, line):
-        rebuilds = []
-
+    def _searchForRebuilds(self, path, line):
+        # type: (Path, str) -> Iterable[Mapping[str, str]]
         for match in _ITER_REBUILD_UNITS(line):
             dict_ = match.groupdict()
-            rebuilds.append(
-                {"library_name": dict_["library_name"], "unit_name": dict_["unit_name"]}
-            )
-
-        return rebuilds
+            yield {
+                "library_name": dict_["library_name"],
+                "unit_name": dict_["unit_name"],
+            }

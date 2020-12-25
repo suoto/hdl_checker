@@ -20,7 +20,7 @@ import os
 import os.path as p
 import re
 from glob import glob
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Mapping, Optional
 
 from .base_builder import BaseBuilder
 
@@ -195,10 +195,9 @@ class GHDL(BaseBuilder):
         if not p.exists(workdir):
             os.makedirs(workdir)
 
-    def _searchForRebuilds(self, line):
-        rebuilds = []
-
-        for match in self._iter_rebuild_units(line):
+    def _searchForRebuilds(self, path, line):
+        # type: (Path, str) -> Iterable[Mapping[str, str]]
+        for match in GHDL._iter_rebuild_units(line):
             mdict = match.groupdict()
             # When compilers reports units out of date, they do this
             # by either
@@ -207,10 +206,6 @@ class GHDL(BaseBuilder):
             #  2. Reporting which design unit has been affected by a
             #     given change.
             if "rebuild_path" in mdict and mdict["rebuild_path"] is not None:
-                rebuilds.append(mdict)
+                yield mdict
             else:
-                rebuilds.append(
-                    {"unit_type": mdict["unit_type"], "unit_name": mdict["unit_name"]}
-                )
-
-        return rebuilds
+                yield {"unit_type": mdict["unit_type"], "unit_name": mdict["unit_name"]}
