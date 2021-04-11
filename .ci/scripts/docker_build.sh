@@ -46,10 +46,11 @@ function setup_msim {
 
   installer=$(basename $URL_MAIN)
 
-  download_if_needed "$DOWNLOAD_DIR/$installer" $URL_MAIN
-  download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
-
   if [ ! -f "$CONTEXT/msim/modelsim_ase/linuxaloem/vsim" ]; then
+
+    download_if_needed "$DOWNLOAD_DIR/$installer" $URL_MAIN
+    download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
+
     chmod +x "$DOWNLOAD_DIR/$installer"
     "$DOWNLOAD_DIR/$installer" --mode unattended \
           --modelsim_edition modelsim_ase        \
