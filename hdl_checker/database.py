@@ -862,7 +862,13 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         database that refer to the given design unit. Search is done by
         matching library and name.
         """
-        library = self.getLibrary(unit.owner)
+        # Use the unit's library if the unit is a dependency
+        if isinstance(unit, BaseDependencySpec):
+            library = unit.library
+        else:
+            # If the unit is either a VHDL or a Verilog design unit (i.e.,
+            # entities, modules, packages, etc), then use the owner's library
+            library = self.getLibrary(unit.owner)
 
         return (
             dependency
