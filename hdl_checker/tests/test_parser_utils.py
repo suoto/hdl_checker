@@ -584,7 +584,12 @@ class TestFilterGitIgnoredPaths(TestCase):
             ["git", "commit", "-m", "'initial'"],
         ):
             _logger.debug("$ %s", cmd)
-            subp.check_call(cmd, cwd=self.base_path, stdout=subp.PIPE)
+            for line in (
+                subp.check_output(cmd, cwd=self.base_path)
+                .decode(errors="replace")
+                .splitlines()
+            ):
+                _logger.debug("  %s", line)
 
         _logger.debug(
             "Status:\n%s",
