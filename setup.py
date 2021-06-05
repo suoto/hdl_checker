@@ -30,7 +30,6 @@ Operating System :: Microsoft :: Windows
 Operating System :: POSIX :: Linux
 Programming Language :: Python
 Programming Language :: Python :: 3
-Programming Language :: Python :: 3.5
 Programming Language :: Python :: 3.6
 Programming Language :: Python :: 3.7
 Programming Language :: Python :: 3.8
@@ -39,7 +38,6 @@ Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)
 Topic :: Text Editors :: Integrated Development Environments (IDE)
 """
 
-# pylint: disable=bad-whitespace
 setuptools.setup(
     name                          = 'hdl_checker',
     version                       = versioneer.get_version(),
@@ -73,4 +71,3 @@ setuptools.setup(
     },
     classifiers=CLASSIFIERS.splitlines(),
 )
-# pylint: enable=bad-whitespace
