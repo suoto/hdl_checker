@@ -58,8 +58,7 @@ Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
 
 #### Using [dense-analysis/ale][vim_ale]
 
-See (PR [#2804][vim_ale_pr]), once it gets merged, ALE should support HDL Checker
-out of the box.
+ALE supports HDL Checker out of the box.
 
 #### Using [coc.nvim][vim_coc_nvim]
 
@@ -82,6 +81,26 @@ this to your [coc.nvim configuration file][vim_coc_nvim_config_file]:
         }
     }
 }
+```
+#### Using NeoVim's native language server
+
+```vim
+lua << EOF
+local nvim_lsp = require'nvim_lsp'
+-- Only define once
+if not nvim_lsp.hdl_checker then
+  require'nvim_lsp/configs'.hdl_checker = {
+    default_config = {
+    cmd = {"hdl_checker", "--lsp", };
+    filetypes = {"vhdl", "verilog", "systemverilog"};
+      root_dir = function(fname)
+        return nvim_lsp.util.find_git_ancestor(fname) or vim.loop.os_homedir()
+      end;
+      settings = {};
+    };
+  }
+end
+EOF
 ```
 
 #### Using [autozimu/LanguageClient-neovim][vim_lc_nvim]
