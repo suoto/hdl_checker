@@ -84,22 +84,32 @@ this to your [coc.nvim configuration file][vim_coc_nvim_config_file]:
 ```
 #### Using NeoVim's native language server
 
-```vim
+This requires [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig).
+```lua
 lua << EOF
-local nvim_lsp = require'nvim_lsp'
+local lspconfig = require'lspconfig'
 -- Only define once
-if not nvim_lsp.hdl_checker then
-  require'nvim_lsp/configs'.hdl_checker = {
+if not lspconfig.hdl_checker then
+  require'lspconfig/configs'.hdl_checker = {
     default_config = {
     cmd = {"hdl_checker", "--lsp", };
     filetypes = {"vhdl", "verilog", "systemverilog"};
       root_dir = function(fname)
-        return nvim_lsp.util.find_git_ancestor(fname) or vim.loop.os_homedir()
+        -- will look for a parent directory with a .git directory. If none, just
+        -- use the current directory
+        return lspconfig.util.find_git_ancestor(fname) or lspconfig.util.path.dirname(fname)
+        -- or (not both)
+        -- Will look for the .hdl_checker.config file in a parent directory. If
+        -- none, will use the current directory
+        return lspconfig.util.root_pattern('.hdl_checker.config')(fname) or lspconfig.util.path.dirname(fname)
       end;
       settings = {};
     };
   }
 end
+
+lspconfig.hdl_checker.setup()
+
 EOF
 ```
 
