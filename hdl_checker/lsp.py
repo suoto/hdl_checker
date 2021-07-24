@@ -57,29 +57,24 @@ from pygls.types import (
 from pygls.uris import from_fs_path, to_fs_path
 from tabulate import tabulate
 
-from hdl_checker import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
-from hdl_checker.config_generators.simple_finder import SimpleFinder
-from hdl_checker.core import HdlCheckerCore
-from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
-from hdl_checker.exceptions import UnknownParameterError
-from hdl_checker.parsers.elements.dependency_spec import (
+from . import DEFAULT_LIBRARY, DEFAULT_PROJECT_FILE
+from .config_generators.simple_finder import SimpleFinder
+from .core import HdlCheckerCore
+from .diagnostics import CheckerDiagnostic, DiagType
+from .exceptions import UnknownParameterError
+from .parsers.elements.dependency_spec import (
     BaseDependencySpec,
     IncludedPath,
     RequiredDesignUnit,
 )
-from hdl_checker.parsers.elements.design_unit import (
+from .parsers.elements.design_unit import (
     VerilogDesignUnit,
     VhdlDesignUnit,
     tAnyDesignUnit,
 )
-from hdl_checker.path import Path, TemporaryPath
-from hdl_checker.types import ConfigFileOrigin  # , Location
-from hdl_checker.utils import (
-    debounce,
-    getTemporaryFilename,
-    logCalls,
-    onNewReleaseFound,
-)
+from .path import Path, TemporaryPath
+from .types import ConfigFileOrigin  # , Location
+from .utils import debounce, getTemporaryFilename, logCalls, onNewReleaseFound
 
 _logger = logging.getLogger(__name__)
 
@@ -136,7 +131,7 @@ class Server(HdlCheckerCore):
     def __init__(self, lsp, root_dir):
         # type: (LanguageServer, Path) -> None
         self._lsp = lsp
-        super(Server, self).__init__(root_dir)
+        super().__init__(root_dir)
 
     def _handleUiInfo(self, message):
         # type: (...) -> Any
@@ -165,7 +160,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
     def __init__(self, *args, **kwargs) -> None:
         self._checker: Optional[Server] = None
-        super(HdlCheckerLanguageServer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Default checker
         self.onConfigUpdate(None)
         self._global_diags: Set[CheckerDiagnostic] = set()
@@ -245,7 +240,8 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         # Write this to a file and tell the server to use it
         auto_project_file = getTemporaryFilename(AUTO_PROJECT_FILE_NAME)
-        json.dump(config, open(auto_project_file, "w"))
+        with open(auto_project_file, "w") as fd:
+            json.dump(config, fd)
         self.checker.setConfig(auto_project_file, origin=ConfigFileOrigin.generated)
 
     def _getProjectFilePath(self, options: Optional[Any] = None) -> str:
@@ -509,7 +505,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Included paths are dependencies but they're referred to by path, so
         # we return a definition to point to the beginning of the file
         if isinstance(dependency, IncludedPath):
-            return [Location(target_uri, Range(Position(0, 0), Position(0, 0),),)]
+            return [Location(target_uri, Range(Position(0, 0), Position(0, 0)))]
 
         locations: List[Location] = []
 
@@ -557,9 +553,7 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         self.lint(params.textDocument.uri, True)
 
     @server.feature(TEXT_DOCUMENT_DID_CHANGE)
-    def didChange(
-        self: HdlCheckerLanguageServer, params: DidChangeTextDocumentParams,
-    ):
+    def didChange(self: HdlCheckerLanguageServer, params: DidChangeTextDocumentParams):
         """Text document did change notification."""
         self.lint(params.textDocument.uri, False)
 
@@ -570,25 +564,23 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
 
     @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
     def didChangeConfiguration(
-        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams = None,
+        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams = None
     ) -> None:
         self.onConfigUpdate(settings)
 
     @server.feature(HOVER)
-    def onHover(
-        self: HdlCheckerLanguageServer, params: HoverParams,
-    ) -> Optional[Hover]:
+    def onHover(self: HdlCheckerLanguageServer, params: HoverParams) -> Optional[Hover]:
         return self.hover(params)
 
     @server.feature(REFERENCES)
     def onReferences(
-        self: HdlCheckerLanguageServer, params: ReferenceParams,
+        self: HdlCheckerLanguageServer, params: ReferenceParams
     ) -> Optional[List[Location]]:
         return self.references(params)
 
     @server.feature(DEFINITION)
     def onDefinition(
-        self: HdlCheckerLanguageServer, params: TextDocumentPositionParams,
+        self: HdlCheckerLanguageServer, params: TextDocumentPositionParams
     ) -> Optional[List[Location]]:
         return self.definitions(params)
 
