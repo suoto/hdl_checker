@@ -891,8 +891,8 @@ class TestValidProject(_LspHelper):
         self.assertCountEqual(
             references,
             {
-                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
-                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+                (uris.from_fs_path("some_path"), 1, 2, 1, 3),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 5),
             },
         )
 
@@ -920,9 +920,9 @@ class TestValidProject(_LspHelper):
         self.assertCountEqual(
             references,
             {
-                (uris.from_fs_path(path_to_foo), 7, 7, 7, 7),
-                (uris.from_fs_path("some_path"), 1, 2, 1, 2),
-                (uris.from_fs_path("some_path"), 3, 4, 3, 4),
+                (uris.from_fs_path(path_to_foo), 7, 7, 7, 8),
+                (uris.from_fs_path("some_path"), 1, 2, 1, 3),
+                (uris.from_fs_path("some_path"), 3, 4, 3, 5),
             },
         )
 

@@ -114,7 +114,9 @@ def checkerDiagToLspDict(diag: CheckerDiagnostic) -> Diagnostic:
             start=Position(
                 line=diag.line_number or 0, character=diag.column_number or 0
             ),
-            end=Position(line=diag.line_number or 0, character=diag.column_number or 0),
+            end=Position(
+                line=diag.line_number or 0, character=(diag.column_number or 0) + 1
+            ),
         ),
         message=diag.text,
         severity=_translateSeverity(diag.severity),
@@ -323,7 +325,7 @@ class HdlCheckerLanguageServer(LanguageServer):
                     Location(
                         uri=from_fs_path(str(element.owner)),
                         range=Range(
-                            start=Position(line, column), end=Position(line, column)
+                            start=Position(line, column), end=Position(line, column + 1)
                         ),
                     )
                 ]
@@ -334,7 +336,7 @@ class HdlCheckerLanguageServer(LanguageServer):
                     Location(
                         uri=from_fs_path(str(reference.owner)),
                         range=Range(
-                            start=Position(line, column), end=Position(line, column)
+                            start=Position(line, column), end=Position(line, column + 1)
                         ),
                     )
                 ]
@@ -465,7 +467,7 @@ class HdlCheckerLanguageServer(LanguageServer):
                     line=params.position.line, character=params.position.character
                 ),
                 end=Position(
-                    line=params.position.line, character=params.position.character
+                    line=params.position.line, character=params.position.character + 1
                 ),
             ),
         )
@@ -505,7 +507,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Included paths are dependencies but they're referred to by path, so
         # we return a definition to point to the beginning of the file
         if isinstance(dependency, IncludedPath):
-            return [Location(target_uri, Range(Position(0, 0), Position(0, 0)))]
+            return [Location(target_uri, Range(Position(0, 0), Position(0, 1)))]
 
         locations: List[Location] = []
 

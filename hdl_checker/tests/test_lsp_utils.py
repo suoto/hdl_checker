@@ -80,7 +80,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
         self.assertEqual(
             diag.range,
             Range(
-                start=Position(line=0, character=0), end=Position(line=0, character=0),
+                start=Position(line=0, character=0), end=Position(line=0, character=1),
             ),
         )
 
