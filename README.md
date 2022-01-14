@@ -89,8 +89,8 @@ This requires [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig).
 lua << EOF
 local lspconfig = require'lspconfig'
 -- Only define once
-if not lspconfig.hdl_checker then
-  require'lspconfig/configs'.hdl_checker = {
+if not require'lspconfig.configs'.hdl_checker then
+  require'lspconfig.configs'.hdl_checker = {
     default_config = {
     cmd = {"hdl_checker", "--lsp", };
     filetypes = {"vhdl", "verilog", "systemverilog"};
@@ -108,7 +108,7 @@ if not lspconfig.hdl_checker then
   }
 end
 
-lspconfig.hdl_checker.setup()
+lspconfig.hdl_checker.setup{}
 
 EOF
 ```
