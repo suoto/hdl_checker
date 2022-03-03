@@ -36,13 +36,13 @@ compilation order, interpreting some compilers messages and providing some
 ## Installation
 
 ```sh
-pip install hdl-checker --upgrade
+pip3 install hdl-checker --upgrade
 ```
 
 or
 
 ```sh
-pip install hdl-checker --user --upgrade
+pip3 install hdl-checker --user --upgrade
 ```
 
 **Note:** Make sure you can run `hdl_checker --version`, especially if using PIP
