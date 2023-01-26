@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
-"Xilinx xhvdl builder implementation"
+"Xilinx Simulator builder implementation"
 
 import os.path as p
 import re
@@ -37,7 +37,7 @@ _ITER_REBUILD_UNITS = re.compile(
     flags=re.I,
 ).finditer
 
-# XVHDL specific class properties
+# XSIM specific class properties
 _STDOUT_MESSAGE_SCANNER = re.compile(
     r"^(?P<severity>[EW])\w+:\s*"
     r"\[(?P<error_code>[^\]]+)\]\s*"
@@ -50,11 +50,11 @@ _STDOUT_MESSAGE_SCANNER = re.compile(
 )
 
 
-class XVHDL(BaseBuilder):
+class XSIM(BaseBuilder):
     """Builder implementation of the xvhdl compiler"""
 
     # Implementation of abstract class properties
-    builder_name = "xvhdl"
+    builder_name = "xsim"
     # TODO: Add xvlog support
     file_types = {FileType.vhdl}
 
@@ -75,10 +75,10 @@ class XVHDL(BaseBuilder):
     def __init__(self, *args, **kwargs):
         # type: (...) -> None
         self._version = ""
-        super(XVHDL, self).__init__(*args, **kwargs)
-        self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
+        super(XSIM, self).__init__(*args, **kwargs)
+        self._xsimini = p.join(self._work_folder, ".xsim.init")
         # Create the ini file
-        open(self._xvhdlini, "w").close()
+        open(self._xsimini, "w").close()
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -105,7 +105,7 @@ class XVHDL(BaseBuilder):
             )
 
     def _parseBuiltinLibraries(self):
-        "(Not used by XVHDL)"
+        "(Not used by XSIM)"
         return (
             Identifier(x, case_sensitive=False)
             for x in (
@@ -144,7 +144,7 @@ class XVHDL(BaseBuilder):
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None
-        with open(self._xvhdlini, mode="w") as fd:
+        with open(self._xsimini, mode="w") as fd:
             content = "\n".join(
                 [
                     "%s=%s" % (x, p.join(self._work_folder, x.name))
@@ -161,7 +161,7 @@ class XVHDL(BaseBuilder):
             "--verbose",
             "0",
             "--initfile",
-            self._xvhdlini,
+            self._xsimini,
             "--work",
             library.name,
         ]

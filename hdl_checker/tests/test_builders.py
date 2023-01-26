@@ -42,7 +42,7 @@ from hdl_checker.tests import (
 from hdl_checker.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
-    XVHDL,
+    XSIM,
     AnyBuilder,
     Fallback,
     MSim,
@@ -71,7 +71,7 @@ _logger = logging.getLogger(__name__)
 TEST_TEMP_PATH = getTestTempPath(__name__)
 SOURCES_PATH = p.join(TEST_TEMP_PATH, "test_builders")
 
-BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fallback}
+BUILDER_CLASS_MAP = {"msim": MSim, "xsim": XSIM, "ghdl": GHDL, "fallback": Fallback}
 
 
 class _SourceMock(SourceMock):
@@ -369,10 +369,10 @@ class TestBuilder(TestCase):
             ("some_file_on_same_level.vhd",),
         ]
     )
-    def test_ParseXvhdlResult(self, path):
+    def test_ParseXsimResult(self, path):
         # type: (...) -> Any
-        if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
+        if not isinstance(self.builder, XSIM):
+            raise unittest2.SkipTest("XSIM only test")
 
         self.assertEqual(
             list(
@@ -517,8 +517,8 @@ class TestBuilder(TestCase):
                     ),
                 }
             ]
-        elif self.builder_name == "xvhdl":
-            # XVHDL reports different errors depending on the version
+        elif self.builder_name == "xsim":
+            # XSIM reports different errors depending on the version
             expected = [
                 {
                     BuilderDiag(
@@ -603,10 +603,10 @@ class TestBuilder(TestCase):
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
-    def test_XvhdlRecompileMsg0(self):
+    def test_XsimRecompileMsg0(self):
         # type: (...) -> Any
-        if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
+        if not isinstance(self.builder, XSIM):
+            raise unittest2.SkipTest("XSIM only test")
 
         line = (
             "ERROR: [VRFC 10-113] {} needs to be re-saved since std.standard "
