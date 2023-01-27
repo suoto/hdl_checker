@@ -51,12 +51,11 @@ _STDOUT_MESSAGE_SCANNER = re.compile(
 
 
 class XSIM(BaseBuilder):
-    """Builder implementation of the xvhdl compiler"""
+    """Builder implementation of the xvhdl and xvlog compiler"""
 
     # Implementation of abstract class properties
     builder_name = "xsim"
-    # TODO: Add xvlog support
-    file_types = {FileType.vhdl}
+    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
 
     def _shouldIgnoreLine(self, line):
         # type: (str) -> bool
@@ -136,6 +135,7 @@ class XSIM(BaseBuilder):
         try:
             temp_dir = tempfile.mkdtemp()
             runShellCommand(["xvhdl", "--nolog", "--version"], cwd=temp_dir)
+            runShellCommand(["xvlog", "--nolog", "--version"], cwd=temp_dir)
             return True
         except OSError:
             return False
@@ -155,8 +155,15 @@ class XSIM(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+        xsimCmd = None
+        filetype = FileType.fromPath(path)
+        if filetype == FileType.vhdl:
+            xsimCmd = "xvhdl"
+        if filetype in (FileType.verilog, FileType.systemverilog):
+            xsimCmd = "xvlog"
+        assert( xsimCmd != None )
         cmd = [
-            "xvhdl",
+            xsimCmd,
             "--nolog",
             "--verbose",
             "0",
@@ -165,6 +172,8 @@ class XSIM(BaseBuilder):
             "--work",
             library.name,
         ]
+        if filetype == FileType.systemverilog:
+            cmd += ["-sv"]
         cmd += [str(x) for x in (flags or [])]
         cmd += [path.name]
         return runShellCommand(cmd, cwd=self._work_folder)
