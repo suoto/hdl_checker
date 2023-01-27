@@ -22,13 +22,13 @@ import shutil
 import tempfile
 from typing import Iterable, Mapping, Optional
 
-from .base_builder import BaseBuilder
-
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import runShellCommand
+
+from .base_builder import BaseBuilder
 
 _ITER_REBUILD_UNITS = re.compile(
     r"ERROR:\s*\[[^\]]*\]\s*"
@@ -74,10 +74,11 @@ class XSIM(BaseBuilder):
     def __init__(self, *args, **kwargs):
         # type: (...) -> None
         self._version = ""
-        super(XSIM, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._xsimini = p.join(self._work_folder, ".xsim.init")
         # Create the ini file
-        open(self._xsimini, "w").close()
+        with open(self._xsimini, "w", encoding="utf8"):
+            pass
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -125,7 +126,7 @@ class XSIM(BaseBuilder):
         )
         self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
         self._logger.info(
-            "xvhdl version string: '%s'. " "Version number is '%s'",
+            "xvhdl version string: '%s'. Version number is '%s'",
             stdout[:-1],
             self._version,
         )
@@ -144,10 +145,10 @@ class XSIM(BaseBuilder):
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None
-        with open(self._xsimini, mode="w") as fd:
+        with open(self._xsimini, mode="w", encoding="utf8") as fd:
             content = "\n".join(
                 [
-                    "%s=%s" % (x, p.join(self._work_folder, x.name))
+                    f"{x}=%s" % p.join(self._work_folder, x.name)
                     for x in self._added_libraries
                 ]
             )
@@ -155,15 +156,15 @@ class XSIM(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
-        xsimCmd = None
+        xsim_cmd = None
         filetype = FileType.fromPath(path)
         if filetype == FileType.vhdl:
-            xsimCmd = "xvhdl"
+            xsim_cmd = "xvhdl"
         if filetype in (FileType.verilog, FileType.systemverilog):
-            xsimCmd = "xvlog"
-        assert( xsimCmd != None )
+            xsim_cmd = "xvlog"
+        assert xsim_cmd is not None
         cmd = [
-            xsimCmd,
+            xsim_cmd,
             "--nolog",
             "--verbose",
             "0",
