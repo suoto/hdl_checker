@@ -36,7 +36,7 @@ from hdl_checker.builder_utils import BuilderName, getBuilderByName
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
-from hdl_checker.builders.xvhdl import XVHDL
+from hdl_checker.builders.xsim import XSIM
 from hdl_checker.utils import _getLatestReleaseVersion, onNewReleaseFound, readFile
 
 _logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class TestBuilderUtils(unittest2.TestCase):
     def test_getBuilderByName(self):
         self.assertEqual(getBuilderByName(BuilderName.msim.value), MSim)
         self.assertEqual(getBuilderByName(BuilderName.ghdl.value), GHDL)
-        self.assertEqual(getBuilderByName(BuilderName.xvhdl.value), XVHDL)
+        self.assertEqual(getBuilderByName(BuilderName.xsim.value), XSIM)
         self.assertEqual(getBuilderByName("foo"), Fallback)
 
 

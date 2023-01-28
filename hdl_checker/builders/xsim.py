@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
-"Xilinx xhvdl builder implementation"
+"Xilinx Simulator builder implementation"
 
 import os.path as p
 import re
@@ -22,13 +22,13 @@ import shutil
 import tempfile
 from typing import Iterable, Mapping, Optional
 
-from .base_builder import BaseBuilder
-
 from hdl_checker.diagnostics import BuilderDiag, DiagType
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import runShellCommand
+
+from .base_builder import BaseBuilder
 
 _ITER_REBUILD_UNITS = re.compile(
     r"ERROR:\s*\[[^\]]*\]\s*"
@@ -37,7 +37,7 @@ _ITER_REBUILD_UNITS = re.compile(
     flags=re.I,
 ).finditer
 
-# XVHDL specific class properties
+# XSIM specific class properties
 _STDOUT_MESSAGE_SCANNER = re.compile(
     r"^(?P<severity>[EW])\w+:\s*"
     r"\[(?P<error_code>[^\]]+)\]\s*"
@@ -50,13 +50,12 @@ _STDOUT_MESSAGE_SCANNER = re.compile(
 )
 
 
-class XVHDL(BaseBuilder):
-    """Builder implementation of the xvhdl compiler"""
+class XSIM(BaseBuilder):
+    """Builder implementation of the xvhdl and xvlog compiler"""
 
     # Implementation of abstract class properties
-    builder_name = "xvhdl"
-    # TODO: Add xvlog support
-    file_types = {FileType.vhdl}
+    builder_name = "xsim"
+    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
 
     def _shouldIgnoreLine(self, line):
         # type: (str) -> bool
@@ -75,10 +74,11 @@ class XVHDL(BaseBuilder):
     def __init__(self, *args, **kwargs):
         # type: (...) -> None
         self._version = ""
-        super(XVHDL, self).__init__(*args, **kwargs)
-        self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
+        super().__init__(*args, **kwargs)
+        self._xsimini = p.join(self._work_folder, ".xsim.init")
         # Create the ini file
-        open(self._xvhdlini, "w").close()
+        with open(self._xsimini, "w", encoding="utf8"):
+            pass
 
     def _makeRecords(self, line):
         # type: (str) -> Iterable[BuilderDiag]
@@ -105,7 +105,7 @@ class XVHDL(BaseBuilder):
             )
 
     def _parseBuiltinLibraries(self):
-        "(Not used by XVHDL)"
+        "(Not used by XSIM)"
         return (
             Identifier(x, case_sensitive=False)
             for x in (
@@ -126,7 +126,7 @@ class XVHDL(BaseBuilder):
         )
         self._version = re.findall(r"^Vivado Simulator\s+([\d\.]+)", stdout[0])[0]
         self._logger.info(
-            "xvhdl version string: '%s'. " "Version number is '%s'",
+            "xvhdl version string: '%s'. Version number is '%s'",
             stdout[:-1],
             self._version,
         )
@@ -136,6 +136,7 @@ class XVHDL(BaseBuilder):
         try:
             temp_dir = tempfile.mkdtemp()
             runShellCommand(["xvhdl", "--nolog", "--version"], cwd=temp_dir)
+            runShellCommand(["xvlog", "--nolog", "--version"], cwd=temp_dir)
             return True
         except OSError:
             return False
@@ -144,10 +145,10 @@ class XVHDL(BaseBuilder):
 
     def _createLibrary(self, library):
         # type: (Identifier) -> None
-        with open(self._xvhdlini, mode="w") as fd:
+        with open(self._xsimini, mode="w", encoding="utf8") as fd:
             content = "\n".join(
                 [
-                    "%s=%s" % (x, p.join(self._work_folder, x.name))
+                    f"{x}=%s" % p.join(self._work_folder, x.name)
                     for x in self._added_libraries
                 ]
             )
@@ -155,16 +156,25 @@ class XVHDL(BaseBuilder):
 
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+        xsim_cmd = None
+        filetype = FileType.fromPath(path)
+        if filetype == FileType.vhdl:
+            xsim_cmd = "xvhdl"
+        if filetype in (FileType.verilog, FileType.systemverilog):
+            xsim_cmd = "xvlog"
+        assert xsim_cmd is not None
         cmd = [
-            "xvhdl",
+            xsim_cmd,
             "--nolog",
             "--verbose",
             "0",
             "--initfile",
-            self._xvhdlini,
+            self._xsimini,
             "--work",
             library.name,
         ]
+        if filetype == FileType.systemverilog:
+            cmd += ["-sv"]
         cmd += [str(x) for x in (flags or [])]
         cmd += [path.name]
         return runShellCommand(cmd, cwd=self._work_folder)
