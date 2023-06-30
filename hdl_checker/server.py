@@ -221,7 +221,7 @@ def run(args):
 
     if args.lsp:
         stdin, stdout = _binaryStdio()
-        server = lsp.HdlCheckerLanguageServer()
+        server = lsp.HdlCheckerLanguageServer("hdl_checker", version)
         lsp.setupLanguageServerFeatures(server)
         server.start_io(stdin=stdin, stdout=stdout)
     else:

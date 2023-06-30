@@ -507,7 +507,7 @@ class TestValidProject(_LspHelper):
     )  # pylint: disable=invalid-name
     def test_ReportBuildSequenceFallback(self):
         _logger.info("#" * 100)
-        with patch.object(self.server, "client_capabilities", None):
+        with patch.object(self.server, "_client_capabilities", None):
             self.runTestBuildSequenceTable(tablefmt="plain")
 
     @patch(
@@ -518,7 +518,7 @@ class TestValidProject(_LspHelper):
         _logger.info("#" * 100)
         with patch.object(
             self.server,
-            "client_capabilities",
+            "_client_capabilities",
             ClientCapabilities(
                 text_document=TextDocumentClientCapabilities(
                     synchronization=None,
