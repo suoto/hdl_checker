@@ -23,19 +23,17 @@ from os import path as p
 from tempfile import mkdtemp
 from typing import Any, Callable, Iterable, List, Optional, Set, Tuple, Union
 
-from pygls.features import (
-    DEFINITION,
-    HOVER,
+from pygls.server import LanguageServer
+from lsprotocol.types import (
+    TEXT_DOCUMENT_DEFINITION,
+    TEXT_DOCUMENT_HOVER,
     INITIALIZE,
     INITIALIZED,
-    REFERENCES,
+    TEXT_DOCUMENT_REFERENCES,
     TEXT_DOCUMENT_DID_CHANGE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DID_SAVE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
-)
-from pygls.server import LanguageServer
-from pygls.types import (
     ClientCapabilities,
     Diagnostic,
     DiagnosticSeverity,
@@ -167,7 +165,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         self.onConfigUpdate(None)
         self._global_diags: Set[CheckerDiagnostic] = set()
         self.initialization_options: Optional[Any] = None
-        self.client_capabilities: Optional[ClientCapabilities] = None
+        self._client_capabilities: Optional[ClientCapabilities] = None
 
     @property
     def checker(self) -> Server:
@@ -353,7 +351,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         try:
             return (
                 MarkupKind.Markdown.value
-                in self.client_capabilities.textDocument.hover.contentFormat
+                in self._client_capabilities.textDocument.hover.contentFormat
             )
         except AttributeError:
             return False
@@ -536,7 +534,7 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
     @server.feature(INITIALIZE)
     def initialize(self: HdlCheckerLanguageServer, params: InitializeParams) -> None:
         options = params.initializationOptions
-        self.client_capabilities = params.capabilities
+        self._client_capabilities = params.capabilities
         self.initialization_options = options
 
     @server.feature(INITIALIZED)
@@ -570,17 +568,17 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
     ) -> None:
         self.onConfigUpdate(settings)
 
-    @server.feature(HOVER)
+    @server.feature(TEXT_DOCUMENT_HOVER)
     def onHover(self: HdlCheckerLanguageServer, params: HoverParams) -> Optional[Hover]:
         return self.hover(params)
 
-    @server.feature(REFERENCES)
+    @server.feature(TEXT_DOCUMENT_REFERENCES)
     def onReferences(
         self: HdlCheckerLanguageServer, params: ReferenceParams
     ) -> Optional[List[Location]]:
         return self.references(params)
 
-    @server.feature(DEFINITION)
+    @server.feature(TEXT_DOCUMENT_DEFINITION)
     def onDefinition(
         self: HdlCheckerLanguageServer, params: TextDocumentPositionParams
     ) -> Optional[List[Location]]:
