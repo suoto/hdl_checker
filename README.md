@@ -56,6 +56,10 @@ Install the [HDL Checker VSCode client][hdl_checker_vscode] on VS Code.
 
 ### Vim/NeoVim
 
+#### Using [williamboman/mason.nvim][vim-mason]
+
+Mason and mason-lspconfig supports HDL Checker out of the box
+
 #### Using [dense-analysis/ale][vim_ale]
 
 ALE supports HDL Checker out of the box.
@@ -302,5 +306,6 @@ mentioned or used by this software.
 [vim_coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
 [vim_coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
 [vim_lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
+[vim-mason]: https://github.com/williamboman/mason.nvim
 [Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
 [Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html
