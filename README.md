@@ -138,6 +138,24 @@ Add this to your Emacs config file
   :config (add-hook 'vhdl-mode-hook 'lsp))
 ```
 
+#### Using [gmlarumbe/verilog-ext][verilog-ext]
+
+``` elisp
+(require 'verilog-ext)
+(verilog-ext-mode-setup)
+(verilog-ext-eglot-set-server 've-hdl-checker) ;`eglot' config
+(verilog-ext-lsp-set-server 've-hdl-checker)   ; `lsp' config
+```
+
+#### Using [gmlarumbe/vhdl-ext][vhdl-ext]
+
+``` elisp
+(require 'vhdl-ext)
+(vhdl-ext-mode-setup)
+(vhdl-ext-eglot-set-server 've-hdl-checker) ;`eglot' config
+(vhdl-ext-lsp-set-server 've-hdl-checker)   ; `lsp' config
+```
+
 ## Usage
 
 HDL Checker server can be started via `hdl_checker` command. Use `hdl_checker
@@ -285,6 +303,8 @@ mentioned or used by this software.
 
 [docker]: https://www.docker.com/
 [emacs_lsp]: https://github.com/emacs-lsp/lsp-mode/
+[verilog-ext]: https://github.com/gmlarumbe/verilog-ext/
+[vhdl-ext]: https://github.com/gmlarumbe/vhdl-ext/
 [GHDL]: https://github.com/ghdl/ghdl
 [gpl]: http://www.gnu.org/copyleft/gpl.html
 [hdl_checker_container]: https://cloud.docker.com/u/suoto/repository/docker/suoto/hdl_checker_test
