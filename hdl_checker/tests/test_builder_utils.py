@@ -37,7 +37,7 @@ from hdl_checker.builder_utils import (
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
-from hdl_checker.builders.xvhdl import XVHDL
+from hdl_checker.builders.xsim import XSIM
 from hdl_checker.path import Path
 from hdl_checker.types import FileType
 
@@ -55,7 +55,7 @@ def _path(*args):
 class TestBuilderUtils(TestCase):
     def test_getBuilderByName(self):
         self.assertEqual(getBuilderByName("msim"), MSim)
-        self.assertEqual(getBuilderByName("xvhdl"), XVHDL)
+        self.assertEqual(getBuilderByName("xsim"), XSIM)
         self.assertEqual(getBuilderByName("ghdl"), GHDL)
         self.assertEqual(getBuilderByName("other"), Fallback)
 
@@ -214,7 +214,7 @@ class TestGetVunitSources(TestCase):
         ]
 
         builder = MagicMock()
-        builder.builder_name = "xvhdl"
+        builder.builder_name = "xsim"
         builder.file_types = {FileType.vhdl, FileType.systemverilog}
 
         self.assertTrue(foundVunit(), "Need VUnit for this test")
