@@ -29,11 +29,10 @@ from multiprocessing import Queue
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import mock
-import six
-import unittest2  # type: ignore
+import unittest
 from parameterized import parameterized_class  # type: ignore
 from pygls import uris
-from unittest2 import TestCase
+from unittest import TestCase
 
 from hdl_checker import exceptions
 from hdl_checker.core import HdlCheckerCore
@@ -462,7 +461,7 @@ def windowsOnly(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if not ON_WINDOWS:
-            return unittest2.skip("Windows only test")
+            return unittest.skip("Windows only test")
         return func(*args, **kwargs)
 
     return wrapper
@@ -472,7 +471,7 @@ def linuxOnly(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if not ON_LINUX:
-            return unittest2.skip("Linux only test")
+            return unittest.skip("Linux only test")
         return func(*args, **kwargs)
 
     return wrapper

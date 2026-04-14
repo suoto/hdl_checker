@@ -28,7 +28,7 @@ from tempfile import mkdtemp
 from typing import Any, List, Optional
 
 import parameterized  # type: ignore
-import unittest2  # type: ignore
+import unittest
 from mock import MagicMock, patch
 
 from hdl_checker.tests import (
@@ -177,7 +177,7 @@ class TestBuilder(TestCase):
     def test_ParseMsimResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         self.assertEqual(
             list(
@@ -341,7 +341,7 @@ class TestBuilder(TestCase):
     def test_ParseGhdlResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, GHDL):
-            raise unittest2.SkipTest("GHDL only test")
+            raise unittest.SkipTest("GHDL only test")
 
         records = list(
             self.builder._makeRecords(
@@ -372,7 +372,7 @@ class TestBuilder(TestCase):
     def test_ParseXvhdlResult(self, path):
         # type: (...) -> Any
         if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
+            raise unittest.SkipTest("XVHDL only test")
 
         self.assertEqual(
             list(
@@ -415,7 +415,7 @@ class TestBuilder(TestCase):
     def test_VhdlCompilation(self, *args):
         # type: (...) -> Any
         if FileType.vhdl not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support VHDL".format(self.builder_name)
             )
 
@@ -434,7 +434,7 @@ class TestBuilder(TestCase):
     def test_VerilogCompilation(self, *args):
         # type: (...) -> Any
         if FileType.verilog not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support Verilog".format(self.builder_name)
             )
 
@@ -455,7 +455,7 @@ class TestBuilder(TestCase):
     def test_SystemverilogCompilation(self, *args):
         # type: (...) -> Any
         if FileType.systemverilog not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support SystemVerilog".format(self.builder_name)
             )
 
@@ -552,7 +552,7 @@ class TestBuilder(TestCase):
     def test_MsimRecompileMsg0(self):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = (
             "** Error: (vcom-13) Recompile foo_lib.bar_component because "
@@ -567,7 +567,7 @@ class TestBuilder(TestCase):
     def test_MsimRecompileMsg1(self):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = (
             "** Error: (vcom-13) Recompile foo_lib.bar_component because "
@@ -582,7 +582,7 @@ class TestBuilder(TestCase):
     def test_MsimRecompileMsg2(self):
         # type: (...) -> Any
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = '** Warning: (vcom-6) -- Waiting for lock by "user@host, pid = 4661". Lockfile is'
 
@@ -594,7 +594,7 @@ class TestBuilder(TestCase):
     def test_GhdlRecompileMsg(self):
         # type: (...) -> Any
         if not isinstance(self.builder, GHDL):
-            raise unittest2.SkipTest("GHDL only test")
+            raise unittest.SkipTest("GHDL only test")
 
         line = 'somefile.vhd:12:13: package "leon3" is obsoleted by package "amba"'
 
@@ -606,7 +606,7 @@ class TestBuilder(TestCase):
     def test_XvhdlRecompileMsg0(self):
         # type: (...) -> Any
         if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
+            raise unittest.SkipTest("XVHDL only test")
 
         line = (
             "ERROR: [VRFC 10-113] {} needs to be re-saved since std.standard "

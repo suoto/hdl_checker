@@ -15,34 +15,30 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-FROM suoto/xsim:2018.3
+FROM ubuntu:22.04
 
 ENV BUILDERS /builders
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
-ENV PACKAGES="ca-certificates \
-              g++-multilib    \
-              gcc             \
-              gcc-multilib    \
-              git             \
-              gnat            \
-              lib32gcc1       \
-              lib32stdc++6    \
-              lib32z1         \
-              libtcl8.6       \
-              make            \
-              python2.7       \
-              python2.7-dev   \
-              python3-pip     \
-              python3.6       \
-              python3.6-dev   \
-              python3.7       \
-              python3.7-dev   \
-              python3.8       \
-              python3.8-dev   \
-              wget            \
+ENV PACKAGES="ca-certificates    \
+              g++-multilib       \
+              gcc                \
+              gcc-multilib       \
+              git                \
+              gnat               \
+              lib32stdc++6       \
+              lib32z1            \
+              libtcl8.6          \
+              make               \
+              python3-pip        \
+              python3.10          \
+              python3.10-dev      \
+              python3.11          \
+              python3.11-dev      \
+              software-properties-common \
+              wget               \
               zlib1g-dev"
 
 RUN apt-get update -qq            && \
@@ -50,6 +46,14 @@ RUN apt-get update -qq            && \
     apt-get clean                 && \
     rm -rf /var/lib/apt/lists/*
 
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update -qq                    && \
+    apt-get install -qq python3.12 python3.12-dev  && \
+    apt-get clean                         && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN which pip
+RUN pip --version
 RUN pip3 install tox
 RUN pip3 install coverage==4.1
 
@@ -78,7 +82,7 @@ COPY msim $BUILDERS/msim
 # Test installations
 RUN "$BUILDERS/ghdl/bin/ghdl" --version
 RUN "$BUILDERS/msim/modelsim_ase/linuxaloem/vcom" -version
-RUN "/xsim/bin/xvhdl" -version
+# RUN "/xsim/bin/xvhdl" -version
 
 VOLUME /hdl_checker
 WORKDIR /hdl_checker

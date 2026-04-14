@@ -27,7 +27,7 @@ import re
 import subprocess as subp
 
 import parameterized  # type: ignore
-import unittest2  # type: ignore
+import unittest
 from mock import MagicMock, Mock, patch
 
 from hdl_checker.tests import linuxOnly
@@ -87,13 +87,13 @@ def checkFile(filename):
     return match is not None
 
 
-class TestFileHeaders(unittest2.TestCase):
+class TestFileHeaders(unittest.TestCase):
     @parameterized.parameterized.expand([(x,) for x in _getRelevantFiles()])
     def test_has_license(self, path):
         self.assertTrue(checkFile(path))
 
 
-class TestBuilderUtils(unittest2.TestCase):
+class TestBuilderUtils(unittest.TestCase):
     def test_getBuilderByName(self):
         self.assertEqual(getBuilderByName(BuilderName.msim.value), MSim)
         self.assertEqual(getBuilderByName(BuilderName.ghdl.value), GHDL)
@@ -101,7 +101,7 @@ class TestBuilderUtils(unittest2.TestCase):
         self.assertEqual(getBuilderByName("foo"), Fallback)
 
 
-class TestReportingRelease(unittest2.TestCase):
+class TestReportingRelease(unittest.TestCase):
     @patch("hdl_checker.utils.subp.Popen")
     def test_GetCorrectVersion(self, popen):
         process_mock = Mock()

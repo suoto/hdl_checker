@@ -46,10 +46,24 @@ jobs:
         run: ./run_tests.sh -e py38-linux -- -v
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
+  Python312:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.12"
+      - name: Get Docker image
+        run: docker pull suoto/hdl_checker_test:latest
+      - name: Run tests
+        run: ./run_tests.sh -e py312-linux -- -v
+      - name: Upload coverage
+        run: bash <(curl -s https://codecov.io/bash)
 
   Pypi:
     runs-on: ubuntu-latest
-    needs: [Python36, Python37, Python38]
+    needs: [Python36, Python37, Python38, Python312]
     steps:
       - uses: actions/checkout@v1
       - name: Build dist

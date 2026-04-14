@@ -41,15 +41,15 @@ function setup_msim {
 
   pushd "$CONTEXT" || exit 1
 
-  URL_MAIN=http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/ModelSimProSetup-19.2.0.57-linux.run
-  URL_PART_2=http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/modelsim-part2-19.2.0.57-linux.qdz
+  URL_MAIN=https://downloads.intel.com/akdlm/software/acdsinst/20.1std.1/720/ib_installers/ModelSimSetup-20.1.1.720-linux.run
+  # URL_PART_2=http://download.altera.com/akdlm/software/acdsinst/19.2/57/ib_installers/modelsim-part2-19.2.0.57-linux.qdz
 
   installer=$(basename $URL_MAIN)
 
   if [ ! -f "$CONTEXT/msim/modelsim_ase/linuxaloem/vsim" ]; then
 
     download_if_needed "$DOWNLOAD_DIR/$installer" $URL_MAIN
-    download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
+    # download_if_needed "$DOWNLOAD_DIR/$(basename $URL_PART_2)" $URL_PART_2
 
     chmod +x "$DOWNLOAD_DIR/$installer"
     "$DOWNLOAD_DIR/$installer" --mode unattended \

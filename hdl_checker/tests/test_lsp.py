@@ -25,7 +25,7 @@ import os.path as p
 from threading import Thread
 from typing import Any, List, Optional, Union
 
-import unittest2  # type: ignore
+import unittest
 from mock import patch
 from pygls import features, uris
 from pygls.server import LanguageServer
@@ -106,7 +106,7 @@ if ON_WINDOWS:
     TEST_PROJECT = TEST_PROJECT.lower()
 
 
-class _LspHelper(unittest2.TestCase):
+class _LspHelper(unittest.TestCase):
     def _createClientServerPair(self, params: Optional[InitializeParams]):
         # pylint: disable=attribute-defined-outside-init
         setupTestSuport(TEST_TEMP_PATH)
@@ -183,7 +183,7 @@ class _LspHelper(unittest2.TestCase):
         if self.__class__ is _LspHelper:
             self.assertIsNone(getattr(self, "server", None))
             self.assertIsNone(getattr(self, "client", None))
-            return unittest2.skip("Won't run this on %s" % self.__class__)
+            return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         _logger.info("Shutting down server")
         shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
@@ -310,13 +310,13 @@ class _LspHelper(unittest2.TestCase):
 
     def test_LintFileOnOpen(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
-            return unittest2.skip("Won't run this on %s" % self.__class__)
+            return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
     def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
-            return unittest2.skip("Won't run this on %s" % self.__class__)
+            return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         self._runDidSaveCheck(
             p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
@@ -324,7 +324,7 @@ class _LspHelper(unittest2.TestCase):
 
     def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
-            return unittest2.skip("Won't run this on %s" % self.__class__)
+            return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         self._runDidOpenCheck(
             p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
