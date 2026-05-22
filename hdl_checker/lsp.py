@@ -288,7 +288,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
     def _getDiags(self, doc_uri: URI, is_saved: bool) -> Iterable[CheckerDiagnostic]:
         """
-        Gets diags of the URI, wether from the saved file or from its contents;
+        Gets diags of the URI, whether from the saved file or from its contents;
         returns an iterable containing the diagnostics of the doc_uri and other
         URIs that were compiled as dependencies and generated diagnostics with
         severity higher than error

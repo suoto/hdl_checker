@@ -641,7 +641,7 @@ class TestDatabase(TestCase):
 
         self.database.removeSource(file_0)
 
-        # file_0.vhd units will still be found (parsing does not depent on the
+        # file_0.vhd units will still be found (parsing does not depend on the
         # source being added or not)
         self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
         # collateral.vhd units should continue to be found
@@ -678,7 +678,7 @@ class TestDatabase(TestCase):
 
         self.database.removeSource(file_0)
 
-        # file_0.vhd units will still be found (parsing does not depent on the
+        # file_0.vhd units will still be found (parsing does not depend on the
         # source being added or not)
         self.assertTrue(list(self.database.getDesignUnitsByPath(file_0)))
         # collateral.vhd units should continue to be found

@@ -8,7 +8,7 @@
 [![Mentioned in Awesome Computer Architecture](https://awesome.re/mentioned-badge.svg)](https://github.com/rajesh-s/awesome-computer-architecture)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdl_checker)
 
-HDL Checker is a language server that wraps VHDL/Verilg/SystemVerilog tools that
+HDL Checker is a language server that wraps VHDL/Verilog/SystemVerilog tools that
 aims to reduce the boilerplate code needed to set things up. It supports
 [Language Server Protocol][LSP] or a custom HTTP interface; can infer library
 VHDL files likely belong to, besides working out mixed language dependencies,

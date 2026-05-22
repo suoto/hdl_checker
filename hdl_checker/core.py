@@ -367,21 +367,21 @@ class HdlCheckerCore:
     @abc.abstractmethod
     def _handleUiInfo(self, message):  # type: (AnyStr) -> None
         """
-        Method that should be overriden to handle info messages from
+        Method that should be overridden to handle info messages from
         HDL Checker to the user
         """
 
     @abc.abstractmethod
     def _handleUiWarning(self, message):  # type: (AnyStr) -> None
         """
-        Method that should be overriden to handle warning messages
+        Method that should be overridden to handle warning messages
         from HDL Checker to the user
         """
 
     @abc.abstractmethod
     def _handleUiError(self, message):  # type: (AnyStr) -> None
         """
-        Method that should be overriden to handle errors messages
+        Method that should be overridden to handle errors messages
         from HDL Checker to the user
         """
 
@@ -418,7 +418,7 @@ class HdlCheckerCore:
         # type: (Path, Identifier, BuildFlagScope, bool) -> Iterable[CheckerDiagnostic]
         """
         Builds the given path and handle any files that might require
-        rebuilding until there is nothing to rebuild. The number of iteractions
+        rebuilding until there is nothing to rebuild. The number of interactions
         is fixed in 10.
         """
         _logger.debug("_buildAndHandleRebuilds(%s)", path)

@@ -165,7 +165,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     def isAvailable():  # pragma: no cover
         # type: (...) -> Any
         """
-        Method that should be overriden by child classes and return True
+        Method that should be overridden by child classes and return True
         if the given builder is available on the current environment
         """
         raise NotImplementedError

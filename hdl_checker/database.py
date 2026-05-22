@@ -179,7 +179,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         # type: (Path) -> None
         """
         Removes a path from the database. No error is raised if the path wasn't
-        added previously. In this case, avoid clearning LRU caches
+        added previously. In this case, avoid cleaning LRU caches
         """
         _logger.debug("Removing %s from database", path)
         clear_lru_caches = False
@@ -531,7 +531,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         else:
             library = getMostCommonItem(all_libraries)
 
-            # For now we'll report this as an issue on the dependecy. In the
+            # For now we'll report this as an issue on the dependency. In the
             # future, we should probably store this diagnostic on a different
             # dict where the dependency is the key and put it all together when
             # the self.getDiagnosticsForPath is called (aka, cross reference on
@@ -634,7 +634,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             if (library, name) == (dependency.library, dependency.name)
         ):
 
-            # Fill in a report for every occurence found
+            # Fill in a report for every occurrence found
             for location in dependency.locations:
                 self._addDiagnostic(
                     DependencyNotUnique(

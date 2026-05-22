@@ -140,7 +140,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     def _getSourceContent(self):
         # type: () -> str
         """
-        Method that can be overriden to change the contents of the file, like
+        Method that can be overridden to change the contents of the file, like
         striping comments off.
         """
         return readFile(str(self.filename))
