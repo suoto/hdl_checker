@@ -214,7 +214,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         _logger.debug("Updating from %s, workspace=%s", options, self.workspace)
 
-        # Clear previus diagnostics
+        # Clear previous diagnostics
         self._global_diags = set()
 
         path = self._getProjectFilePath(options)
@@ -252,7 +252,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         the root URI as provided by the workspace
         """
         path = DEFAULT_PROJECT_FILE
-        if options and options.project_file is not None:
+        if options and getattr(options, "project_file", None) is not None:
             path = options.project_file
 
         # Project file will be related to the root path
