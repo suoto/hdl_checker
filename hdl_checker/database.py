@@ -61,10 +61,7 @@ from hdl_checker.types import (  # pylint: disable=unused-import
 )
 from hdl_checker.utils import HashableByKey, getMostCommonItem, isFileReadable
 
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache  # type: ignore
+from functools import lru_cache
 
 _logger = logging.getLogger(__name__)
 _LIBRARY_WORK = Identifier("work", case_sensitive=False)

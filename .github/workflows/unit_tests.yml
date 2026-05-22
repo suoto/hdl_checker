@@ -4,54 +4,26 @@ name: Unit tests
 on: [push, pull_request]
 
 jobs:
-  Python36:
+  Python311:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: Setup Python 3.6
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v4
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.6
+          python-version: "3.11"
       - name: Get Docker image
         run: docker pull suoto/hdl_checker_test:latest
       - name: Run tests
-        run: ./run_tests.sh -e py36-linux -- -v
-      - name: Upload coverage
-        run: bash <(curl -s https://codecov.io/bash)
-  Python37:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Setup Python 3.7
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.7
-      - name: Get Docker image
-        run: docker pull suoto/hdl_checker_test:latest
-      - name: Run tests
-        run: ./run_tests.sh -e py37-linux -- -v
-      - name: Upload coverage
-        run: bash <(curl -s https://codecov.io/bash)
-  Python38:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Setup Python 3.8
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.8
-      - name: Get Docker image
-        run: docker pull suoto/hdl_checker_test:latest
-      - name: Run tests
-        run: ./run_tests.sh -e py38-linux -- -v
+        run: ./run_tests.sh -e py311-linux -- -v
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
   Python312:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Setup Python 3.12
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: "3.12"
       - name: Get Docker image
@@ -60,12 +32,25 @@ jobs:
         run: ./run_tests.sh -e py312-linux -- -v
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
-
+  Python313:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+      - name: Get Docker image
+        run: docker pull suoto/hdl_checker_test:latest
+      - name: Run tests
+        run: ./run_tests.sh -e py313-linux -- -v
+      - name: Upload coverage
+        run: bash <(curl -s https://codecov.io/bash)
   Pypi:
     runs-on: ubuntu-latest
-    needs: [Python36, Python37, Python38, Python312]
+    needs: [Python311, Python312, Python313]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Build dist
         run: python setup.py sdist
       - name: Publish package

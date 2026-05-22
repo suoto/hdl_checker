@@ -62,10 +62,7 @@ from hdl_checker.types import (
 )
 from hdl_checker.utils import removeDirIfExists, removeIfExists, toBytes
 
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache  # type: ignore
+from functools import lru_cache
 
 _logger = logging.getLogger(__name__)
 
@@ -424,6 +421,7 @@ class HdlCheckerCore:
         rebuilding until there is nothing to rebuild. The number of iteractions
         is fixed in 10.
         """
+        _logger.debug("_buildAndHandleRebuilds(%s)", path)
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):

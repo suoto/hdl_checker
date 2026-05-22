@@ -60,9 +60,12 @@ class TestBuilderUtils(TestCase):
         self.assertEqual(getBuilderByName("other"), Fallback)
 
     def test_getWorkingBuilders(self):
-        # Test no working builders
+        # Test no working builders (patch all out so env doesn't affect result)
         _logger.info("Checking no builder works")
-        self.assertEqual(getPreferredBuilder(), Fallback)
+        with patch.object(GHDL, "isAvailable", staticmethod(lambda: False)), \
+             patch.object(MSim, "isAvailable", staticmethod(lambda: False)), \
+             patch.object(XVHDL, "isAvailable", staticmethod(lambda: False)):
+            self.assertEqual(getPreferredBuilder(), Fallback)
 
         # Patch one builder
         with patch.object(MSim, "isAvailable", staticmethod(lambda: True)):

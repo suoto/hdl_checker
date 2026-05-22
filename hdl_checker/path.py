@@ -23,18 +23,16 @@ from os import path as p
 from os import stat
 from typing import Union
 
-import six
-
 _logger = logging.getLogger(__name__)
 
 
-class Path(object):
+class Path:
     "Path helper class to speed up comparing different paths"
 
     def __init__(self, name, base_path=None):
         # type: (Union[Path, str], Union[Path, str, None]) -> None
         assert isinstance(
-            name, (Path, six.string_types)
+            name, (Path, str)
         ), "Invalid type for path: {} ({})".format(name, type(name))
 
         if p.isabs(str(name)) or base_path is None:
@@ -114,15 +112,6 @@ class Path(object):
             return False
 
         return NotImplemented  # pragma: no cover
-
-    def __ne__(self, other):  # pragma: no cover
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-
-        if result is NotImplemented:
-            return NotImplemented
-
-        return not result
 
     def __jsonEncode__(self):
         """

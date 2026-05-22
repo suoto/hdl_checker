@@ -24,8 +24,6 @@ import subprocess as subp
 from glob import iglob as glob
 from typing import Any, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Type, Union
 
-import six
-
 from .parsers.verilog_parser import VerilogParser
 from .parsers.vhdl_parser import VhdlParser
 
@@ -141,7 +139,7 @@ class JsonSourceEntry(
         info = {}  # type: Dict[str, Union[None, str, BuildFlags]]
 
         # Support both
-        if not isinstance(path, six.string_types):
+        if not isinstance(path, str):
             path = iterable[0]
             info = iterable[1]
 
@@ -342,12 +340,31 @@ def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
         if proc is None:
             proc = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
 
-        proc.stdin.write(toBytes(str(path.abspath) + "\n"))
-        # Flush so that data makes to the process
-        proc.stdin.flush()
-
-        if proc.stdout.readline().decode().startswith("::"):
+        try:
+            proc.stdin.write(toBytes(str(path.abspath) + "\n"))
+            # Flush so that data makes to the process
+            proc.stdin.flush()
+        except BrokenPipeError:
+            # Process died before we could write; path is outside repo
             yield path
+            proc.wait()
+            del proc
+            proc = None
+            continue
+
+        line = proc.stdout.readline().decode()
+
+        if line.startswith("::"):
+            yield path
+        elif not line:
+            # Empty read means git closed stdout — path is outside the repo
+            # (git 2.28+ exits immediately for out-of-repo paths). poll() may
+            # lag behind due to OS scheduling, so we wait here.
+            yield path
+            proc.wait()
+            del proc
+            proc = None
+            continue
 
         # proc will die whenever we write a path that's outside the repo.
         # Because this method aims to filter *out* ignored files and files

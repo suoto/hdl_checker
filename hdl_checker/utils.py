@@ -34,8 +34,6 @@ from tempfile import NamedTemporaryFile
 from threading import Timer
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
 
-import six
-
 _logger = logging.getLogger(__name__)
 
 ON_WINDOWS = os.name == "nt"
@@ -45,7 +43,7 @@ ON_MAC = sys.platform == "darwin"
 
 def setupLogging(stream, level):  # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, six.string_types):
+    if isinstance(stream, str):
         _stream = open(stream, "a")
     else:
         _stream = stream
@@ -78,7 +76,10 @@ def terminateProcess(pid):
         ctypes.windll.kernel32.TerminateProcess(handle, -1)
         ctypes.windll.kernel32.CloseHandle(handle)
     else:
-        os.kill(pid, signal.SIGTERM)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
 
 
 def isProcessRunning(pid):
@@ -179,39 +180,11 @@ def toBytes(value):  # pragma: no cover
     if not value:
         return bytes()
 
-    # This is tricky. On py2, the bytes type from builtins (from python-future) is
-    # a subclass of str. So all of the following are true:
-    #   isinstance(str(), bytes)
-    #   isinstance(bytes(), str)
-    # But they don't behave the same in one important aspect: iterating over a
-    # bytes instance yields ints, while iterating over a (raw, py2) str yields
-    # chars. We want consistent behavior so we force the use of bytes().
-
     if isinstance(value, bytes):
         return value
 
-    # This is meant to catch Python 2's native str type.
-
-    if isinstance(value, bytes):
-        return bytes(value, encoding="utf8")
-
     if isinstance(value, str):
-        # On py2, with `from builtins import *` imported, the following is true:
-        #
-        #   bytes(str(u'abc'), 'utf8') == b"b'abc'"
-        #
-        # Obviously this is a bug in python-future. So we work around it. Also filed
-        # upstream at: https://github.com/PythonCharmers/python-future/issues/193
-        # We can't just return value.encode('utf8') on both py2 & py3 because on
-        # py2 that *sometimes* returns the built-in str type instead of the newbytes
-        # type from python-future.
-
-        if six.PY2:
-            return bytes(value.encode("utf8"), encoding="utf8")
-
         return bytes(value, encoding="utf8")
-
-    # This is meant to catch `int` and similar non-string/bytes types.
 
     return toBytes(str(value))
 
@@ -309,12 +282,10 @@ def removeDirIfExists(dirname):
         return False
 
 
-class HashableByKey(object):  # pylint: disable=useless-object-inheritance
+class HashableByKey(abc.ABC):
     """
-    Implements hash and comparison operators properly across Python 2 and 3
+    Implements hash and equality operators by delegating to __hash_key__.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     @property
     @abc.abstractmethod
@@ -335,16 +306,6 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
             return self.__hash_key__ == other.__hash_key__
 
         return NotImplemented  # pragma: no cover
-
-    def __ne__(self, other):  # pragma: no cover
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-
-        if result is not NotImplemented:
-            return not result
-
-        return NotImplemented
-
 
 def logCalls(func):  # pragma: no cover
     # type: (Callable) -> Callable

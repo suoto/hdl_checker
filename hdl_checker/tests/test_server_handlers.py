@@ -38,6 +38,7 @@ from hdl_checker.tests import (
 
 import hdl_checker
 import hdl_checker.handlers as handlers
+from hdl_checker.builders.fallback import Fallback
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType, StaticCheckerDiag
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
@@ -82,7 +83,8 @@ with such.A("hdl_checker bottle app") as it:
     @it.should("get diagnose info with an existing project file")  # type: ignore
     @disableVunit
     def test():
-        reply = it.app.post("/get_diagnose_info", {"project_file": it.project_file})
+        with patch("hdl_checker.core.getPreferredBuilder", return_value=Fallback):
+            reply = it.app.post("/get_diagnose_info", {"project_file": it.project_file})
 
         _logger.info("Reply is %s", reply.json["info"])
 
@@ -100,9 +102,10 @@ with such.A("hdl_checker bottle app") as it:
     def test():
         open(_path("foo_bar.prj"), "w").write("")
 
-        reply = it.app.post(
-            "/get_diagnose_info", {"project_file": _path("foo_bar.prj")}
-        )
+        with patch("hdl_checker.core.getPreferredBuilder", return_value=Fallback):
+            reply = it.app.post(
+                "/get_diagnose_info", {"project_file": _path("foo_bar.prj")}
+            )
 
         _logger.info("Reply is %s", reply.json["info"])
         it.assertCountEqual(
@@ -129,7 +132,7 @@ with such.A("hdl_checker bottle app") as it:
         pids = []
 
         with patch("hdl_checker.handlers.terminateProcess", pids.append):
-            reply = it.app.post("/shutdown")
+            reply = it.app.post("/shutdown", expect_errors=True)
 
         it.assertEqual(pids, [os.getpid()])
 

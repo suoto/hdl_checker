@@ -205,6 +205,7 @@ class MSim(BaseBuilder):
     def _buildSource(self, path, library, flags=None):
         # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
         filetype = FileType.fromPath(path)
+        self._logger.warning("Build source: %s", path)
         if filetype == FileType.vhdl:
             return self._buildVhdl(path, library, flags)
         if filetype in (FileType.verilog, FileType.systemverilog):

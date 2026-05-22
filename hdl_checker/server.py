@@ -25,8 +25,6 @@ import os
 import sys
 from threading import Timer
 
-import six
-
 from hdl_checker import __version__ as version
 from hdl_checker import handlers, lsp
 from hdl_checker.utils import (
@@ -133,16 +131,6 @@ def openForStdHandle(filepath):
     Returns a file object that can be used to replace sys.stdout or
     sys.stderr
     """
-    # Need to open the file in binary mode on py2 because of bytes vs unicode.
-    # If we open in text mode (default), then third-party code that uses `print`
-    # (we're replacing sys.stdout!) with an `str` object on py2 will cause
-    # tracebacks because text mode insists on unicode objects. (Don't forget,
-    # `open` is actually `io.open` because of future builtins.)
-    # Since this function is used for logging purposes, we don't want the output
-    # to be delayed. This means no buffering for binary mode and line buffering
-    # for text mode. See https://docs.python.org/2/library/io.html#io.open
-    if six.PY2:
-        return open(filepath, mode="wb", buffering=0)
     return open(filepath, mode="w", buffering=1)
 
 
@@ -157,27 +145,9 @@ def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
 def _binaryStdio():  # pragma: no cover
     """
     (from https://github.com/palantir/python-language-server)
-
-    This seems to be different for Window/Unix Python2/3, so going by:
-        https://stackoverflow.com/questions/2850893/reading-binary-data-from-stdin
     """
-
-    if six.PY3:
-        # pylint: disable=no-member
-        stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
-    else:
-        # Python 2 on Windows opens sys.stdin in text mode, and
-        # binary data that read from it becomes corrupted on \r\n
-        if sys.platform == "win32":
-            # set sys.stdin to binary mode
-            # pylint: disable=no-member,import-error
-            import msvcrt
-
-            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-        stdin, stdout = sys.stdin, sys.stdout
-
-    return stdin, stdout
+    # pylint: disable=no-member
+    return sys.stdin.buffer, sys.stdout.buffer
 
 
 def run(args):

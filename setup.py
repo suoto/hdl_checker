@@ -30,13 +30,9 @@ Operating System :: Microsoft :: Windows
 Operating System :: POSIX :: Linux
 Programming Language :: Python
 Programming Language :: Python :: 3
-Programming Language :: Python :: 3.6
-Programming Language :: Python :: 3.7
-Programming Language :: Python :: 3.8
-Programming Language :: Python :: 3.9
-Programming Language :: Python :: 3.10
 Programming Language :: Python :: 3.11
 Programming Language :: Python :: 3.12
+Programming Language :: Python :: 3.13
 Topic :: Software Development
 Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)
 Topic :: Text Editors :: Integrated Development Environments (IDE)
@@ -55,19 +51,14 @@ setuptools.setup(
     keywords                      = 'VHDL Verilog SystemVerilog linter LSP language server protocol vimhdl vim-hdl',
     platforms                     = 'any',
     packages                      = setuptools.find_packages(),
+    python_requires               = '>=3.11',
     install_requires              = ['argcomplete',
                                      'argparse',
-                                     'backports.functools_lru_cache; python_version<"3.2"',
                                      'bottle>=0.12.9',
-                                     'enum34>=1.1.6; python_version<"3.3"',
-                                     'future>=0.14.0',
-                                     'futures; python_version<"3.2"',
                                      'prettytable>=0.7.2',
                                      'pygls==0.9.1',
                                      'requests>=2.20.0',
-                                     'six>=1.10.0',
                                      'tabulate>=0.8.5',
-                                     'typing>=3.7.4',
                                      'waitress>=0.9.0', ],
     cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {

@@ -109,10 +109,10 @@ class TestBuilder(TestCase):
         # Add the builder path to the environment so we can call it
         if self.builder_path:
             _logger.info("Adding '%s' to the system path", self.builder_path)
-            self.assertTrue(
-                p.exists(self.builder_path),
-                "Path for builder '%s' does not exists" % self.builder_name,
-            )
+            if not p.exists(self.builder_path):
+                self.skipTest(
+                    "Path for builder '%s' does not exists" % self.builder_name
+                )
             self.patch = patch.dict(
                 "os.environ",
                 {"PATH": os.pathsep.join([self.builder_path, os.environ["PATH"]])},
@@ -124,7 +124,12 @@ class TestBuilder(TestCase):
         builder_class = BUILDER_CLASS_MAP[self.builder_name]
         work_folder = _temp("_%s" % self.builder_name)
         _logger.info("Builder class: %s, work folder is %s", builder_class, work_folder)
-        self.builder = builder_class(work_folder, MagicMock())  # type: AnyBuilder
+        try:
+            self.builder = builder_class(work_folder, MagicMock())  # type: AnyBuilder
+        except SanityCheckError as exc:
+            if self.builder_path:
+                self.patch.stop()
+            self.skipTest(str(exc))
         self.builder_class = builder_class
 
     def tearDown(self):
@@ -678,6 +683,11 @@ class TestMiscCases(TestCase):
         # type: (...) -> Any
         if builder_class is Fallback:
             self.assertTrue(builder_class.isAvailable())
+        elif builder_class.isAvailable():
+            self.skipTest(
+                "%s is available in this environment; cannot test unavailable case"
+                % builder_class.builder_name
+            )
         else:
             self.assertFalse(builder_class.isAvailable())
 
@@ -686,6 +696,11 @@ class TestMiscCases(TestCase):
         # type: (...) -> Any
         if builder_class is Fallback:
             raise self.skipTest("Fallback won't raise any exception")
+        if builder_class.isAvailable():
+            self.skipTest(
+                "%s is available; SanityCheckError won't be raised"
+                % builder_class.builder_name
+            )
 
         _logger.info("Testing builder %s", builder_class.builder_name)
 

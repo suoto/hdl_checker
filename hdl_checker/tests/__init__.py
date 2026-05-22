@@ -344,37 +344,6 @@ def assertSameFile(it):  # pylint: disable=invalid-name
     return wrapper
 
 
-#  def assertCountEqual(it):  # pylint: disable=invalid-name
-
-#      assert six.PY2, "Only needed on Python2"
-
-#      def wrapper(first, second, msg=None):
-#          temp = list(second)  # make a mutable copy
-#          not_found = []
-#          for elem in first:
-#              try:
-#                  temp.remove(elem)
-#              except ValueError:
-#                  not_found.append(elem)
-
-#          error_details = []
-
-#          if not_found:
-#              error_details += [
-#                  "Second list is missing item {}".format(x) for x in not_found
-#              ]
-
-#          error_details += ["First list is missing item {}".format(x) for x in temp]
-
-#          if error_details:
-#              # Add user message at the top
-#              error_details = [msg] + error_details
-#              error_details += ["", "Lists {} and {} differ".format(first, second)]
-#              it.fail("\n".join([str(x) for x in error_details]))
-
-#      return wrapper
-
-
 def writeListToFile(filename, _list):  # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     # Wait a little bit to force the timestamp rad via os.path.getmtime to

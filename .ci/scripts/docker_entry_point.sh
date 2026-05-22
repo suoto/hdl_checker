@@ -21,21 +21,11 @@ set -e
 # Mimic the username, user ID and group ID of the env outside the container to
 # avoid permission issues
 
-USERNAME="${USERNAME:-user}"
+# ln -s /builders "/home/souto/builders"
 
-addgroup "$USERNAME" --gid "$GROUP_ID" > /dev/null 2>&1
-
-adduser --disabled-password            \
-  --gid "$GROUP_ID"                    \
-  --uid "$USER_ID"                     \
-  --home "/home/$USERNAME" "$USERNAME" > /dev/null 2>&1
-
-ln -s /builders "/home/$USERNAME/builders"
-
-su -l "$USERNAME" -c "    \
-  cd /hdl_checker      && \
-  tox ${TOX_ARGS[*]}   && \
-  coverage combine     && \
-  coverage xml         && \
-  coverage report      && \
-  coverage html"
+cd /hdl_checker
+tox ${TOX_ARGS[*]}
+coverage combine
+coverage xml
+coverage report
+coverage html

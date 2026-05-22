@@ -250,6 +250,8 @@ def shutdownServer():
     """
     _logger.info("Shutting down server")
     terminateProcess(os.getpid())
+    bottle.response.status = 503
+    return ""
 
 
 @app.post("/get_dependencies")
