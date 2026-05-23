@@ -36,9 +36,6 @@ clone_folder: c:\projects\hdl_checker
 # fetch repository as zip archive
 shallow_clone: false
 
-# set clone depth
-clone_depth: 5
-
 # environment variables
 environment:
   GHDL_URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip

@@ -70,9 +70,6 @@ def _getFiles():
 
 def _getRelevantFiles():
     def _fileFilter(path):
-        # Exclude versioneer files
-        if p.basename(path) in ("_version.py", "versioneer.py"):
-            return False
         if p.join(".ci", "test_support") in path:
             return False
         return path.split(".")[-1] in ("py", "sh", "ps1")

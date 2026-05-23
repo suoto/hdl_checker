@@ -17,7 +17,6 @@
 "HDL Checker installation script"
 
 import setuptools  # type: ignore
-import versioneer
 
 LONG_DESCRIPTION = open("README.md", "rb").read().decode(encoding='utf8', errors='replace')
 
@@ -40,7 +39,6 @@ Topic :: Text Editors :: Integrated Development Environments (IDE)
 
 setuptools.setup(
     name                          = 'hdl_checker',
-    version                       = versioneer.get_version(),
     description                   = 'HDL code checker',
     long_description              = LONG_DESCRIPTION,
     long_description_content_type = "text/markdown",
@@ -60,7 +58,6 @@ setuptools.setup(
                                      'requests>=2.20.0',
                                      'tabulate>=0.8.5',
                                      'waitress>=0.9.0', ],
-    cmdclass                      = versioneer.get_cmdclass(),
     entry_points                  = {
         'console_scripts' : ['hdl_checker=hdl_checker.server:main', ]
     },

@@ -402,8 +402,8 @@ def onNewReleaseFound(func):
         __version__ as current,
     )
 
-    # When installing via pip from github, versioneer will report the current
-    # version as 0+unknown, in which case we won't notify
+    # When the package is not properly installed, the version may be
+    # "0+unknown", in which case we won't notify
     if not _VERSION_FORMAT.match(current):
         return
 

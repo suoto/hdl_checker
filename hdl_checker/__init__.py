@@ -22,8 +22,7 @@ takes into account the sources dependencies when building so you don't
 need to provide a source list ordered by hand.
 """
 import os
-
-from ._version import get_versions
+from importlib.metadata import version, PackageNotFoundError
 
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.utils import ON_WINDOWS
@@ -32,8 +31,10 @@ __author__ = "Andre Souto (andre820@gmail.com)"
 __license__ = "GPLv3"
 __status__ = "Development"
 
-__version__ = get_versions()["version"]
-del get_versions
+try:
+    __version__ = version("hdl_checker")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
 
 DEFAULT_PROJECT_FILE = os.environ.get(
     "HDL_CHECKER_DEFAULT_PROJECT_FILE",
