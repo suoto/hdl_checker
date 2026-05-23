@@ -490,53 +490,61 @@ class TestBuilder(TestCase):
 
         if self.builder_name == "msim":
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text='Unknown identifier "some_lib".',
-                    line_number=3,
-                    error_code="vcom-1136",
-                    severity=DiagType.ERROR,
-                )
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text='Unknown identifier "some_lib".',
+                        line_number=3,
+                        error_code="vcom-1136",
+                        severity=DiagType.ERROR,
+                    )
+                }
             ]
         elif self.builder_name == "ghdl":
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text='no declaration for "some_lib"',
-                    line_number=3,
-                    column_number=4,
-                    severity=DiagType.ERROR,
-                ),
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text="entity 'source_with_error' was not analysed",
-                    line_number=17,
-                    column_number=34,
-                    severity=DiagType.ERROR,
-                ),
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text='no declaration for "some_lib"',
+                        line_number=3,
+                        column_number=4,
+                        severity=DiagType.ERROR,
+                    ),
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text='entity "source_with_error" was not analysed',
+                        line_number=17,
+                        column_number=34,
+                        severity=DiagType.ERROR,
+                    ),
+                }
             ]
         elif self.builder_name == "xvhdl":
             # XVHDL reports different errors depending on the version
             expected = [
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text="some_lib is not declared",
-                    line_number=3,
-                    error_code="VRFC 10-91",
-                    severity=DiagType.ERROR,
-                ),
-                BuilderDiag(
-                    filename=source,
-                    builder_name=self.builder_name,
-                    text="'some_lib' is not declared",
-                    line_number=3,
-                    error_code="VRFC 10-2989",
-                    severity=DiagType.ERROR,
-                ),
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text="some_lib is not declared",
+                        line_number=3,
+                        error_code="VRFC 10-91",
+                        severity=DiagType.ERROR,
+                    )
+                },
+                {
+                    BuilderDiag(
+                        filename=source,
+                        builder_name=self.builder_name,
+                        text="'some_lib' is not declared",
+                        line_number=3,
+                        error_code="VRFC 10-2989",
+                        severity=DiagType.ERROR,
+                    )
+                },
             ]
 
         if not isinstance(self.builder, Fallback):
