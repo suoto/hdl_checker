@@ -52,12 +52,9 @@ setuptools.setup(
     python_requires               = '>=3.11',
     install_requires              = ['argcomplete',
                                      'argparse',
-                                     'bottle>=0.12.9',
                                      'prettytable>=0.7.2',
                                      'pygls==0.9.1',
-                                     'requests>=2.20.0',
-                                     'tabulate>=0.8.5',
-                                     'waitress>=0.9.0', ],
+                                     'tabulate>=0.8.5', ],
     entry_points                  = {
         'console_scripts' : ['hdl_checker=hdl_checker.server:main', ]
     },

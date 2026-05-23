@@ -26,7 +26,7 @@ import traceback
 from multiprocessing.pool import ThreadPool
 from pprint import pformat
 from threading import RLock, Timer
-from typing import Any, AnyStr, Iterable, NamedTuple
+from typing import Any, Iterable, NamedTuple
 
 from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
@@ -356,21 +356,21 @@ class HdlCheckerCore:
         removeDirIfExists(str(self.work_dir))
 
     @abc.abstractmethod
-    def _handleUiInfo(self, message: AnyStr) -> None:
+    def _handleUiInfo(self, message: str) -> None:
         """
         Method that should be overridden to handle info messages from
         HDL Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiWarning(self, message: AnyStr) -> None:
+    def _handleUiWarning(self, message: str) -> None:
         """
         Method that should be overridden to handle warning messages
         from HDL Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiError(self, message: AnyStr) -> None:
+    def _handleUiError(self, message: str) -> None:
         """
         Method that should be overridden to handle errors messages
         from HDL Checker to the user
@@ -519,7 +519,7 @@ class HdlCheckerCore:
 
         return {diag for diag in diags if not isinstance(diag, PathNotInProjectFile)}
 
-    def getMessagesWithText(self, path: Path, content: AnyStr) -> Iterable[CheckerDiagnostic]:
+    def getMessagesWithText(self, path: Path, content: str) -> Iterable[CheckerDiagnostic]:
         """
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
@@ -560,7 +560,11 @@ class HdlCheckerCore:
 
                 diags.add(diag)
 
-            diags |= set(self.database.getDiagnosticsForPath(temporary_file))
+            diags |= {
+                diag
+                for diag in self.database.getDiagnosticsForPath(Path(temporary_file.name))
+                if not isinstance(diag, PathNotInProjectFile)
+            }
 
             self.database.removeSource(temp_path)
             removeIfExists(temporary_file.name)
@@ -571,7 +575,7 @@ class HdlCheckerCore:
         return diags
 
     @lru_cache()
-    def resolveDependencyToPath(self, dependency: RequiredDesignUnit) -> tuple[Path, Identifier] | None:
+    def resolveDependencyToPath(self, dependency: RequiredDesignUnit) -> tuple[Path, Identifier | None] | None:
         """
         Retrieves the build sequence for the dependency's owner and extracts
         the path that implements a design unit whose names match that of the
@@ -602,6 +606,8 @@ class HdlCheckerCore:
         if isinstance(dependency, RequiredDesignUnit):
             return self.resolveDependencyToPath(dependency)
         if isinstance(dependency, IncludedPath):
-            return (self.database.resolveIncludedPath(dependency), None)
+            resolved = self.database.resolveIncludedPath(dependency)
+            if resolved is not None:
+                return (resolved, None)
         _logger.info("Could not resolve %s (%s)", dependency, type(dependency))
         return None

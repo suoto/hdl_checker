@@ -128,7 +128,7 @@ class TestCheckerDiagToLspDict(unittest.TestCase):
 
         time.sleep(2 * interval)
 
-        self.assertEqual(queue.get(1), 2)
+        self.assertEqual(queue.get(timeout=1), 2)
         self.assertTrue(queue.empty())
 
     def test_debounceWithKey(self):

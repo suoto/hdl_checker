@@ -470,6 +470,7 @@ class TestBuilder(TestCase):
         for record in records:
             _logger.info(record)
 
+        expected: list = []
         if self.builder_name == "msim":
             expected = [
                 {

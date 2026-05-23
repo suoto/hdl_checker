@@ -24,10 +24,8 @@ import os.path as p
 import subprocess as subp
 import tempfile
 import time
-from multiprocessing import Event, Process, Queue
 from threading import Thread
 
-import requests
 from mock import patch
 from pygls import features, uris
 from pygls.types import ClientCapabilities, Diagnostic, InitializeParams
@@ -36,9 +34,10 @@ from nose2.tools import such  # type: ignore
 
 from hdl_checker.tests import disableVunit, getTestTempPath
 
+import hdl_checker
 import hdl_checker.lsp
 from hdl_checker import server
-from hdl_checker.utils import ON_LINUX, ON_WINDOWS, isProcessRunning, terminateProcess
+from hdl_checker.utils import ON_LINUX, ON_WINDOWS
 
 _logger = logging.getLogger(__name__)
 
@@ -67,65 +66,12 @@ def _path(*args):
     return p.join(TEST_TEMP_PATH, *args)
 
 
-def doNothing(queue):
-    _logger.debug("I'm ready")
-    queue.get()
-    _logger.debug("Ok, done")
-
-
-def _getUnusedLocalhostPort():
-    """
-    These were "Borrowed" from YCM.
-    See https://github.com/Valloric/YouCompleteMe
-    """
-    import socket
-
-    sock = socket.socket()
-    # This tells the OS to give us any free port in the range [1024 - 65535]
-    sock.bind(("", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
-
-
-def _startClient(client):
-    client.start()
-
-
 class _ClientServer(
     object
 ):  # pylint: disable=useless-object-inheritance,too-few-public-methods
     """ A class to setup a client/server pair """
 
     def __init__(self):
-        #  # Client to Server pipe
-        #  csr, csw = os.pipe()
-        #  # Server to client pipe
-        #  scr, scw = os.pipe()
-
-        #  self.server_thread = Thread(
-        #      target=start_io_lang_server,
-        #      args=(
-        #          os.fdopen(csr, "rb"),
-        #          os.fdopen(scw, "wb"),
-        #          False,
-        #          hdl_checker.lsp.HdlCheckerLanguageServer,
-        #      ),
-        #  )
-
-        #  self.server_thread.daemon = True
-        #  self.server_thread.start()
-
-        #  # Object being tested is the server thread. Avoid both objects
-        #  # competing for the same cache by using the raw Python language server
-        #  self.client = PythonLanguageServer(
-        #      os.fdopen(scr, "rb"), os.fdopen(csw, "wb"), start_io_lang_server
-        #  )
-
-        #  self.client_thread = Thread(target=_startClient, args=[self.client])
-        #  self.client_thread.daemon = True
-        #  self.client_thread.start()
-
         # Client to Server pipe
         csr, csw = os.pipe()
         # Server to client pipe
@@ -146,7 +92,7 @@ class _ClientServer(
         server_thread.start()
 
         # Add thread id to the server (just for testing)
-        self.server.thread_id = server_thread.ident
+        self.server.thread_id = server_thread.ident  # type: ignore[attr-defined]
 
         # Setup client
         self.client = hdl_checker.lsp.HdlCheckerLanguageServer(asyncio.new_event_loop())
@@ -167,7 +113,7 @@ class _ClientServer(
 
         # Wait for client transport to be ready before returning
         for _ in range(50):
-            if self.client.lsp.transport is not None:
+            if self.client.lsp.transport is not None:  # type: ignore[attr-defined]
                 break
             time.sleep(0.1)
 
@@ -182,8 +128,6 @@ with such.A("hdl_checker server") as it:
         p.join(HDL_CHECKER_BASE_PATH, "hdl_checker", "server.py"),
         "--log-level",
         SERVER_LOG_LEVEL,
-        "--stdout",
-        p.join(TEST_LOG_PATH, "hdl_checker-stdout.log"),
         "--stderr",
         p.join(TEST_LOG_PATH, "hdl_checker-stderr.log"),
         "--log-stream",
@@ -198,190 +142,25 @@ with such.A("hdl_checker server") as it:
 
         with patch.object(server, "sys") as sys:
             with patch.object(
-                server.argparse._sys, "argv", [p.abspath(server.__file__), "--version"]
+                server.argparse._sys, "argv", [p.abspath(server.__file__), "--version"]  # type: ignore[attr-defined]
             ):
                 server.parseArguments()
 
         sys.stdout.write.assert_called_with(version + "\n")
         sys.exit.assert_called_with(0)
 
-    with it.having("http server"):
-
-        def startCodeCheckerServer():
-            it._host = "127.0.0.1"
-            it._port = str(_getUnusedLocalhostPort())
-            it._url = "http://{0}:{1}".format(it._host, it._port)
-
-            cmd = list(_SERVER_BASE_CMD) + ["--host", it._host, "--port", str(it._port)]
-
-            _logger.info("Starting hdl_checker server with '%s'", " ".join(cmd))
-
-            stdout_r, stdout_w = os.pipe()
-            stderr_r, stderr_w = os.pipe()
-
-            it.stdout = os.fdopen(stdout_r, "rb")
-            it.stderr = os.fdopen(stderr_r, "rb")
-
-            it._server = subp.Popen(
-                cmd,
-                env=os.environ.copy(),
-                stdout=os.fdopen(stdout_w, "wb"),
-                stderr=os.fdopen(stderr_w, "wb"),
-            )
-            waitForServer()
-
-        def startServerAttachedToPid(pid):
-            it._url = "http://{0}:{1}".format(it._host, it._port)
-
-            cmd = list(_SERVER_BASE_CMD) + [
-                "--host",
-                it._host,
-                "--port",
-                str(it._port),
-                "--attach-to-pid",
-                str(pid),
-            ]
-
-            _logger.info("Starting hdl_checker server with '%s'", " ".join(cmd))
-
-            it._server = subp.Popen(cmd, env=os.environ.copy())
-            waitForServer()
-
-        def waitForServer():
-            event = Event()
-
-            def wait():
-                # Wait until the server is up and replying
-                start = time.time()
-                while not event.is_set():
-                    try:
-                        reply = requests.post(it._url + "/get_diagnose_info")
-                        if reply.ok:
-                            _logger.info(
-                                "Server replied OK after %.1fs", time.time() - start
-                            )
-                            event.set()
-                            return
-                    except requests.ConnectionError:
-                        pass
-                    except:
-                        _logger.exception(
-                            "Exception while waiting for server to respond"
-                        )
-                        raise
-
-                    time.sleep(0.5)
-
-                _logger.info("Exiting wait thread")
-
-            Thread(target=wait).start()
-            # Wait 10s for the server to start responding
-            event.wait(timeout=10)
-
-            if event.is_set():
-                return
-
-            # Set the event from here to force the wait thread to exit
-            event.set()
-
-            _logger.error("Server is not replying")
-
-            it._server.terminate()
-            terminateProcess(it._server.pid)
-
-            _logger.error("stderr: %s", it.stderr.read())
-
-            it.fail("Server is not responding")
-
-        def waitUntilBuildFinishes(data):
-            _logger.info("Waiting for 30s until build is finished")
-            for i in range(30):
-                #  time.sleep(1)
-                _logger.info("Elapsed %ds", i)
-                _ = requests.post(it._url + "/get_messages_by_path", data)
-                ui_messages = requests.post(it._url + "/get_ui_messages", data)
-                _logger.debug("==> %s", ui_messages.json)
-                if ui_messages.json["ui_messages"] == []:
-                    _logger.info("Ok, done")
-                    return
-
-            assert False, "Server is still building after 30s"
-
-        @it.has_teardown
-        def teardown():
-            it._server.terminate()
-            terminateProcess(it._server.pid)
-
-        @it.should("start and respond a request")  # type: ignore
-        @disableVunit
-        def test():
-            startCodeCheckerServer()
-            some_project = _path("some_project")
-            open(some_project, "w").write("")
-            # Ensure the server is active
-            reply = requests.post(
-                it._url + "/get_diagnose_info", data={"project_file": some_project}
-            )
-            it.assertTrue(reply.ok, "Reply was not OK: {}".format(reply))
-
-        @it.should("shutdown the server when requested")  # type: ignore
-        @disableVunit
-        def test():
-            # Send a request to the shutdown addr; server may close the
-            # connection abruptly (ConnectionError) or return a non-OK status
-            try:
-                reply = requests.post(it._url + "/shutdown")
-                it.assertFalse(reply.ok)
-            except requests.ConnectionError:
-                pass
-
-            it._server.terminate()
-            terminateProcess(it._server.pid)
-
-        @it.should(  # type: ignore
-            "terminate when the parent PID is not running anymore"
-        )
-        def test():
-
-            queue = Queue()
-
-            proc = Process(target=doNothing, args=(queue,))
-            proc.start()
-
-            _logger.info("Started dummy process with PID %d", proc.pid)
-            startServerAttachedToPid(proc.pid)
-            time.sleep(3)
-            _logger.info("Allowing the dummy process to finish")
-            queue.put(1)
-            proc.join()
-
-            if isProcessRunning(proc.pid):
-                _logger.warning("Dummy process %d was still running", proc.pid)
-                proc.terminate()
-                time.sleep(1)
-                it.assertFalse(
-                    isProcessRunning(proc.pid),
-                    "Process %d is still running after terminating " "it!" % proc.pid,
-                )
-
-            time.sleep(1)
-            _logger.info("Server should have died by now")
-
-            with it.assertRaises(requests.ConnectionError):
-                requests.post(it._url + "/get_diagnose_info")
-
     with it.having("LSP server"):
 
         @it.should("initialize with no project file")  # type: ignore
         @disableVunit
-        def test():
+        def test():  # type: ignore[no-redef]
             client_server = _ClientServer()
-            response = client_server.client.lsp.send_request(
+            response = client_server.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.INITIALIZE,
                 InitializeParams(
                     process_id=1234,
                     capabilities=ClientCapabilities(),
-                    root_uri=uris.from_fs_path(TEST_TEMP_PATH),
+                    root_uri=uris.from_fs_path(TEST_TEMP_PATH) or "",
                 ),
             ).result(timeout=CALL_TIMEOUT)
 
@@ -389,30 +168,37 @@ with such.A("hdl_checker server") as it:
             it.assertEqual(response.capabilities.textDocumentSync, 2)
             it.assertEqual(response.capabilities.hoverProvider, True)
 
-            shutdown_response = client_server.client.lsp.send_request(
+            shutdown_response = client_server.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.SHUTDOWN
             ).result(2)
-            client_server.client.lsp.notify(features.EXIT)
+            client_server.client.lsp.notify(features.EXIT)  # type: ignore[attr-defined]
             it.assertIsNone(shutdown_response)
 
         @it.should("log to temporary files if files aren't specified")  # type: ignore
         @disableVunit
-        def test():
+        def test():  # type: ignore[no-redef]
             from hdl_checker import server
 
             with patch.object(
-                server.argparse._sys, "argv", [p.abspath(server.__file__)]
+                server.argparse._sys, "argv", [p.abspath(server.__file__)]  # type: ignore[attr-defined]
             ):
                 args = server.parseArguments()
 
-            it.assertIs(args.log_stream, server.sys.stdout)
-
             if ON_LINUX:
+                it.assertEqual(
+                    p.basename(args.log_stream),
+                    "hdl_checker_log_pid{}.log".format(os.getpid()),
+                )
+
                 it.assertEqual(
                     p.basename(args.stderr),
                     "hdl_checker_stderr_pid{}.log".format(os.getpid()),
                 )
             else:
+                it.assertTrue(
+                    p.basename(args.log_stream).startswith("hdl_checker_log_pid"),
+                    "log file should not be {}".format(args.stderr),
+                )
                 it.assertTrue(
                     p.basename(args.stderr).startswith("hdl_checker_stderr_pid"),
                     "stderr log should not be {}".format(args.stderr),
@@ -426,7 +212,7 @@ with such.A("hdl_checker server") as it:
             it.assertEqual(output, stdout)
 
         @it.should("report version correctly")
-        def test():
+        def test():  # type: ignore[no-redef]
             assertCommandPrints(["hdl_checker", "--version"], hdl_checker.__version__)
 
         def startServerWrapper(cmd):
@@ -460,7 +246,6 @@ with such.A("hdl_checker server") as it:
                 "Version string for hdl_checker is '{}'".format(
                     proc.pid, hdl_checker.__version__
                 ),
-                #  "Starting HdlCheckerLanguageServer IO language server",
             ]
 
             _logger.info(
@@ -478,29 +263,28 @@ with such.A("hdl_checker server") as it:
             os.remove(log_file)
 
         @it.should(  # type: ignore
-            "start server given the --lsp flag and setting stderr"
+            "start server and setting stderr"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             startServerWrapper(
                 [
                     "hdl_checker",
-                    "--lsp",
                     "--stderr",
                     p.join(TEST_LOG_PATH, "hdl_checker_stderr.log"),
                 ]
             )
 
-        @it.should("start server given the --lsp flag")  # type: ignore
-        def test():
-            startServerWrapper(["hdl_checker", "--lsp"])
+        @it.should("start server")  # type: ignore
+        def test():  # type: ignore[no-redef]
+            startServerWrapper(["hdl_checker"])
 
         @it.should("log to temporary files if files aren't specified")  # type: ignore
         @disableVunit
-        def test():
+        def test():  # type: ignore[no-redef]
             from hdl_checker import server
 
             with patch.object(
-                server.argparse._sys, "argv", [p.abspath(server.__file__), "--lsp"]
+                server.argparse._sys, "argv", [p.abspath(server.__file__)]  # type: ignore[attr-defined]
             ):
                 args = server.parseArguments()
 
@@ -526,22 +310,11 @@ with such.A("hdl_checker server") as it:
 
         @it.should("disable writing to log when passing --log-stream NONE")  # type: ignore
         @disableVunit
-        def test():
+        def test():  # type: ignore[no-redef]
             from hdl_checker import server
 
-            # Check it works with LSP
             with patch.object(
-                server.argparse._sys,
-                "argv",
-                [p.abspath(server.__file__), "--lsp", "--log-stream", "NONE"],
-            ):
-                args = server.parseArguments()
-
-            it.assertIsNone(args.log_stream)
-
-            # Check it works with HTTP server
-            with patch.object(
-                server.argparse._sys,
+                server.argparse._sys,  # type: ignore[attr-defined]
                 "argv",
                 [p.abspath(server.__file__), "--log-stream", "NONE"],
             ):
@@ -551,22 +324,11 @@ with such.A("hdl_checker server") as it:
 
         @it.should("disable writing to stderr when passing --stderr NONE")  # type: ignore
         @disableVunit
-        def test():
+        def test():  # type: ignore[no-redef]
             from hdl_checker import server
 
-            # Check it works with LSP
             with patch.object(
-                server.argparse._sys,
-                "argv",
-                [p.abspath(server.__file__), "--lsp", "--stderr", "NONE"],
-            ):
-                args = server.parseArguments()
-
-            it.assertIsNone(args.stderr)
-
-            # Check it works with HTTP server
-            with patch.object(
-                server.argparse._sys,
+                server.argparse._sys,  # type: ignore[attr-defined]
                 "argv",
                 [p.abspath(server.__file__), "--stderr", "NONE"],
             ):
@@ -582,12 +344,12 @@ def test_StartLsp(redirection, binary_stdio, start_server):
     args = type(
         "args",
         (object,),
-        {"lsp": True, "stderr": "stderr", "log_stream": None, "attach_to_pid": None},
+        {"stderr": "stderr", "log_stream": None, "attach_to_pid": None},
     )
 
     server.run(args)
 
-    redirection.assert_called_once_with(None, "stderr")
+    redirection.assert_called_once_with("stderr")
     binary_stdio.assert_called_once()
     start_server.assert_called_once_with(stdin="stdin", stdout="stdout")
 

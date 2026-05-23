@@ -41,12 +41,10 @@ from hdl_checker.types import (
 )
 
 
-class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
+class BaseBuilder(abc.ABC):
     """
     Class that implements the base builder flow
     """
-
-    __metaclass__ = abc.ABCMeta
 
     # Set an empty container for the default flags
     default_flags: dict[BuildFlagScope, dict[FileType, BuildFlags]] = {
@@ -83,14 +81,16 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 # Remove the name of included file from the resolve path
                 yield str(resolved).replace(str(included_file.name), "")
 
-    @abc.abstractproperty
-    def builder_name(self) -> Any:
+    @property
+    @abc.abstractmethod
+    def builder_name(self) -> str:
         """
         Defines the builder identification
         """
 
-    @abc.abstractproperty
-    def file_types(self) -> Any:
+    @property
+    @abc.abstractmethod
+    def file_types(self) -> set[FileType]:
         """
         Returns the file types supported by the builder
         """
@@ -99,7 +99,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         # Shell accesses must be atomic
         self._lock = Lock()
 
-        self._logger = logging.getLogger(__package__ + "." + self.builder_name)
+        self._logger = logging.getLogger((__package__ or "") + "." + self.builder_name)
         self._database = database
         self._work_folder = p.abspath(p.expanduser(work_folder.name))
         self._build_info_cache: dict[Path, dict[str, Any]] = {}
@@ -137,7 +137,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         obj._lock = Lock()
         obj._build_info_cache = {}
-        obj.__dict__.update(state)
+        obj.__dict__.update(state)  # type: ignore[attr-defined]
         # pylint: enable=protected-access
 
         return obj
@@ -174,7 +174,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             raise SanityCheckError(self.builder_name, str(exc))
 
     @abc.abstractmethod
-    def _shouldIgnoreLine(self, line):
+    def _shouldIgnoreLine(self, line: str) -> bool:
         """
         Method called for each stdout output and should return True if
         the given line should not be parsed using _makeRecords
@@ -182,7 +182,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
     @abc.abstractmethod
-    def _makeRecords(self, line):
+    def _makeRecords(self, line: str) -> Iterable[CheckerDiagnostic]:
         """
         Static method that converts a string into a dict that has
         elements identifying its fields
@@ -271,7 +271,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         return frozenset(self._builtin_libraries)
 
     @abc.abstractmethod
-    def _checkEnvironment(self):
+    def _checkEnvironment(self) -> None:
         """
         Sanity environment check that should be implemented by child
         classes. Nothing is done with the return, the child class should
@@ -281,7 +281,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     @abc.abstractmethod
     def _buildSource(
         self, path: Path, library: Identifier, flags: BuildFlags | None = None
-    ) -> Iterable[str]:
+    ) -> list[str]:
         """
         Callback called to actually build the source
         """
@@ -372,7 +372,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         self._createLibrary(library)
 
     @abc.abstractmethod
-    def _createLibrary(self, library) -> Any:
+    def _createLibrary(self, library: Identifier) -> None:
         """
         Callback called to create a library
         """

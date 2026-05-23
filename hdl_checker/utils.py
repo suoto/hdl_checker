@@ -32,7 +32,7 @@ import threading
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Timer
-from typing import Callable, Iterable, TypeVar
+from typing import Any, Callable, Iterable, TypeVar
 
 _logger = logging.getLogger(__name__)
 
@@ -72,9 +72,9 @@ def terminateProcess(pid):
         import ctypes  # pylint: disable=import-outside-toplevel
 
         process_terminate = 1
-        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)
-        ctypes.windll.kernel32.TerminateProcess(handle, -1)
-        ctypes.windll.kernel32.CloseHandle(handle)
+        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)  # type: ignore[attr-defined]
+        ctypes.windll.kernel32.TerminateProcess(handle, -1)  # type: ignore[attr-defined]
+        ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
     else:
         try:
             os.kill(pid, signal.SIGTERM)
@@ -117,7 +117,7 @@ def _isProcessRunningOnWindows(pid):
     http://code.activestate.com/recipes/305279-getting-process-information-on-windows/)
     """
     from ctypes import (  # pylint: disable=import-outside-toplevel
-        windll,
+        windll,  # type: ignore[attr-defined]
         c_ulong,
         sizeof,
         byref,
@@ -144,7 +144,7 @@ def _isProcessRunningOnWindows(pid):
 
 if not hasattr(p, "samefile"):
 
-    def _samefile(file1, file2):
+    def samefile(file1, file2):
         """
         Emulated version of os.path.samefile. This is needed for Python
         2.7 running on Windows (at least on Appveyor CI)
@@ -154,9 +154,7 @@ if not hasattr(p, "samefile"):
 
 
 else:
-    _samefile = p.samefile  # pylint: disable=invalid-name
-
-samefile = _samefile  # pylint: disable=invalid-name
+    samefile = p.samefile  # type: ignore[assignment]
 
 
 def removeDuplicates(seq):
@@ -221,7 +219,7 @@ def isFileReadable(path: str) -> bool:
         return False
 
 
-def runShellCommand(cmd_with_args: tuple[str, ...] | list[str], shell: bool = False, env: dict | None = None, cwd: str | None = None) -> Iterable[str]:
+def runShellCommand(cmd_with_args: tuple[str, ...] | list[str], shell: bool = False, env: dict | None = None, cwd: str | None = None) -> list[str]:
     """
     Runs a shell command and handles stdout catching
     """
@@ -240,7 +238,7 @@ def runShellCommand(cmd_with_args: tuple[str, ...] | list[str], shell: bool = Fa
             .splitlines()
         )
     except subp.CalledProcessError as exc:
-        stdout = tuple(exc.output.decode(errors="replace").splitlines())
+        stdout = exc.output.decode(errors="replace").splitlines()
         _logger.debug(
             "Command '%s' failed with error code %d.\nStdout:\n%s",
             cmd_with_args,
@@ -285,7 +283,7 @@ class HashableByKey(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         """ Implement this attribute to use it for hashing and comparing"""
 
     def __hash__(self):
@@ -329,7 +327,7 @@ def getMostCommonItem(items: Iterable[T]) -> T:
     Gets the most common item on an interable of items
     """
     data = Counter(items)
-    return max(items, key=data.get)
+    return max(items, key=lambda x: data[x])
 
 
 def readFile(path):

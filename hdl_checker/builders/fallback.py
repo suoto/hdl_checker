@@ -16,38 +16,41 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Fallback builder for cases where no builder is found"
 
+from typing import Iterable
+
 from hdl_checker.builders.base_builder import BaseBuilder
-from hdl_checker.types import FileType
+from hdl_checker.diagnostics import CheckerDiagnostic
+from hdl_checker.parsers.elements.identifier import Identifier
+from hdl_checker.path import Path
+from hdl_checker.types import BuildFlags, FileType
 
 
 class Fallback(BaseBuilder):
     "Dummy fallback builder"
 
     # Implementation of abstract class properties
-    builder_name = "fallback"
-    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
+    builder_name = "fallback"  # type: ignore[assignment]
+    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}  # type: ignore[assignment]
 
     def __init__(self, *args, **kwargs) -> None:
         self._version = "<undefined>"
         super(Fallback, self).__init__(*args, **kwargs)
 
-    # Since Fallback._buildSource returns nothing,
-    # Fallback._makeRecords is never called
-    def _makeRecords(self, _):  # pragma: no cover
+    def _makeRecords(self, line: str) -> Iterable[CheckerDiagnostic]:  # pragma: no cover
         return []
 
-    def _shouldIgnoreLine(self, line):  # pragma: no cover
+    def _shouldIgnoreLine(self, line: str) -> bool:  # pragma: no cover
         return True
 
-    def _checkEnvironment(self):
+    def _checkEnvironment(self) -> None:
         return
 
     @staticmethod
     def isAvailable():
         return True
 
-    def _buildSource(self, path, library, flags=None):  # pragma: no cover
-        return [], []
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:  # pragma: no cover
+        return []
 
-    def _createLibrary(self, library):  # pragma: no cover
+    def _createLibrary(self, library: Identifier) -> None:  # pragma: no cover
         pass

@@ -122,7 +122,7 @@ class JsonSourceEntry(
     """
 
     @classmethod
-    def make(cls, iterable) -> JsonSourceEntry:
+    def make(cls, iterable) -> "JsonSourceEntry":
         """
         Creates a JsonSourceEntry from all supported formats:
             - str
@@ -330,6 +330,8 @@ def _filterGitIgnoredPathsOnUnix(path_to_repo: Path, paths: Iterable[Path]) -> I
         if proc is None:
             proc = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
 
+        assert proc.stdin is not None
+        assert proc.stdout is not None
         try:
             proc.stdin.write(toBytes(str(path.abspath) + "\n"))
             # Flush so that data makes to the process

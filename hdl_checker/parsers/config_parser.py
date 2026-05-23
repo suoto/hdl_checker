@@ -97,7 +97,7 @@ class ConfigParser(object):
             },
         }
 
-        self._sources: list[tuple[str, str, BuildFlags]] = []
+        self._sources: list[tuple[str, dict[str, Any]]] = []
 
         self.filename = filename
 

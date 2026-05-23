@@ -37,8 +37,8 @@ class GHDL(BaseBuilder):
     """
 
     # Implementation of abstract class properties
-    builder_name = "ghdl"
-    file_types = {FileType.vhdl}
+    builder_name = "ghdl"  # type: ignore[assignment]
+    file_types = {FileType.vhdl}  # type: ignore[assignment]
 
     # Default build flags
     default_flags = {
@@ -62,9 +62,12 @@ class GHDL(BaseBuilder):
         r"^\s*(actual prefix|library directory):" r"\s*(?P<library_path>.*)\s*"
     )
 
-    _shouldIgnoreLine = re.compile(
+    _shouldIgnoreLine_re = re.compile(
         "|".join([r"^\s*$", r"ghdl: compilation error"])
-    ).match
+    )
+
+    def _shouldIgnoreLine(self, line: str) -> bool:
+        return self._shouldIgnoreLine_re.match(line) is not None
 
     _iter_rebuild_units = re.compile(
         r'((?P<unit_type>entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
@@ -174,7 +177,7 @@ class GHDL(BaseBuilder):
         """
         return ["ghdl", "-s"] + self._getGhdlArgs(path, library, flags)
 
-    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         self._importSource(path, library, flags)
 
         stdout: list[str] = []
@@ -186,7 +189,7 @@ class GHDL(BaseBuilder):
 
         return stdout
 
-    def _createLibrary(self, _):
+    def _createLibrary(self, library: Identifier) -> None:
         workdir = p.join(self._work_folder)
         if not p.exists(workdir):
             os.makedirs(workdir)

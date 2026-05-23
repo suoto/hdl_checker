@@ -63,6 +63,7 @@ from hdl_checker.path import Path
 from hdl_checker.types import (
     BuildFlagScope,
     ConfigFileOrigin,
+    DesignUnitType,
     FileType,
     Location,
     RebuildLibraryUnit,
@@ -93,7 +94,7 @@ def _Path(*args):
 
 
 def patchClassMap(**kwargs):
-    class_map = hdl_checker.serialization.CLASS_MAP.copy()
+    class_map = hdl_checker.serialization.CLASS_MAP.copy()  # type: ignore[attr-defined]
     for name, value in kwargs.items():
         class_map.update({name: value})
 
@@ -115,10 +116,10 @@ with such.A("hdl_checker project") as it:
     @it.should("warn when setup is taking too long")
     @patch("hdl_checker.core._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)
+        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)  # type: ignore[attr-defined]
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
-    def test(handle_ui_info):
+    def test(handle_ui_info):  # type: ignore[no-redef]
 
         path = tempfile.mkdtemp()
 
@@ -135,7 +136,7 @@ with such.A("hdl_checker project") as it:
         project.getMessagesByPath(Path(source))
 
         handle_ui_info.assert_called_once_with(
-            hdl_checker.core._HOW_LONG_IS_TOO_LONG_MSG
+            hdl_checker.core._HOW_LONG_IS_TOO_LONG_MSG  # type: ignore[attr-defined]
         )
 
         removeIfExists(path)
@@ -145,10 +146,10 @@ with such.A("hdl_checker project") as it:
     )
     @patch("hdl_checker.core._HOW_LONG_IS_TOO_LONG", 0.1)
     @patch.object(
-        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)
+        hdl_checker.core.HdlCheckerCore, "configure", lambda *_: time.sleep(0.5)  # type: ignore[attr-defined]
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
-    def test(handle_ui_info):
+    def test(handle_ui_info):  # type: ignore[no-redef]
 
         path = tempfile.mkdtemp()
 
@@ -172,7 +173,7 @@ with such.A("hdl_checker project") as it:
         "not warn when setup takes less than _HOW_LONG_IS_TOO_LONG"
     )
     @patch("hdl_checker.tests.DummyServer._handleUiInfo")
-    def test(handle_ui_info):
+    def test(handle_ui_info):  # type: ignore[no-redef]
         path = tempfile.mkdtemp()
 
         config = p.join(path, "config.json")
@@ -196,7 +197,7 @@ with such.A("hdl_checker project") as it:
         "hdl_checker.builders.fallback.Fallback._parseBuiltinLibraries",
         return_value=[Identifier("builtin")],
     )
-    def test(parse_builtins):
+    def test(parse_builtins):  # type: ignore[no-redef]
         # type: (...) -> None
         root = tempfile.mkdtemp()
         server = DummyServer(Path(root))
@@ -229,12 +230,12 @@ with such.A("hdl_checker project") as it:
     with it.having("non existing root dir"):
 
         @it.has_setup
-        def setup():
+        def setup():  # type: ignore[no-redef]
             it.project_file = Path("non_existing_file")
             it.assertFalse(p.exists(it.project_file.name))
 
         @it.should("raise exception when trying to instantiate")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             project = DummyServer(_Path("nonexisting"))
             with it.assertRaises(FileNotFoundError):
                 project.setConfig(str(it.project_file), origin=ConfigFileOrigin.user)
@@ -242,15 +243,15 @@ with such.A("hdl_checker project") as it:
     with it.having("no project file at all"):
 
         @it.has_setup
-        def setup():
+        def setup():  # type: ignore[no-redef]
             it.project = DummyServer(Path(TEST_PROJECT))
 
         @it.should("use fallback to Fallback builder")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.assertIsInstance(it.project.builder, Fallback)
 
         @it.should("restore state from a saved cache")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.project._saveCache()
             it.project._recoverCacheIfPossible()
             it.assertIsNone(it.project.config_file)
@@ -260,7 +261,7 @@ with such.A("hdl_checker project") as it:
             "hdl_checker.core.getStaticMessages",
             return_value=[CheckerDiagnostic(text="some text")],
         )
-        def test(meth):
+        def test(meth):  # type: ignore[no-redef]
 
             _logger.info("Files: %s", it.project.database._paths)
 
@@ -282,7 +283,7 @@ with such.A("hdl_checker project") as it:
     with it.having("an existing and valid project file"):
 
         @it.has_setup
-        def setup():
+        def setup():  # type: ignore[no-redef]
             setupTestSuport(TEST_TEMP_PATH)
 
             it.project = DummyServer(_Path(TEST_TEMP_PATH))
@@ -329,12 +330,12 @@ with such.A("hdl_checker project") as it:
                 it.project.setConfig(it.config_file, origin=ConfigFileOrigin.user)
 
         @it.should("use MockBuilder builder")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             # Just to make sure patch worked
             it.assertEqual(it.project.builder.builder_name, MockBuilder.builder_name)
 
         @it.should("save cache after checking a source")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
@@ -345,14 +346,14 @@ with such.A("hdl_checker project") as it:
 
         @it.should("restore state from a saved cache")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        def test():
+        def test():  # type: ignore[no-redef]
             it.project._saveCache()
             it.project._recoverCacheIfPossible()
             it.assertIsNotNone(it.project.config_file)
 
         @it.should("not reparse when setting the config file")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
-        def test():
+        def test():  # type: ignore[no-redef]
             it.project._saveCache()
 
             _ = DummyServer(_Path(TEST_TEMP_PATH))
@@ -371,7 +372,7 @@ with such.A("hdl_checker project") as it:
         @it.should("not recover cache if versions differ")  # type: ignore
         @patchClassMap(MockBuilder=MockBuilder)
         @patch("hdl_checker.core.json.load", return_value={"__version__": None})
-        def test(json_load):
+        def test(json_load):  # type: ignore[no-redef]
             source = _SourceMock(
                 library="some_lib", design_units=[{"name": "target", "type": "entity"}]
             )
@@ -387,7 +388,7 @@ with such.A("hdl_checker project") as it:
         @it.should("clean up and reparse if the config file changes")  # type: ignore
         @linuxOnly
         @patchClassMap(MockBuilder=MockBuilder)
-        def test():
+        def test():  # type: ignore[no-redef]
             # Make sure everything is up to date prior to running
             with patch.object(it.project, "configure") as configure:
                 it.project._updateConfigIfNeeded()
@@ -410,7 +411,7 @@ with such.A("hdl_checker project") as it:
 
         @it.should("warn when failing to recover from cache")  # type: ignore
         @patch("hdl_checker.tests.DummyServer._handleUiWarning")
-        def test(handle_ui_warning):
+        def test(handle_ui_warning):  # type: ignore[no-redef]
             it.project._saveCache()
             # Copy parameters of the object we're checking against
             root_dir = it.project.root_dir
@@ -433,7 +434,7 @@ with such.A("hdl_checker project") as it:
         # Avoid saving to cache because the patched method is not JSON
         # serializable
         @patch("hdl_checker.core.json.dump")
-        def test(_):
+        def test(_):  # type: ignore[no-redef]
             with PatchBuilder():
                 it.project.setConfig(
                     Path(p.join(TEST_PROJECT, "vimhdl.prj")),
@@ -529,7 +530,7 @@ with such.A("hdl_checker project") as it:
                 )
 
         @it.should("Resolve dependency to path")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
             clock_divider = RequiredDesignUnit(
@@ -550,7 +551,7 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "Resolve dependency to path when it's defined on the same file"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             path = _Path(TEST_PROJECT, "basic_library", "package_with_functions.vhd")
 
             clock_divider = RequiredDesignUnit(
@@ -566,7 +567,7 @@ with such.A("hdl_checker project") as it:
             )
 
         @it.should("Not resolve dependencies whose library is built in")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             path = _Path(TEST_PROJECT, "another_library", "foo.vhd")
 
             numeric_std = RequiredDesignUnit(
@@ -585,7 +586,7 @@ with such.A("hdl_checker project") as it:
         @patch(
             "hdl_checker.core.getBuilderByName", new=lambda name: FailingBuilder
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             cache_content = {"builder": FailingBuilder.builder_name}
 
             cache_path = it.project._getCacheFilename()
@@ -637,11 +638,11 @@ with such.A("hdl_checker project") as it:
             it.assertIsInstance(it.project.builder, MockBuilder)
 
         @it.should("use mock builder")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.assertIsInstance(it.project.builder, MockBuilder)
 
         @it.should("get messages for an absolute path")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.join(TEST_PROJECT, "another_library", "foo.vhd")
 
             diagnostics = it.project.getMessagesByPath(Path(filename))
@@ -660,7 +661,7 @@ with such.A("hdl_checker project") as it:
             it.assertTrue(it.project.database.paths)
 
         @it.should("get messages for relative path")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.relpath(
                 p.join(TEST_PROJECT, "another_library", "foo.vhd"),
                 str(it.project.root_dir),
@@ -682,7 +683,7 @@ with such.A("hdl_checker project") as it:
             )
 
         @it.should("get messages with text")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.assertTrue(it.project.database.paths)
 
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
@@ -726,7 +727,7 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "get messages with text for file outside the project file"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["entity some_entity is end;"])
 
@@ -750,7 +751,7 @@ with such.A("hdl_checker project") as it:
             it.assertIn(PathNotInProjectFile(filename), diagnostics)
 
         @it.should("get updated messages")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = Path(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
 
             code = open(str(filename), "r").read().split("\n")
@@ -777,7 +778,7 @@ with such.A("hdl_checker project") as it:
                 writeListToFile(str(filename), code)
 
         @it.should("get messages by path of a different source")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd"))
 
             it.assertCountEqual(
@@ -796,7 +797,7 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "get messages from a source outside the project file"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = Path(p.join(TEST_TEMP_PATH, "some_file.vhd"))
             writeListToFile(str(filename), ["library some_lib;"])
 
@@ -849,7 +850,7 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "rebuild sources when needed within the same library"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             it.project.database._clearLruCaches()
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [
@@ -875,7 +876,7 @@ with such.A("hdl_checker project") as it:
         @it.should(  # type: ignore
             "rebuild sources when changing a package on different libraries"
         )
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
             rebuilds = [[_RebuildLibraryUnit(library="another_library", name="foo")]]
 
@@ -898,7 +899,7 @@ with such.A("hdl_checker project") as it:
             return RebuildPath(Path(path))
 
         @it.should("rebuild sources with path as a hint")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             abs_path = p.join(
@@ -928,10 +929,10 @@ with such.A("hdl_checker project") as it:
             )
 
         def _RebuildUnit(name, type_):
-            return RebuildUnit(name=Identifier(name), type_=Identifier(type_))
+            return RebuildUnit(name=Identifier(name), type_=DesignUnitType(type_))
 
         @it.should("rebuild package if needed")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }
@@ -953,7 +954,7 @@ with such.A("hdl_checker project") as it:
             )
 
         @it.should("rebuild a combination of all")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             filename = p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
 
             # - {unit_type: '', 'unit_name': }

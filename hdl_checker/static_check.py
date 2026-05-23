@@ -18,6 +18,7 @@
 
 import logging
 import re
+from typing import Sequence
 
 #  from hdl_checker.path import Path
 from hdl_checker.diagnostics import (
@@ -141,6 +142,8 @@ def _findObjects(lines):
                     continue
                 _group_d = match.groupdict()
                 index = match.lastindex
+                if index is None:
+                    continue
                 if "port" in _group_d.keys() and _group_d["port"] is not None:
                     index -= 1
                 start = match.start(index)
@@ -151,11 +154,12 @@ def _findObjects(lines):
                 for submatch in re.finditer(r"(\w+)", value):
                     # Need to decrement the last index because we have a group that
                     # catches the port type (in, out, inout, etc)
-                    name = submatch.group(submatch.lastindex)
+                    sub_index = submatch.lastindex or 0
+                    name = submatch.group(sub_index)
                     yield name, {
                         "lnum": lnum,
-                        "start": start + submatch.start(submatch.lastindex),
-                        "end": end + submatch.start(submatch.lastindex),
+                        "start": start + submatch.start(sub_index),
+                        "end": end + submatch.start(sub_index),
                         "type": key,
                     }
         lnum += 1
@@ -211,7 +215,7 @@ def _getCommentTags(lines):
             result += [
                 StaticCheckerDiag(
                     line_number=lnum - 1,
-                    column_number=match.start(match.lastindex - 1),
+                    column_number=match.start((match.lastindex or 1) - 1),
                     severity=DiagType.STYLE_INFO,
                     text="%s: %s" % (_dict["tag"].upper(), _dict["text"]),
                 )
@@ -235,7 +239,7 @@ def _getMiscChecks(objects):
             )
 
 
-def getStaticMessages(lines: tuple[str, ...]) -> list[StaticCheckerDiag]:
+def getStaticMessages(lines: Sequence[str]) -> list[StaticCheckerDiag]:
     "VHDL static checking"
     objects = _getObjectsFromText(lines)
 

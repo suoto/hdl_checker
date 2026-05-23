@@ -26,7 +26,7 @@ import sys
 from threading import Timer
 
 from hdl_checker import __version__ as version
-from hdl_checker import handlers, lsp
+from hdl_checker import lsp
 from hdl_checker.utils import (
     getTemporaryFilename,
     isProcessRunning,
@@ -42,41 +42,24 @@ def parseArguments():
 
     parser = argparse.ArgumentParser()
 
-    # Options
-    parser.add_argument("--host", action="store", help="[HTTP] Host to serve")
-    parser.add_argument("--port", action="store", type=int, help="[HTTP] Port to serve")
-    parser.add_argument(
-        "--lsp",
-        action="store_true",
-        default=False,
-        help="Starts the server in LSP mode. Defaults to false",
-    )
-
     parser.add_argument(
         "--attach-to-pid",
         action="store",
         type=int,
-        help="[HTTP, LSP] Stops the server if given PID is not active",
+        help="Stops the server if given PID is not active",
     )
-    parser.add_argument("--log-level", action="store", help="[HTTP, LSP] Logging level")
+    parser.add_argument("--log-level", action="store", help="Logging level")
     parser.add_argument(
         "--log-stream",
         action="store",
-        help="[HTTP, LSP] Log file, defaults to stdout when in HTTP or a "
-        "temporary file named hdl_checker_log_pid<PID>.log when in LSP mode. "
-        "Use NONE to disable logging altogether",
+        help="Log file, defaults to a temporary file named "
+        "hdl_checker_log_pid<PID>.log. Use NONE to disable logging altogether",
     )
 
     parser.add_argument(
-        "--stdout",
-        action="store",
-        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
-        "named hdl_checker_stdout_pid<PID>.log",
-    )
-    parser.add_argument(
         "--stderr",
         action="store",
-        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
+        help="File to redirect stderr to. Defaults to a temporary file "
         "named hdl_checker_stderr_pid<PID>.log. "
         "Use NONE to disable redirecting stderr altogether",
     )
@@ -100,14 +83,6 @@ def parseArguments():
     if args.version:
         sys.stdout.write("%s\n" % version)
         sys.exit(0)
-
-    if args.lsp:
-        args.host = None
-        args.port = None
-    else:
-        args.host = args.host or "localhost"
-        args.port = args.port or 50000
-        args.log_stream = args.log_stream or sys.stdout
 
     # If not set, create a temporary file safely so there's no clashes
     if args.log_stream == "NONE":
@@ -134,10 +109,8 @@ def openForStdHandle(filepath):
     return open(filepath, mode="w", buffering=1)
 
 
-def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
-    "Redirect stdout and stderr to files"
-    if stdout is not None:
-        sys.stdout = openForStdHandle(stdout)
+def _setupPipeRedirection(stderr):  # pragma: no cover
+    "Redirect stderr to a file"
     if stderr is not None:
         sys.stderr = openForStdHandle(stderr)
 
@@ -152,10 +125,9 @@ def _binaryStdio():  # pragma: no cover
 
 def run(args):
     """
-    Import modules and tries to start a hdl_checker server
+    Starts the hdl_checker LSP server
     """
-    # LSP will use stdio to communicate
-    _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
+    _setupPipeRedirection(args.stderr)
 
     if args.log_stream:
         setupLogging(args.log_stream, args.log_level)
@@ -189,16 +161,13 @@ def run(args):
         version,
     )
 
-    if args.lsp:
-        stdin, stdout = _binaryStdio()
-        server = lsp.HdlCheckerLanguageServer()
-        lsp.setupLanguageServerFeatures(server)
-        server.start_io(stdin=stdin, stdout=stdout)
-    else:
-        if args.attach_to_pid is not None:
-            _attachPids(args.attach_to_pid, os.getpid())
+    if args.attach_to_pid is not None:
+        _attachPids(args.attach_to_pid, os.getpid())
 
-        handlers.app.run(host=args.host, port=args.port, threads=10, server="waitress")
+    stdin, stdout = _binaryStdio()
+    server = lsp.HdlCheckerLanguageServer()
+    lsp.setupLanguageServerFeatures(server)
+    server.start_io(stdin=stdin, stdout=stdout)
 
 
 def main():

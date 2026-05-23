@@ -265,8 +265,8 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
             state["sources"].append(source_info)
 
-        state["inferred_libraries"] = tuple(self._inferred_libraries)
-        state["design_units"] = tuple(self._design_units)
+        state["inferred_libraries"] = list(self._inferred_libraries)
+        state["design_units"] = list(self._design_units)
 
         return state
 

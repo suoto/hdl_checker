@@ -66,7 +66,7 @@ class _ConfigDict(object):
                 self.flags[lang][scope] = []
 
     def toDict(self):
-        d = {"sources": tuple(self.sources), "include": tuple(self.include)}
+        d: dict = {"sources": tuple(self.sources), "include": tuple(self.include)}
 
         for lang in FileType:
             d[lang.value] = {"flags": {}}

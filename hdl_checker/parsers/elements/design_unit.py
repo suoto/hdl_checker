@@ -17,6 +17,7 @@
 "Class defining a parsed design unit"
 
 import logging
+from typing import Any
 
 from .identifier import (  # pylint: disable=unused-import
     Identifier,
@@ -101,7 +102,7 @@ class _DesignUnit(ParsedElement):
         return self._name
 
     @property
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         return (
             self.owner,
             self.type_,

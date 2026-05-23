@@ -85,7 +85,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
         """
         return CheckerDiagnostic(
             checker=kwargs.get("checker", getattr(self, "checker", None)),
-            text=kwargs.get("text", getattr(self, "text", None)),
+            text=kwargs.get("text", getattr(self, "text", "")),
             filename=kwargs.get("filename", getattr(self, "filename", None)),
             line_number=kwargs.get("line_number", getattr(self, "line_number", None)),
             column_number=kwargs.get(

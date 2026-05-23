@@ -16,6 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Spec for a parsed dependency"
 
+from typing import Any
 
 from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
@@ -71,7 +72,7 @@ class BaseDependencySpec(ParsedElement):
         return len(self.name) + len(self.library) + 1
 
     @property
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         return (
             self.owner,
             self.library,

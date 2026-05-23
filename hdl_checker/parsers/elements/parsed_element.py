@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-import logging
 import abc
-from typing import Iterable
+import logging
+from typing import Any, Iterable
 
 from hdl_checker.types import Location
 from hdl_checker.utils import HashableByKey
@@ -28,7 +28,6 @@ LocationList = Iterable[Location]
 
 
 class ParsedElement(HashableByKey):
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self, locations: LocationList | None = None) -> None:
         set_of_locations: set[Location] = set()
@@ -47,7 +46,7 @@ class ParsedElement(HashableByKey):
         return self._locations
 
     @property
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         return (self.locations,)
 
     @abc.abstractmethod
@@ -62,6 +61,9 @@ class ParsedElement(HashableByKey):
         name_length = len(self)
 
         for location in self.locations:
+            if location.line is None or location.column is None:
+                continue
+
             if line != location.line:
                 continue
 

@@ -36,8 +36,8 @@ class MSim(BaseBuilder):
     """Builder implementation of the ModelSim compiler"""
 
     # Implementation of abstract class properties
-    builder_name = "msim"
-    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
+    builder_name = "msim"  # type: ignore[assignment]
+    file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}  # type: ignore[assignment]
 
     # MSim specific class properties
     _stdout_message_scanner = re.compile(
@@ -106,8 +106,8 @@ class MSim(BaseBuilder):
         },
     }
 
-    def _shouldIgnoreLine(self, line):
-        return self._should_ignore(line)
+    def _shouldIgnoreLine(self, line: str) -> bool:
+        return self._should_ignore(line) is not None
 
     def __init__(self, work_folder: Path, database: Database) -> None:
         self._version = ""
@@ -197,7 +197,7 @@ class MSim(BaseBuilder):
                 self._logger.error(_msg)
                 assert 0, _msg
 
-    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         filetype = FileType.fromPath(path)
         self._logger.warning("Build source: %s", path)
         if filetype == FileType.vhdl:
@@ -209,7 +209,7 @@ class MSim(BaseBuilder):
             "Unknown file type %s for path '%s'", filetype, path
         )
 
-        return ""  # Just to satisfy pylint
+        return []  # Just to satisfy pylint
 
     def _getExtraFlags(self, path: Path) -> Iterable[str]:
         """
@@ -227,7 +227,7 @@ class MSim(BaseBuilder):
             libs += ["+incdir+" + incdir]
         return libs
 
-    def _buildVhdl(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
+    def _buildVhdl(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         "Builds a VHDL file"
         assert isinstance(library, Identifier)
         cmd = [
@@ -244,7 +244,7 @@ class MSim(BaseBuilder):
 
         return runShellCommand(cmd)
 
-    def _buildVerilog(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
+    def _buildVerilog(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         "Builds a Verilog/SystemVerilog file"
         cmd = [
             "vlog",
@@ -265,7 +265,7 @@ class MSim(BaseBuilder):
 
         return runShellCommand(cmd)
 
-    def _createLibrary(self, library):
+    def _createLibrary(self, library: Identifier) -> None:
         if p.exists(p.join(self._work_folder, library.name)):
             self._logger.debug("Path for library '%s' already exists", library)
             return
@@ -306,7 +306,7 @@ class MSim(BaseBuilder):
             self._logger.warning("Library %s doesn't exists", library)
             return None
         return runShellCommand(
-            ["vdel", "-modelsimini", self._modelsim_ini, "-lib", library, "-all"]
+            ["vdel", "-modelsimini", self._modelsim_ini.name, "-lib", library, "-all"]
         )
 
     def _mapLibrary(self, library: Identifier) -> None:

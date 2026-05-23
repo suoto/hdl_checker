@@ -17,7 +17,7 @@
 "VHDL source file parser"
 
 import re
-from typing import Iterator
+from typing import Any, Iterator
 
 from .elements.dependency_spec import RequiredDesignUnit
 from .elements.design_unit import VhdlDesignUnit

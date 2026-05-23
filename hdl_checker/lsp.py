@@ -119,8 +119,8 @@ def checkerDiagToLspDict(diag: CheckerDiagnostic) -> Diagnostic:
             ),
         ),
         message=diag.text,
-        severity=_translateSeverity(diag.severity),
-        code=diag.error_code if diag.error_code else None,
+        severity=_translateSeverity(diag.severity),  # type: ignore[arg-type]
+        code=diag.error_code if diag.error_code else None,  # type: ignore[arg-type]
         source=diag.checker,
     )
 
@@ -206,6 +206,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             return
 
         root_dir = to_fs_path(self.workspace.root_uri)
+        assert root_dir is not None
         self._checker = Server(self, root_dir=Path(root_dir))
 
         _logger.debug("Updating from %s, workspace=%s", options, self.workspace)
@@ -252,7 +253,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             path = options.project_file
 
         # Project file will be related to the root path
-        if self.workspace:
+        if self.workspace and self.workspace.root_path:
             path = p.join(self.workspace.root_path, path)
 
         return path
@@ -270,10 +271,12 @@ class HdlCheckerLanguageServer(LanguageServer):
         paths = {diag.filename for diag in diags}
         # Add text_doc.uri to the set to trigger clearing diagnostics when it's not
         # present
-        paths.add(Path(to_fs_path(uri)))
+        fs_path = to_fs_path(uri)
+        assert fs_path is not None
+        paths.add(Path(fs_path))
 
         for path in paths:
-            self.lsp.publish_diagnostics(
+            self.lsp.publish_diagnostics(  # type: ignore[attr-defined]
                 from_fs_path(str(path)),
                 tuple(
                     checkerDiagToLspDict(diag)
@@ -295,7 +298,9 @@ class HdlCheckerLanguageServer(LanguageServer):
 
         # If the file has not been saved, use the appropriate method, which
         # will involve dumping the modified contents into a temporary file
-        path = Path(to_fs_path(doc_uri))
+        fs_path = to_fs_path(doc_uri)
+        assert fs_path is not None
+        path = Path(fs_path)
 
         if is_saved:
             return self.checker.getMessagesByPath(path)
@@ -305,9 +310,9 @@ class HdlCheckerLanguageServer(LanguageServer):
     def references(self, params: ReferenceParams) -> list[Location] | None:
         "Tries to find references for the selected element"
 
-        element = self.getElementAtPosition(
-            Path(to_fs_path(params.textDocument.uri)), params.position
-        )
+        fs_path = to_fs_path(params.textDocument.uri)
+        assert fs_path is not None
+        element = self.getElementAtPosition(Path(fs_path), params.position)
 
         # Element not identified
         if element is None:
@@ -319,9 +324,10 @@ class HdlCheckerLanguageServer(LanguageServer):
             for line, column in element.locations:
                 references += [
                     Location(
-                        uri=from_fs_path(str(element.owner)),
+                        uri=from_fs_path(str(element.owner)) or "",
                         range=Range(
-                            start=Position(line, column), end=Position(line, column + 1)
+                            start=Position(line or 0, column or 0),
+                            end=Position(line or 0, (column or 0) + 1),
                         ),
                     )
                 ]
@@ -330,9 +336,10 @@ class HdlCheckerLanguageServer(LanguageServer):
             for line, column in reference.locations:
                 references += [
                     Location(
-                        uri=from_fs_path(str(reference.owner)),
+                        uri=from_fs_path(str(reference.owner)) or "",
                         range=Range(
-                            start=Position(line, column), end=Position(line, column + 1)
+                            start=Position(line or 0, column or 0),
+                            end=Position(line or 0, (column or 0) + 1),
                         ),
                     )
                 ]
@@ -349,7 +356,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         try:
             return (
                 MarkupKind.Markdown.value
-                in self.client_capabilities.textDocument.hover.contentFormat
+                in self.client_capabilities.textDocument.hover.contentFormat  # type: ignore[union-attr]
             )
         except AttributeError:
             return False
@@ -439,7 +446,9 @@ class HdlCheckerLanguageServer(LanguageServer):
         Handles HoverParams and produces a Hover object if a known element is
         found within the given location
         """
-        path = Path(to_fs_path(params.textDocument.uri))
+        fs_path = to_fs_path(params.textDocument.uri)
+        assert fs_path is not None
+        path = Path(fs_path)
         # Check if the element under the cursor matches something we know
         element = self.getElementAtPosition(path, params.position)
 
@@ -474,9 +483,9 @@ class HdlCheckerLanguageServer(LanguageServer):
         """
         Returns known definitions found in the given location
         """
-        dependency = self.getElementAtPosition(
-            Path(to_fs_path(params.textDocument.uri)), params.position
-        )
+        fs_path = to_fs_path(params.textDocument.uri)
+        assert fs_path is not None
+        dependency = self.getElementAtPosition(Path(fs_path), params.position)
 
         if not isinstance(dependency, BaseDependencySpec):
             _logger.debug("Go to definition not supported for item %s", dependency)
@@ -502,7 +511,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         # Included paths are dependencies but they're referred to by path, so
         # we return a definition to point to the beginning of the file
         if isinstance(dependency, IncludedPath):
-            return [Location(target_uri, Range(Position(0, 0), Position(0, 1)))]
+            return [Location(target_uri or "", Range(Position(0, 0), Position(0, 1)))]
 
         locations: list[Location] = []
 
@@ -513,10 +522,10 @@ class HdlCheckerLanguageServer(LanguageServer):
                 for line, column in unit.locations:
                     locations += [
                         Location(
-                            target_uri,
+                            target_uri or "",
                             Range(
-                                Position(line, column),
-                                Position(line, column + len(unit)),
+                                Position(line or 0, column or 0),
+                                Position(line or 0, (column or 0) + len(unit)),
                             ),
                         )
                     ]
@@ -561,7 +570,7 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
 
     @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
     def didChangeConfiguration(
-        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams = None
+        self: HdlCheckerLanguageServer, settings: DidChangeConfigurationParams | None = None
     ) -> None:
         self.onConfigUpdate(settings)
 

@@ -36,7 +36,7 @@ from hdl_checker.utils import removeDirIfExists
 
 try:
     import vunit  # type: ignore # pylint: disable=unused-import
-    from vunit import VUnit as VUnit_VHDL  # pylint: disable=import-error
+    from vunit import VUnit as VUnit_VHDL  # type: ignore[import-not-found]  # pylint: disable=import-error
     from vunit.verilog import (  # type: ignore
         VUnit as VUnit_Verilog,
     )  # pylint: disable=import-error
@@ -57,10 +57,10 @@ class BuilderName(Enum):
     Supported tools
     """
 
-    msim = MSim.builder_name
-    xvhdl = XVHDL.builder_name
-    ghdl = GHDL.builder_name
-    fallback = Fallback.builder_name
+    msim = "msim"
+    xvhdl = "xvhdl"
+    ghdl = "ghdl"
+    fallback = "fallback"
 
 
 def getBuilderByName(name):
@@ -127,13 +127,13 @@ def getVunitSources(builder: AnyValidBuilder) -> Iterable[tuple[Path, str | None
 
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:
-        sources += _getSourcesFromVUnitModule(VUnit_VHDL)
+        sources += _getSourcesFromVUnitModule(VUnit_VHDL)  # type: ignore[possibly-undefined]
         _logger.debug("Added VUnit VHDL files")
 
     if FileType.systemverilog in builder.file_types:
         _logger.debug("Builder supports Verilog, adding VUnit Verilog files")
         builder.addExternalLibrary(FileType.verilog, Identifier("vunit_lib", False))
-        sources += _getSourcesFromVUnitModule(VUnit_Verilog)
+        sources += _getSourcesFromVUnitModule(VUnit_Verilog)  # type: ignore[possibly-undefined]
 
     if not sources:
         _logger.info("Vunit found but no file types are supported by %s", builder)
@@ -154,7 +154,7 @@ def getVunitSources(builder: AnyValidBuilder) -> Iterable[tuple[Path, str | None
         yield Path(path), library, flags
 
     if FileType.systemverilog in builder.file_types:
-        for path in findRtlSourcesByPath(Path(p.dirname(vunit.__file__))):
+        for path in findRtlSourcesByPath(Path(p.dirname(vunit.__file__))):  # type: ignore[possibly-undefined]
             if _isHeader(path):
                 yield Path(path), None, ()
 

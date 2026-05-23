@@ -41,7 +41,7 @@ from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
-from hdl_checker.types import FileType
+from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import ON_LINUX, ON_WINDOWS, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
@@ -85,8 +85,8 @@ class SourceMock(object):
     def __init__(
         self,
         design_units,  # type: Iterable[dict[str, str]]
-        library=None,  # type: str
-        dependencies=None,  # type: Iterable[MockDep]
+        library=None,  # type: str | None
+        dependencies=None,  # type: Iterable[MockDep] | None
         filename=None,  # type: str | None
     ):
 
@@ -145,7 +145,8 @@ class SourceMock(object):
         lines = []
 
         for lib in libs:
-            lines.append("library {0};".format(lib.display_name))
+            if lib is not None:
+                lines.append("library {0};".format(lib.display_name))
 
         for dependency in self._dependencies:
             if dependency.library is not None:
@@ -193,7 +194,7 @@ class SourceMock(object):
         )
 
     def getmtime(self):
-        return p.getmtime(self.filename)
+        return p.getmtime(self.filename.name)
 
     def getDesignUnits(self):
         return self._design_units
@@ -202,13 +203,13 @@ class SourceMock(object):
         return self._dependencies
 
     def getRawSourceContent(self):
-        return open(self.filename).read()
+        return open(self.filename.name).read()
 
 
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("MockBuilder")
-    builder_name = "mock_builder"
-    file_types = (FileType.vhdl,)
+    builder_name = "mock_builder"  # type: ignore[assignment]
+    file_types = (FileType.vhdl,)  # type: ignore[assignment]
 
     def __init__(self, work_folder, *args, **kwargs):
         # type: (...) -> None
@@ -218,26 +219,26 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
         super(MockBuilder, self).__init__(work_folder, *args, **kwargs)
 
-    def _makeRecords(self, _):  # pragma: no cover
+    def _makeRecords(self, line: str) -> list:  # pragma: no cover
         return []
 
-    def _shouldIgnoreLine(self, line):  # pragma: no cover
+    def _shouldIgnoreLine(self, line: str) -> bool:  # pragma: no cover
         return True
 
-    def _checkEnvironment(self):
+    def _checkEnvironment(self) -> None:
         return
 
     @staticmethod
     def isAvailable():
         return True
 
-    def _buildSource(self, path, library, flags=None):
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         self._logger.debug(
             "Building path=%s, library=%s, flags=%s", path, library, flags
         )
-        return [], []
+        return []
 
-    def _createLibrary(self, library):  # pylint: disable=unused-argument
+    def _createLibrary(self, library: Identifier) -> None:  # pylint: disable=unused-argument
         pass
 
     def _parseBuiltinLibraries(self):
@@ -250,7 +251,7 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
 class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
-    builder_name = "FailingBuilder"
+    builder_name = "FailingBuilder"  # type: ignore[assignment]
 
     def _checkEnvironment(self):
         raise exceptions.SanityCheckError(self.builder_name, "Fake error")
@@ -451,7 +452,7 @@ def toCheckerDiagnostic(uri: str, diags: Any) -> Iterable[CheckerDiagnostic]:
         yield CheckerDiagnostic(
             text=diag.message,
             checker=diag.source,
-            filename=uris.to_fs_path(uri),
+            filename=Path(uris.to_fs_path(uri) or ""),
             line_number=diag.range.start.line,
             column_number=diag.range.start.character,
             error_code=diag.code,

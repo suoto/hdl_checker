@@ -19,7 +19,7 @@
 import abc
 import logging
 import os.path as p
-from typing import Any
+from typing import Any, Iterable
 
 from .elements.dependency_spec import (
     BaseDependencySpec,
@@ -38,8 +38,6 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     Parses and stores information about a source file such as design
     units it depends on and design units it provides
     """
-
-    __metaclass__ = abc.ABCMeta
 
     def __init__(self, filename: Path) -> None:
         assert isinstance(filename, Path), "Invalid type: {}".format(filename)
@@ -91,14 +89,19 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     def __hash_key__(self):
         return (self.filename, self._content)
 
-    def _changed(self) -> Any:
+    def _changed(self) -> bool:
         """
         Checks if the file changed based on the modification time
         provided by p.getmtime
         """
         if not p.exists(str(self.filename)):
             return False
-        return bool(self.getmtime() > self._mtime)  # type: ignore
+        if self._mtime is None:
+            return True
+        file_mtime = self.getmtime()
+        if file_mtime is None:
+            return True
+        return file_mtime > self._mtime
 
     def _clearCachesIfChanged(self) -> None:
         """
@@ -183,21 +186,21 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
         return self._libraries
 
     @abc.abstractmethod
-    def _getDesignUnits(self):
+    def _getDesignUnits(self) -> Iterable[tAnyDesignUnit]:
         """
         Method that should implement the real parsing of the source file
         to find design units defined. Use the output of the getSourceContent
         method to avoid unnecessary I/O
         """
 
-    def _getLibraries(self):
+    def _getLibraries(self) -> Iterable[str]:
         """
         Parses the source file to find libraries required by the file
         """
         return ()
 
     @abc.abstractmethod
-    def _getDependencies(self):
+    def _getDependencies(self) -> Iterable[BaseDependencySpec]:
         """
         Parses the source and returns a list of dictionaries that
         describe its dependencies

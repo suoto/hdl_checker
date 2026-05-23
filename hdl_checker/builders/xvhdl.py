@@ -54,9 +54,9 @@ class XVHDL(BaseBuilder):
     """Builder implementation of the xvhdl compiler"""
 
     # Implementation of abstract class properties
-    builder_name = "xvhdl"
+    builder_name = "xvhdl"  # type: ignore[assignment]
     # TODO: Add xvlog support
-    file_types = {FileType.vhdl}
+    file_types = {FileType.vhdl}  # type: ignore[assignment]
 
     def _shouldIgnoreLine(self, line: str) -> bool:
         if "ignored due to previous errors" in line:
@@ -130,8 +130,8 @@ class XVHDL(BaseBuilder):
 
     @staticmethod
     def isAvailable():
+        temp_dir = tempfile.mkdtemp()
         try:
-            temp_dir = tempfile.mkdtemp()
             runShellCommand(["xvhdl", "--nolog", "--version"], cwd=temp_dir)
             return True
         except OSError:
@@ -149,7 +149,7 @@ class XVHDL(BaseBuilder):
             )
             fd.write(content)
 
-    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         cmd = [
             "xvhdl",
             "--nolog",

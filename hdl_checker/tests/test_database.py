@@ -94,7 +94,7 @@ class _Database(Database):
 
     def __jsonEncode__(self):
         state = super(_Database, self).__jsonEncode__()
-        state["__class__"] = "Database"  # super(_Database, self).__class__.__name__
+        state["__class__"] = "Database"  # type: ignore[index]
         return state
 
     def _configFromSources(self, sources, root_path):
@@ -116,7 +116,7 @@ class _Database(Database):
 
         self.configure({"sources": config}, root_path)
 
-    def test_getDependenciesUnits(self, path: Path) -> Iterable[tuple[Identifier, Identifier]]:
+    def test_getDependenciesUnits(self, path: Path) -> Iterable[tuple[Any | None, str]]:
         _msg = []
         for library, name in super(_Database, self).getDependenciesUnits(path):
             yield getattr(library, "name", None), name.name

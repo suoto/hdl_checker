@@ -80,7 +80,10 @@ _CLIENT_CAPABILITIES = ClientCapabilities(
         synchronization=None,  # type: ignore
         completion=None,  # type: ignore
         hover=HoverAbstract(
-            dynamic_registration=False, content_format=[MarkupKind.PlainText,],
+            dynamic_registration=False,
+            content_format=[
+                MarkupKind.PlainText,
+            ],
         ),
         signature_help=None,  # type:ignore
         references=None,  # type:ignore
@@ -121,7 +124,7 @@ class _LspHelper(unittest.TestCase):
         self.server = lsp.HdlCheckerLanguageServer()
         lsp.setupLanguageServerFeatures(self.server)
 
-        self.server_diagnostics = []  # type: ignore
+        self.server_diagnostics = []
 
         @self.server.feature(features.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
         def serverPublishDiagnosticsHandler(diag):  # pylint: disable=unused-variable
@@ -142,8 +145,8 @@ class _LspHelper(unittest.TestCase):
 
         # Setup client (client doesn't need the HDL checker stuff)
         self.client = LanguageServer(asyncio.new_event_loop())
-        self.client_messages = []  # type: ignore
-        self.client_diagnostics = []  # type: ignore
+        self.client_messages = []
+        self.client_diagnostics = []
 
         @self.client.feature(features.WINDOW_SHOW_MESSAGE)
         def clientShowMessageHandler(*args):  # pylint: disable=unused-variable
@@ -171,38 +174,40 @@ class _LspHelper(unittest.TestCase):
             return
 
         _logger.info("Sending initialize request")
-        self.client.lsp.send_request(features.INITIALIZE, params).result(
+        self.client.lsp.send_request(features.INITIALIZE, params).result(  # type: ignore[attr-defined]
             LSP_REQUEST_TIMEOUT
         )
 
         _logger.info("Sending initialized request")
-        self.client.lsp.send_request(features.INITIALIZED).result(LSP_REQUEST_TIMEOUT)
+        self.client.lsp.send_request(features.INITIALIZED).result(LSP_REQUEST_TIMEOUT)  # type: ignore[attr-defined]
         _logger.info("Client server setup complete")
 
-    def tearDown(self):  # pylint:disable=inconsistent-return-statements
+    def tearDown(self):  # type: ignore[override]  # pylint:disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
             self.assertIsNone(getattr(self, "server", None))
             self.assertIsNone(getattr(self, "client", None))
             return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         _logger.info("Shutting down server")
-        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(
+        shutdown_response = self.client.lsp.send_request(features.SHUTDOWN).result(  # type: ignore[attr-defined]
             LSP_REQUEST_TIMEOUT
         )
-        self.client.lsp.notify(features.EXIT)
+        self.client.lsp.notify(features.EXIT)  # type: ignore[attr-defined]
         self.assertIsNone(shutdown_response)
         # pygls server has cleanup routines run when the interpreter is
         # exiting, at which point the client will be long gone. This results in
         # RuntimeError: cannot schedule new futures after shutdown. To work
         # around this, we're accessing its itnernal event to force it to exit
-        self.client._stop_event.set()
+        self.client._stop_event.set()  # type: ignore[union-attr]
         self.server_thread.join()
         self.client_thread.join()
 
     def checkLintFileOnMethod(
         self,
-        params: DidOpenTextDocumentParams | DidSaveTextDocumentParams | DidChangeTextDocumentParams,
-        expected_diags=list[CheckerDiagnostic],
+        params: DidOpenTextDocumentParams
+        | DidSaveTextDocumentParams
+        | DidChangeTextDocumentParams,
+        expected_diags: list[CheckerDiagnostic] = [],  # noqa: B006
     ):
         """
         Generic method to check diagnostics reported are correct
@@ -231,13 +236,15 @@ class _LspHelper(unittest.TestCase):
 
         _logger.info("Patching %s with %s", "getMessagesByPath", list(expected_diags))
         with patch.object(
-            self.server.checker, "getMessagesByPath", return_value=list(expected_diags),
+            self.server.checker,
+            "getMessagesByPath",
+            return_value=list(expected_diags),
         ):
-            hdl_checker.utils.ENABLE_DEBOUNCE = False
+            hdl_checker.utils.ENABLE_DEBOUNCE = False  # type: ignore[attr-defined]
             try:
-                self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)
+                self.client.lsp.send_request(method, params).result(LSP_REQUEST_TIMEOUT)  # type: ignore[attr-defined]
             finally:
-                hdl_checker.utils.ENABLE_DEBOUNCE = True
+                hdl_checker.utils.ENABLE_DEBOUNCE = True  # type: ignore[attr-defined]
 
             self.assertTrue(
                 self.client_diagnostics, "Expected client to have diagnostics"
@@ -255,7 +262,10 @@ class _LspHelper(unittest.TestCase):
         self.checkLintFileOnMethod(
             DidOpenTextDocumentParams(
                 TextDocumentItem(
-                    uris.from_fs_path(source), language_id="vhdl", version=0, text="",
+                    uris.from_fs_path(source) or "",
+                    language_id="vhdl",
+                    version=0,
+                    text="",
                 )
             ),
             [
@@ -271,7 +281,7 @@ class _LspHelper(unittest.TestCase):
     def _runDidSaveCheck(self, source: Path | None):
         self.checkLintFileOnMethod(
             DidSaveTextDocumentParams(
-                text_document=TextDocumentIdentifier(uris.from_fs_path(source)),
+                text_document=TextDocumentIdentifier(uris.from_fs_path(source) or ""),
                 text="Hello",
             ),
             [
@@ -287,7 +297,10 @@ class _LspHelper(unittest.TestCase):
     def _runDidChangeCheck(self, source: Path | None):
         self.checkLintFileOnMethod(
             DidChangeTextDocumentParams(
-                VersionedTextDocumentIdentifier(uris.from_fs_path(source), version=1,),
+                VersionedTextDocumentIdentifier(
+                    uris.from_fs_path(source) or "",
+                    version=1,
+                ),
                 [
                     TextDocumentContentChangeEvent(
                         range=Range(Position(0, 0), Position(1, 1))
@@ -308,14 +321,14 @@ class _LspHelper(unittest.TestCase):
         if self.__class__ is _LspHelper:
             return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
-        self._runDidOpenCheck(p.join(TEST_PROJECT, "another_library", "foo.vhd"))
+        self._runDidOpenCheck(Path(p.join(TEST_PROJECT, "another_library", "foo.vhd")))
 
     def test_LintFileWhenSaving(self):  # pylint: disable=inconsistent-return-statements
         if self.__class__ is _LspHelper:
             return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         self._runDidSaveCheck(
-            p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
+            Path(p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")  )
         )
 
     def test_LintFileOnChange(self):  # pylint: disable=inconsistent-return-statements
@@ -323,10 +336,10 @@ class _LspHelper(unittest.TestCase):
             return unittest.skip("Won't run this on %s" % self.__class__)
         _logger.info("#" * 100)
         self._runDidOpenCheck(
-            p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+            Path(p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"))
         )
         self._runDidChangeCheck(
-            p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd")
+            Path(p.join(TEST_PROJECT, "basic_library", "clk_en_generator.vhd"))
         )
 
 
@@ -338,7 +351,8 @@ class TestRootUriNoProjectFile(_LspHelper):
 
         self.patches = (
             patch.object(
-                hdl_checker.config_generators.base_generator.BaseGenerator, "generate",
+                hdl_checker.config_generators.base_generator.BaseGenerator,
+                "generate",  # type: ignore[attr-defined]
             ),
             patch("hdl_checker.core.json.dump", spec=json.dump),
         )
@@ -350,7 +364,7 @@ class TestRootUriNoProjectFile(_LspHelper):
             InitializeParams(
                 process_id=1234,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=uris.from_fs_path(TEST_PROJECT),
+                root_uri=uris.from_fs_path(TEST_PROJECT),  # type: ignore[arg-type]
             )
         )
 
@@ -365,9 +379,9 @@ class TestRootUriNoProjectFile(_LspHelper):
         self,
     ):  # pylint: disable=no-self-use,invalid-name
         _logger.info("#" * 100)
-        lsp.SimpleFinder.generate.assert_called_once()  # pylint: disable=no-member
+        lsp.SimpleFinder.generate.assert_called_once()  # type: ignore[union-attr]  # pylint: disable=no-member
         #  Will get called twice
-        hdl_checker.core.json.dump.assert_called()  # pylint: disable=no-member
+        hdl_checker.core.json.dump.assert_called()  # type: ignore[attr-defined]  # pylint: disable=no-member
 
 
 class TestOldStyleProjectFile(_LspHelper):
@@ -380,7 +394,7 @@ class TestOldStyleProjectFile(_LspHelper):
             InitializeParams(
                 process_id=1235,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=uris.from_fs_path(TEST_PROJECT),
+                root_uri=uris.from_fs_path(TEST_PROJECT),  # type: ignore[arg-type]
                 initialization_options={"project_file": "vimhdl.prj"},
             ),
         )
@@ -398,7 +412,7 @@ class TestNonExistingProjectFile(_LspHelper):
             InitializeParams(
                 process_id=1236,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=uris.from_fs_path(TEST_PROJECT),
+                root_uri=uris.from_fs_path(TEST_PROJECT),  # type: ignore[arg-type]
                 initialization_options={"project_file": self.project_file},
             ),
         )
@@ -416,7 +430,7 @@ class TestNoRootNoProjectFile(_LspHelper):
             InitializeParams(
                 process_id=1236,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=None,
+                root_uri=None,  # type: ignore[arg-type]
                 initialization_options={"project_file": None},
             ),
         )
@@ -433,7 +447,7 @@ class TestNoRootWithProjectFile(_LspHelper):
             InitializeParams(
                 process_id=1237,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=None,
+                root_uri=None,  # type: ignore[arg-type]
                 initialization_options={
                     "project_file": p.join(TEST_PROJECT, "vimhdl.prj")
                 },
@@ -453,7 +467,7 @@ class TestValidProject(_LspHelper):
             InitializeParams(
                 process_id=1238,
                 capabilities=_CLIENT_CAPABILITIES,
-                root_uri=uris.from_fs_path(TEST_PROJECT),
+                root_uri=uris.from_fs_path(TEST_PROJECT),  # type: ignore[arg-type]
                 initialization_options={"project_file": "config.json"},
             ),
         )
@@ -480,6 +494,7 @@ class TestValidProject(_LspHelper):
             ),
         ]
 
+        got = ""
         try:
             got = self.server.getBuildSequenceForHover(clk_en_generator)
             self.assertEqual(got, "\n".join(expected))
@@ -517,39 +532,41 @@ class TestValidProject(_LspHelper):
             "client_capabilities",
             ClientCapabilities(
                 text_document=TextDocumentClientCapabilities(
-                    synchronization=None,
-                    completion=None,
+                    synchronization=None,  # type: ignore[arg-type]
+                    completion=None,  # type: ignore[arg-type]
                     hover=HoverAbstract(
                         dynamic_registration=False,
                         # This is what we really need
-                        content_format=[MarkupKind.Markdown,],
+                        content_format=[
+                            MarkupKind.Markdown,
+                        ],
                     ),
-                    signature_help=None,
-                    references=None,
-                    document_highlight=None,
-                    document_symbol=None,
-                    formatting=None,
-                    range_formatting=None,
-                    on_type_formatting=None,
-                    definition=None,
-                    type_definition=None,
-                    implementation=None,
-                    code_action=None,
-                    code_lens=None,
-                    document_link=None,
-                    color_provider=None,
-                    rename=None,
+                    signature_help=None,  # type: ignore[arg-type]
+                    references=None,  # type: ignore[arg-type]
+                    document_highlight=None,  # type: ignore[arg-type]
+                    document_symbol=None,  # type: ignore[arg-type]
+                    formatting=None,  # type: ignore[arg-type]
+                    range_formatting=None,  # type: ignore[arg-type]
+                    on_type_formatting=None,  # type: ignore[arg-type]
+                    definition=None,  # type: ignore[arg-type]
+                    type_definition=None,  # type: ignore[arg-type]
+                    implementation=None,  # type: ignore[arg-type]
+                    code_action=None,  # type: ignore[arg-type]
+                    code_lens=None,  # type: ignore[arg-type]
+                    document_link=None,  # type: ignore[arg-type]
+                    color_provider=None,  # type: ignore[arg-type]
+                    rename=None,  # type: ignore[arg-type]
                     publish_diagnostics=PublishDiagnosticsAbstract(
                         related_information=True
                     ),
-                    folding_range=None,
+                    folding_range=None,  # type: ignore[arg-type]
                 )
             ),
         ):
             self.runTestBuildSequenceTable(tablefmt="github")
 
     @patch.object(
-        hdl_checker.core.HdlCheckerCore,
+        hdl_checker.core.HdlCheckerCore,  # type: ignore[attr-defined]
         "resolveDependencyToPath",
         lambda self, _: None,
     )  # pylint: disable=invalid-name
@@ -568,7 +585,7 @@ class TestValidProject(_LspHelper):
         )
 
     @patch.object(
-        hdl_checker.core.HdlCheckerCore,
+        hdl_checker.core.HdlCheckerCore,  # type: ignore[attr-defined]
         "resolveDependencyToPath",
         lambda self, _: (Path("some_path"), Identifier("some_library")),
     )
@@ -630,12 +647,12 @@ class TestValidProject(_LspHelper):
 
         patches = (
             patch.object(
-                hdl_checker.database.Database,
+                hdl_checker.database.Database,  # type: ignore[attr-defined]
                 "getDesignUnitsByPath",
                 getDesignUnitsByPath,
             ),
             patch.object(
-                hdl_checker.database.Database,
+                hdl_checker.database.Database,  # type: ignore[attr-defined]
                 "getDependenciesByPath",
                 getDependenciesByPath,
             ),
@@ -701,13 +718,14 @@ class TestValidProject(_LspHelper):
     def test_HoverOnInvalidRange(self):
         _logger.info("#" * 100)
         self.assertIsNone(
-            self.client.lsp.send_request(
+            self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.HOVER,
                 HoverParams(
                     TextDocumentIdentifier(
                         uris.from_fs_path(
                             p.join(TEST_PROJECT, "another_library", "foo.vhd")
                         )
+                        or ""
                     ),
                     Position(line=0, character=0),
                 ),
@@ -743,10 +761,10 @@ class TestValidProject(_LspHelper):
         ]
 
         self.assertEqual(
-            self.client.lsp.send_request(
+            self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.HOVER,
                 HoverParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(line=7, character=7),
                 ),
             )
@@ -765,10 +783,10 @@ class TestValidProject(_LspHelper):
         clock_divider = p.join(TEST_PROJECT, "basic_library", "clock_divider.vhd")
 
         self.assertEqual(
-            self.client.lsp.send_request(
+            self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.HOVER,
                 HoverParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(line=32, character=32),
                 ),
             )
@@ -794,20 +812,23 @@ class TestValidProject(_LspHelper):
                 x.range.end.line,
                 x.range.end.character,
             )
-            for x in self.client.lsp.send_request(
+            for x in self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.DEFINITION,
                 TextDocumentPositionParams(
-                    TextDocumentIdentifier(uris.from_fs_path(source)), Position(1, 9),
+                    TextDocumentIdentifier(uris.from_fs_path(source) or ""),
+                    Position(1, 9),
                 ),
             ).result(LSP_REQUEST_TIMEOUT)
         }
 
         self.assertIn(
-            (uris.from_fs_path(target), 1, 7, 1, 15), definitions,
+            (uris.from_fs_path(target), 1, 7, 1, 15),
+            definitions,
         )
 
         self.assertIn(
-            (uris.from_fs_path(target), 4, 7, 4, 15), definitions,
+            (uris.from_fs_path(target), 4, 7, 4, 15),
+            definitions,
         )
 
     @patch(
@@ -821,7 +842,7 @@ class TestValidProject(_LspHelper):
         self.assertFalse(
             self.server.definitions(
                 TextDocumentPositionParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(3, 15),
                 )
             )
@@ -838,14 +859,14 @@ class TestValidProject(_LspHelper):
         self.assertFalse(
             self.server.definitions(
                 TextDocumentPositionParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(0, 0),
                 )
             )
         )
 
     @patch.object(
-        hdl_checker.database.Database,
+        hdl_checker.database.Database,  # type: ignore[attr-defined]
         "getReferencesToDesignUnit",
         return_value=[
             RequiredDesignUnit(
@@ -874,10 +895,10 @@ class TestValidProject(_LspHelper):
                 x.range.end.line,
                 x.range.end.character,
             )
-            for x in self.client.lsp.send_request(
+            for x in self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.REFERENCES,
                 ReferenceParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(7, 7),
                     ReferenceContext(include_declaration=False),
                 ),
@@ -903,10 +924,10 @@ class TestValidProject(_LspHelper):
                 x.range.end.line,
                 x.range.end.character,
             )
-            for x in self.client.lsp.send_request(
+            for x in self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.REFERENCES,
                 ReferenceParams(
-                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                    TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                     Position(7, 7),
                     ReferenceContext(include_declaration=True),
                 ),
@@ -934,7 +955,7 @@ class TestValidProject(_LspHelper):
             self.assertIsNone(
                 self.server.references(
                     ReferenceParams(
-                        TextDocumentIdentifier(uris.from_fs_path(path_to_foo)),
+                        TextDocumentIdentifier(uris.from_fs_path(path_to_foo) or ""),
                         Position(0, 0),
                         ReferenceContext(include_declaration=include_declaration),
                     )
@@ -945,11 +966,12 @@ class TestValidProject(_LspHelper):
         _logger.info("#" * 100)
         # pylint: disable=no-member
         with patch.object(self.server, "onConfigUpdate"):
-            self.client.lsp.send_request(
+            self.client.lsp.send_request(  # type: ignore[attr-defined]
                 features.WORKSPACE_DID_CHANGE_CONFIGURATION, {"foo": "bar"}
             ).result(LSP_REQUEST_TIMEOUT)
 
             self.assertIn(
-                "bar", {x[0].foo for x in self.server.onConfigUpdate.call_args if x},
+                "bar",
+                {x[0].foo for x in self.server.onConfigUpdate.call_args if x},  # type: ignore[union-attr]
             )
         # pylint: enable=no-member

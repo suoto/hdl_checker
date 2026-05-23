@@ -26,11 +26,9 @@ import os.path as p
 from tempfile import mkdtemp
 
 from mock import patch
-from webtest import TestApp  # type: ignore # pylint:disable=import-error
 
 from hdl_checker.tests import TestCase
 
-import hdl_checker.handlers as handlers
 from hdl_checker.config_generators.simple_finder import SimpleFinder
 from hdl_checker.utils import removeDirIfExists
 
@@ -41,8 +39,6 @@ class TestConfigGenerator(TestCase):
     maxDiff = None
 
     def setUp(self):
-        self.app = TestApp(handlers.app)
-
         self.dummy_test_path = mkdtemp(prefix=__name__ + "_")
 
         os.mkdir(p.join(self.dummy_test_path, "path_a"))

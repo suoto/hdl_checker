@@ -35,7 +35,7 @@ from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.parsers.vhdl_parser import VhdlParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
-from hdl_checker.types import DesignUnitType
+from hdl_checker.types import DesignUnitType, Location
 
 _logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ with such.A("VHDL source file object") as it:
                         owner=it.source.filename,
                         type_=DesignUnitType.entity,
                         name="clock_divider",
-                        locations={(14, 7)},
+                        locations={Location(14, 7)},
                     )
                 ],
             )
@@ -357,7 +357,7 @@ with such.A("VHDL source file object") as it:
                         owner=it.source.filename,
                         type_=DesignUnitType.package,
                         name="package_with_constants",
-                        locations={(7, 8)},
+                        locations={Location(7, 8)},
                     )
                 ],
             )
@@ -439,11 +439,11 @@ with such.A("VHDL source file object") as it:
                 os.remove(_FILENAME)
 
         @it.should("create the object with no errors")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.source = VhdlParser(Path(_FILENAME))
 
         @it.should("return the names of the packages found")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
             it.assertCountEqual(
                 list(it.source.getDesignUnits()),
                 [
@@ -451,13 +451,13 @@ with such.A("VHDL source file object") as it:
                         owner=it.source.filename,
                         type_=DesignUnitType.context,
                         name="context_name",
-                        locations={(0, 7)},
+                        locations={Location(0, 7)},
                     )
                 ],
             )
 
         @it.should("return its dependencies")  # type: ignore
-        def test():  # type: () -> None
+        def test():  # type: () -> None  # type: ignore[no-redef]
             it.assertCountEqual(
                 it.source.getDependencies(),
                 [
