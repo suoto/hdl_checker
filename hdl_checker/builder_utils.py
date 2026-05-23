@@ -21,15 +21,7 @@ import os.path as p
 from contextlib import contextmanager
 from enum import Enum
 from tempfile import mkdtemp
-from typing import (  # pylint: disable=unused-import
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Iterable  # pylint: disable=unused-import
 
 from .builders.fallback import Fallback
 from .builders.ghdl import GHDL
@@ -56,8 +48,8 @@ except ImportError:  # pragma: no cover
 
 _logger = logging.getLogger(__name__)
 
-AnyValidBuilder = Union[MSim, XVHDL, GHDL]
-AnyBuilder = Union[AnyValidBuilder, Fallback]
+AnyValidBuilder = MSim | XVHDL | GHDL
+AnyBuilder = AnyValidBuilder | Fallback
 
 
 class BuilderName(Enum):
@@ -102,38 +94,36 @@ def getPreferredBuilder():
     return Fallback
 
 
-def foundVunit():  # type: () -> bool
+def foundVunit() -> bool:
     """
     Checks if our env has VUnit installed
     """
     return HAS_VUNIT
 
 
-_VUNIT_FLAGS = {
+_VUNIT_FLAGS: dict[BuilderName, dict[str, tuple[str, ...]]] = {
     BuilderName.msim: {"93": ("-93",), "2002": ("-2002",), "2008": ("-2008",)},
     BuilderName.ghdl: {
         "93": ("--std=93c",),
         "2002": ("--std=02",),
         "2008": ("--std=08",),
     },
-}  # type: Dict[BuilderName, Dict[str, BuildFlags]]
+}
 
 
-def _isHeader(path):
-    # type: (Path) -> bool
+def _isHeader(path: Path) -> bool:
     ext = path.name.split(".")[-1].lower()
     return ext in ("vh", "svh")
 
 
-def getVunitSources(builder):
-    # type: (AnyValidBuilder) -> Iterable[Tuple[Path, Optional[str], BuildFlags]]
+def getVunitSources(builder: AnyValidBuilder) -> Iterable[tuple[Path, str | None, BuildFlags]]:
     "Gets VUnit sources according to the file types supported by builder"
     if not foundVunit():
         return
 
     _logger.debug("VUnit installation found")
 
-    sources = []  # type: List[vunit.source_file.SourceFile]
+    sources: list = []
 
     # Prefer VHDL VUnit
     if FileType.vhdl in builder.file_types:

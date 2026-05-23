@@ -17,7 +17,7 @@
 "VHDL source file parser"
 
 import re
-from typing import Any, Dict, Generator, Iterable, Optional, Set, Tuple, Union
+from typing import Iterator
 
 from .elements.dependency_spec import RequiredDesignUnit
 from .elements.design_unit import VhdlDesignUnit
@@ -56,7 +56,7 @@ _PACKAGE_BODY = re.compile(
 _LIBRARY_USES = re.compile(
     r"(?:(?P<library>\b\w+)\s*\.\s*(?P<unit>\b\w+\w+))|(?:\s*--.*)", flags=re.I
 )
-IncompleteDependency = Dict[str, Union[str, Set[Any]]]
+IncompleteDependency = dict[str, str | set[Any]]
 
 
 class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
@@ -64,15 +64,13 @@ class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
     Stores dependencies definitions to create immutable objects later on
     """
 
-    def __init__(self):
-        #  type: (...) -> None
-        self._keys = set()  # type: Set[int]
-        self._libraries = {}  # type: Dict[int, Optional[VhdlIdentifier]]
-        self._units = {}  # type: Dict[int, VhdlIdentifier]
-        self._locations = {}  # type: Dict[int, Set[Location]]
+    def __init__(self) -> None:
+        self._keys: set[int] = set()
+        self._libraries: dict[int, VhdlIdentifier | None] = {}
+        self._units: dict[int, VhdlIdentifier] = {}
+        self._locations: dict[int, set[Location]] = {}
 
-    def add(self, library, unit, line, column):
-        #  type: (str, str, int, int) -> None
+    def add(self, library: str, unit: str, line: int, column: int) -> None:
         """
         Adds a dependency definition to the list
         """
@@ -88,8 +86,7 @@ class _PartialDependency(object):  # pylint: disable=useless-object-inheritance
 
         self._locations[key].add(Location(line, column))
 
-    def items(self):
-        #  type: () -> Iterable[Tuple[Optional[VhdlIdentifier], VhdlIdentifier, Set[Location]]]
+    def items(self) -> Iterator[tuple[VhdlIdentifier | None, VhdlIdentifier, set[Location]]]:
         """
         Returns items added previously
         """
@@ -103,8 +100,7 @@ class VhdlParser(BaseSourceFile):
     units it depends on and design units it provides
     """
 
-    def _iterDesignUnitMatches(self):
-        # type: (...) -> Any
+    def _iterDesignUnitMatches(self) -> Iterator[tuple[dict[str, str | None], set[Location]]]:
         """
         Iterates over the matches of _DESIGN_UNITS against
         source's lines
@@ -121,7 +117,7 @@ class VhdlParser(BaseSourceFile):
 
             yield match.groupdict(), {Location(start_line, start_char)}
 
-    def _getDependencies(self):  # type: () -> Generator[RequiredDesignUnit, None, None]
+    def _getDependencies(self) -> Iterator[RequiredDesignUnit]:
         library_names = {x.lower() for x in self.getLibraries()}
         library_names.add("work")
 
@@ -171,12 +167,11 @@ class VhdlParser(BaseSourceFile):
                 locations={Location(line_number, column_number)},
             )
 
-    def _getLibraries(self):
-        # type: (...) -> Any
+    def _getLibraries(self) -> set[str]:
         """
         Parses the source file to find design units and dependencies
         """
-        libs = set()  # type: Set[str]
+        libs: set[str] = set()
 
         for match in _LIBRARIES.finditer(self.getSourceContent()):
             for group in match.groups():
@@ -189,7 +184,7 @@ class VhdlParser(BaseSourceFile):
 
         return libs
 
-    def _getDesignUnits(self):  # type: () -> Generator[VhdlDesignUnit, None, None]
+    def _getDesignUnits(self) -> Iterator[VhdlDesignUnit]:
         """
         Parses the source file to find design units and dependencies
         """

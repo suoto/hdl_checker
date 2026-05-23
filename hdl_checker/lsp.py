@@ -21,7 +21,7 @@ import logging
 from os import getpid
 from os import path as p
 from tempfile import mkdtemp
-from typing import Any, Callable, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Iterable
 
 from pygls.features import (
     DEFINITION,
@@ -130,25 +130,21 @@ class Server(HdlCheckerCore):
     HDL Checker project builder class
     """
 
-    def __init__(self, lsp, root_dir):
-        # type: (LanguageServer, Path) -> None
+    def __init__(self, lsp: LanguageServer, root_dir: Path) -> None:
         self._lsp = lsp
         super().__init__(root_dir)
 
-    def _handleUiInfo(self, message):
-        # type: (...) -> Any
+    def _handleUiInfo(self, message: str) -> None:
         _logger.debug("UI info: %s (lsp=%s)", message, self._lsp)
         if self._lsp:  # pragma: no cover
             self._lsp.show_message(message, MessageType.Info)
 
-    def _handleUiWarning(self, message):
-        # type: (...) -> Any
+    def _handleUiWarning(self, message: str) -> None:
         _logger.debug("UI warning: %s (lsp=%s)", message, self._lsp)
         if self._lsp:  # pragma: no cover
             self._lsp.show_message(message, MessageType.Warning)
 
-    def _handleUiError(self, message):
-        # type: (...) -> Any
+    def _handleUiError(self, message: str) -> None:
         _logger.debug("UI error: %s (lsp=%s)", message, self._lsp)
         if self._lsp:  # pragma: no cover
             self._lsp.show_message(message, MessageType.Error)
@@ -161,13 +157,13 @@ class HdlCheckerLanguageServer(LanguageServer):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        self._checker: Optional[Server] = None
+        self._checker: Server | None = None
         super().__init__(*args, **kwargs)
         # Default checker
         self.onConfigUpdate(None)
-        self._global_diags: Set[CheckerDiagnostic] = set()
-        self.initialization_options: Optional[Any] = None
-        self.client_capabilities: Optional[ClientCapabilities] = None
+        self._global_diags: set[CheckerDiagnostic] = set()
+        self.initialization_options: Any | None = None
+        self.client_capabilities: ClientCapabilities | None = None
 
     @property
     def checker(self) -> Server:
@@ -197,7 +193,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         _logger.info("[WARNING] %s", msg)
         self.show_message(msg, MessageType.Warning)
 
-    def onConfigUpdate(self, options: Optional[Any]) -> None:
+    def onConfigUpdate(self, options: Any | None) -> None:
         """
         Updates the checker server from options if the 'project_file' key is
         present. Please not that this is run from both initialize and
@@ -246,7 +242,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             json.dump(config, fd)
         self.checker.setConfig(auto_project_file, origin=ConfigFileOrigin.generated)
 
-    def _getProjectFilePath(self, options: Optional[Any] = None) -> str:
+    def _getProjectFilePath(self, options: Any | None = None) -> str:
         """
         Tries to get 'project_file' from the options dict and combine it with
         the root URI as provided by the workspace
@@ -306,7 +302,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         text = self.workspace.get_document(doc_uri).source
         return self.checker.getMessagesWithText(path, text)
 
-    def references(self, params: ReferenceParams) -> Optional[List[Location]]:
+    def references(self, params: ReferenceParams) -> list[Location] | None:
         "Tries to find references for the selected element"
 
         element = self.getElementAtPosition(
@@ -317,7 +313,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         if element is None:
             return None
 
-        references: List[Location] = []
+        references: list[Location] = []
 
         if params.context.includeDeclaration:
             for line, column in element.locations:
@@ -371,7 +367,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         """
         Return a formatted text with the build sequence for the given path
         """
-        sequence = []  # type: List[Tuple[int, str, str]]
+        sequence: list[tuple[int, str, str]] = []
 
         # Adds the sequence of dependencies' paths
         for i, (seq_library, seq_path) in enumerate(
@@ -400,8 +396,7 @@ class HdlCheckerLanguageServer(LanguageServer):
             ),
         )
 
-    def getDependencyInfoForHover(self, dependency):
-        # type: (BaseDependencySpec) -> str
+    def getDependencyInfoForHover(self, dependency: BaseDependencySpec) -> str:
         """
         Report which source defines a given dependency when the user hovers
         over its name
@@ -422,7 +417,7 @@ class HdlCheckerLanguageServer(LanguageServer):
 
     def getElementAtPosition(
         self, path: Path, position: Position
-    ) -> Union[BaseDependencySpec, tAnyDesignUnit, None]:
+    ) -> BaseDependencySpec | tAnyDesignUnit | None:
         """
         Gets design units and dependencies (in this order) of path and checks
         if their definitions include position. Not every element is identified,
@@ -432,14 +427,14 @@ class HdlCheckerLanguageServer(LanguageServer):
         for meth in (
             self.checker.database.getDesignUnitsByPath,
             self.checker.database.getDependenciesByPath,
-        ):  # type: Callable
+        ):
             for element in meth(path):
                 if element.includes(position.line, position.character):
                     return element
 
         return None
 
-    def hover(self, params: HoverParams) -> Optional[Hover]:
+    def hover(self, params: HoverParams) -> Hover | None:
         """
         Handles HoverParams and produces a Hover object if a known element is
         found within the given location
@@ -475,7 +470,7 @@ class HdlCheckerLanguageServer(LanguageServer):
     @logCalls
     def definitions(
         self, params: TextDocumentPositionParams
-    ) -> Optional[List[Location]]:
+    ) -> list[Location] | None:
         """
         Returns known definitions found in the given location
         """
@@ -509,7 +504,7 @@ class HdlCheckerLanguageServer(LanguageServer):
         if isinstance(dependency, IncludedPath):
             return [Location(target_uri, Range(Position(0, 0), Position(0, 1)))]
 
-        locations: List[Location] = []
+        locations: list[Location] = []
 
         # Get the design unit that has matched the dependency to extract the
         # location where it's defined
@@ -571,19 +566,19 @@ def setupLanguageServerFeatures(server: HdlCheckerLanguageServer) -> None:
         self.onConfigUpdate(settings)
 
     @server.feature(HOVER)
-    def onHover(self: HdlCheckerLanguageServer, params: HoverParams) -> Optional[Hover]:
+    def onHover(self: HdlCheckerLanguageServer, params: HoverParams) -> Hover | None:
         return self.hover(params)
 
     @server.feature(REFERENCES)
     def onReferences(
         self: HdlCheckerLanguageServer, params: ReferenceParams
-    ) -> Optional[List[Location]]:
+    ) -> list[Location] | None:
         return self.references(params)
 
     @server.feature(DEFINITION)
     def onDefinition(
         self: HdlCheckerLanguageServer, params: TextDocumentPositionParams
-    ) -> Optional[List[Location]]:
+    ) -> list[Location] | None:
         return self.definitions(params)
 
     # pylint: enable=unused-variable

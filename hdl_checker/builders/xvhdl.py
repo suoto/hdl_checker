@@ -20,7 +20,7 @@ import os.path as p
 import re
 import shutil
 import tempfile
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping
 
 from .base_builder import BaseBuilder
 
@@ -58,8 +58,7 @@ class XVHDL(BaseBuilder):
     # TODO: Add xvlog support
     file_types = {FileType.vhdl}
 
-    def _shouldIgnoreLine(self, line):
-        # type: (str) -> bool
+    def _shouldIgnoreLine(self, line: str) -> bool:
         if "ignored due to previous errors" in line:
             return True
 
@@ -72,16 +71,14 @@ class XVHDL(BaseBuilder):
 
         return not (line.startswith("ERROR") or line.startswith("WARNING"))
 
-    def __init__(self, *args, **kwargs):
-        # type: (...) -> None
+    def __init__(self, *args, **kwargs) -> None:
         self._version = ""
         super(XVHDL, self).__init__(*args, **kwargs)
         self._xvhdlini = p.join(self._work_folder, ".xvhdl.init")
         # Create the ini file
         open(self._xvhdlini, "w").close()
 
-    def _makeRecords(self, line):
-        # type: (str) -> Iterable[BuilderDiag]
+    def _makeRecords(self, line: str) -> Iterable[BuilderDiag]:
         for match in _STDOUT_MESSAGE_SCANNER.finditer(line):
 
             info = match.groupdict()
@@ -142,8 +139,7 @@ class XVHDL(BaseBuilder):
         finally:
             shutil.rmtree(temp_dir)
 
-    def _createLibrary(self, library):
-        # type: (Identifier) -> None
+    def _createLibrary(self, library: Identifier) -> None:
         with open(self._xvhdlini, mode="w") as fd:
             content = "\n".join(
                 [
@@ -153,8 +149,7 @@ class XVHDL(BaseBuilder):
             )
             fd.write(content)
 
-    def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
         cmd = [
             "xvhdl",
             "--nolog",
@@ -169,8 +164,7 @@ class XVHDL(BaseBuilder):
         cmd += [path.name]
         return runShellCommand(cmd, cwd=self._work_folder)
 
-    def _searchForRebuilds(self, path, line):
-        # type: (Path, str) -> Iterable[Mapping[str, str]]
+    def _searchForRebuilds(self, path: Path, line: str) -> Iterable[Mapping[str, str]]:
         for match in _ITER_REBUILD_UNITS(line):
             dict_ = match.groupdict()
             yield {

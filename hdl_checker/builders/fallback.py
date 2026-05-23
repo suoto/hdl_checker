@@ -27,8 +27,7 @@ class Fallback(BaseBuilder):
     builder_name = "fallback"
     file_types = {FileType.vhdl, FileType.verilog, FileType.systemverilog}
 
-    def __init__(self, *args, **kwargs):
-        # type: (...) -> None
+    def __init__(self, *args, **kwargs) -> None:
         self._version = "<undefined>"
         super(Fallback, self).__init__(*args, **kwargs)
 

@@ -26,7 +26,7 @@ import shutil
 import subprocess as subp
 import time
 from multiprocessing import Queue
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Iterable
 
 import mock
 import unittest
@@ -47,7 +47,7 @@ from hdl_checker.utils import ON_LINUX, ON_WINDOWS, removeDuplicates, samefile
 _logger = logging.getLogger(__name__)
 
 
-MockDep = Union[Tuple[str], Tuple[str, str]]
+MockDep = tuple[str] | tuple[str, str]
 
 
 class DummyServer(HdlCheckerCore):
@@ -56,7 +56,7 @@ class DummyServer(HdlCheckerCore):
 
     def __init__(self, *args, **kwargs):
         _logger.info("Creating server %d", DummyServer._server_index)
-        self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
+        self._msg_queue = Queue()  # type: Queue[tuple[str, str]]
         self._ui_handler = logging.getLogger("server %d/UI" % DummyServer._server_index)
         DummyServer._server_index += 1
         super(DummyServer, self).__init__(*args, **kwargs)
@@ -84,10 +84,10 @@ class SourceMock(object):
 
     def __init__(
         self,
-        design_units,  # type: Iterable[Dict[str, str]]
+        design_units,  # type: Iterable[dict[str, str]]
         library=None,  # type: str
         dependencies=None,  # type: Iterable[MockDep]
-        filename=None,  # type: Optional[str]
+        filename=None,  # type: str | None
     ):
 
         self._design_units = list(design_units or [])
@@ -109,7 +109,7 @@ class SourceMock(object):
         self.flags = []  # type: ignore
 
         self.library = library
-        self._dependencies = []  # type: List[RequiredDesignUnit]
+        self._dependencies = []  # type: list[RequiredDesignUnit]
         for dep_spec in dependencies or []:
             _name = dep_spec[0]
             _library = "work"

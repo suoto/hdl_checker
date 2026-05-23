@@ -23,7 +23,7 @@ import os.path as p
 import re
 from glob import glob
 from threading import RLock
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Any, Iterable
 
 from hdl_checker import exceptions
 from hdl_checker.path import Path
@@ -46,7 +46,7 @@ _configFileScan = re.compile(
 # pylint: enable=invalid-name
 
 
-def _extractSet(entry):  # type: (str) -> BuildFlags
+def _extractSet(entry: str) -> BuildFlags:
     """
     Extract a list by splitting a string at whitespaces, removing
     empty values caused by leading/trailing/multiple whitespaces
@@ -74,12 +74,12 @@ class ConfigParser(object):
 
     _logger = logging.getLogger(__name__ + ".ConfigParser")
 
-    def __init__(self, filename):  # type: (Path) -> None
+    def __init__(self, filename: Path) -> None:
         self._logger.debug("Creating config parser for filename '%s'", filename)
 
-        self._parms = {"builder": None}  # type: Dict[str, Union[str, None]]
+        self._parms: dict[str, str | None] = {"builder": None}
 
-        self._flags = {
+        self._flags: dict[FileType, dict[BuildFlagScope, BuildFlags]] = {
             FileType.vhdl: {
                 BuildFlagScope.single: (),
                 BuildFlagScope.all: (),
@@ -95,37 +95,35 @@ class ConfigParser(object):
                 BuildFlagScope.all: (),
                 BuildFlagScope.dependencies: (),
             },
-        }  # type: Dict[FileType, Dict[BuildFlagScope, BuildFlags] ]
+        }
 
-        self._sources = []  # type: List[Tuple[str, str, BuildFlags]]
+        self._sources: list[tuple[str, str, BuildFlags]] = []
 
         self.filename = filename
 
         self._timestamp = 0.0
         self._parse_lock = RLock()
 
-    def _shouldParse(self):  # type: () -> bool
+    def _shouldParse(self) -> bool:
         """
         Checks if we should parse the configuration file
         """
         return self.filename.mtime > self._timestamp
 
-    def _updateTimestamp(self):
-        # type: (...) -> Any
+    def _updateTimestamp(self) -> None:
         """
         Updates our timestamp with the configuration file
         """
         self._timestamp = self.filename.mtime
 
-    def isParsing(self):  # type: () -> bool
+    def isParsing(self) -> bool:
         "Checks if parsing is ongoing in another thread"
         locked = not self._parse_lock.acquire(False)
         if not locked:
             self._parse_lock.release()
         return locked
 
-    def _parseIfNeeded(self):
-        # type: () -> None
+    def _parseIfNeeded(self) -> None:
         """
         Locks accesses to parsed attributes and parses the configuration file
         """
@@ -133,7 +131,7 @@ class ConfigParser(object):
             if self._shouldParse():
                 self._parse()
 
-    def _parse(self):  # type: () -> None
+    def _parse(self) -> None:
         """
         Parse the configuration file without any previous checking
         """
@@ -144,7 +142,7 @@ class ConfigParser(object):
             line = _replaceCfgComments("", _line.decode(errors="ignore"))
             self._parseLine(line)
 
-    def _parseLine(self, line):  # type: (str) -> None
+    def _parseLine(self, line: str) -> None:
         """
         Parses a line a calls the appropriate extraction methods
         """
@@ -167,8 +165,7 @@ class ConfigParser(object):
                         )
                     )
 
-    def _handleParsedParameter(self, parameter, lang, value):
-        # type: (str, str, str) -> None
+    def _handleParsedParameter(self, parameter: str, lang: str, value: str) -> None:
         """
         Handles a parsed line that sets a parameter
         """
@@ -188,7 +185,7 @@ class ConfigParser(object):
         else:
             raise exceptions.UnknownParameterError(parameter)
 
-    def _getSourcePaths(self, path):  # type: (str) -> Iterable[str]
+    def _getSourcePaths(self, path: str) -> Iterable[str]:
         """
         Normalizes and handles absolute/relative paths
         """
@@ -201,14 +198,13 @@ class ConfigParser(object):
 
         return glob(source_path) or [source_path]
 
-    def parse(self):
-        # type: (...) -> Dict[Any, Any]
+    def parse(self) -> dict[str, Any]:
         """
         Parses the file if it hasn't been parsed before or if the config file
         has been changed
         """
         self._parseIfNeeded()
-        data = {"sources": self._sources}  # type: Dict[Any, Any]
+        data: dict[str, Any] = {"sources": self._sources}
 
         builder_name = self._parms.get("builder", None)
         if builder_name is not None:

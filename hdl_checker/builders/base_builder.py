@@ -21,7 +21,7 @@ import logging
 import os
 import os.path as p
 from threading import Lock
-from typing import Any, Dict, FrozenSet, Iterable, Mapping, Optional, Set, Tuple
+from typing import Any, Iterable, Mapping
 
 from hdl_checker.database import Database  # pylint: disable=unused-import
 from hdl_checker.diagnostics import CheckerDiagnostic, DiagType
@@ -49,17 +49,18 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     # Set an empty container for the default flags
-    default_flags = {
+    default_flags: dict[BuildFlagScope, dict[FileType, BuildFlags]] = {
         BuildFlagScope.dependencies: {},
         BuildFlagScope.single: {},
         BuildFlagScope.all: {},
-    }  # type: Dict[BuildFlagScope, Dict[FileType, BuildFlags]]
+    }
 
-    _external_libraries = {FileType.vhdl: set(), FileType.verilog: set()}  # type: dict
+    _external_libraries: dict[FileType, set[Identifier]] = {
+        FileType.vhdl: set(), FileType.verilog: set()
+    }
 
     @classmethod
-    def addExternalLibrary(cls, lang, library_name):
-        # type: (FileType, Identifier) -> None
+    def addExternalLibrary(cls, lang: FileType, library_name: Identifier) -> None:
         """
         Adds an external library so it may be referenced by the builder
         directly
@@ -67,8 +68,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         assert lang in cls._external_libraries, "Uknown language '%s'" % lang.value
         cls._external_libraries[lang].add(library_name)
 
-    def _getIncludesForPath(self, path):
-        # type: (Path) -> Iterable[str]
+    def _getIncludesForPath(self, path: Path) -> Iterable[str]:
         """
         Resolves included path dependencies for path and generates a list of
         include directories
@@ -84,35 +84,31 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
                 yield str(resolved).replace(str(included_file.name), "")
 
     @abc.abstractproperty
-    def builder_name(self):
-        # type: (...) -> Any
+    def builder_name(self) -> Any:
         """
         Defines the builder identification
         """
 
     @abc.abstractproperty
-    def file_types(self):
-        # type: (...) -> Any
+    def file_types(self) -> Any:
         """
         Returns the file types supported by the builder
         """
 
-    def __init__(self, work_folder, database):
-        # type: (Path, Database) -> None
+    def __init__(self, work_folder: Path, database: Database) -> None:
         # Shell accesses must be atomic
         self._lock = Lock()
 
         self._logger = logging.getLogger(__package__ + "." + self.builder_name)
         self._database = database
         self._work_folder = p.abspath(p.expanduser(work_folder.name))
-        self._build_info_cache = {}  # type: Dict[Path, Dict[str, Any]]
-        self._builtin_libraries = None  # type: Optional[Set[Identifier]]
-        self._added_libraries = set()  # type: Set[Identifier]
+        self._build_info_cache: dict[Path, dict[str, Any]] = {}
+        self._builtin_libraries: set[Identifier] | None = None
+        self._added_libraries: set[Identifier] = set()
 
         self.setup()
 
-    def setup(self):
-        # type: (...) -> Any
+    def setup(self) -> None:
         """
         Creates directories and parses builtins libraries
         """
@@ -129,8 +125,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         self.checkEnvironment()
 
     @classmethod
-    def __jsonDecode__(cls, state):
-        # type: (...) -> Any
+    def __jsonDecode__(cls, state) -> Any:
         """
         Returns an object of cls based on a given state
         """
@@ -147,8 +142,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return obj
 
-    def __jsonEncode__(self):
-        # type: (...) -> Any
+    def __jsonEncode__(self) -> dict[str, Any]:
         """
         Gets a dict that describes the current state of this object
         """
@@ -162,16 +156,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         return state
 
     @staticmethod
-    def isAvailable():  # pragma: no cover
-        # type: (...) -> Any
+    def isAvailable() -> Any:  # pragma: no cover
         """
         Method that should be overridden by child classes and return True
         if the given builder is available on the current environment
         """
         raise NotImplementedError
 
-    def checkEnvironment(self):
-        # type: (...) -> Any
+    def checkEnvironment(self) -> None:
         """
         Sanity environment check for child classes. Any exception raised
         is translated to SanityCheckError exception.
@@ -196,8 +188,9 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         elements identifying its fields
         """
 
-    def _getRebuilds(self, path, line, library):
-        # type: (Path, str, Identifier) -> Set[RebuildInfo]
+    def _getRebuilds(
+        self, path: Path, line: str, library: Identifier
+    ) -> set[RebuildInfo]:
         """
         Gets info on what should be rebuilt to satisfy the builder
         """
@@ -206,12 +199,12 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         except NotImplementedError:  # pragma: no cover
             return set()
 
-        rebuilds = set()  # type: Set[RebuildInfo]
+        rebuilds: set[RebuildInfo] = set()
         for rebuild in parse_results:
-            unit_type = rebuild.get("unit_type", None)  # type: Optional[str]
-            library_name = rebuild.get("library_name", None)  # type: Optional[str]
-            unit_name = rebuild.get("unit_name", None)  # type: Optional[str]
-            rebuild_path = rebuild.get("rebuild_path", None)  # type: Optional[str]
+            unit_type: str | None = rebuild.get("unit_type", None)
+            library_name: str | None = rebuild.get("library_name", None)
+            unit_name: str | None = rebuild.get("unit_name", None)
+            rebuild_path: str | None = rebuild.get("rebuild_path", None)
 
             if library_name == "work":
                 library_name = library.name
@@ -238,31 +231,27 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return rebuilds
 
-    def _searchForRebuilds(self, path, line):  # pragma: no cover
-        # type: (Path, str) -> Iterable[Mapping[str, str]]
+    def _searchForRebuilds(self, path: Path, line: str) -> Iterable[Mapping[str, str]]:  # pragma: no cover
         """
         Finds units that the builders is telling us to rebuild
         """
         raise NotImplementedError
 
-    def _parseBuiltinLibraries(self):
-        # type: (...) -> Iterable[Identifier]
+    def _parseBuiltinLibraries(self) -> Iterable[Identifier]:
         """
         Discovers libraries that exist regardless before we do anything
         """
         raise NotImplementedError
 
     @property
-    def work_folder(self):
-        # type: (...) -> str
+    def work_folder(self) -> str:
         """
         Returns the path to the work folder this builder is using
         """
         return self._work_folder
 
     @property
-    def builtin_libraries(self):
-        # type: (...) -> FrozenSet[Identifier]
+    def builtin_libraries(self) -> frozenset[Identifier]:
         """
         Return a list of precompiled libraries this builder is aware of
         """
@@ -290,14 +279,14 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         """
 
     @abc.abstractmethod
-    def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildSource(
+        self, path: Path, library: Identifier, flags: BuildFlags | None = None
+    ) -> Iterable[str]:
         """
         Callback called to actually build the source
         """
 
-    def _getFlags(self, path, scope):
-        # type: (Path, BuildFlagScope) -> BuildFlags
+    def _getFlags(self, path: Path, scope: BuildFlagScope) -> BuildFlags:
         """
         Gets flags to build the path, both builder based and from the database.
         If a build is forced, assume we're building a single file (not its
@@ -311,8 +300,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         )
 
     def _buildAndGetDiagnostics(
-        self, path, library, flags
-    ):  # type: (Path, Identifier, BuildFlags) -> Tuple[Set[CheckerDiagnostic],Set[RebuildInfo]]
+        self, path: Path, library: Identifier, flags: BuildFlags
+    ) -> tuple[set[CheckerDiagnostic], set[RebuildInfo]]:
         """
         Runs _buildSource method and parses the output to find message
         records and units that should be rebuilt
@@ -325,8 +314,8 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         for lib in (x.library for x in self._database.getDependenciesByPath(path)):
             self._createLibraryIfNeeded(lib or Identifier("work"))
 
-        diagnostics = set()  # type: Set[CheckerDiagnostic]
-        rebuilds = set()  # type: Set[RebuildInfo]
+        diagnostics: set[CheckerDiagnostic] = set()
+        rebuilds: set[RebuildInfo] = set()
 
         for line in self._buildSource(path, library, flags=flags):
             if self._shouldIgnoreLine(line):
@@ -353,8 +342,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
 
         return diagnostics, rebuilds
 
-    def _logBuildResults(self, diagnostics, rebuilds):  # pragma: no cover
-        # type: (...) -> Any
+    def _logBuildResults(self, diagnostics, rebuilds) -> None:  # pragma: no cover
         """
         Logs diagnostics and rebuilds only for debugging purposes
         """
@@ -371,8 +359,7 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
             for rebuild in rebuilds:
                 self._logger.debug(rebuild)
 
-    def _createLibraryIfNeeded(self, library):
-        # type: (Identifier) -> None
+    def _createLibraryIfNeeded(self, library: Identifier) -> None:
         """
         Proxy for only creating libraries once and avoid overwriting builtin
         libraries
@@ -385,21 +372,18 @@ class BaseBuilder(object):  # pylint: disable=useless-object-inheritance
         self._createLibrary(library)
 
     @abc.abstractmethod
-    def _createLibrary(self, library):
-        # type: (...) -> Any
+    def _createLibrary(self, library) -> Any:
         """
         Callback called to create a library
         """
 
-    def _isFileTypeSupported(self, path):
-        # type: (Path) -> bool
+    def _isFileTypeSupported(self, path: Path) -> bool:
         """
         Checks if a given path is supported by this builder
         """
         return FileType.fromPath(path) in self.file_types
 
-    def build(self, path, library, scope, forced=False):
-        # type: (Path, Identifier, BuildFlagScope, bool) -> Tuple[Set[CheckerDiagnostic], Set[RebuildInfo]]
+    def build(self, path: Path, library: Identifier, scope: BuildFlagScope, forced: bool = False) -> tuple[set[CheckerDiagnostic], set[RebuildInfo]]:
         """
         Method that interfaces with parents and implements the building
         chain

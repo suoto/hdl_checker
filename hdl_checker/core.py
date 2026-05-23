@@ -26,7 +26,7 @@ import traceback
 from multiprocessing.pool import ThreadPool
 from pprint import pformat
 from threading import RLock, Timer
-from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
+from typing import Any, AnyStr, Iterable, NamedTuple
 
 from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
@@ -102,7 +102,7 @@ class HdlCheckerCore:
         self.work_dir = Path(p.join(str(self.root_dir), WORK_PATH))
 
         self._lock = RLock()
-        self.config_file: Optional[WatchedFile] = None
+        self.config_file: WatchedFile | None = None
 
         self._database = Database()
         self._builder = Fallback(self.work_dir, self._database)
@@ -145,7 +145,7 @@ class HdlCheckerCore:
             for meth in self._cached_methods:
                 meth.cache_clear()
 
-    def setConfig(self, filename: Union[Path, str], origin: ConfigFileOrigin) -> None:
+    def setConfig(self, filename: Path | str, origin: ConfigFileOrigin) -> None:
         """
         Sets the configuration file. Calling this method will only trigger a
         configuration update if the given file name is different what was
@@ -209,7 +209,7 @@ class HdlCheckerCore:
             _logger.debug("Updated config file to %s", self.config_file)
             timer.cancel()
 
-    def configure(self, config: Dict[Any, Any]) -> None:
+    def configure(self, config: dict[Any, Any]) -> None:
         "Updates configuration from a dictionary"
 
         _logger.debug("Updating with base config:\n%s", pformat(config))
@@ -267,7 +267,7 @@ class HdlCheckerCore:
             os.makedirs(p.dirname(cache_fname.name))
         json.dump(state, open(cache_fname.name, "w"), indent=True, cls=StateEncoder)
 
-    def _setState(self, state: Dict[str, Any]) -> None:
+    def _setState(self, state: dict[str, Any]) -> None:
         """
         Serializer load implementation
         """
@@ -467,7 +467,7 @@ class HdlCheckerCore:
 
         path = Path(path, self.root_dir)
 
-        builder_diags: Set[CheckerDiagnostic] = set()
+        builder_diags: set[CheckerDiagnostic] = set()
 
         if self._USE_THREADS:
             pool = ThreadPool()
@@ -546,7 +546,7 @@ class HdlCheckerCore:
                     self.database.getFlags(path, BuildFlagScope.dependencies),
                 )
 
-            diags: Set[CheckerDiagnostic] = set()
+            diags: set[CheckerDiagnostic] = set()
 
             # Some messages may not include the filename field when checking a
             # file by content. In this case, we'll assume the empty filenames
@@ -571,7 +571,7 @@ class HdlCheckerCore:
         return diags
 
     @lru_cache()
-    def resolveDependencyToPath(self, dependency: RequiredDesignUnit) -> Optional[Tuple[Path, Identifier]]:
+    def resolveDependencyToPath(self, dependency: RequiredDesignUnit) -> tuple[Path, Identifier] | None:
         """
         Retrieves the build sequence for the dependency's owner and extracts
         the path that implements a design unit whose names match that of the
@@ -597,7 +597,7 @@ class HdlCheckerCore:
 
     def resolveDependency(
         self, dependency: BaseDependencySpec
-    ) -> Optional[Tuple[Path, Optional[Identifier]]]:
+    ) -> tuple[Path, Identifier | None] | None:
         """Resolves RequiredDesignUnit and IncludedPath dependencies"""
         if isinstance(dependency, RequiredDesignUnit):
             return self.resolveDependencyToPath(dependency)

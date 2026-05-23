@@ -21,7 +21,6 @@
 import logging
 from os import path as p
 from os import stat
-from typing import Union
 
 _logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ _logger = logging.getLogger(__name__)
 class Path:
     "Path helper class to speed up comparing different paths"
 
-    def __init__(self, name: Union["Path", str], base_path: Union["Path", str, None] = None):
+    def __init__(self, name: "Path | str", base_path: "Path | str | None" = None):
         assert isinstance(
             name, (Path, str)
         ), "Invalid type for path: {} ({})".format(name, type(name))

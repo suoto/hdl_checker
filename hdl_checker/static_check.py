@@ -18,7 +18,6 @@
 
 import logging
 import re
-from typing import List, Tuple
 
 #  from hdl_checker.path import Path
 from hdl_checker.diagnostics import (
@@ -236,12 +235,11 @@ def _getMiscChecks(objects):
             )
 
 
-def getStaticMessages(lines):
-    # type: (Tuple[str, ...]) -> List[StaticCheckerDiag]
+def getStaticMessages(lines: tuple[str, ...]) -> list[StaticCheckerDiag]:
     "VHDL static checking"
     objects = _getObjectsFromText(lines)
 
-    result = []  # type: List[StaticCheckerDiag]
+    result: list[StaticCheckerDiag] = []
 
     for _object in _getUnusedObjects(lines, objects.keys()):
         obj_dict = objects[_object]

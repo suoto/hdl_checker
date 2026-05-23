@@ -16,8 +16,8 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import Iterable, Optional, Set
 import abc
+from typing import Iterable
 
 from hdl_checker.types import Location
 from hdl_checker.utils import HashableByKey
@@ -30,9 +30,8 @@ LocationList = Iterable[Location]
 class ParsedElement(HashableByKey):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, locations=None):
-        # type: (Optional[LocationList]) -> None
-        set_of_locations = set()  # type: Set[Location]
+    def __init__(self, locations: LocationList | None = None) -> None:
+        set_of_locations: set[Location] = set()
         for line_number, column_number in locations or []:
             set_of_locations.add(
                 Location(
@@ -52,16 +51,14 @@ class ParsedElement(HashableByKey):
         return (self.locations,)
 
     @abc.abstractmethod
-    def __len__(self):
-        # type: (...) -> int
+    def __len__(self) -> int:
         """
         len(self) should return the length the parsed element uses on the text.
         It will be used to calculate an end position for it and allow checking
         if a given location is within the element's text
         """
 
-    def includes(self, line, column):
-        # type: (int, int) -> bool
+    def includes(self, line: int, column: int) -> bool:
         name_length = len(self)
 
         for location in self.locations:

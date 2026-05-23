@@ -17,7 +17,6 @@
 "Class defining a parsed design unit"
 
 import logging
-from typing import Optional, Union
 
 from .identifier import (  # pylint: disable=unused-import
     Identifier,
@@ -37,8 +36,13 @@ class _DesignUnit(ParsedElement):
     Specifies a design unit (uses mostly VHDL nomenclature)
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, Identifier, Optional[LocationList]) -> None
+    def __init__(
+        self,
+        owner: Path,
+        type_: DesignUnitType,
+        name: Identifier,
+        locations: LocationList | None = None,
+    ) -> None:
         self._owner = owner
         self._type = type_
         self._name = name
@@ -82,20 +86,17 @@ class _DesignUnit(ParsedElement):
         )
 
     @property
-    def owner(self):
-        # type: () -> Path
+    def owner(self) -> Path:
         "Owner of the design unit"
         return self._owner
 
     @property
-    def type_(self):
-        # type: () -> DesignUnitType
+    def type_(self) -> DesignUnitType:
         "Design unit type"
         return self._type
 
     @property
-    def name(self):
-        # type: () -> Identifier
+    def name(self) -> Identifier:
         "Design unit name"
         return self._name
 
@@ -114,8 +115,13 @@ class VhdlDesignUnit(_DesignUnit):
     Specifies a design unit whose name is case insensitive
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
+    def __init__(
+        self,
+        owner: Path,
+        type_: DesignUnitType,
+        name: str,
+        locations: LocationList | None = None,
+    ) -> None:
         super(VhdlDesignUnit, self).__init__(
             owner=owner, type_=type_, name=VhdlIdentifier(name), locations=locations
         )
@@ -126,11 +132,16 @@ class VerilogDesignUnit(_DesignUnit):
     Specifies a design unit whose name is case sensitive
     """
 
-    def __init__(self, owner, type_, name, locations=None):
-        # type: (Path, DesignUnitType, str, Optional[LocationList]) -> None
+    def __init__(
+        self,
+        owner: Path,
+        type_: DesignUnitType,
+        name: str,
+        locations: LocationList | None = None,
+    ) -> None:
         super(VerilogDesignUnit, self).__init__(
             owner=owner, type_=type_, name=VerilogIdentifier(name), locations=locations
         )
 
 
-tAnyDesignUnit = Union[VhdlDesignUnit, VerilogDesignUnit]
+tAnyDesignUnit = VhdlDesignUnit | VerilogDesignUnit

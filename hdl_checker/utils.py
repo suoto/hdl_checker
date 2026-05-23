@@ -32,7 +32,7 @@ import threading
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Timer
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
+from typing import Callable, Iterable, TypeVar
 
 _logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ def isFileReadable(path: str) -> bool:
         return False
 
 
-def runShellCommand(cmd_with_args: Union[Tuple[str], List[str]], shell: bool = False, env: Optional[Dict] = None, cwd: Optional[str] = None) -> Iterable[str]:
+def runShellCommand(cmd_with_args: tuple[str, ...] | list[str], shell: bool = False, env: dict | None = None, cwd: str | None = None) -> Iterable[str]:
     """
     Runs a shell command and handles stdout catching
     """
@@ -340,10 +340,10 @@ def readFile(path):
 REPO_URL = "https://github.com/suoto/hdl_checker"
 _TAGS = re.compile(r"^\w+\s+refs\/tags\/v(?P<tag>(?:\d+\.){2}\d+)", flags=re.MULTILINE)
 
-VersionFormat = Tuple[int, ...]
+VersionFormat = tuple[int, ...]
 
 
-def _getLatestReleaseVersion() -> Optional[VersionFormat]:
+def _getLatestReleaseVersion() -> tuple[int, ...] | None:
     """
     Return the latest tag from https://github.com/suoto/hdl_checker, striping
     the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to

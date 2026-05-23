@@ -16,7 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Diagnostics holders for checkers"
 
-from typing import Iterable, Optional
+from typing import Iterable
 
 from hdl_checker.parsers.elements.dependency_spec import (  # pylint: disable=unused-import
     BaseDependencySpec,
@@ -57,10 +57,10 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
     def __init__(  # pylint: disable=too-many-arguments
         self,
         text: str,
-        checker: Optional[str] = None,
-        filename: Optional[Path] = None,
-        line_number: Optional[int] = None,
-        column_number: Optional[int] = None,
+        checker: str | None = None,
+        filename: Path | None = None,
+        line_number: int | None = None,
+        column_number: int | None = None,
         error_code=None,
         severity=None,
     ):
@@ -69,7 +69,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
         self._checker = CHECKER_NAME if checker is None else checker
 
         # Modifiable attributes
-        self._filename: Optional[Path] = filename
+        self._filename: Path | None = filename
         self._error_code = error_code
         self._text = str(text)
 

@@ -20,7 +20,7 @@ import os
 import os.path as p
 import re
 from shutil import copyfile
-from typing import Any, Iterable, List, Mapping, Optional
+from typing import Iterable, Mapping
 
 from .base_builder import BaseBuilder
 
@@ -109,20 +109,17 @@ class MSim(BaseBuilder):
     def _shouldIgnoreLine(self, line):
         return self._should_ignore(line)
 
-    def __init__(self, work_folder, database):
-        # type: (Path, Database) -> None
+    def __init__(self, work_folder: Path, database: Database) -> None:
         self._version = ""
         self._modelsim_ini = Path(p.join(work_folder.name, "modelsim.ini"))
         super(MSim, self).__init__(work_folder, database)
 
-    def setup(self):
-        # type: (...) -> Any
+    def setup(self) -> None:
         super(MSim, self).setup()
         if not self._iniFileExists():
             self._createIniFile()
 
-    def _makeRecords(self, line):
-        # type: (str) -> Iterable[BuilderDiag]
+    def _makeRecords(self, line: str) -> Iterable[BuilderDiag]:
         for match in self._stdout_message_scanner(line):  # type: ignore
             info = match.groupdict()
 
@@ -177,15 +174,13 @@ class MSim(BaseBuilder):
         except OSError:
             return False
 
-    def _parseBuiltinLibraries(self):
-        # type: (...) -> Any
+    def _parseBuiltinLibraries(self) -> Iterable[Identifier]:
         "Discovers libraries that exist regardless before we do anything"
         for line in runShellCommand(["vmap"]):
             for match in self._BuilderLibraryScanner.finditer(line):
                 yield Identifier(match.groupdict()["library_name"], False)
 
-    def _searchForRebuilds(self, path, line):
-        # type: (Path, str) -> Iterable[Mapping[str, str]]
+    def _searchForRebuilds(self, path: Path, line: str) -> Iterable[Mapping[str, str]]:
         if line.startswith("** Warning: ") and "Waiting for lock by" in line:
             yield {"rebuild_path": path.abspath}
         for match in MSim._iter_rebuild_units(line):
@@ -202,8 +197,7 @@ class MSim(BaseBuilder):
                 self._logger.error(_msg)
                 assert 0, _msg
 
-    def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
         filetype = FileType.fromPath(path)
         self._logger.warning("Build source: %s", path)
         if filetype == FileType.vhdl:
@@ -217,8 +211,7 @@ class MSim(BaseBuilder):
 
         return ""  # Just to satisfy pylint
 
-    def _getExtraFlags(self, path):
-        # type: (Path) -> Iterable[str]
+    def _getExtraFlags(self, path: Path) -> Iterable[str]:
         """
         Gets extra flags configured for the specific language
         """
@@ -227,15 +220,14 @@ class MSim(BaseBuilder):
         if lang is FileType.systemverilog:
             lang = FileType.verilog
 
-        libs = []  # type: List[str]
+        libs: list[str] = []
         for library in self._added_libraries | self._external_libraries[lang]:
             libs = ["-L", library.name]
         for incdir in self._getIncludesForPath(path):
             libs += ["+incdir+" + incdir]
         return libs
 
-    def _buildVhdl(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildVhdl(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
         "Builds a VHDL file"
         assert isinstance(library, Identifier)
         cmd = [
@@ -252,8 +244,7 @@ class MSim(BaseBuilder):
 
         return runShellCommand(cmd)
 
-    def _buildVerilog(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildVerilog(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
         "Builds a Verilog/SystemVerilog file"
         cmd = [
             "vlog",
@@ -281,15 +272,13 @@ class MSim(BaseBuilder):
         self._mapLibrary(library)
         self._logger.debug("Added and mapped library '%s'", library)
 
-    def _iniFileExists(self):
-        # type: (...) -> bool
+    def _iniFileExists(self) -> bool:
         """
         Checks if the modelsim.ini file exists at the expected location
         """
         return p.exists(self._modelsim_ini.abspath)
 
-    def _createIniFile(self):
-        # type: (...) -> Any
+    def _createIniFile(self) -> None:
         """
         Adds a library to a non-existent ModelSim init file
         """
@@ -320,8 +309,7 @@ class MSim(BaseBuilder):
             ["vdel", "-modelsimini", self._modelsim_ini, "-lib", library, "-all"]
         )
 
-    def _mapLibrary(self, library):
-        # type: (Identifier) -> None
+    def _mapLibrary(self, library: Identifier) -> None:
         """
         Adds a library to an existing ModelSim init file
         """

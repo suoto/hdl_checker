@@ -17,7 +17,7 @@
 "Common type definitions for type hinting"
 from collections import namedtuple
 from enum import Enum
-from typing import NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple
 
 from hdl_checker.exceptions import UnknownTypeExtension
 from hdl_checker.parsers.elements.identifier import Identifier
@@ -31,7 +31,7 @@ class DesignUnitType(str, Enum):
     context = "context"
 
 
-BuildFlags = Tuple[str, ...]
+BuildFlags = tuple[str, ...]
 LibraryAndUnit = namedtuple("LibraryAndUnit", ["library", "unit"])
 
 RebuildUnit = NamedTuple(
@@ -42,7 +42,7 @@ RebuildLibraryUnit = NamedTuple(
 )
 RebuildPath = NamedTuple("RebuildPath", (("path", Path),))
 
-RebuildInfo = Union[RebuildUnit, RebuildLibraryUnit, RebuildPath]
+RebuildInfo = RebuildUnit | RebuildLibraryUnit | RebuildPath
 
 
 class FileType(Enum):
@@ -94,10 +94,10 @@ class MarkupKind(Enum):
 
 
 # A location on a source file
-Location = NamedTuple("Location", (("line", Optional[int]), ("column", Optional[int])))
+Location = NamedTuple("Location", (("line", int | None), ("column", int | None)))
 
 # A location range within a source file
-Range = NamedTuple("Range", (("start", Location), ("end", Optional[Location])))
+Range = NamedTuple("Range", (("start", Location), ("end", Location | None)))
 
 
 class ConfigFileOrigin(str, Enum):

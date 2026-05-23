@@ -19,7 +19,7 @@
 import abc
 import logging
 import os.path as p
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from .elements.dependency_spec import (
     BaseDependencySpec,
@@ -41,16 +41,15 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, filename):
-        # type: (Path, ) -> None
+    def __init__(self, filename: Path) -> None:
         assert isinstance(filename, Path), "Invalid type: {}".format(filename)
         self.filename = filename
-        self._cache = {}  # type: Dict[str, Any]
-        self._content = None  # type: Optional[str]
-        self._mtime = 0  # type: Optional[float]
+        self._cache: dict[str, Any] = {}
+        self._content: str | None = None
+        self._mtime: float | None = None
         self.filetype = FileType.fromPath(self.filename)
-        self._dependencies = None  # type: Optional[Set[BaseDependencySpec]]
-        self._design_units = None  # type: Optional[Set[tAnyDesignUnit]]
+        self._dependencies: set[BaseDependencySpec] | None = None
+        self._design_units: set[tAnyDesignUnit] | None = None
         self._libraries = None
 
     def __jsonEncode__(self):
@@ -92,8 +91,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
     def __hash_key__(self):
         return (self.filename, self._content)
 
-    def _changed(self):
-        # type: (...) -> Any
+    def _changed(self) -> Any:
         """
         Checks if the file changed based on the modification time
         provided by p.getmtime
@@ -102,8 +100,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             return False
         return bool(self.getmtime() > self._mtime)  # type: ignore
 
-    def _clearCachesIfChanged(self):
-        # type: () -> None
+    def _clearCachesIfChanged(self) -> None:
         """
         Clears all the caches if the file has changed to force updating
         every parsed info
@@ -115,8 +112,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             self._libraries = None
             self._cache = {}
 
-    def getmtime(self):
-        # type: () -> Optional[float]
+    def getmtime(self) -> float | None:
         """
         Gets file modification time as defined in p.getmtime
         """
@@ -124,8 +120,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
             return None
         return self.filename.mtime
 
-    def getSourceContent(self):
-        # type: (...) -> Any
+    def getSourceContent(self) -> Any:
         """
         Cached version of the _getSourceContent method
         """
@@ -137,15 +132,14 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._content
 
-    def _getSourceContent(self):
-        # type: () -> str
+    def _getSourceContent(self) -> str:
         """
         Method that can be overridden to change the contents of the file, like
         striping comments off.
         """
         return readFile(str(self.filename))
 
-    def getDesignUnits(self):  # type: () -> Set[tAnyDesignUnit]
+    def getDesignUnits(self) -> set[tAnyDesignUnit]:
         """
         Cached version of the _getDesignUnits method
         """
@@ -157,8 +151,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._design_units
 
-    def getDependencies(self):
-        # type: () -> Set[BaseDependencySpec]
+    def getDependencies(self) -> set[BaseDependencySpec]:
         """
         Cached version of the _getDependencies method
         """
@@ -176,8 +169,7 @@ class BaseSourceFile(HashableByKey):  # pylint:disable=too-many-instance-attribu
 
         return self._dependencies
 
-    def getLibraries(self):
-        # type: (...) -> Any
+    def getLibraries(self) -> Any:
         """
         Cached version of the _getLibraries method
         """

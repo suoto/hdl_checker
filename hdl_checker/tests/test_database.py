@@ -27,7 +27,7 @@ import os.path as p
 import tempfile
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterable, Set, Tuple
+from typing import Any, Iterable
 
 from mock import PropertyMock, patch
 
@@ -67,8 +67,7 @@ class _SourceMock(SourceMock):
 
 
 class _Database(Database):
-    def configure(self, root_config, root_path):
-        # type: (Dict[str, Any], str) -> int
+    def configure(self, root_config: dict[str, Any], root_path: str) -> int:
         _logger.info("Updating config from\n%s", pformat(root_config))
         result = super(_Database, self).configure(root_config, root_path)
 
@@ -81,9 +80,9 @@ class _Database(Database):
         _logger.debug("- %d paths:", len(self._paths))
         for path in self._paths:
             timestamp = self._parse_timestamp[path]
-            dependencies = self._dependencies_map.get(
+            dependencies: set[BaseDependencySpec] = self._dependencies_map.get(
                 path, set()
-            )  # type: Set[BaseDependencySpec]
+            )
             _logger.debug("  - Path: %s (%f)", path, timestamp)
             _logger.debug("    - library:      : %s", self._library_map.get(path, "?"))
             _logger.debug("    - flags:        : %s", self._flags_map.get(path, "-"))
@@ -117,8 +116,7 @@ class _Database(Database):
 
         self.configure({"sources": config}, root_path)
 
-    def test_getDependenciesUnits(self, path):
-        # type: (Path) -> Iterable[Tuple[Identifier, Identifier]]
+    def test_getDependenciesUnits(self, path: Path) -> Iterable[tuple[Identifier, Identifier]]:
         _msg = []
         for library, name in super(_Database, self).getDependenciesUnits(path):
             yield getattr(library, "name", None), name.name
@@ -126,8 +124,7 @@ class _Database(Database):
 
         _logger.debug("getDependenciesUnits('%s') => %s", path, _msg)
 
-    def test_getBuildSequence(self, path):
-        # type: (Path) -> Iterable[Tuple[Identifier, Path]]
+    def test_getBuildSequence(self, path: Path) -> Iterable[tuple[Identifier, Path]]:
         _msg = []
         for library, build_path in super(_Database, self).getBuildSequence(path):
             yield library, build_path
@@ -154,29 +151,25 @@ class _Database(Database):
             _logger.info("No cache info for %s", self)
 
 
-def _path(*args):
-    # type: (str) -> str
+def _path(*args) -> str:
     "Helper to reduce foorprint of p.join(TEST_TEMP_PATH, *args)"
     return p.join(TEST_TEMP_PATH, *args)
 
 
-def _Path(*args):
-    # type: (str) -> Path
+def _Path(*args) -> Path:
     return Path(_path(*args))
 
 
 class TestDatabase(TestCase):
     maxDiff = None
 
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         setupTestSuport(TEST_TEMP_PATH)
         self.database = _Database()
 
     @patch("hdl_checker.parser_utils.findRtlSourcesByPath")
-    def test_AcceptsEmptySourcesList(self, meth):
-        # type: (...) -> Any
+    def test_AcceptsEmptySourcesList(self, meth) -> Any:
         # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
         # findRtlSourcesByPath
         with tempfile.NamedTemporaryFile(suffix=".vhd", delete=False) as path:
@@ -206,8 +199,7 @@ class TestDatabase(TestCase):
             meth.assert_called_once_with(Path(TEST_TEMP_PATH))
 
     @patch("hdl_checker.parser_utils.findRtlSourcesByPath")
-    def test_AcceptsEmptyDict(self, meth):
-        # type: (...) -> Any
+    def test_AcceptsEmptyDict(self, meth) -> Any:
         # Make TEST_TEMP_PATH/some_path.vhd readable so it is returned by
         # findRtlSourcesByPath
         with tempfile.NamedTemporaryFile(suffix=".vhd", delete=False) as path:
@@ -220,8 +212,7 @@ class TestDatabase(TestCase):
             self.assertEqual(self.database.getFlags(Path("any")), ())
             meth.assert_called_once_with(Path(TEST_TEMP_PATH))
 
-    def test_AcceptsBasicStructure(self):
-        # type: (...) -> Any
+    def test_AcceptsBasicStructure(self) -> Any:
         _SourceMock(
             filename=_path("foo.vhd"),
             design_units=[{"name": "entity_a", "type": "entity"}],
@@ -322,8 +313,7 @@ class TestDatabase(TestCase):
             {foo_path},
         )
 
-    def test_UpdateInfoIfSourceChanged(self):
-        # type: (...) -> Any
+    def test_UpdateInfoIfSourceChanged(self) -> Any:
         self.test_AcceptsBasicStructure()
 
         # Make sure the env is sane before actually testing
@@ -372,8 +362,7 @@ class TestDatabase(TestCase):
             [_Path("foo.vhd"), oof_path],
         )
 
-    def test_UpdatePathLibrary(self):
-        # type: (...) -> Any
+    def test_UpdatePathLibrary(self) -> Any:
         sources = {
             _SourceMock(
                 filename=_path("file_0.vhd"),
@@ -419,8 +408,7 @@ class TestDatabase(TestCase):
             {("another_library", "foo"), ("lib", "bar")},
         )
 
-    def test_InfersUsesMostCommonLibraryIfNeeded(self):
-        # type: (...) -> Any
+    def test_InfersUsesMostCommonLibraryIfNeeded(self) -> Any:
         # Given a design unit used in multiple ways, use the most common one
         self.database._configFromSources(
             {
@@ -480,8 +468,7 @@ class TestDatabase(TestCase):
             Identifier("lib_b", False),
         )
 
-    def test_LibraryInferenceIgnoresWorkReferences(self):
-        # type: (...) -> Any
+    def test_LibraryInferenceIgnoresWorkReferences(self) -> Any:
         # When using work.something, 'work' means the current library and
         # should be ignored
         self.database._configFromSources(
@@ -525,8 +512,7 @@ class TestDatabase(TestCase):
             Identifier("some_dep_lib", False),
         )
 
-    def test_LibraryInferenceUsesTheMostCommon(self):
-        # type: (...) -> Any
+    def test_LibraryInferenceUsesTheMostCommon(self) -> Any:
         # When using work.something and on a source whose library has been set,
         # should use that instead of the most common
         self.database._configFromSources(
@@ -740,8 +726,7 @@ class TestDatabase(TestCase):
             self.database.getDiagnosticsForPath(path), [PathNotInProjectFile(path)]
         )
 
-    def test_TemporaryPathsDontGeneratePathNotInProject(self):
-        # type: (...) -> Any
+    def test_TemporaryPathsDontGeneratePathNotInProject(self) -> Any:
         path = _path("foo.vhd")
 
         self.database._clearLruCaches()
@@ -758,8 +743,7 @@ class TestDatabase(TestCase):
             self.database.getLibrary(Path(path))
             meth.assert_called_once_with(PathNotInProjectFile(Path(path)))
 
-    def test_GetReferencesToDesignUnit(self):
-        # type: (...) -> Any
+    def test_GetReferencesToDesignUnit(self) -> Any:
         self.database._configFromSources(
             {
                 _SourceMock(
@@ -828,8 +812,7 @@ class TestDatabase(TestCase):
         )
 
 class TestDirectDependencies(TestCase):
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         self.database = _Database()
 
@@ -888,14 +871,12 @@ class TestDirectDependencies(TestCase):
 
         self.database._configFromSources(sources, TEST_TEMP_PATH)
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> Any:
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_GetCorrectDependenciesOfEntityA(self):
-        # type: (...) -> Any
+    def test_GetCorrectDependenciesOfEntityA(self) -> Any:
         deps = list(self.database.test_getDependenciesUnits(_Path("entity_a.vhd")))
 
         # Indirect dependencies should always come first
@@ -910,8 +891,7 @@ class TestDirectDependencies(TestCase):
             },
         )
 
-    def test_GetCorrectBuildSequencyOfEntityA(self):
-        # type: (...) -> Any
+    def test_GetCorrectBuildSequencyOfEntityA(self) -> Any:
         sequence = list(self.database.test_getBuildSequence(_Path("entity_a.vhd")))
 
         # entity_a
@@ -938,8 +918,7 @@ class TestDirectDependencies(TestCase):
         # If conditions above are respected, direct_dep_b can be anywhere
         self.assertIn(direct_dep_b, sequence)
 
-    def test_GetCorrectDependenciesOfIndirectDep(self):
-        # type: (...) -> Any
+    def test_GetCorrectDependenciesOfIndirectDep(self) -> Any:
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("indirect_dep.vhd")),
             {("lib", "common_dep")},
@@ -947,8 +926,7 @@ class TestDirectDependencies(TestCase):
 
 
 class TestDirectCircularDependencies(TestCase):
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         self.database = _Database()
 
@@ -969,14 +947,12 @@ class TestDirectCircularDependencies(TestCase):
 
         self.database._configFromSources(sources, TEST_TEMP_PATH)
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> Any:
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_ShouldHandleBothSides(self):
-        # type: (...) -> Any
+    def test_ShouldHandleBothSides(self) -> Any:
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_a.vhd")),
             (("lib", "unit_b"),),
@@ -989,8 +965,7 @@ class TestDirectCircularDependencies(TestCase):
 
 
 class TestMultilevelCircularDependencies(TestCase):
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         self.database = _Database()
 
@@ -1029,14 +1004,12 @@ class TestMultilevelCircularDependencies(TestCase):
 
         self.database._configFromSources(sources, TEST_TEMP_PATH)
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> Any:
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_ReportAllButTheSourceInQuestion(self):
-        # type: (...) -> Any
+    def test_ReportAllButTheSourceInQuestion(self) -> Any:
         self.assertCountEqual(
             self.database.test_getDependenciesUnits(_Path("unit_a.vhd")),
             {("work", "unit_b"), ("work", "unit_c"), ("work", "unit_d")},
@@ -1059,8 +1032,7 @@ class TestMultilevelCircularDependencies(TestCase):
 
 
 class TestIndirectLibraryInference(TestCase):
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         self.database = _Database()
 
@@ -1090,22 +1062,19 @@ class TestIndirectLibraryInference(TestCase):
 
         self.database._configFromSources(sources, TEST_TEMP_PATH)
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> Any:
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_InferLibraryWhenUsingDirectly(self):
-        # type: (...) -> Any
+    def test_InferLibraryWhenUsingDirectly(self) -> Any:
         sequence = tuple(
             self.database.test_getBuildSequence(_Path("no_lib_but_use_it_directly.vhd"))
         )
 
         self.assertEqual(sequence, ((Identifier("find_me"), _Path("target_pkg.vhd")),))
 
-    def test_InferLibraryFromPath(self):
-        # type: (...) -> Any
+    def test_InferLibraryFromPath(self) -> Any:
         sequence = tuple(
             self.database.test_getBuildSequence(
                 _Path("with_lib_but_use_it_directly.vhd")
@@ -1118,8 +1087,7 @@ class TestIndirectLibraryInference(TestCase):
 class TestUnitsDefinedInMultipleSources(TestCase):
     maxDiff = None
 
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         _logger.info("Setting up %s", self)
         self.database = _Database()
 
@@ -1158,14 +1126,12 @@ class TestUnitsDefinedInMultipleSources(TestCase):
 
         self.database._configFromSources(sources, TEST_TEMP_PATH)
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> Any:
         _logger.info("Tearing down %s", self)
         self.database.test_reportCacheInfo()
         del self.database
 
-    def test_BuildSequenceUnitsAreUnique(self):
-        # type: (...) -> Any
+    def test_BuildSequenceUnitsAreUnique(self) -> Any:
         # If a design unit is defined in multiple places, we should not include
         # all of them
 
@@ -1185,8 +1151,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             ),
         )
 
-    def test_NonUniqueUnitsAreReported(self):
-        # type: (...) -> Any
+    def test_NonUniqueUnitsAreReported(self) -> Any:
 
         # Design units defined in multiple places should trigger
         # DependencyNotUnique in the path's diagnostics
@@ -1236,8 +1201,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
             [],
         )
 
-    def test_TemporaryPathsDontGenerateDiagnostics(self):
-        # type: (...) -> Any
+    def test_TemporaryPathsDontGenerateDiagnostics(self) -> Any:
 
         # Create a copy of a source file with same contents but a different
         # name to mimic getting info from a dump (which is in itself a version
@@ -1264,8 +1228,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
         # path.Path class, the test would have failed
         self.test_NonUniqueUnitsAreReported()
 
-    def test_TemporaryPathsAreExcluded(self):
-        # type: (...) -> Any
+    def test_TemporaryPathsAreExcluded(self) -> Any:
         # This should add diagnostics
         with patch.object(self.database, "_addDiagnostic") as meth:
             name = Identifier("no_lib_package")
@@ -1293,8 +1256,7 @@ class TestUnitsDefinedInMultipleSources(TestCase):
 class TestResolveIncludes(TestCase):
     @patch("hdl_checker.database.Database._addDiagnostic")
     @patch("hdl_checker.database.Database.paths", new_callable=PropertyMock)
-    def test_ResolveIncludePath(self, paths, add_diagnostic):
-        # type: (...) -> Any
+    def test_ResolveIncludePath(self, paths, add_diagnostic) -> Any:
         database = Database()
 
         paths.return_value = frozenset(

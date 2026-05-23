@@ -20,7 +20,7 @@ import os
 import os.path as p
 import re
 from glob import glob
-from typing import Any, Iterable, List, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 from .base_builder import BaseBuilder
 
@@ -77,8 +77,7 @@ class GHDL(BaseBuilder):
         self._version = ""
         super(GHDL, self).__init__(*args, **kwargs)
 
-    def _makeRecords(self, line):
-        # type: (str) -> Iterable[BuilderDiag]
+    def _makeRecords(self, line: str) -> Iterable[BuilderDiag]:
         for match in GHDL._stdout_message_parser(line):
             info = match.groupdict()
 
@@ -114,8 +113,7 @@ class GHDL(BaseBuilder):
         except OSError:
             return False
 
-    def _parseBuiltinLibraries(self):
-        # type: (...) -> Any
+    def _parseBuiltinLibraries(self) -> Iterable[Identifier]:
         """
         Discovers libraries that exist regardless before we do anything
         """
@@ -139,8 +137,7 @@ class GHDL(BaseBuilder):
                     name = path.split(p.sep)[-1]
                     yield Identifier(name.strip(), case_sensitive=False)
 
-    def _getGhdlArgs(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _getGhdlArgs(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Return the GHDL arguments that are common to most calls
         """
@@ -165,25 +162,22 @@ class GHDL(BaseBuilder):
         cmd = ["ghdl", "-i"] + self._getGhdlArgs(path, library, tuple(vhdl_std))
         return cmd
 
-    def _analyzeSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _analyzeSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Runs GHDL with analyze source switch
         """
         return ["ghdl", "-a"] + self._getGhdlArgs(path, library, flags)
 
-    def _checkSyntax(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _checkSyntax(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Runs GHDL with syntax check switch
         """
         return ["ghdl", "-s"] + self._getGhdlArgs(path, library, flags)
 
-    def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> Iterable[str]:
         self._importSource(path, library, flags)
 
-        stdout = []  # type: List[str]
+        stdout: list[str] = []
         for cmd in (
             self._analyzeSource(path, library, flags),
             self._checkSyntax(path, library, flags),
@@ -197,8 +191,7 @@ class GHDL(BaseBuilder):
         if not p.exists(workdir):
             os.makedirs(workdir)
 
-    def _searchForRebuilds(self, path, line):
-        # type: (Path, str) -> Iterable[Mapping[str, str]]
+    def _searchForRebuilds(self, path: Path, line: str) -> Iterable[Mapping[str, str]]:
         for match in GHDL._iter_rebuild_units(line):
             mdict = match.groupdict()
             # When compilers reports units out of date, they do this

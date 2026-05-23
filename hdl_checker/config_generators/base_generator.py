@@ -19,12 +19,11 @@
 import abc
 import logging
 from pprint import pformat
-from typing import Dict, Optional, Set, Tuple
 
 from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 
-SourceSpec = Tuple[Path, BuildFlags, Optional[str]]
+SourceSpec = tuple[Path, BuildFlags, str | None]
 
 
 class BaseGenerator:
@@ -34,12 +33,11 @@ class BaseGenerator:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self):  # type: () -> None
+    def __init__(self) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._sources = set()  # type: Set[SourceSpec]
+        self._sources: set[SourceSpec] = set()
 
-    def _addSource(self, path, flags=None, library=None):
-        # type: (Path, BuildFlags, Optional[str]) -> None
+    def _addSource(self, path: Path, flags: BuildFlags | None = None, library: str | None = None) -> None:
         """
         Add a source to project, which includes regular sources AND headers
         """
@@ -49,7 +47,7 @@ class BaseGenerator:
         self._sources.add((path, flags or (), library))
 
     @abc.abstractmethod
-    def _populate(self):  # type: () -> None
+    def _populate(self) -> None:
         """
         Method that will be called for generating the project file contets and
         should be implemented by child classes

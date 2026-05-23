@@ -22,8 +22,6 @@ import os.path as p
 import signal
 import tempfile
 from multiprocessing import Queue
-from typing import Any, Dict, List, Optional, Tuple
-
 import bottle  # type: ignore
 
 from hdl_checker import __version__ as version
@@ -43,32 +41,26 @@ class Server(HdlCheckerCore):
     HDL Checker project builder class
     """
 
-    def __init__(self, *args, **kwargs):
-        # type: (...) -> None
-        self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
+    def __init__(self, *args, **kwargs) -> None:
+        self._msg_queue: Queue[tuple[str, str]] = Queue()
         super(Server, self).__init__(*args, **kwargs)
 
-    def _handleUiInfo(self, message):
-        # type: (...) -> Any
+    def _handleUiInfo(self, message: str) -> None:
         self._msg_queue.put(("info", message))
 
-    def _handleUiWarning(self, message):
-        # type: (...) -> Any
+    def _handleUiWarning(self, message: str) -> None:
         self._msg_queue.put(("warning", message))
 
-    def _handleUiError(self, message):
-        # type: (...) -> Any
+    def _handleUiError(self, message: str) -> None:
         self._msg_queue.put(("error", message))
 
     def getQueuedMessages(self):
-        # type: (...) -> Any
         "Returns queued UI messages"
         while not self._msg_queue.empty():  # pragma: no cover
             yield self._msg_queue.get()
 
 
-def _getServerByProjectFile(project_file):
-    # type: (Optional[str]) -> Server
+def _getServerByProjectFile(project_file: str | None) -> Server:
     """
     Returns the Server object that corresponds to the given project file. If
     the object doesn't exists yet it gets created and then returned
@@ -113,8 +105,7 @@ def _exceptionWrapper(func):
     return _wrapper
 
 
-def setupSignalHandlers():
-    # type: (...) -> Any
+def setupSignalHandlers() -> None:
     """
     Configures signal handlers that will be called when exiting Python
     shell
@@ -131,12 +122,11 @@ def setupSignalHandlers():
         signal.signal(sig, signalHandler)
 
 
-def _getProjectDiags(project_file):
-    # type: (str) -> Any
+def _getProjectDiags(project_file: str) -> list[str]:
     """
     Get project specific diagnose
     """
-    diags = []  # type: List[str]
+    diags: list[str] = []
     server = _getServerByProjectFile(project_file)
 
     if isinstance(server.builder, Fallback):
@@ -149,8 +139,7 @@ def _getProjectDiags(project_file):
 
 @app.post("/get_diagnose_info")
 @_exceptionWrapper
-def getDiagnoseInfo():
-    # type: (...) -> Any
+def getDiagnoseInfo() -> dict[str, list[str]]:
     """
     Collects misc diagnose info for the clients
     """
@@ -169,8 +158,7 @@ def getDiagnoseInfo():
 
 @app.post("/get_messages_by_path")
 @_exceptionWrapper
-def getMessagesByPath():
-    # type: (...) -> Any
+def getMessagesByPath() -> dict[str, list]:
     """
     Get messages for a given projec_file/path pair
     """
@@ -200,8 +188,7 @@ def getMessagesByPath():
 
 @app.post("/get_ui_messages")
 @_exceptionWrapper
-def getUiMessages():
-    # type: (...) -> Any
+def getUiMessages() -> dict[str, list]:
     """
     Get messages for a given projec_file/path pair
     """
@@ -226,8 +213,7 @@ def getUiMessages():
 
 @app.post("/rebuild_project")
 @_exceptionWrapper
-def rebuildProject():
-    # type: (...) -> Any
+def rebuildProject() -> None:
     """
     Rebuilds the current project
     """
@@ -243,8 +229,7 @@ def rebuildProject():
 
 @app.post("/shutdown")
 @_exceptionWrapper
-def shutdownServer():
-    # type: (...) -> Any
+def shutdownServer() -> str:
     """
     Terminates the current process to shutdown the server
     """
@@ -256,8 +241,7 @@ def shutdownServer():
 
 @app.post("/get_dependencies")
 @_exceptionWrapper
-def getDependencies():
-    # type: (...) -> Any
+def getDependencies() -> dict[str, list[str]]:
     """
     Returns the direct dependencies of a given source path
     """
@@ -280,8 +264,7 @@ def getDependencies():
 
 @app.post("/get_build_sequence")
 @_exceptionWrapper
-def getBuildSequence():
-    # type: (...) -> Any
+def getBuildSequence() -> dict[str, tuple[str, ...]]:
     """
     Returns the build sequence of a given source path
     """
@@ -304,5 +287,5 @@ def getBuildSequence():
 
 
 #  We'll store a dict to store differents hdl_checker objects
-servers = {}  # type: Dict[Path, Server] # pylint: disable=invalid-name
+servers: dict[Path, Server] = {}  # pylint: disable=invalid-name
 setupSignalHandlers()

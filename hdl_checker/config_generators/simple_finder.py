@@ -16,7 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Base class for creating a project file"
 
-from typing import Iterable, List
+from typing import Iterable
 
 from .base_generator import BaseGenerator
 
@@ -41,13 +41,12 @@ class SimpleFinder(BaseGenerator):
     set of paths recursively
     """
 
-    def __init__(self, paths):  # type: (List[str]) -> None
+    def __init__(self, paths: list[str]) -> None:
         super(SimpleFinder, self).__init__()
         self._logger.debug("Search paths: %s", paths)
         self._paths = {Path(x) for x in paths}
 
-    def _getLibrary(self, path):  # pylint:disable=no-self-use,unused-argument
-        # type: (Path) -> str
+    def _getLibrary(self, path: Path) -> str:  # pylint:disable=no-self-use,unused-argument
         """
         Returns the library name given the path. On this implementation this
         returns a default name; child classes can override this to provide
@@ -56,8 +55,7 @@ class SimpleFinder(BaseGenerator):
         """
         return NotImplemented
 
-    def _findSources(self):
-        # type: (...) -> Iterable[Path]
+    def _findSources(self) -> Iterable[Path]:
         """
         Iterates over the paths and searches for relevant files by extension.
         """
@@ -70,7 +68,7 @@ class SimpleFinder(BaseGenerator):
             for source_path in filter_func(search_path, sources):
                 yield source_path
 
-    def _populate(self):  # type: (...) -> None
+    def _populate(self) -> None:
         for path in self._findSources():
             library = self._getLibrary(path)
             self._addSource(

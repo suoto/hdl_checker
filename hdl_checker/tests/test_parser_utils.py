@@ -83,13 +83,11 @@ class TestConfigHandlers(TestCase):
     def setUp(self):
         self.base_path = mkdtemp()
 
-        def _path(*args):
-            # type: (str) -> str
+        def _path(*args: str) -> str:
             "Helper to reduce foorprint of p.join(self.base_path, *args)"
             return p.join(self.base_path, *args)
 
-        def _Path(*args):
-            # type: (str) -> Path
+        def _Path(*args: str) -> Path:
             "Helper to reduce foorprint of Path(p.join(self.base_path, *args))"
             return Path(_path(*args))
 
@@ -196,8 +194,7 @@ class TestConfigHandlers(TestCase):
             ),
         )
 
-    def test_IncludeFolderShouldUseConfigFileIfPossible(self):
-        # type: (...) -> None
+    def test_IncludeFolderShouldUseConfigFileIfPossible(self) -> None:
         folder = mkdtemp()
         config_file = p.join(folder, DEFAULT_PROJECT_FILE)
         open(config_file, "w").close()
@@ -210,8 +207,7 @@ class TestConfigHandlers(TestCase):
         _logger.info("Result:\n%s", pformat(result))
         self.assertCountEqual(result, [(folder, {"foo": "bar"})])
 
-    def test_IncludeFolderShouldSearch(self):
-        # type: (...) -> None
+    def test_IncludeFolderShouldSearch(self) -> None:
         folder = mkdtemp()
 
         with patch("hdl_checker.parser_utils.findRtlSourcesByPath") as meth:
@@ -427,8 +423,7 @@ class TestExpandingPathNames(TestCase):
             open(path, "w").close()
             self.assertTrue(p.exists(path))
 
-    def test_ExpandWithFileWildcards(self):
-        # type: (...) -> Any
+    def test_ExpandWithFileWildcards(self) -> Any:
         config = {
             "sources": [
                 self.join("*.vhd"),
@@ -452,8 +447,7 @@ class TestExpandingPathNames(TestCase):
             ),
         )
 
-    def test_ExpandWithRecursiveWildcards(self):
-        # type: (...) -> Any
+    def test_ExpandWithRecursiveWildcards(self) -> Any:
         """
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
@@ -475,8 +469,7 @@ class TestExpandingPathNames(TestCase):
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 
-    def test_ExpandWithRecursiveWildcardsAndRelativePaths(self):
-        # type: (...) -> Any
+    def test_ExpandWithRecursiveWildcardsAndRelativePaths(self) -> Any:
         """
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
@@ -498,8 +491,7 @@ class TestExpandingPathNames(TestCase):
 
         self.assertCountEqual(flattenConfig(config, root_path=self.base_path), expected)
 
-    def test_ExpandWhenPatternMatchesNonRtlFiles(self):
-        # type: (...) -> Any
+    def test_ExpandWhenPatternMatchesNonRtlFiles(self) -> Any:
         """
         Recursive wildcards are only available on Python3, expected result will
         be different but we're not porting it back
@@ -549,8 +541,7 @@ class TestFilterGitIgnoredPaths(TestCase):
         return p.join(self.base_path, *args)
 
     @timeit
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> Any:
         self.base_path = mkdtemp(prefix=__name__ + "_")
 
         self.out_of_repo = NamedTemporaryFile(
@@ -597,8 +588,7 @@ class TestFilterGitIgnoredPaths(TestCase):
         )
 
     @timeit
-    def test_FilterGitPaths(self):
-        # type: (...) -> Any
+    def test_FilterGitPaths(self) -> Any:
         self.assertTrue(isGitRepo(Path(self.base_path)))
 
         result = list(

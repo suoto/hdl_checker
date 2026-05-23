@@ -23,7 +23,7 @@ import logging
 import os
 import os.path as p
 from threading import Thread
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import unittest
 from mock import patch
@@ -107,7 +107,7 @@ if ON_WINDOWS:
 
 
 class _LspHelper(unittest.TestCase):
-    def _createClientServerPair(self, params: Optional[InitializeParams]):
+    def _createClientServerPair(self, params: InitializeParams | None):
         # pylint: disable=attribute-defined-outside-init
         setupTestSuport(TEST_TEMP_PATH)
         _logger.debug("Creating server")
@@ -201,12 +201,8 @@ class _LspHelper(unittest.TestCase):
 
     def checkLintFileOnMethod(
         self,
-        params: Union[
-            DidOpenTextDocumentParams,
-            DidSaveTextDocumentParams,
-            DidChangeTextDocumentParams,
-        ],
-        expected_diags=List[CheckerDiagnostic],
+        params: DidOpenTextDocumentParams | DidSaveTextDocumentParams | DidChangeTextDocumentParams,
+        expected_diags=list[CheckerDiagnostic],
     ):
         """
         Generic method to check diagnostics reported are correct
@@ -246,7 +242,7 @@ class _LspHelper(unittest.TestCase):
             self.assertTrue(
                 self.client_diagnostics, "Expected client to have diagnostics"
             )
-            diags: List[CheckerDiagnostic] = []
+            diags: list[CheckerDiagnostic] = []
             while self.client_diagnostics:
                 diag = self.client_diagnostics.pop()
                 diags += list(toCheckerDiagnostic(diag[0], diag[1]))
@@ -255,7 +251,7 @@ class _LspHelper(unittest.TestCase):
             _logger.info("Got:      %d => %s", len(diags), diags)
             self.assertFalse(set(expected_diags) - set(diags))
 
-    def _runDidOpenCheck(self, source: Optional[Path]):
+    def _runDidOpenCheck(self, source: Path | None):
         self.checkLintFileOnMethod(
             DidOpenTextDocumentParams(
                 TextDocumentItem(
@@ -272,7 +268,7 @@ class _LspHelper(unittest.TestCase):
             ],
         )
 
-    def _runDidSaveCheck(self, source: Optional[Path]):
+    def _runDidSaveCheck(self, source: Path | None):
         self.checkLintFileOnMethod(
             DidSaveTextDocumentParams(
                 text_document=TextDocumentIdentifier(uris.from_fs_path(source)),
@@ -288,7 +284,7 @@ class _LspHelper(unittest.TestCase):
             ],
         )
 
-    def _runDidChangeCheck(self, source: Optional[Path]):
+    def _runDidChangeCheck(self, source: Path | None):
         self.checkLintFileOnMethod(
             DidChangeTextDocumentParams(
                 VersionedTextDocumentIdentifier(uris.from_fs_path(source), version=1,),

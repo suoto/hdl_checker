@@ -51,7 +51,7 @@ SOME_ABS_PATH = "C:\\some\\abs\\path.VHDL" if ON_WINDOWS else "/some/abs/path.VH
 
 
 @contextmanager
-def fileWithContent(content):  # type: (bytes) -> Iterator[str]
+def fileWithContent(content: bytes) -> Iterator[str]:
     with tempfile.NamedTemporaryFile(delete=False) as fd:
         print("Writing to %s (%s)" % (fd, fd.name))
         fd.write(content)
@@ -64,8 +64,7 @@ such.unittest.TestCase.maxDiff = None
 with such.A("config parser object") as it:
 
     @it.has_setup
-    def setup():
-        # type: (...) -> Any
+    def setup() -> Any:
         setupTestSuport(TEST_TEMP_PATH)
 
     #  @it.has_teardown
@@ -79,8 +78,7 @@ with such.A("config parser object") as it:
     @it.should(
         "raise UnknownParameterError exception when an unknown " "parameter is found"
     )
-    def test_raises_exception():
-        # type: (...) -> Any
+    def test_raises_exception() -> Any:
         with it.assertRaises(UnknownParameterError):
             with fileWithContent(b"foo = bar") as name:
                 parser = ConfigParser(Path(name))
@@ -89,8 +87,7 @@ with such.A("config parser object") as it:
     with it.having("a regular file"):
 
         @it.has_setup
-        def setup():
-            # type: (...) -> Any
+        def setup() -> Any:
             it.path = Path(tempfile.mktemp())
 
             contents = toBytes(
@@ -129,8 +126,7 @@ systemverilog work bar.sv some sv flag
                 fd.flush()
 
         @it.should("find the correct info")
-        def test_parsing_regular_file():
-            # type: (...) -> Any
+        def test_parsing_regular_file() -> Any:
             parser = ConfigParser(it.path)
             config = parser.parse()
 
@@ -207,8 +203,7 @@ systemverilog work bar.sv some sv flag
             )
 
         @it.should("only parse when the file actually changes")
-        def test_only_parse_when_source_changes():
-            # type: (...) -> Any
+        def test_only_parse_when_source_changes() -> Any:
             parser = ConfigParser(it.path)
 
             _logger.info("Parsing %s for the 1st time", it.path)
@@ -224,8 +219,7 @@ systemverilog work bar.sv some sv flag
                 _parseLine.assert_not_called()
 
         @it.should("report parsing in progress")
-        def test_should_report_parsing_in_progress():
-            # type: (...) -> Any
+        def test_should_report_parsing_in_progress() -> Any:
             parser = ConfigParser(it.path)
             it.assertFalse(parser.isParsing(), "Parser should not be busy right now")
 
