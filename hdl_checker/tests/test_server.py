@@ -165,6 +165,12 @@ class _ClientServer(
         client_thread.daemon = True
         client_thread.start()
 
+        # Wait for client transport to be ready before returning
+        for _ in range(50):
+            if self.client.lsp.transport is not None:
+                break
+            time.sleep(0.1)
+
 
 such.unittest.TestCase.maxDiff = None
 
