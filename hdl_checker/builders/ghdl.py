@@ -53,7 +53,7 @@ class GHDL(BaseBuilder):
         r"^(?P<filename>.*):(?=\d)"
         r"(?P<line_number>\d+):"
         r"(?P<column_number>\d+):"
-        r"((?P<is_warning>warning:)\s*|\s*)"
+        r"((?P<severity>(warning|error):)\s*|\s*)"
         r"(?P<error_message>.*)",
         re.I,
     ).finditer
@@ -89,7 +89,9 @@ class GHDL(BaseBuilder):
             yield BuilderDiag(
                 builder_name=self.builder_name,
                 text=info.get("error_message", None),
-                severity=DiagType.WARNING if info["is_warning"] else DiagType.ERROR,
+                severity=DiagType.WARNING
+                if info["severity"] == "warning"
+                else DiagType.ERROR,
                 filename=None if filename is None else Path(filename),
                 line_number=None if line_number is None else int(line_number) - 1,
                 column_number=None if column_number is None else int(column_number) - 1,
@@ -99,7 +101,7 @@ class GHDL(BaseBuilder):
         stdout = runShellCommand(["ghdl", "--version"])
         self._version = re.findall(r"(?<=GHDL)\s+([^\s]+)\s+", stdout[0])[0]
         self._logger.info(
-            "GHDL version string: '%s'. " "Version number is '%s'",
+            "GHDL version string: '%s'. Version number is '%s'",
             stdout[:-1],
             self._version,
         )
