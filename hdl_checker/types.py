@@ -52,8 +52,7 @@ class FileType(Enum):
     systemverilog = "systemverilog"
 
     @staticmethod
-    def fromPath(path):
-        # type: (Path) -> FileType
+    def fromPath(path: "Path") -> "FileType":
         "Extracts FileType from the given path's extension"
         ext = path.name.split(".")[-1].lower()
         if ext in ("vhd", "vhdl"):

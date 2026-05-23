@@ -209,8 +209,7 @@ def getTemporaryFilename(name):
     return p.join(p.sep, "tmp", basename + "." + (suffix or "log"))
 
 
-def isFileReadable(path):
-    # type: (str) -> bool
+def isFileReadable(path: str) -> bool:
     """
     Checks if a given file is readable
     """
@@ -222,8 +221,7 @@ def isFileReadable(path):
         return False
 
 
-def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
-    # type: (Union[Tuple[str], List[str]], bool, Optional[Dict], Optional[str]) -> Iterable[str]
+def runShellCommand(cmd_with_args: Union[Tuple[str], List[str]], shell: bool = False, env: Optional[Dict] = None, cwd: Optional[str] = None) -> Iterable[str]:
     """
     Runs a shell command and handles stdout catching
     """
@@ -255,8 +253,7 @@ def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
         raise
 
 
-def removeIfExists(filename):
-    # type: (str) -> bool
+def removeIfExists(filename: str) -> bool:
     "Removes filename using os.remove and catches the exception if that fails"
     try:
         os.remove(filename)
@@ -267,8 +264,7 @@ def removeIfExists(filename):
         return False
 
 
-def removeDirIfExists(dirname):
-    # type: (str) -> bool
+def removeDirIfExists(dirname: str) -> bool:
     """
     Removes the directory dirname using shutil.rmtree and catches the exception
     if that fails
@@ -307,13 +303,11 @@ class HashableByKey(abc.ABC):
 
         return NotImplemented  # pragma: no cover
 
-def logCalls(func):  # pragma: no cover
-    # type: (Callable) -> Callable
+def logCalls(func: Callable) -> Callable:  # pragma: no cover
     "Decorator to Log calls to func"
 
     @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        # type: (...) -> Callable
+    def wrapper(self, *args, **kwargs) -> Callable:
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
             result = func(self, *args, **kwargs)
@@ -330,8 +324,7 @@ def logCalls(func):  # pragma: no cover
 T = TypeVar("T")  # pylint: disable=invalid-name
 
 
-def getMostCommonItem(items):
-    # type: (Iterable[T]) -> T
+def getMostCommonItem(items: Iterable[T]) -> T:
     """
     Gets the most common item on an interable of items
     """
@@ -350,8 +343,7 @@ _TAGS = re.compile(r"^\w+\s+refs\/tags\/v(?P<tag>(?:\d+\.){2}\d+)", flags=re.MUL
 VersionFormat = Tuple[int, ...]
 
 
-def _getLatestReleaseVersion():
-    # type: () -> Optional[VersionFormat]
+def _getLatestReleaseVersion() -> Optional[VersionFormat]:
     """
     Return the latest tag from https://github.com/suoto/hdl_checker, striping
     the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to
@@ -392,8 +384,7 @@ def _getLatestReleaseVersion():
 _VERSION_FORMAT = re.compile(r"^\d+\.\d+\.\d+$")
 
 
-def onNewReleaseFound(func):
-    # type: (Callable[[str], None]) -> None
+def onNewReleaseFound(func: Callable[[str], None]) -> None:
     """
     Checks if a new release is out and calls func if the running an older
     version
