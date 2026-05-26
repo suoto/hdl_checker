@@ -18,6 +18,8 @@
 
 import logging
 import os.path as p
+import subprocess
+import sys
 from contextlib import contextmanager
 from enum import Enum
 from tempfile import mkdtemp
@@ -34,19 +36,58 @@ from hdl_checker.path import Path
 from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import removeDirIfExists
 
-try:
-    import vunit  # type: ignore # pylint: disable=unused-import
-    from vunit import VUnit as VUnit_VHDL  # type: ignore[import-not-found]  # pylint: disable=import-error
-    from vunit.verilog import (  # type: ignore
-        VUnit as VUnit_Verilog,
-    )  # pylint: disable=import-error
+_logger = logging.getLogger(__name__)
 
+
+def _find_vunit_site_packages() -> str | None:
+    """
+    Try to locate the site-packages directory containing vunit by querying the
+    python interpreter in PATH.  This allows hdl_checker (e.g. installed via
+    pipx) to find vunit installed in the user's active venv or system Python.
+    """
+    for python in ("python", "python3"):
+        try:
+            result = subprocess.run(
+                [python, "-c",
+                 "import vunit, os; print(os.path.dirname(os.path.dirname(vunit.__file__)))"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return None
+
+
+_vunit_pkg_dir: str | None = None
+
+try:
+    from vunit import VUnit as VUnit_VHDL  # type: ignore[import-not-found]  # pylint: disable=import-error
+    from vunit.verilog import VUnit as VUnit_Verilog  # type: ignore  # pylint: disable=import-error
+    # __file__ is str | None (None for built-in/namespace packages); vunit is
+    # always a file-backed package so the fallback to "" is never reached, but
+    # it narrows the type to str so p.dirname is satisfied without a type: ignore.
+    import vunit as _vunit  # type: ignore[import-not-found]  # pylint: disable=import-error
+    _vunit_pkg_dir = p.dirname(_vunit.__file__ or "")
     HAS_VUNIT = True
 except ImportError:  # pragma: no cover
-    HAS_VUNIT = False
-
-
-_logger = logging.getLogger(__name__)
+    _vunit_sp = _find_vunit_site_packages()
+    if _vunit_sp and _vunit_sp not in sys.path:
+        sys.path.append(_vunit_sp)
+        try:
+            from vunit import VUnit as VUnit_VHDL  # type: ignore[import-not-found]  # pylint: disable=import-error
+            from vunit.verilog import VUnit as VUnit_Verilog  # type: ignore  # pylint: disable=import-error
+            import vunit as _vunit  # type: ignore[import-not-found]  # pylint: disable=import-error
+            _vunit_pkg_dir = p.dirname(_vunit.__file__ or "")
+            HAS_VUNIT = True
+            _logger.debug("VUnit found in external environment: %s", _vunit_pkg_dir)
+        except ImportError as exc:
+            _logger.warning("No VUnit support: %s", exc)
+            HAS_VUNIT = False
+    else:
+        HAS_VUNIT = False
 
 AnyValidBuilder = MSim | XVHDL | GHDL
 AnyBuilder = AnyValidBuilder | Fallback
@@ -119,6 +160,7 @@ def _isHeader(path: Path) -> bool:
 def getVunitSources(builder: AnyValidBuilder) -> Iterable[tuple[Path, str | None, BuildFlags]]:
     "Gets VUnit sources according to the file types supported by builder"
     if not foundVunit():
+        _logger.info("VUnit not found, VUnit files will not be included")
         return
 
     _logger.debug("VUnit installation found")
@@ -154,7 +196,7 @@ def getVunitSources(builder: AnyValidBuilder) -> Iterable[tuple[Path, str | None
         yield Path(path), library, flags
 
     if FileType.systemverilog in builder.file_types:
-        for path in findRtlSourcesByPath(Path(p.dirname(vunit.__file__))):  # type: ignore[possibly-undefined]
+        for path in findRtlSourcesByPath(Path(_vunit_pkg_dir)):  # type: ignore[arg-type]
             if _isHeader(path):
                 yield Path(path), None, ()
 

@@ -21,8 +21,6 @@ set -e
 # Mimic the username, user ID and group ID of the env outside the container to
 # avoid permission issues
 
-# ln -s /builders "/home/souto/builders"
-
 cd /hdl_checker
 tox ${TOX_ARGS[*]}
 coverage combine

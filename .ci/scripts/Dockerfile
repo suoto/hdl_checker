@@ -62,7 +62,6 @@ COPY msim $BUILDERS/msim
 # Test installations
 RUN "$BUILDERS/ghdl/bin/ghdl" --version
 RUN "$BUILDERS/msim/modelsim_ase/linuxaloem/vcom" -version
-# RUN "/xsim/bin/xvhdl" -version
 
 VOLUME /hdl_checker
 WORKDIR /hdl_checker

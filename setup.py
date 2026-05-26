@@ -55,6 +55,9 @@ setuptools.setup(
                                      'prettytable>=0.7.2',
                                      'pygls==0.9.1',
                                      'tabulate>=0.8.5', ],
+    extras_require                = {
+        'vunit': ['vunit-hdl'],
+    },
     entry_points                  = {
         'console_scripts' : ['hdl_checker=hdl_checker.server:main', ]
     },
