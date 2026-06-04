@@ -222,7 +222,7 @@ class MSim(BaseBuilder):
 
         libs: list[str] = []
         for library in self._added_libraries | self._external_libraries[lang]:
-            libs = ["-L", library.name]
+            libs += ["-L", library.name]
         for incdir in self._getIncludesForPath(path):
             libs += ["+incdir+" + incdir]
         return libs

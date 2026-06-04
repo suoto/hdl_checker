@@ -434,7 +434,7 @@ class HdlCheckerCore:
             % (path, self._MAX_REBUILD_ATTEMPTS)
         )
 
-        return {}
+        return set()
 
     def _handleRebuilds(self, rebuilds: Iterable[RebuildInfo]) -> None:
         """

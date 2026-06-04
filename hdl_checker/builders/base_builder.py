@@ -328,7 +328,7 @@ class BaseBuilder(abc.ABC):
                         diagnostics.add(record.copy(filename=path))
                     else:
                         diagnostics.add(record)
-                except:
+                except Exception:
                     self._logger.exception(
                         " - %s hash: %s | %s",
                         record,
