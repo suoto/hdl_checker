@@ -182,35 +182,18 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             except KeyError:
                 pass
 
-            try:
-                del self._parse_timestamp[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._library_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._flags_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._dependencies_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._diags[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
+            for mapping in (
+                self._parse_timestamp,
+                self._library_map,
+                self._flags_map,
+                self._dependencies_map,
+                self._diags,
+            ):
+                try:
+                    del mapping[path]
+                    clear_lru_caches = True
+                except KeyError:
+                    pass
 
             if clear_lru_caches:
                 self._clearLruCaches()
@@ -378,7 +361,6 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         if path not in self.paths:
             # Add the path to the project but put it on a different library
-            self._parseSourceIfNeeded(path)
             self._updatePathLibrary(path, Identifier("not_in_project", True))
             # Report paths that are valid (that is, not temporary) when they
             # can't be found in the project file
@@ -409,9 +391,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         if mtime == self._parse_timestamp.get(path, 0):
             return
 
-        self._parseSource(path)
+        self._parseSource(path, mtime)
 
-    def _parseSource(self, path: Path) -> None:
+    def _parseSource(self, path: Path, mtime: float | None = None) -> None:
         """
         Extracts info from a source, taking care of removing previously defined
         items before
@@ -430,7 +412,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         with self._lock:
             # Update the timestamp
-            self._parse_timestamp[path] = p.getmtime(str(path))
+            self._parse_timestamp[path] = mtime if mtime is not None else p.getmtime(str(path))
 
             # Remove all design units that referred to this path before adding
             # new ones, but use the non API method for that to avoid recursing
@@ -722,7 +704,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
-        self._diags[path] = set()
+        self._diags.setdefault(path, set())
         units_compiled: set[LibraryUnitTuple] = set()
 
         units_to_build = self.getDependenciesUnits(path)

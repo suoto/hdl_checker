@@ -104,20 +104,13 @@ class BuilderName(Enum):
     fallback = "fallback"
 
 
-def getBuilderByName(name):
+def getBuilderByName(name: str):
     "Returns the builder class given a string name"
-    # Check if the builder selected is implemented and create the
-    # builder attribute
-    if name == "msim":
-        builder = MSim
-    elif name == "xvhdl":
-        builder = XVHDL
-    elif name == "ghdl":
-        builder = GHDL
-    else:
-        builder = Fallback
-
-    return builder
+    return {
+        "msim": MSim,
+        "xvhdl": XVHDL,
+        "ghdl": GHDL,
+    }.get(name, Fallback)
 
 
 def getPreferredBuilder():
