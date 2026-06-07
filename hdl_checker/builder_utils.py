@@ -28,8 +28,6 @@ from typing import Iterable  # pylint: disable=unused-import
 from .builders.fallback import Fallback
 from .builders.ghdl import GHDL
 from .builders.msim import MSim
-from .builders.xvhdl import XVHDL
-
 from hdl_checker.parser_utils import findRtlSourcesByPath
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
@@ -89,7 +87,7 @@ except ImportError:  # pragma: no cover
     else:
         HAS_VUNIT = False
 
-AnyValidBuilder = MSim | XVHDL | GHDL
+AnyValidBuilder = MSim | GHDL
 AnyBuilder = AnyValidBuilder | Fallback
 
 
@@ -99,7 +97,6 @@ class BuilderName(Enum):
     """
 
     msim = "msim"
-    xvhdl = "xvhdl"
     ghdl = "ghdl"
     fallback = "fallback"
 
@@ -108,7 +105,6 @@ def getBuilderByName(name: str):
     "Returns the builder class given a string name"
     return {
         "msim": MSim,
-        "xvhdl": XVHDL,
         "ghdl": GHDL,
     }.get(name, Fallback)
 
@@ -226,7 +222,7 @@ def _getSourcesFromVUnitModule(vunit_module):
         return list(vunit_project.get_source_files())
 
 
-__all__ = ["MSim", "XVHDL", "GHDL", "Fallback"]
+__all__ = ["MSim", "GHDL", "Fallback"]
 
 # This holds the builders in order of preference
-AVAILABLE_BUILDERS = MSim, XVHDL, GHDL, Fallback
+AVAILABLE_BUILDERS = MSim, GHDL, Fallback

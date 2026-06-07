@@ -40,7 +40,6 @@ from hdl_checker.tests import (
 from hdl_checker.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
-    XVHDL,
     AnyBuilder,
     Fallback,
     MSim,
@@ -69,7 +68,7 @@ _logger = logging.getLogger(__name__)
 TEST_TEMP_PATH = getTestTempPath(__name__)
 SOURCES_PATH = p.join(TEST_TEMP_PATH, "test_builders")
 
-BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fallback}
+BUILDER_CLASS_MAP = {"msim": MSim, "ghdl": GHDL, "fallback": Fallback}
 
 
 class _SourceMock(SourceMock):
@@ -354,54 +353,6 @@ class TestBuilder(TestCase):
 
         self.assertCountEqual(records, expected)
 
-    @parameterized.parameterized.expand(
-        [
-            ("/some/file/with/abs/path.vhd",),
-            ("some/file/with/relative/path.vhd",),
-            ("some_file_on_same_level.vhd",),
-        ]
-    )
-    def test_ParseXvhdlResult(self, path) -> None:
-        if not isinstance(self.builder, XVHDL):
-            raise unittest.SkipTest("XVHDL only test")
-
-        self.assertEqual(
-            list(
-                self.builder._makeRecords(
-                    "ERROR: [VRFC 10-1412] syntax error near ) [%s:12]" % path
-                )
-            ),
-            [
-                BuilderDiag(
-                    builder_name=self.builder_name,
-                    text="syntax error near )",
-                    filename=Path(path),
-                    line_number=11,
-                    error_code="VRFC 10-1412",
-                    severity=DiagType.ERROR,
-                )
-            ],
-        )
-
-        self.assertEqual(
-            list(
-                self.builder._makeRecords(
-                    "WARNING: [VRFC 10-1256] possible infinite loop; process "
-                    "does not have a wait statement [%s:119]" % path
-                )
-            ),
-            [
-                BuilderDiag(
-                    builder_name=self.builder_name,
-                    text="possible infinite loop; process does not have a wait statement",
-                    filename=Path(path),
-                    line_number=118,
-                    error_code="VRFC 10-1256",
-                    severity=DiagType.WARNING,
-                )
-            ],
-        )
-
     @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
     def test_VhdlCompilation(self, *args) -> None:
         if FileType.vhdl not in self.builder.file_types:
@@ -505,31 +456,6 @@ class TestBuilder(TestCase):
                     ),
                 }
             ]
-        elif self.builder_name == "xvhdl":
-            # XVHDL reports different errors depending on the version
-            expected = [
-                {
-                    BuilderDiag(
-                        filename=source,
-                        builder_name=self.builder_name,
-                        text="some_lib is not declared",
-                        line_number=3,
-                        error_code="VRFC 10-91",
-                        severity=DiagType.ERROR,
-                    )
-                },
-                {
-                    BuilderDiag(
-                        filename=source,
-                        builder_name=self.builder_name,
-                        text="'some_lib' is not declared",
-                        line_number=3,
-                        error_code="VRFC 10-2989",
-                        severity=DiagType.ERROR,
-                    )
-                },
-            ]
-
         if not isinstance(self.builder, Fallback):
             self.assertIn(records, expected)
         else:
@@ -584,22 +510,6 @@ class TestBuilder(TestCase):
 
         self.assertEqual(
             [{"unit_type": "package", "unit_name": "leon3"}],
-            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
-        )
-
-    def test_XvhdlRecompileMsg0(self) -> None:
-        if not isinstance(self.builder, XVHDL):
-            raise unittest.SkipTest("XVHDL only test")
-
-        line = (
-            "ERROR: [VRFC 10-113] {} needs to be re-saved since std.standard "
-            "changed".format(
-                p.join("some", "path", "xsim.dir", "some_library", "some_package.vdb")
-            )
-        )
-
-        self.assertEqual(
-            [{"library_name": "some_library", "unit_name": "some_package"}],
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 

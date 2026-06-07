@@ -266,7 +266,6 @@ class PatchBuilder(object):
             "Returns the builder class given a string name"
             from hdl_checker.builders.msim import MSim
             from hdl_checker.builders.ghdl import GHDL
-            from hdl_checker.builders.xvhdl import XVHDL
             from hdl_checker.builders.fallback import Fallback
 
             # Check if the builder selected is implemented and create the
@@ -276,8 +275,6 @@ class PatchBuilder(object):
                 return MockBuilder
             if name == "msim":
                 return MSim
-            if name == "xvhdl":
-                return XVHDL
             if name == "ghdl":
                 return GHDL
 
@@ -360,7 +357,6 @@ if not ON_WINDOWS:
     TEST_ENVS = {
         "ghdl": os.environ["GHDL_PATH"],
         "msim": os.environ["MODELSIM_PATH"],
-        "xvhdl": os.environ["XSIM_PATH"],
         "fallback": None,
     }
 else:

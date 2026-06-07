@@ -178,8 +178,6 @@ HDL Checker supports
 * [Mentor ModelSim][Mentor_msim]
 * [ModelSim Intel FPGA Edition][Intel_msim]
 * [GHDL][GHDL]
-* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx
-  Vivado][Xilinx_Vivado])
 
 ### Configuring HDL Checker
 
@@ -278,8 +276,6 @@ registered trademarks of Mentor Graphics, Inc.
 
 Intel® and its logo is a trademark or registered trademark of Intel Corporation.
 
-Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
-
 HDL Checker's author has no connection or affiliation to any of the trademarks
 mentioned or used by this software.
 
@@ -302,5 +298,3 @@ mentioned or used by this software.
 [vim_coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
 [vim_coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
 [vim_lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
-[Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
-[Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html

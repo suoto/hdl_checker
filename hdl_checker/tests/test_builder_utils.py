@@ -37,7 +37,6 @@ from hdl_checker.builder_utils import (
 from hdl_checker.builders.fallback import Fallback
 from hdl_checker.builders.ghdl import GHDL
 from hdl_checker.builders.msim import MSim
-from hdl_checker.builders.xvhdl import XVHDL
 from hdl_checker.path import Path
 from hdl_checker.types import FileType
 
@@ -55,16 +54,14 @@ def _path(*args):
 class TestBuilderUtils(TestCase):
     def test_getBuilderByName(self):
         self.assertEqual(getBuilderByName("msim"), MSim)
-        self.assertEqual(getBuilderByName("xvhdl"), XVHDL)
         self.assertEqual(getBuilderByName("ghdl"), GHDL)
         self.assertEqual(getBuilderByName("other"), Fallback)
 
     def test_getWorkingBuilders(self):
         # Test no working builders (patch all out so env doesn't affect result)
         _logger.info("Checking no builder works")
-        with patch.object(GHDL, "isAvailable", staticmethod(lambda: False)), \
-             patch.object(MSim, "isAvailable", staticmethod(lambda: False)), \
-             patch.object(XVHDL, "isAvailable", staticmethod(lambda: False)):
+        with (patch.object(GHDL, "isAvailable", staticmethod(lambda: False)),
+              patch.object(MSim, "isAvailable", staticmethod(lambda: False))):
             self.assertEqual(getPreferredBuilder(), Fallback)
 
         # Patch one builder
@@ -217,7 +214,7 @@ class TestGetVunitSources(TestCase):
         ]
 
         builder = MagicMock()
-        builder.builder_name = "xvhdl"
+        builder.builder_name = "msim"
         builder.file_types = {FileType.vhdl, FileType.systemverilog}
 
         self.assertTrue(foundVunit(), "Need VUnit for this test")
@@ -230,10 +227,10 @@ class TestGetVunitSources(TestCase):
         self.assertCountEqual(
             sources,
             {
-                (Path(_path("path_0.vhd")), "libary_0", ()),
-                (Path(_path("path_1.vhd")), "libary_1", ()),
-                (Path(_path("path_2.sv")), "libary_2", ()),
-                (Path(_path("path_3.sv")), "libary_3", ()),
+                (Path(_path("path_0.vhd")), "libary_0", ("-2008",)),
+                (Path(_path("path_1.vhd")), "libary_1", ("-2008",)),
+                (Path(_path("path_2.sv")), "libary_2", ("-2008",)),
+                (Path(_path("path_3.sv")), "libary_3", ("-2008",)),
                 (Path(_path("some_header.vh")), None, ()),
                 (Path(_path("some_header.svh")), None, ()),
             },
