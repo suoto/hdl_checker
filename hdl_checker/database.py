@@ -704,7 +704,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
-        self._diags.setdefault(path, set())
+        self._diags[path] = set()
         units_compiled: set[LibraryUnitTuple] = set()
 
         units_to_build = self.getDependenciesUnits(path)
