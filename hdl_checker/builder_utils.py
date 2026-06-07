@@ -54,7 +54,8 @@ def _find_vunit_site_packages() -> str | None:
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError, OSError) as exc:
+            _logger.info("VUnit not, got exception: %s", exc)
             continue
     return None
 

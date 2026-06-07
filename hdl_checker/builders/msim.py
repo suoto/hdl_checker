@@ -199,7 +199,7 @@ class MSim(BaseBuilder):
 
     def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         filetype = FileType.fromPath(path)
-        self._logger.warning("Build source: %s", path)
+        self._logger.debug("Build source: %s", path)
         if filetype == FileType.vhdl:
             return self._buildVhdl(path, library, flags)
         if filetype in (FileType.verilog, FileType.systemverilog):
