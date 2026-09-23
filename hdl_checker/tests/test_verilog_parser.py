@@ -34,7 +34,7 @@ from hdl_checker.parsers.elements.parsed_element import Location
 from hdl_checker.parsers.verilog_parser import VerilogDesignUnit, VerilogParser
 from hdl_checker.path import Path
 from hdl_checker.serialization import StateEncoder, jsonObjectHook
-from hdl_checker.types import DesignUnitType
+from hdl_checker.types import DesignUnitType, Location
 
 _logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ def parametrizeClassWithFileTypes(cls):
 
 @parametrizeClassWithFileTypes
 class TestVerilogSource(TestCase):
+    filetype: str
     maxDiff = None
 
     @classmethod
@@ -92,13 +93,13 @@ class TestVerilogSource(TestCase):
                     owner=self.source.filename,
                     name="clock_divider",
                     type_=DesignUnitType.entity,
-                    locations={(5, 7)},
+                    locations={Location(5, 7)},
                 ),
                 VerilogDesignUnit(
                     owner=self.source.filename,
                     name="\\m$gPkg!",
                     type_=DesignUnitType.package,
-                    locations={(15, 8)},
+                    locations={Location(15, 8)},
                 ),
             ],
         )

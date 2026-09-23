@@ -22,9 +22,7 @@ import os
 import os.path as p
 import subprocess as subp
 from glob import iglob as glob
-from typing import Any, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Type, Union
-
-import six
+from typing import Any, Iterable, NamedTuple
 
 from .parsers.verilog_parser import VerilogParser
 from .parsers.vhdl_parser import VhdlParser
@@ -37,14 +35,14 @@ from hdl_checker.utils import ON_WINDOWS, isFileReadable, toBytes
 
 _logger = logging.getLogger(__name__)
 
-PARSERS = {
+PARSERS: dict[FileType, type[VhdlParser | VerilogParser]] = {
     FileType.vhdl: VhdlParser,
     FileType.verilog: VerilogParser,
     FileType.systemverilog: VerilogParser,
-}  # type: Dict[FileType, Type[Union[VhdlParser, VerilogParser]]]
+}
 
 
-def getSourceParserFromPath(path):  # type: (Path) -> Union[VhdlParser, VerilogParser]
+def getSourceParserFromPath(path: Path) -> VhdlParser | VerilogParser:
     """
     Returns either a VhdlParser or VerilogParser based on the path's file
     extension
@@ -52,8 +50,7 @@ def getSourceParserFromPath(path):  # type: (Path) -> Union[VhdlParser, VerilogP
     return PARSERS[FileType.fromPath(path)](path)
 
 
-def _makeAbsoluteIfNeeded(root, paths):
-    # type: (str, Iterable[str]) -> Iterable[str]
+def _makeAbsoluteIfNeeded(root: str, paths: Iterable[str]) -> Iterable[str]:
     "Makes paths absolute by prepending root if needed"
     for path in paths:
         if p.isabs(path):
@@ -62,14 +59,13 @@ def _makeAbsoluteIfNeeded(root, paths):
             yield p.join(root, path)
 
 
-def getIncludedConfigs(search_paths, root_dir="."):
-    # type: (Iterable[str], str) -> Iterable[Tuple[str, Dict[str, Any]]]
+def getIncludedConfigs(search_paths: Iterable[str], root_dir: str = ".") -> Iterable[tuple[str, dict[str, Any]]]:
     "Returns configuration contents of included files"
     # Copy the dict to avoid messing up with the caller's env
 
     # Will search for inclusion clauses recursivelly but we need to keep
     # track of infinite loops
-    checked_paths = set()  # type: Set[str]
+    checked_paths: set[str] = set()
 
     paths = set(_makeAbsoluteIfNeeded(root_dir, search_paths))
 
@@ -117,7 +113,7 @@ def getIncludedConfigs(search_paths, root_dir="."):
 class JsonSourceEntry(
     NamedTuple(
         "JsonSourceEntry",
-        (("path_expr", str), ("library", Optional[str]), ("flags", str)),
+        (("path_expr", str), ("library", str | None), ("flags", str)),
     )
 ):
     """
@@ -126,8 +122,7 @@ class JsonSourceEntry(
     """
 
     @classmethod
-    def make(cls, iterable):  # pylint: disable=arguments-differ
-        # type: (...) -> Any
+    def make(cls, iterable) -> "JsonSourceEntry":
         """
         Creates a JsonSourceEntry from all supported formats:
             - str
@@ -138,10 +133,10 @@ class JsonSourceEntry(
               }
         """
         path = iterable
-        info = {}  # type: Dict[str, Union[None, str, BuildFlags]]
+        info: dict[str, None | str | BuildFlags] = {}
 
         # Support both
-        if not isinstance(path, six.string_types):
+        if not isinstance(path, str):
             path = iterable[0]
             info = iterable[1]
 
@@ -155,7 +150,7 @@ SourceEntry = NamedTuple(
     "SourceEntry",
     (
         ("path", Path),
-        ("library", Optional[str]),
+        ("library", str | None),
         ("source_specific_flags", BuildFlags),
         ("single_flags", BuildFlags),
         ("dependencies_flags", BuildFlags),
@@ -163,8 +158,7 @@ SourceEntry = NamedTuple(
 )
 
 
-def flattenConfig(root_config, root_path):
-    # type: (Dict[str, Any], str) -> Iterable[SourceEntry]
+def flattenConfig(root_config: dict[str, Any], root_path: str) -> Iterable[SourceEntry]:
     """
     Expands the given root config and also recursively expands included JSON
     files as well
@@ -181,8 +175,7 @@ def flattenConfig(root_config, root_path):
         yield entry
 
 
-def _expand(config, ref_path):
-    # type: (Dict[str, Any], str) -> Iterable[SourceEntry]
+def _expand(config: dict[str, Any], ref_path: str) -> Iterable[SourceEntry]:
     """
     Expands the sources defined in the config dict into a list of tuples
     """
@@ -236,8 +229,7 @@ def _expand(config, ref_path):
                     yield SourceEntry(path, source.library, (), (), ())
 
 
-def findRtlSourcesByPath(path):
-    # type: (Path) -> Iterable[Path]
+def findRtlSourcesByPath(path: Path) -> Iterable[Path]:
     """
     Finds RTL sources (files with extensions within FileType enum) inside
     <path>
@@ -261,8 +253,7 @@ def findRtlSourcesByPath(path):
                 yield full_path
 
 
-def isGitRepo(path):
-    # type: (Path) -> bool
+def isGitRepo(path: Path) -> bool:
     """
     Checks if path is a git repository by checking if 'git -C path rev-parse
     --show-toplevel' returns an existing path
@@ -275,8 +266,7 @@ def isGitRepo(path):
         return False
 
 
-def _gitLsFiles(path_to_repo, recurse_submodules=False):
-    # type: (Path, bool) -> Iterable[Path]
+def _gitLsFiles(path_to_repo: Path, recurse_submodules: bool = False) -> Iterable[Path]:
     "Lists files from a git repository"
     cmd = ["git", "-C", path_to_repo.abspath, "ls-files"]
     if recurse_submodules:
@@ -288,8 +278,7 @@ def _gitLsFiles(path_to_repo, recurse_submodules=False):
         yield Path(line, path_to_repo.abspath)
 
 
-def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
-    # type: (Path, Iterable[Path]) -> Iterable[Path]
+def _filterGitIgnoredPathsOnWin(path_to_repo: Path, paths: Iterable[Path]) -> Iterable[Path]:
     """
     Filters out paths that are ignored by git; paths outside the repo are kept.
     Uses a multiple calls to 'git check-ignore' and checks if the output is
@@ -315,8 +304,7 @@ def _filterGitIgnoredPathsOnWin(path_to_repo, paths):
             yield path
 
 
-def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
-    # type: (Path, Iterable[Path]) -> Iterable[Path]
+def _filterGitIgnoredPathsOnUnix(path_to_repo: Path, paths: Iterable[Path]) -> Iterable[Path]:
     """
     Filters out paths that are ignored by git; paths outside the repo are kept.
     Uses a 'git check-ignore --stdin' and writes <paths> iteratively to avoid
@@ -342,12 +330,33 @@ def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
         if proc is None:
             proc = subp.Popen(cmd, stdin=subp.PIPE, stdout=subp.PIPE, stderr=subp.PIPE)
 
-        proc.stdin.write(toBytes(str(path.abspath) + "\n"))
-        # Flush so that data makes to the process
-        proc.stdin.flush()
-
-        if proc.stdout.readline().decode().startswith("::"):
+        assert proc.stdin is not None
+        assert proc.stdout is not None
+        try:
+            proc.stdin.write(toBytes(str(path.abspath) + "\n"))
+            # Flush so that data makes to the process
+            proc.stdin.flush()
+        except BrokenPipeError:
+            # Process died before we could write; path is outside repo
             yield path
+            proc.wait()
+            del proc
+            proc = None
+            continue
+
+        line = proc.stdout.readline().decode()
+
+        if line.startswith("::"):
+            yield path
+        elif not line:
+            # Empty read means git closed stdout — path is outside the repo
+            # (git 2.28+ exits immediately for out-of-repo paths). poll() may
+            # lag behind due to OS scheduling, so we wait here.
+            yield path
+            proc.wait()
+            del proc
+            proc = None
+            continue
 
         # proc will die whenever we write a path that's outside the repo.
         # Because this method aims to filter *out* ignored files and files
@@ -360,8 +369,7 @@ def _filterGitIgnoredPathsOnUnix(path_to_repo, paths):
             proc = None
 
 
-def filterGitIgnoredPaths(path_to_repo, paths):
-    # type: (Path, Iterable[Path]) -> Iterable[Path]
+def filterGitIgnoredPaths(path_to_repo: Path, paths: Iterable[Path]) -> Iterable[Path]:
     """
     Filters out paths that are ignored by git; paths outside the repo are kept.
     """

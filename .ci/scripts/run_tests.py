@@ -257,4 +257,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Use os._exit to skip Python's shutdown sequence; daemon threads from the
+    # LSP server tests (pygls start_io) would otherwise SIGABRT when they try
+    # to write to stderr while the interpreter is finalising.  Coverage is
+    # already saved inside main() before this point.
+    os._exit(main())

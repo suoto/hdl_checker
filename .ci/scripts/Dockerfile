@@ -15,60 +15,44 @@
 # You should have received a copy of the GNU General Public License
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 
-FROM suoto/xsim:2018.3
+FROM ubuntu:24.04
 
 ENV BUILDERS /builders
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN dpkg --add-architecture i386
 
-ENV PACKAGES="ca-certificates \
-              g++-multilib    \
-              gcc             \
-              gcc-multilib    \
-              git             \
-              gnat            \
-              lib32gcc1       \
-              lib32stdc++6    \
-              lib32z1         \
-              libtcl8.6       \
-              make            \
-              python2.7       \
-              python2.7-dev   \
-              python3-pip     \
-              python3.6       \
-              python3.6-dev   \
-              python3.7       \
-              python3.7-dev   \
-              python3.8       \
-              python3.8-dev   \
-              wget            \
-              zlib1g-dev"
+# python3.12 ships with Ubuntu 24.04 main repos
+ENV PACKAGES="ca-certificates    \
+              ghdl-mcode         \
+              git                \
+              lib32stdc++6       \
+              lib32z1            \
+              libtcl8.6          \
+              python3-pip        \
+              python3.12         \
+              python3.12-dev     \
+              software-properties-common \
+              wget"
 
 RUN apt-get update -qq            && \
     apt-get install -qq $PACKAGES && \
     apt-get clean                 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install tox
-RUN pip3 install coverage==4.1
+# python3.11, python3.13 come from deadsnakes on Ubuntu 24.04
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update -qq                    && \
+    apt-get install -qq python3.11 python3.11-dev python3.13 python3.13-dev && \
+    apt-get clean                         && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR $BUILDERS
+RUN pip3 install tox --break-system-packages
+RUN pip3 install coverage>=7.2 --break-system-packages
 
-# Build GHDL from source
-WORKDIR /tmp/
-RUN git clone --depth=1 --branch=v0.37.0 https://github.com/ghdl/ghdl
-WORKDIR /tmp/ghdl
-WORKDIR /tmp/ghdl/build
-
-RUN ../configure --prefix=$BUILDERS/ghdl && \
-    make -j                              && \
-    make install
-
-RUN apt-get purge -qq make zlib1g-dev && \
-    apt-get clean                     && \
-    apt-get autoclean
-RUN rm -rf /tmp/ghdl
+RUN mkdir -p $BUILDERS/ghdl/bin && \
+    ln -s /usr/bin/ghdl $BUILDERS/ghdl/bin/ghdl && \
+    ln -s /usr/bin/ghdl-mcode $BUILDERS/ghdl/bin/ghdl-mcode
 
 RUN $BUILDERS/ghdl/bin/ghdl --version
 
@@ -78,7 +62,6 @@ COPY msim $BUILDERS/msim
 # Test installations
 RUN "$BUILDERS/ghdl/bin/ghdl" --version
 RUN "$BUILDERS/msim/modelsim_ase/linuxaloem/vcom" -version
-RUN "/xsim/bin/xvhdl" -version
 
 VOLUME /hdl_checker
 WORKDIR /hdl_checker

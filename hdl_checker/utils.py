@@ -32,9 +32,7 @@ import threading
 from collections import Counter
 from tempfile import NamedTemporaryFile
 from threading import Timer
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Union
-
-import six
+from typing import Any, Callable, Iterable, TypeVar
 
 _logger = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ ON_MAC = sys.platform == "darwin"
 
 def setupLogging(stream, level):  # pragma: no cover
     "Setup logging according to the command line parameters"
-    if isinstance(stream, six.string_types):
+    if isinstance(stream, str):
         _stream = open(stream, "a")
     else:
         _stream = stream
@@ -74,11 +72,14 @@ def terminateProcess(pid):
         import ctypes  # pylint: disable=import-outside-toplevel
 
         process_terminate = 1
-        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)
-        ctypes.windll.kernel32.TerminateProcess(handle, -1)
-        ctypes.windll.kernel32.CloseHandle(handle)
+        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)  # type: ignore[attr-defined]
+        ctypes.windll.kernel32.TerminateProcess(handle, -1)  # type: ignore[attr-defined]
+        ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
     else:
-        os.kill(pid, signal.SIGTERM)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
 
 
 def isProcessRunning(pid):
@@ -116,7 +117,7 @@ def _isProcessRunningOnWindows(pid):
     http://code.activestate.com/recipes/305279-getting-process-information-on-windows/)
     """
     from ctypes import (  # pylint: disable=import-outside-toplevel
-        windll,
+        windll,  # type: ignore[attr-defined]
         c_ulong,
         sizeof,
         byref,
@@ -143,7 +144,7 @@ def _isProcessRunningOnWindows(pid):
 
 if not hasattr(p, "samefile"):
 
-    def _samefile(file1, file2):
+    def samefile(file1, file2):
         """
         Emulated version of os.path.samefile. This is needed for Python
         2.7 running on Windows (at least on Appveyor CI)
@@ -153,9 +154,7 @@ if not hasattr(p, "samefile"):
 
 
 else:
-    _samefile = p.samefile  # pylint: disable=invalid-name
-
-samefile = _samefile  # pylint: disable=invalid-name
+    samefile = p.samefile  # type: ignore[assignment]
 
 
 def removeDuplicates(seq):
@@ -179,39 +178,11 @@ def toBytes(value):  # pragma: no cover
     if not value:
         return bytes()
 
-    # This is tricky. On py2, the bytes type from builtins (from python-future) is
-    # a subclass of str. So all of the following are true:
-    #   isinstance(str(), bytes)
-    #   isinstance(bytes(), str)
-    # But they don't behave the same in one important aspect: iterating over a
-    # bytes instance yields ints, while iterating over a (raw, py2) str yields
-    # chars. We want consistent behavior so we force the use of bytes().
-
     if isinstance(value, bytes):
         return value
 
-    # This is meant to catch Python 2's native str type.
-
-    if isinstance(value, bytes):
-        return bytes(value, encoding="utf8")
-
     if isinstance(value, str):
-        # On py2, with `from builtins import *` imported, the following is true:
-        #
-        #   bytes(str(u'abc'), 'utf8') == b"b'abc'"
-        #
-        # Obviously this is a bug in python-future. So we work around it. Also filed
-        # upstream at: https://github.com/PythonCharmers/python-future/issues/193
-        # We can't just return value.encode('utf8') on both py2 & py3 because on
-        # py2 that *sometimes* returns the built-in str type instead of the newbytes
-        # type from python-future.
-
-        if six.PY2:
-            return bytes(value.encode("utf8"), encoding="utf8")
-
         return bytes(value, encoding="utf8")
-
-    # This is meant to catch `int` and similar non-string/bytes types.
 
     return toBytes(str(value))
 
@@ -236,8 +207,7 @@ def getTemporaryFilename(name):
     return p.join(p.sep, "tmp", basename + "." + (suffix or "log"))
 
 
-def isFileReadable(path):
-    # type: (str) -> bool
+def isFileReadable(path: str) -> bool:
     """
     Checks if a given file is readable
     """
@@ -249,8 +219,7 @@ def isFileReadable(path):
         return False
 
 
-def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
-    # type: (Union[Tuple[str], List[str]], bool, Optional[Dict], Optional[str]) -> Iterable[str]
+def runShellCommand(cmd_with_args: tuple[str, ...] | list[str], shell: bool = False, env: dict | None = None, cwd: str | None = None) -> list[str]:
     """
     Runs a shell command and handles stdout catching
     """
@@ -269,7 +238,7 @@ def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
             .splitlines()
         )
     except subp.CalledProcessError as exc:
-        stdout = tuple(exc.output.decode(errors="replace").splitlines())
+        stdout = exc.output.decode(errors="replace").splitlines()
         _logger.debug(
             "Command '%s' failed with error code %d.\nStdout:\n%s",
             cmd_with_args,
@@ -282,8 +251,7 @@ def runShellCommand(cmd_with_args, shell=False, env=None, cwd=None):
         raise
 
 
-def removeIfExists(filename):
-    # type: (str) -> bool
+def removeIfExists(filename: str) -> bool:
     "Removes filename using os.remove and catches the exception if that fails"
     try:
         os.remove(filename)
@@ -294,8 +262,7 @@ def removeIfExists(filename):
         return False
 
 
-def removeDirIfExists(dirname):
-    # type: (str) -> bool
+def removeDirIfExists(dirname: str) -> bool:
     """
     Removes the directory dirname using shutil.rmtree and catches the exception
     if that fails
@@ -309,16 +276,14 @@ def removeDirIfExists(dirname):
         return False
 
 
-class HashableByKey(object):  # pylint: disable=useless-object-inheritance
+class HashableByKey(abc.ABC):
     """
-    Implements hash and comparison operators properly across Python 2 and 3
+    Implements hash and equality operators by delegating to __hash_key__.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     @property
     @abc.abstractmethod
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         """ Implement this attribute to use it for hashing and comparing"""
 
     def __hash__(self):
@@ -336,23 +301,11 @@ class HashableByKey(object):  # pylint: disable=useless-object-inheritance
 
         return NotImplemented  # pragma: no cover
 
-    def __ne__(self, other):  # pragma: no cover
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-
-        if result is not NotImplemented:
-            return not result
-
-        return NotImplemented
-
-
-def logCalls(func):  # pragma: no cover
-    # type: (Callable) -> Callable
+def logCalls(func: Callable) -> Callable:  # pragma: no cover
     "Decorator to Log calls to func"
 
     @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        # type: (...) -> Callable
+    def wrapper(self, *args, **kwargs) -> Callable:
         _str = "%s(%s, %s)" % (func.__name__, args, pprint.pformat(kwargs))
         try:
             result = func(self, *args, **kwargs)
@@ -369,13 +322,12 @@ def logCalls(func):  # pragma: no cover
 T = TypeVar("T")  # pylint: disable=invalid-name
 
 
-def getMostCommonItem(items):
-    # type: (Iterable[T]) -> T
+def getMostCommonItem(items: Iterable[T]) -> T:
     """
     Gets the most common item on an interable of items
     """
     data = Counter(items)
-    return max(items, key=data.get)
+    return max(items, key=lambda x: data[x])
 
 
 def readFile(path):
@@ -386,11 +338,10 @@ def readFile(path):
 REPO_URL = "https://github.com/suoto/hdl_checker"
 _TAGS = re.compile(r"^\w+\s+refs\/tags\/v(?P<tag>(?:\d+\.){2}\d+)", flags=re.MULTILINE)
 
-VersionFormat = Tuple[int, ...]
+VersionFormat = tuple[int, ...]
 
 
-def _getLatestReleaseVersion():
-    # type: () -> Optional[VersionFormat]
+def _getLatestReleaseVersion() -> tuple[int, ...] | None:
     """
     Return the latest tag from https://github.com/suoto/hdl_checker, striping
     the leading 'v' (so that v1.0.0 becomes simply 1.0.0). If the connection to
@@ -431,8 +382,7 @@ def _getLatestReleaseVersion():
 _VERSION_FORMAT = re.compile(r"^\d+\.\d+\.\d+$")
 
 
-def onNewReleaseFound(func):
-    # type: (Callable[[str], None]) -> None
+def onNewReleaseFound(func: Callable[[str], None]) -> None:
     """
     Checks if a new release is out and calls func if the running an older
     version
@@ -441,8 +391,8 @@ def onNewReleaseFound(func):
         __version__ as current,
     )
 
-    # When installing via pip from github, versioneer will report the current
-    # version as 0+unknown, in which case we won't notify
+    # When the package is not properly installed, the version may be
+    # "0+unknown", in which case we won't notify
     if not _VERSION_FORMAT.match(current):
         return
 

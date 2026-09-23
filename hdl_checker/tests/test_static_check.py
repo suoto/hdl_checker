@@ -47,7 +47,7 @@ with such.A("hdl_checker project") as it:
         [" p0 : process"],
         [" process(clk)"],
     )
-    def test(case, parm):
+    def test(case, parm):  # type: ignore[no-redef]
         _logger.info("Running test case '%s'", case)
         text = ["library foo;"] + parm + ["library bar;"]
 
@@ -62,7 +62,7 @@ with such.A("hdl_checker project") as it:
         " -- TODO: something to do",
         " -- FIXME: something to fix",
     )
-    def test(case, parm):
+    def test(case, parm):  # type: ignore[no-redef]
         _logger.info("Running test case '%s'", case)
         expected = re.sub(r"\s*--\s*", "", parm)
 
@@ -213,7 +213,7 @@ with such.A("hdl_checker project") as it:
             ]
 
         @it.should("get VHDL objects from a package-package body pair")  # type: ignore
-        def test():
+        def test():  # type: ignore[no-redef]
 
             it.assertDictEqual(
                 {"ieee": {"end": 12, "lnum": 0, "start": 8, "type": "library"}},

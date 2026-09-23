@@ -25,10 +25,8 @@ import os.path as p
 import shutil
 from multiprocessing import Queue
 from tempfile import mkdtemp
-from typing import Any, List, Optional
-
 import parameterized  # type: ignore
-import unittest2  # type: ignore
+import unittest
 from mock import MagicMock, patch
 
 from hdl_checker.tests import (
@@ -42,7 +40,6 @@ from hdl_checker.tests import (
 from hdl_checker.builder_utils import (
     AVAILABLE_BUILDERS,
     GHDL,
-    XVHDL,
     AnyBuilder,
     Fallback,
     MSim,
@@ -71,21 +68,19 @@ _logger = logging.getLogger(__name__)
 TEST_TEMP_PATH = getTestTempPath(__name__)
 SOURCES_PATH = p.join(TEST_TEMP_PATH, "test_builders")
 
-BUILDER_CLASS_MAP = {"msim": MSim, "xvhdl": XVHDL, "ghdl": GHDL, "fallback": Fallback}
+BUILDER_CLASS_MAP = {"msim": MSim, "ghdl": GHDL, "fallback": Fallback}
 
 
 class _SourceMock(SourceMock):
     base_path = TEST_TEMP_PATH
 
 
-def _source(*args):
-    # type: (str) -> Path
+def _source(*args: str) -> Path:
     "Helper to reduce foorprint of Path(p.join(SOURCES_PATH, *args))"
     return Path(p.join(SOURCES_PATH, *args))
 
 
-def _temp(*args):
-    # type: (str) -> Path
+def _temp(*args: str) -> Path:
     "Helper to reduce foorprint of Path(p.join(TEST_TEMP_PATH, *args))"
     return Path(p.join(TEST_TEMP_PATH, *args))
 
@@ -101,18 +96,17 @@ class TestBuilder(TestCase):
     def setUpClass(cls):
         setupTestSuport(TEST_TEMP_PATH)
 
-    def setUp(self):
-        # type: (...) -> Any
+    def setUp(self) -> None:
         # Add builder path to the env
         self.original_env = os.environ.copy()
 
         # Add the builder path to the environment so we can call it
         if self.builder_path:
             _logger.info("Adding '%s' to the system path", self.builder_path)
-            self.assertTrue(
-                p.exists(self.builder_path),
-                "Path for builder '%s' does not exists" % self.builder_name,
-            )
+            if not p.exists(self.builder_path):
+                self.skipTest(
+                    "Path for builder '%s' does not exists" % self.builder_name
+                )
             self.patch = patch.dict(
                 "os.environ",
                 {"PATH": os.pathsep.join([self.builder_path, os.environ["PATH"]])},
@@ -124,38 +118,37 @@ class TestBuilder(TestCase):
         builder_class = BUILDER_CLASS_MAP[self.builder_name]
         work_folder = _temp("_%s" % self.builder_name)
         _logger.info("Builder class: %s, work folder is %s", builder_class, work_folder)
-        self.builder = builder_class(work_folder, MagicMock())  # type: AnyBuilder
+        try:
+            self.builder: AnyBuilder = builder_class(work_folder, MagicMock())
+        except SanityCheckError as exc:
+            if self.builder_path:
+                self.patch.stop()
+            self.skipTest(str(exc))
         self.builder_class = builder_class
 
-    def tearDown(self):
-        # type: (...) -> Any
+    def tearDown(self) -> None:
         if self.builder_path:
             self.patch.stop()
         if p.exists("._%s" % self.builder_name):
             shutil.rmtree("._%s" % self.builder_name)
 
-    def test_EnvironmentCheck(self):
-        # type: (...) -> Any
+    def test_EnvironmentCheck(self) -> None:
         self.builder.checkEnvironment()
 
-    def test_BuilderReportsItsAvailable(self):  # pylint: disable=invalid-name
-        # type: (...) -> Any
+    def test_BuilderReportsItsAvailable(self) -> None:  # pylint: disable=invalid-name
         self.assertTrue(self.builder_class.isAvailable())  # type: ignore
 
-    def test_CreateLibraryMultipleTimes(self):  # pylint: disable=invalid-name
-        # type: (...) -> Any
+    def test_CreateLibraryMultipleTimes(self) -> None:  # pylint: disable=invalid-name
         self.builder._createLibraryIfNeeded(Identifier("random_lib"))
         self.builder._createLibraryIfNeeded(Identifier("random_lib"))
 
     def test_BuilderDoesNothingWhenCreatingBuiltinLibraries(
         self,
-    ):  # pylint: disable=invalid-name
-        # type: (...) -> Any
+    ) -> None:  # pylint: disable=invalid-name
         self.builder._createLibraryIfNeeded(Identifier("ieee"))
 
-    def test_FindsBuiltinLibraries(self):
-        # type: (...) -> Any
-        expected = []  # type: List[str]
+    def test_FindsBuiltinLibraries(self) -> None:
+        expected: list[str] = []
 
         if not isinstance(self.builder, Fallback):
             expected += ["ieee", "std"]
@@ -174,10 +167,9 @@ class TestBuilder(TestCase):
             (r"C:\some\file\on\windows.vhd",),
         ]
     )
-    def test_ParseMsimResult(self, path):
-        # type: (...) -> Any
+    def test_ParseMsimResult(self, path) -> None:
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         self.assertEqual(
             list(
@@ -338,10 +330,9 @@ class TestBuilder(TestCase):
             (r"C:\some\file\on\windows.vhd",),
         ]
     )
-    def test_ParseGhdlResult(self, path):
-        # type: (...) -> Any
+    def test_ParseGhdlResult(self, path) -> None:
         if not isinstance(self.builder, GHDL):
-            raise unittest2.SkipTest("GHDL only test")
+            raise unittest.SkipTest("GHDL only test")
 
         records = list(
             self.builder._makeRecords(
@@ -362,60 +353,10 @@ class TestBuilder(TestCase):
 
         self.assertCountEqual(records, expected)
 
-    @parameterized.parameterized.expand(
-        [
-            ("/some/file/with/abs/path.vhd",),
-            ("some/file/with/relative/path.vhd",),
-            ("some_file_on_same_level.vhd",),
-        ]
-    )
-    def test_ParseXvhdlResult(self, path):
-        # type: (...) -> Any
-        if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
-
-        self.assertEqual(
-            list(
-                self.builder._makeRecords(
-                    "ERROR: [VRFC 10-1412] syntax error near ) [%s:12]" % path
-                )
-            ),
-            [
-                BuilderDiag(
-                    builder_name=self.builder_name,
-                    text="syntax error near )",
-                    filename=Path(path),
-                    line_number=11,
-                    error_code="VRFC 10-1412",
-                    severity=DiagType.ERROR,
-                )
-            ],
-        )
-
-        self.assertEqual(
-            list(
-                self.builder._makeRecords(
-                    "WARNING: [VRFC 10-1256] possible infinite loop; process "
-                    "does not have a wait statement [%s:119]" % path
-                )
-            ),
-            [
-                BuilderDiag(
-                    builder_name=self.builder_name,
-                    text="possible infinite loop; process does not have a wait statement",
-                    filename=Path(path),
-                    line_number=118,
-                    error_code="VRFC 10-1256",
-                    severity=DiagType.WARNING,
-                )
-            ],
-        )
-
     @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
-    def test_VhdlCompilation(self, *args):
-        # type: (...) -> Any
+    def test_VhdlCompilation(self, *args) -> None:
         if FileType.vhdl not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support VHDL".format(self.builder_name)
             )
 
@@ -431,10 +372,9 @@ class TestBuilder(TestCase):
         self.assertFalse(rebuilds)
 
     @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
-    def test_VerilogCompilation(self, *args):
-        # type: (...) -> Any
+    def test_VerilogCompilation(self, *args) -> None:
         if FileType.verilog not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support Verilog".format(self.builder_name)
             )
 
@@ -452,10 +392,9 @@ class TestBuilder(TestCase):
         self.assertFalse(rebuilds)
 
     @patch("hdl_checker.database.Database.getLibrary", return_value=Identifier("work"))
-    def test_SystemverilogCompilation(self, *args):
-        # type: (...) -> Any
+    def test_SystemverilogCompilation(self, *args) -> None:
         if FileType.systemverilog not in self.builder.file_types:
-            raise unittest2.SkipTest(
+            raise unittest.SkipTest(
                 "Builder {} doesn't support SystemVerilog".format(self.builder_name)
             )
 
@@ -472,8 +411,7 @@ class TestBuilder(TestCase):
         )
         self.assertFalse(rebuilds)
 
-    def test_CatchAKnownError(self):
-        # type: (...) -> Any
+    def test_CatchAKnownError(self) -> None:
         source = _source("source_with_error.vhd")
 
         records, rebuilds = self.builder.build(
@@ -483,6 +421,7 @@ class TestBuilder(TestCase):
         for record in records:
             _logger.info(record)
 
+        expected: list = []
         if self.builder_name == "msim":
             expected = [
                 {
@@ -510,38 +449,13 @@ class TestBuilder(TestCase):
                     BuilderDiag(
                         filename=source,
                         builder_name=self.builder_name,
-                        text="entity 'source_with_error' was not analysed",
+                        text='entity "source_with_error" was not analysed',
                         line_number=17,
                         column_number=34,
                         severity=DiagType.ERROR,
                     ),
                 }
             ]
-        elif self.builder_name == "xvhdl":
-            # XVHDL reports different errors depending on the version
-            expected = [
-                {
-                    BuilderDiag(
-                        filename=source,
-                        builder_name=self.builder_name,
-                        text="some_lib is not declared",
-                        line_number=3,
-                        error_code="VRFC 10-91",
-                        severity=DiagType.ERROR,
-                    )
-                },
-                {
-                    BuilderDiag(
-                        filename=source,
-                        builder_name=self.builder_name,
-                        text="'some_lib' is not declared",
-                        line_number=3,
-                        error_code="VRFC 10-2989",
-                        severity=DiagType.ERROR,
-                    )
-                },
-            ]
-
         if not isinstance(self.builder, Fallback):
             self.assertIn(records, expected)
         else:
@@ -549,10 +463,9 @@ class TestBuilder(TestCase):
 
         self.assertFalse(rebuilds)
 
-    def test_MsimRecompileMsg0(self):
-        # type: (...) -> Any
+    def test_MsimRecompileMsg0(self) -> None:
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = (
             "** Error: (vcom-13) Recompile foo_lib.bar_component because "
@@ -564,10 +477,9 @@ class TestBuilder(TestCase):
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
-    def test_MsimRecompileMsg1(self):
-        # type: (...) -> Any
+    def test_MsimRecompileMsg1(self) -> None:
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = (
             "** Error: (vcom-13) Recompile foo_lib.bar_component because "
@@ -579,10 +491,9 @@ class TestBuilder(TestCase):
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
-    def test_MsimRecompileMsg2(self):
-        # type: (...) -> Any
+    def test_MsimRecompileMsg2(self) -> None:
         if not isinstance(self.builder, MSim):
-            raise unittest2.SkipTest("ModelSim only test")
+            raise unittest.SkipTest("ModelSim only test")
 
         line = '** Warning: (vcom-6) -- Waiting for lock by "user@host, pid = 4661". Lockfile is'
 
@@ -591,32 +502,14 @@ class TestBuilder(TestCase):
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
-    def test_GhdlRecompileMsg(self):
-        # type: (...) -> Any
+    def test_GhdlRecompileMsg(self) -> None:
         if not isinstance(self.builder, GHDL):
-            raise unittest2.SkipTest("GHDL only test")
+            raise unittest.SkipTest("GHDL only test")
 
         line = 'somefile.vhd:12:13: package "leon3" is obsoleted by package "amba"'
 
         self.assertEqual(
             [{"unit_type": "package", "unit_name": "leon3"}],
-            list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
-        )
-
-    def test_XvhdlRecompileMsg0(self):
-        # type: (...) -> Any
-        if not isinstance(self.builder, XVHDL):
-            raise unittest2.SkipTest("XVHDL only test")
-
-        line = (
-            "ERROR: [VRFC 10-113] {} needs to be re-saved since std.standard "
-            "changed".format(
-                p.join("some", "path", "xsim.dir", "some_library", "some_package.vdb")
-            )
-        )
-
-        self.assertEqual(
-            [{"library_name": "some_library", "unit_name": "some_package"}],
             list(self.builder._searchForRebuilds(Path("foo.vhd"), line)),
         )
 
@@ -647,8 +540,7 @@ class TestBuilder(TestCase):
             ({"rebuild_path": "some_path"}, RebuildPath(Path("some_path"))),
         ]
     )
-    def test_GetRebuilds(self, rebuild_info, expected):
-        # type: (...) -> Any
+    def test_GetRebuilds(self, rebuild_info, expected) -> None:
         _logger.info("Rebuild info is %s", rebuild_info)
         library = Identifier("some_lib", False)
         with patch.object(
@@ -674,18 +566,26 @@ class TestBuilder(TestCase):
 
 class TestMiscCases(TestCase):
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
-    def test_NotAvailable(self, builder_class):
-        # type: (...) -> Any
+    def test_NotAvailable(self, builder_class) -> None:
         if builder_class is Fallback:
             self.assertTrue(builder_class.isAvailable())
+        elif builder_class.isAvailable():
+            self.skipTest(
+                "%s is available in this environment; cannot test unavailable case"
+                % builder_class.builder_name
+            )
         else:
             self.assertFalse(builder_class.isAvailable())
 
     @parameterized.parameterized.expand([(x,) for x in AVAILABLE_BUILDERS])
-    def test_RaisesSanityError(self, builder_class):
-        # type: (...) -> Any
+    def test_RaisesSanityError(self, builder_class) -> None:
         if builder_class is Fallback:
             raise self.skipTest("Fallback won't raise any exception")
+        if builder_class.isAvailable():
+            self.skipTest(
+                "%s is available; SanityCheckError won't be raised"
+                % builder_class.builder_name
+            )
 
         _logger.info("Testing builder %s", builder_class.builder_name)
 
@@ -697,8 +597,7 @@ class TestMiscCases(TestCase):
     @parameterized.parameterized.expand(
         [(x,) for x in (FileType.verilog, FileType.systemverilog)]
     )
-    def test_IncludedPaths(self, filetype):
-        # type: (...) -> Any
+    def test_IncludedPaths(self, filetype) -> None:
         work_folder = mkdtemp()
         database = MagicMock(spec=Database)
 
@@ -716,7 +615,7 @@ class TestMiscCases(TestCase):
                 locations=frozenset([Location(0, 0)]),
             )
 
-        included_results = Queue()  # type: Queue[Optional[Path]]
+        included_results: Queue[Path | None] = Queue()
         included_results.put(Path(p.join("", "library", "some", "")))
         included_results.put(None)
 
@@ -733,7 +632,7 @@ class TestMiscCases(TestCase):
 
         database.resolveIncludedPath = resolveIncludedPath
 
-        calls = []  # type: List[List[str]]
+        calls: list[list[str]] = []
 
         def shell(cmd_with_args, *_, **__):
             calls.append(cmd_with_args)

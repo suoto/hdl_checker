@@ -26,7 +26,7 @@ import traceback
 from multiprocessing.pool import ThreadPool
 from pprint import pformat
 from threading import RLock, Timer
-from typing import Any, AnyStr, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
+from typing import Any, Iterable, NamedTuple
 
 from hdl_checker import CACHE_NAME, DEFAULT_LIBRARY, WORK_PATH, __version__
 from hdl_checker.builder_utils import (
@@ -62,10 +62,7 @@ from hdl_checker.types import (
 )
 from hdl_checker.utils import removeDirIfExists, removeIfExists, toBytes
 
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache  # type: ignore
+from functools import lru_cache
 
 _logger = logging.getLogger(__name__)
 
@@ -96,7 +93,7 @@ class HdlCheckerCore:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, root_dir):  # type: (Path) -> None
+    def __init__(self, root_dir: Path) -> None:
         # Root dir is the absolute path to use when any path passed on is
         # relative
         self.root_dir = root_dir
@@ -105,7 +102,7 @@ class HdlCheckerCore:
         self.work_dir = Path(p.join(str(self.root_dir), WORK_PATH))
 
         self._lock = RLock()
-        self.config_file = None  # type: Optional[WatchedFile]
+        self.config_file: WatchedFile | None = None
 
         self._database = Database()
         self._builder = Fallback(self.work_dir, self._database)
@@ -148,8 +145,7 @@ class HdlCheckerCore:
             for meth in self._cached_methods:
                 meth.cache_clear()
 
-    def setConfig(self, filename, origin):
-        # type: (Union[Path, str], ConfigFileOrigin) -> None
+    def setConfig(self, filename: Path | str, origin: ConfigFileOrigin) -> None:
         """
         Sets the configuration file. Calling this method will only trigger a
         configuration update if the given file name is different what was
@@ -170,8 +166,7 @@ class HdlCheckerCore:
         _logger.debug("Set config to %s", self.config_file)
         self._updateConfigIfNeeded()
 
-    def _updateConfigIfNeeded(self):
-        # type: (...) -> Any
+    def _updateConfigIfNeeded(self) -> None:
         """
         Checks if self.config_file has changed; if it has, cleans up working
         dir and re reads it. The config file will be read as JSON first and, if
@@ -214,8 +209,7 @@ class HdlCheckerCore:
             _logger.debug("Updated config file to %s", self.config_file)
             timer.cancel()
 
-    def configure(self, config):
-        # type: (Dict[Any, Any]) -> None
+    def configure(self, config: dict[Any, Any]) -> None:
         "Updates configuration from a dictionary"
 
         _logger.debug("Updating with base config:\n%s", pformat(config))
@@ -248,16 +242,14 @@ class HdlCheckerCore:
         else:
             self._handleUiInfo("No sources were added")
 
-    def _getCacheFilename(self):
-        # type: () -> Path
+    def _getCacheFilename(self) -> Path:
         """
         The cache file name will always be inside the path returned by self._getWorkingPath
         and defaults to cache.json
         """
         return Path(CACHE_NAME, self.work_dir)
 
-    def _saveCache(self):
-        # type: (...) -> Any
+    def _saveCache(self) -> None:
         """
         Dumps project object to a file to recover its state later
         """
@@ -275,8 +267,7 @@ class HdlCheckerCore:
             os.makedirs(p.dirname(cache_fname.name))
         json.dump(state, open(cache_fname.name, "w"), indent=True, cls=StateEncoder)
 
-    def _setState(self, state):
-        # type: (...) -> Any
+    def _setState(self, state: dict[str, Any]) -> None:
         """
         Serializer load implementation
         """
@@ -289,8 +280,7 @@ class HdlCheckerCore:
         else:
             self.config_file = WatchedFile._make(config_file)
 
-    def _recoverCacheIfPossible(self):
-        # type: (...) -> Any
+    def _recoverCacheIfPossible(self) -> None:
         """
         Tries to recover cached info for the given config_file. If
         something goes wrong, assume the cache is invalid and return
@@ -329,8 +319,7 @@ class HdlCheckerCore:
         self._setState(cache)
         self._builder.setup()
 
-    def _setupIfNeeded(self):
-        # type: (...) -> Any
+    def _setupIfNeeded(self) -> None:
         """
         Sanity checks to make sure the environment is sane
         """
@@ -359,8 +348,7 @@ class HdlCheckerCore:
             self.config_file.path, 0, self.config_file.origin
         )
 
-    def clean(self):
-        # type: (...) -> Any
+    def clean(self) -> None:
         """
         Clean up generated files
         """
@@ -368,28 +356,27 @@ class HdlCheckerCore:
         removeDirIfExists(str(self.work_dir))
 
     @abc.abstractmethod
-    def _handleUiInfo(self, message):  # type: (AnyStr) -> None
+    def _handleUiInfo(self, message: str) -> None:
         """
-        Method that should be overriden to handle info messages from
+        Method that should be overridden to handle info messages from
         HDL Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiWarning(self, message):  # type: (AnyStr) -> None
+    def _handleUiWarning(self, message: str) -> None:
         """
-        Method that should be overriden to handle warning messages
+        Method that should be overridden to handle warning messages
         from HDL Checker to the user
         """
 
     @abc.abstractmethod
-    def _handleUiError(self, message):  # type: (AnyStr) -> None
+    def _handleUiError(self, message: str) -> None:
         """
-        Method that should be overriden to handle errors messages
+        Method that should be overridden to handle errors messages
         from HDL Checker to the user
         """
 
-    def _getBuilderMessages(self, path):
-        # type: (Path) -> Iterable[CheckerDiagnostic]
+    def _getBuilderMessages(self, path: Path) -> Iterable[CheckerDiagnostic]:
         """
         Builds the given path taking care of recursively building its
         dependencies first
@@ -417,13 +404,13 @@ class HdlCheckerCore:
         ):
             yield record
 
-    def _buildAndHandleRebuilds(self, path, library, scope, forced=False):
-        # type: (Path, Identifier, BuildFlagScope, bool) -> Iterable[CheckerDiagnostic]
+    def _buildAndHandleRebuilds(self, path: Path, library: Identifier, scope: BuildFlagScope, forced: bool = False) -> Iterable[CheckerDiagnostic]:
         """
         Builds the given path and handle any files that might require
-        rebuilding until there is nothing to rebuild. The number of iteractions
+        rebuilding until there is nothing to rebuild. The number of interactions
         is fixed in 10.
         """
+        _logger.debug("_buildAndHandleRebuilds(%s)", path)
         # Limit the amount of calls to rebuild the same file to avoid
         # hanging the server
         for _ in range(self._MAX_REBUILD_ATTEMPTS):
@@ -447,10 +434,9 @@ class HdlCheckerCore:
             % (path, self._MAX_REBUILD_ATTEMPTS)
         )
 
-        return {}
+        return set()
 
-    def _handleRebuilds(self, rebuilds):
-        # type: (Iterable[RebuildInfo]) -> None
+    def _handleRebuilds(self, rebuilds: Iterable[RebuildInfo]) -> None:
         """
         Resolves hints found in the rebuild list into path objects
         and rebuild them
@@ -472,8 +458,7 @@ class HdlCheckerCore:
             else:  # pragma: no cover
                 _logger.warning("Did nothing with %s", rebuild)
 
-    def getMessagesByPath(self, path):
-        # type: (Path) -> Iterable[CheckerDiagnostic]
+    def getMessagesByPath(self, path: Path) -> Iterable[CheckerDiagnostic]:
         """
         Returns the messages for the given path, including messages
         from the configured builder (if available) and static checks
@@ -482,7 +467,7 @@ class HdlCheckerCore:
 
         path = Path(path, self.root_dir)
 
-        builder_diags = set()  # type: Set[CheckerDiagnostic]
+        builder_diags: set[CheckerDiagnostic] = set()
 
         if self._USE_THREADS:
             pool = ThreadPool()
@@ -534,8 +519,7 @@ class HdlCheckerCore:
 
         return {diag for diag in diags if not isinstance(diag, PathNotInProjectFile)}
 
-    def getMessagesWithText(self, path, content):
-        # type: (Path, AnyStr) -> Iterable[CheckerDiagnostic]
+    def getMessagesWithText(self, path: Path, content: str) -> Iterable[CheckerDiagnostic]:
         """
         Dumps content to a temprary file and replaces the temporary file name
         for path on the diagnostics received
@@ -562,7 +546,7 @@ class HdlCheckerCore:
                     self.database.getFlags(path, BuildFlagScope.dependencies),
                 )
 
-            diags = set()  # type: Set[CheckerDiagnostic]
+            diags: set[CheckerDiagnostic] = set()
 
             # Some messages may not include the filename field when checking a
             # file by content. In this case, we'll assume the empty filenames
@@ -576,7 +560,11 @@ class HdlCheckerCore:
 
                 diags.add(diag)
 
-            diags |= set(self.database.getDiagnosticsForPath(temporary_file))
+            diags |= {
+                diag
+                for diag in self.database.getDiagnosticsForPath(Path(temporary_file.name))
+                if not isinstance(diag, PathNotInProjectFile)
+            }
 
             self.database.removeSource(temp_path)
             removeIfExists(temporary_file.name)
@@ -587,8 +575,7 @@ class HdlCheckerCore:
         return diags
 
     @lru_cache()
-    def resolveDependencyToPath(self, dependency):
-        # type: (RequiredDesignUnit) -> Optional[Tuple[Path, Identifier]]
+    def resolveDependencyToPath(self, dependency: RequiredDesignUnit) -> tuple[Path, Identifier | None] | None:
         """
         Retrieves the build sequence for the dependency's owner and extracts
         the path that implements a design unit whose names match that of the
@@ -614,11 +601,13 @@ class HdlCheckerCore:
 
     def resolveDependency(
         self, dependency: BaseDependencySpec
-    ) -> Optional[Tuple[Path, Optional[Identifier]]]:
+    ) -> tuple[Path, Identifier | None] | None:
         """Resolves RequiredDesignUnit and IncludedPath dependencies"""
         if isinstance(dependency, RequiredDesignUnit):
             return self.resolveDependencyToPath(dependency)
         if isinstance(dependency, IncludedPath):
-            return (self.database.resolveIncludedPath(dependency), None)
+            resolved = self.database.resolveIncludedPath(dependency)
+            if resolved is not None:
+                return (resolved, None)
         _logger.info("Could not resolve %s (%s)", dependency, type(dependency))
         return None

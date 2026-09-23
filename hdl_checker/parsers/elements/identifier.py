@@ -25,8 +25,7 @@ class Identifier(object):
     and comparisons between them
     """
 
-    def __init__(self, name, case_sensitive=False):
-        # type: (str, bool) -> None
+    def __init__(self, name: str, case_sensitive: bool = False) -> None:
         self.case_sensitive = case_sensitive
         self._display_name = str(name)
         self._name = self._display_name.lower()
@@ -89,8 +88,7 @@ class Identifier(object):
 class VhdlIdentifier(Identifier):
     "Equivalent of Identifier(name, case_sensitive=False)"
 
-    def __init__(self, name):
-        # type: (str, ) -> None
+    def __init__(self, name: str) -> None:
         super(VhdlIdentifier, self).__init__(name=name, case_sensitive=False)
 
     @classmethod
@@ -101,8 +99,7 @@ class VhdlIdentifier(Identifier):
 class VerilogIdentifier(Identifier):
     "Equivalent of Identifier(name, case_sensitive=True)"
 
-    def __init__(self, name):
-        # type: (str, ) -> None
+    def __init__(self, name: str) -> None:
         super(VerilogIdentifier, self).__init__(name=name, case_sensitive=True)
 
     @classmethod

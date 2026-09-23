@@ -26,7 +26,7 @@ from typing import Any
 
 import mock
 import parameterized  # type: ignore
-import unittest2  # type: ignore
+import unittest
 from pygls.types import DiagnosticSeverity, MessageType, Position, Range
 
 from hdl_checker import lsp
@@ -37,7 +37,7 @@ from hdl_checker.utils import debounce
 _logger = logging.getLogger(__name__)
 
 
-class TestCheckerDiagToLspDict(unittest2.TestCase):
+class TestCheckerDiagToLspDict(unittest.TestCase):
     """
     Test code inside hdl_checker.lsp that doesn't depend on a server/client
     setup
@@ -128,7 +128,7 @@ class TestCheckerDiagToLspDict(unittest2.TestCase):
 
         time.sleep(2 * interval)
 
-        self.assertEqual(queue.get(1), 2)
+        self.assertEqual(queue.get(timeout=1), 2)
         self.assertTrue(queue.empty())
 
     def test_debounceWithKey(self):

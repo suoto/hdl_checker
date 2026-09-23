@@ -36,9 +36,6 @@ clone_folder: c:\projects\hdl_checker
 # fetch repository as zip archive
 shallow_clone: false
 
-# set clone depth
-clone_depth: 5
-
 # environment variables
 environment:
   GHDL_URL: http://pilotfiber.dl.sourceforge.net/project/ghdl-updates/Builds/ghdl-0.33/ghdl-0.33-win32.zip
@@ -58,9 +55,9 @@ environment:
     #   PYTHON: "C:\\Python37"
     #   TOXENV: py27-windows
 
-    - PYTHON_VERSION: 37
-      PYTHON: "C:\\Python37"
-      TOXENV: py37-windows
+    - PYTHON_VERSION: 311
+      PYTHON: "C:\\Python311"
+      TOXENV: py311-windows
 
 # scripts that run after cloning repository
 install:

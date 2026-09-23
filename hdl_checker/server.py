@@ -25,10 +25,8 @@ import os
 import sys
 from threading import Timer
 
-import six
-
 from hdl_checker import __version__ as version
-from hdl_checker import handlers, lsp
+from hdl_checker import lsp
 from hdl_checker.utils import (
     getTemporaryFilename,
     isProcessRunning,
@@ -44,41 +42,24 @@ def parseArguments():
 
     parser = argparse.ArgumentParser()
 
-    # Options
-    parser.add_argument("--host", action="store", help="[HTTP] Host to serve")
-    parser.add_argument("--port", action="store", type=int, help="[HTTP] Port to serve")
-    parser.add_argument(
-        "--lsp",
-        action="store_true",
-        default=False,
-        help="Starts the server in LSP mode. Defaults to false",
-    )
-
     parser.add_argument(
         "--attach-to-pid",
         action="store",
         type=int,
-        help="[HTTP, LSP] Stops the server if given PID is not active",
+        help="Stops the server if given PID is not active",
     )
-    parser.add_argument("--log-level", action="store", help="[HTTP, LSP] Logging level")
+    parser.add_argument("--log-level", action="store", help="Logging level")
     parser.add_argument(
         "--log-stream",
         action="store",
-        help="[HTTP, LSP] Log file, defaults to stdout when in HTTP or a "
-        "temporary file named hdl_checker_log_pid<PID>.log when in LSP mode. "
-        "Use NONE to disable logging altogether",
+        help="Log file, defaults to a temporary file named "
+        "hdl_checker_log_pid<PID>.log. Use NONE to disable logging altogether",
     )
 
     parser.add_argument(
-        "--stdout",
-        action="store",
-        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
-        "named hdl_checker_stdout_pid<PID>.log",
-    )
-    parser.add_argument(
         "--stderr",
         action="store",
-        help="[HTTP] File to redirect stdout to. Defaults to a temporary file "
+        help="File to redirect stderr to. Defaults to a temporary file "
         "named hdl_checker_stderr_pid<PID>.log. "
         "Use NONE to disable redirecting stderr altogether",
     )
@@ -103,14 +84,6 @@ def parseArguments():
         sys.stdout.write("%s\n" % version)
         sys.exit(0)
 
-    if args.lsp:
-        args.host = None
-        args.port = None
-    else:
-        args.host = args.host or "localhost"
-        args.port = args.port or 50000
-        args.log_stream = args.log_stream or sys.stdout
-
     # If not set, create a temporary file safely so there's no clashes
     if args.log_stream == "NONE":
         args.log_stream = None
@@ -133,23 +106,11 @@ def openForStdHandle(filepath):
     Returns a file object that can be used to replace sys.stdout or
     sys.stderr
     """
-    # Need to open the file in binary mode on py2 because of bytes vs unicode.
-    # If we open in text mode (default), then third-party code that uses `print`
-    # (we're replacing sys.stdout!) with an `str` object on py2 will cause
-    # tracebacks because text mode insists on unicode objects. (Don't forget,
-    # `open` is actually `io.open` because of future builtins.)
-    # Since this function is used for logging purposes, we don't want the output
-    # to be delayed. This means no buffering for binary mode and line buffering
-    # for text mode. See https://docs.python.org/2/library/io.html#io.open
-    if six.PY2:
-        return open(filepath, mode="wb", buffering=0)
     return open(filepath, mode="w", buffering=1)
 
 
-def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
-    "Redirect stdout and stderr to files"
-    if stdout is not None:
-        sys.stdout = openForStdHandle(stdout)
+def _setupPipeRedirection(stderr):  # pragma: no cover
+    "Redirect stderr to a file"
     if stderr is not None:
         sys.stderr = openForStdHandle(stderr)
 
@@ -157,35 +118,16 @@ def _setupPipeRedirection(stdout, stderr):  # pragma: no cover
 def _binaryStdio():  # pragma: no cover
     """
     (from https://github.com/palantir/python-language-server)
-
-    This seems to be different for Window/Unix Python2/3, so going by:
-        https://stackoverflow.com/questions/2850893/reading-binary-data-from-stdin
     """
-
-    if six.PY3:
-        # pylint: disable=no-member
-        stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
-    else:
-        # Python 2 on Windows opens sys.stdin in text mode, and
-        # binary data that read from it becomes corrupted on \r\n
-        if sys.platform == "win32":
-            # set sys.stdin to binary mode
-            # pylint: disable=no-member,import-error
-            import msvcrt
-
-            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-        stdin, stdout = sys.stdin, sys.stdout
-
-    return stdin, stdout
+    # pylint: disable=no-member
+    return sys.stdin.buffer, sys.stdout.buffer
 
 
 def run(args):
     """
-    Import modules and tries to start a hdl_checker server
+    Starts the hdl_checker LSP server
     """
-    # LSP will use stdio to communicate
-    _setupPipeRedirection(None if args.lsp else args.stdout, args.stderr)
+    _setupPipeRedirection(args.stderr)
 
     if args.log_stream:
         setupLogging(args.log_stream, args.log_level)
@@ -219,16 +161,13 @@ def run(args):
         version,
     )
 
-    if args.lsp:
-        stdin, stdout = _binaryStdio()
-        server = lsp.HdlCheckerLanguageServer()
-        lsp.setupLanguageServerFeatures(server)
-        server.start_io(stdin=stdin, stdout=stdout)
-    else:
-        if args.attach_to_pid is not None:
-            _attachPids(args.attach_to_pid, os.getpid())
+    if args.attach_to_pid is not None:
+        _attachPids(args.attach_to_pid, os.getpid())
 
-        handlers.app.run(host=args.host, port=args.port, threads=10, server="waitress")
+    stdin, stdout = _binaryStdio()
+    server = lsp.HdlCheckerLanguageServer()
+    lsp.setupLanguageServerFeatures(server)
+    server.start_io(stdin=stdin, stdout=stdout)
 
 
 def main():

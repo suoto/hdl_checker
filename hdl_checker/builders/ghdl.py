@@ -20,7 +20,7 @@ import os
 import os.path as p
 import re
 from glob import glob
-from typing import Any, Iterable, List, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 from .base_builder import BaseBuilder
 
@@ -37,8 +37,8 @@ class GHDL(BaseBuilder):
     """
 
     # Implementation of abstract class properties
-    builder_name = "ghdl"
-    file_types = {FileType.vhdl}
+    builder_name = "ghdl"  # type: ignore[assignment]
+    file_types = {FileType.vhdl}  # type: ignore[assignment]
 
     # Default build flags
     default_flags = {
@@ -53,7 +53,7 @@ class GHDL(BaseBuilder):
         r"^(?P<filename>.*):(?=\d)"
         r"(?P<line_number>\d+):"
         r"(?P<column_number>\d+):"
-        r"((?P<is_warning>warning:)\s*|\s*)"
+        r"((?P<severity>(warning|error):)\s*|\s*)"
         r"(?P<error_message>.*)",
         re.I,
     ).finditer
@@ -62,9 +62,12 @@ class GHDL(BaseBuilder):
         r"^\s*(actual prefix|library directory):" r"\s*(?P<library_path>.*)\s*"
     )
 
-    _shouldIgnoreLine = re.compile(
+    _shouldIgnoreLine_re = re.compile(
         "|".join([r"^\s*$", r"ghdl: compilation error"])
-    ).match
+    )
+
+    def _shouldIgnoreLine(self, line: str) -> bool:
+        return self._shouldIgnoreLine_re.match(line) is not None
 
     _iter_rebuild_units = re.compile(
         r'((?P<unit_type>entity|package) "(?P<unit_name>\w+)" is obsoleted by (entity|package) "\w+"'
@@ -77,8 +80,7 @@ class GHDL(BaseBuilder):
         self._version = ""
         super(GHDL, self).__init__(*args, **kwargs)
 
-    def _makeRecords(self, line):
-        # type: (str) -> Iterable[BuilderDiag]
+    def _makeRecords(self, line: str) -> Iterable[BuilderDiag]:
         for match in GHDL._stdout_message_parser(line):
             info = match.groupdict()
 
@@ -89,7 +91,9 @@ class GHDL(BaseBuilder):
             yield BuilderDiag(
                 builder_name=self.builder_name,
                 text=info.get("error_message", None),
-                severity=DiagType.WARNING if info["is_warning"] else DiagType.ERROR,
+                severity=DiagType.WARNING
+                if info["severity"] == "warning"
+                else DiagType.ERROR,
                 filename=None if filename is None else Path(filename),
                 line_number=None if line_number is None else int(line_number) - 1,
                 column_number=None if column_number is None else int(column_number) - 1,
@@ -99,7 +103,7 @@ class GHDL(BaseBuilder):
         stdout = runShellCommand(["ghdl", "--version"])
         self._version = re.findall(r"(?<=GHDL)\s+([^\s]+)\s+", stdout[0])[0]
         self._logger.info(
-            "GHDL version string: '%s'. " "Version number is '%s'",
+            "GHDL version string: '%s'. Version number is '%s'",
             stdout[:-1],
             self._version,
         )
@@ -112,8 +116,7 @@ class GHDL(BaseBuilder):
         except OSError:
             return False
 
-    def _parseBuiltinLibraries(self):
-        # type: (...) -> Any
+    def _parseBuiltinLibraries(self) -> Iterable[Identifier]:
         """
         Discovers libraries that exist regardless before we do anything
         """
@@ -137,8 +140,7 @@ class GHDL(BaseBuilder):
                     name = path.split(p.sep)[-1]
                     yield Identifier(name.strip(), case_sensitive=False)
 
-    def _getGhdlArgs(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _getGhdlArgs(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Return the GHDL arguments that are common to most calls
         """
@@ -163,25 +165,22 @@ class GHDL(BaseBuilder):
         cmd = ["ghdl", "-i"] + self._getGhdlArgs(path, library, tuple(vhdl_std))
         return cmd
 
-    def _analyzeSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _analyzeSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Runs GHDL with analyze source switch
         """
         return ["ghdl", "-a"] + self._getGhdlArgs(path, library, flags)
 
-    def _checkSyntax(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> List[str]
+    def _checkSyntax(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         """
         Runs GHDL with syntax check switch
         """
         return ["ghdl", "-s"] + self._getGhdlArgs(path, library, flags)
 
-    def _buildSource(self, path, library, flags=None):
-        # type: (Path, Identifier, Optional[BuildFlags]) -> Iterable[str]
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         self._importSource(path, library, flags)
 
-        stdout = []  # type: List[str]
+        stdout: list[str] = []
         for cmd in (
             self._analyzeSource(path, library, flags),
             self._checkSyntax(path, library, flags),
@@ -190,13 +189,12 @@ class GHDL(BaseBuilder):
 
         return stdout
 
-    def _createLibrary(self, _):
+    def _createLibrary(self, library: Identifier) -> None:
         workdir = p.join(self._work_folder)
         if not p.exists(workdir):
             os.makedirs(workdir)
 
-    def _searchForRebuilds(self, path, line):
-        # type: (Path, str) -> Iterable[Mapping[str, str]]
+    def _searchForRebuilds(self, path: Path, line: str) -> Iterable[Mapping[str, str]]:
         for match in GHDL._iter_rebuild_units(line):
             mdict = match.groupdict()
             # When compilers reports units out of date, they do this

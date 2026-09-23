@@ -10,7 +10,6 @@ When opening an issue, make sure you provide
 * Compiler and version, one of
   * `vsim -version`
   * `ghdl --version`
-  * `xvhdl -version`
 * HDL Checker log output if possible
   * Please note that this typically includes filenames, compiler name and version and some design unit names!
 

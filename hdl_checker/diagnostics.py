@@ -16,7 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Diagnostics holders for checkers"
 
-from typing import Iterable, Optional
+from typing import Iterable
 
 from hdl_checker.parsers.elements.dependency_spec import (  # pylint: disable=unused-import
     BaseDependencySpec,
@@ -56,11 +56,11 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        text,  # type: str
-        checker=None,  # type: Optional[str]
-        filename=None,  # type: Optional[Path]
-        line_number=None,  # type: Optional[int]
-        column_number=None,  # type: Optional[int]
+        text: str,
+        checker: str | None = None,
+        filename: Path | None = None,
+        line_number: int | None = None,
+        column_number: int | None = None,
         error_code=None,
         severity=None,
     ):
@@ -69,7 +69,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
         self._checker = CHECKER_NAME if checker is None else checker
 
         # Modifiable attributes
-        self._filename = filename  # type: Optional[Path]
+        self._filename: Path | None = filename
         self._error_code = error_code
         self._text = str(text)
 
@@ -85,7 +85,7 @@ class CheckerDiagnostic(HashableByKey):  # pylint: disable=too-many-instance-att
         """
         return CheckerDiagnostic(
             checker=kwargs.get("checker", getattr(self, "checker", None)),
-            text=kwargs.get("text", getattr(self, "text", None)),
+            text=kwargs.get("text", getattr(self, "text", "")),
             filename=kwargs.get("filename", getattr(self, "filename", None)),
             line_number=kwargs.get("line_number", getattr(self, "line_number", None)),
             column_number=kwargs.get(
@@ -368,8 +368,7 @@ class PathLibraryIsNotUnique(CheckerDiagnostic):
     Searching for a dependency should yield a single source file
     """
 
-    def __init__(self, filename, actual, choices):
-        # type: (Path, Identifier, Iterable[Identifier]) -> None
+    def __init__(self, filename: Path, actual: Identifier, choices: Iterable[Identifier]):
         _choices = list(choices)
 
         msg = []
@@ -391,8 +390,7 @@ class UnresolvedDependency(CheckerDiagnostic):
     Marks dependencies that could not be resolved for a file
     """
 
-    def __init__(self, dependency, location):
-        # type: (BaseDependencySpec, Location) -> None
+    def __init__(self, dependency: BaseDependencySpec, location: Location):
         if isinstance(dependency, RequiredDesignUnit):
             reference = "%s.%s" % (dependency.library or "work", dependency.name)
         else:

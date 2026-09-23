@@ -27,8 +27,6 @@ TOX_ARGS="$*"
 docker run                                                            \
   --rm                                                                \
   --mount type=bind,source="$PATH_TO_THIS_SCRIPT",target=/hdl_checker \
-  --env USER_ID="$(id -u)"                                            \
-  --env GROUP_ID="$(id -g)"                                           \
   --env TOX_ARGS="$TOX_ARGS"                                          \
-  --env USERNAME="$USER"                                              \
+  --user "$(id -u):$(id -g)"                               \
   suoto/hdl_checker_test:latest /bin/bash -c '.ci/scripts/docker_entry_point.sh'

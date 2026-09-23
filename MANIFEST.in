@@ -1,2 +1,0 @@
-include versioneer.py
-include hdl_checker/_version.py

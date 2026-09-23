@@ -26,14 +26,13 @@ import shutil
 import subprocess as subp
 import time
 from multiprocessing import Queue
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Iterable
 
 import mock
-import six
-import unittest2  # type: ignore
+import unittest
 from parameterized import parameterized_class  # type: ignore
 from pygls import uris
-from unittest2 import TestCase
+from unittest import TestCase
 
 from hdl_checker import exceptions
 from hdl_checker.core import HdlCheckerCore
@@ -42,13 +41,13 @@ from hdl_checker.diagnostics import CheckerDiagnostic
 from hdl_checker.parsers.elements.dependency_spec import RequiredDesignUnit
 from hdl_checker.parsers.elements.identifier import Identifier
 from hdl_checker.path import Path
-from hdl_checker.types import FileType
+from hdl_checker.types import BuildFlags, FileType
 from hdl_checker.utils import ON_LINUX, ON_WINDOWS, removeDuplicates, samefile
 
 _logger = logging.getLogger(__name__)
 
 
-MockDep = Union[Tuple[str], Tuple[str, str]]
+MockDep = tuple[str] | tuple[str, str]
 
 
 class DummyServer(HdlCheckerCore):
@@ -57,7 +56,7 @@ class DummyServer(HdlCheckerCore):
 
     def __init__(self, *args, **kwargs):
         _logger.info("Creating server %d", DummyServer._server_index)
-        self._msg_queue = Queue()  # type: Queue[Tuple[str, str]]
+        self._msg_queue = Queue()  # type: Queue[tuple[str, str]]
         self._ui_handler = logging.getLogger("server %d/UI" % DummyServer._server_index)
         DummyServer._server_index += 1
         super(DummyServer, self).__init__(*args, **kwargs)
@@ -85,10 +84,10 @@ class SourceMock(object):
 
     def __init__(
         self,
-        design_units,  # type: Iterable[Dict[str, str]]
-        library=None,  # type: str
-        dependencies=None,  # type: Iterable[MockDep]
-        filename=None,  # type: Optional[str]
+        design_units,  # type: Iterable[dict[str, str]]
+        library=None,  # type: str | None
+        dependencies=None,  # type: Iterable[MockDep] | None
+        filename=None,  # type: str | None
     ):
 
         self._design_units = list(design_units or [])
@@ -110,7 +109,7 @@ class SourceMock(object):
         self.flags = []  # type: ignore
 
         self.library = library
-        self._dependencies = []  # type: List[RequiredDesignUnit]
+        self._dependencies = []  # type: list[RequiredDesignUnit]
         for dep_spec in dependencies or []:
             _name = dep_spec[0]
             _library = "work"
@@ -146,7 +145,8 @@ class SourceMock(object):
         lines = []
 
         for lib in libs:
-            lines.append("library {0};".format(lib.display_name))
+            if lib is not None:
+                lines.append("library {0};".format(lib.display_name))
 
         for dependency in self._dependencies:
             if dependency.library is not None:
@@ -194,7 +194,7 @@ class SourceMock(object):
         )
 
     def getmtime(self):
-        return p.getmtime(self.filename)
+        return p.getmtime(self.filename.name)
 
     def getDesignUnits(self):
         return self._design_units
@@ -203,13 +203,13 @@ class SourceMock(object):
         return self._dependencies
 
     def getRawSourceContent(self):
-        return open(self.filename).read()
+        return open(self.filename.name).read()
 
 
 class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("MockBuilder")
-    builder_name = "mock_builder"
-    file_types = (FileType.vhdl,)
+    builder_name = "mock_builder"  # type: ignore[assignment]
+    file_types = (FileType.vhdl,)  # type: ignore[assignment]
 
     def __init__(self, work_folder, *args, **kwargs):
         # type: (...) -> None
@@ -219,26 +219,26 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
         super(MockBuilder, self).__init__(work_folder, *args, **kwargs)
 
-    def _makeRecords(self, _):  # pragma: no cover
+    def _makeRecords(self, line: str) -> list:  # pragma: no cover
         return []
 
-    def _shouldIgnoreLine(self, line):  # pragma: no cover
+    def _shouldIgnoreLine(self, line: str) -> bool:  # pragma: no cover
         return True
 
-    def _checkEnvironment(self):
+    def _checkEnvironment(self) -> None:
         return
 
     @staticmethod
     def isAvailable():
         return True
 
-    def _buildSource(self, path, library, flags=None):
+    def _buildSource(self, path: Path, library: Identifier, flags: BuildFlags | None = None) -> list[str]:
         self._logger.debug(
             "Building path=%s, library=%s, flags=%s", path, library, flags
         )
-        return [], []
+        return []
 
-    def _createLibrary(self, library):  # pylint: disable=unused-argument
+    def _createLibrary(self, library: Identifier) -> None:  # pylint: disable=unused-argument
         pass
 
     def _parseBuiltinLibraries(self):
@@ -251,7 +251,7 @@ class MockBuilder(BaseBuilder):  # pylint: disable=abstract-method
 
 class FailingBuilder(MockBuilder):  # pylint: disable=abstract-method
     _logger = logging.getLogger("FailingBuilder")
-    builder_name = "FailingBuilder"
+    builder_name = "FailingBuilder"  # type: ignore[assignment]
 
     def _checkEnvironment(self):
         raise exceptions.SanityCheckError(self.builder_name, "Fake error")
@@ -266,7 +266,6 @@ class PatchBuilder(object):
             "Returns the builder class given a string name"
             from hdl_checker.builders.msim import MSim
             from hdl_checker.builders.ghdl import GHDL
-            from hdl_checker.builders.xvhdl import XVHDL
             from hdl_checker.builders.fallback import Fallback
 
             # Check if the builder selected is implemented and create the
@@ -276,8 +275,6 @@ class PatchBuilder(object):
                 return MockBuilder
             if name == "msim":
                 return MSim
-            if name == "xvhdl":
-                return XVHDL
             if name == "ghdl":
                 return GHDL
 
@@ -345,37 +342,6 @@ def assertSameFile(it):  # pylint: disable=invalid-name
     return wrapper
 
 
-#  def assertCountEqual(it):  # pylint: disable=invalid-name
-
-#      assert six.PY2, "Only needed on Python2"
-
-#      def wrapper(first, second, msg=None):
-#          temp = list(second)  # make a mutable copy
-#          not_found = []
-#          for elem in first:
-#              try:
-#                  temp.remove(elem)
-#              except ValueError:
-#                  not_found.append(elem)
-
-#          error_details = []
-
-#          if not_found:
-#              error_details += [
-#                  "Second list is missing item {}".format(x) for x in not_found
-#              ]
-
-#          error_details += ["First list is missing item {}".format(x) for x in temp]
-
-#          if error_details:
-#              # Add user message at the top
-#              error_details = [msg] + error_details
-#              error_details += ["", "Lists {} and {} differ".format(first, second)]
-#              it.fail("\n".join([str(x) for x in error_details]))
-
-#      return wrapper
-
-
 def writeListToFile(filename, _list):  # pragma: no cover
     "Well... writes '_list' to 'filename'. This is for testing only"
     # Wait a little bit to force the timestamp rad via os.path.getmtime to
@@ -391,7 +357,6 @@ if not ON_WINDOWS:
     TEST_ENVS = {
         "ghdl": os.environ["GHDL_PATH"],
         "msim": os.environ["MODELSIM_PATH"],
-        "xvhdl": os.environ["XSIM_PATH"],
         "fallback": None,
     }
 else:
@@ -462,7 +427,7 @@ def windowsOnly(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if not ON_WINDOWS:
-            return unittest2.skip("Windows only test")
+            return unittest.skip("Windows only test")
         return func(*args, **kwargs)
 
     return wrapper
@@ -472,7 +437,7 @@ def linuxOnly(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if not ON_LINUX:
-            return unittest2.skip("Linux only test")
+            return unittest.skip("Linux only test")
         return func(*args, **kwargs)
 
     return wrapper
@@ -483,7 +448,7 @@ def toCheckerDiagnostic(uri: str, diags: Any) -> Iterable[CheckerDiagnostic]:
         yield CheckerDiagnostic(
             text=diag.message,
             checker=diag.source,
-            filename=uris.to_fs_path(uri),
+            filename=Path(uris.to_fs_path(uri) or ""),
             line_number=diag.range.start.line,
             column_number=diag.range.start.character,
             error_code=diag.code,

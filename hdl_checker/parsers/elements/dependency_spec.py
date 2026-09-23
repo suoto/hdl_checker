@@ -16,7 +16,7 @@
 # along with HDL Checker.  If not, see <http://www.gnu.org/licenses/>.
 "Spec for a parsed dependency"
 
-from typing import Optional
+from typing import Any
 
 from .identifier import Identifier
 from .parsed_element import LocationList, ParsedElement  # pylint: disable=unused-import
@@ -27,8 +27,13 @@ from hdl_checker.path import Path  # pylint: disable=unused-import
 class BaseDependencySpec(ParsedElement):
     "Placeholder for a source dependency"
 
-    def __init__(self, owner, name, library=None, locations=None):
-        # type: (Path, Identifier, Optional[Identifier], Optional[LocationList]) -> None
+    def __init__(
+        self,
+        owner: Path,
+        name: Identifier,
+        library: Identifier | None = None,
+        locations: LocationList | None = None,
+    ) -> None:
         assert isinstance(name, Identifier), "Incorrect arg: {}".format(name)
         assert library is None or isinstance(
             library, Identifier
@@ -40,24 +45,21 @@ class BaseDependencySpec(ParsedElement):
         super(BaseDependencySpec, self).__init__(locations)
 
     @property
-    def owner(self):
-        # type: (...) -> Path
+    def owner(self) -> Path:
         """
         Path of the file that the dependency was found in
         """
         return self._owner
 
     @property
-    def name(self):
-        # type: (...) -> Identifier
+    def name(self) -> Identifier:
         """
         Name of the design unit this dependency refers to
         """
         return self._name
 
     @property
-    def library(self):
-        # type: (...) -> Optional[Identifier]
+    def library(self) -> Identifier | None:
         """
         Library, if any, this dependency was found. If None, should be
         equivalent to the library of the owner (aka 'work' library)
@@ -70,7 +72,7 @@ class BaseDependencySpec(ParsedElement):
         return len(self.name) + len(self.library) + 1
 
     @property
-    def __hash_key__(self):
+    def __hash_key__(self) -> Any:
         return (
             self.owner,
             self.library,
@@ -116,8 +118,12 @@ class IncludedPath(BaseDependencySpec):
     actually the string that the source is including.
     """
 
-    def __init__(self, owner, name, locations=None):
-        # type: (Path, Identifier, Optional[LocationList]) -> None
+    def __init__(
+        self,
+        owner: Path,
+        name: Identifier,
+        locations: LocationList | None = None,
+    ) -> None:
         super(IncludedPath, self).__init__(
             owner=owner, name=name, library=None, locations=locations
         )

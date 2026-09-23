@@ -8,7 +8,7 @@
 [![Mentioned in Awesome Computer Architecture](https://awesome.re/mentioned-badge.svg)](https://github.com/rajesh-s/awesome-computer-architecture)
 [![Analytics](https://ga-beacon.appspot.com/UA-68153177-4/hdlcc/README.md?pixel)](https://github.com/suoto/hdl_checker)
 
-HDL Checker is a language server that wraps VHDL/Verilg/SystemVerilog tools that
+HDL Checker is a language server that wraps VHDL/Verilog/SystemVerilog tools that
 aims to reduce the boilerplate code needed to set things up. It supports
 [Language Server Protocol][LSP] or a custom HTTP interface; can infer library
 VHDL files likely belong to, besides working out mixed language dependencies,
@@ -178,8 +178,6 @@ HDL Checker supports
 * [Mentor ModelSim][Mentor_msim]
 * [ModelSim Intel FPGA Edition][Intel_msim]
 * [GHDL][GHDL]
-* [Vivado Simulator][Vivado_Simulator] (bundled with [Xilinx
-  Vivado][Xilinx_Vivado])
 
 ### Configuring HDL Checker
 
@@ -278,8 +276,6 @@ registered trademarks of Mentor Graphics, Inc.
 
 Intel® and its logo is a trademark or registered trademark of Intel Corporation.
 
-Xilinx® and its logo is a trademark or registered trademark of Xilinx, Inc.
-
 HDL Checker's author has no connection or affiliation to any of the trademarks
 mentioned or used by this software.
 
@@ -302,5 +298,3 @@ mentioned or used by this software.
 [vim_coc_nvim_config_file]: https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file
 [vim_coc_nvim_register_lsp]: https://github.com/neoclide/coc.nvim/wiki/Language-servers#register-custom-language-servers
 [vim_lc_nvim]: https://github.com/autozimu/LanguageClient-neovim
-[Vivado_Simulator]: https://www.xilinx.com/products/design-tools/vivado/simulator.html
-[Xilinx_Vivado]: http://www.xilinx.com/products/design-tools/vivado/vivado-webpack.html

@@ -19,7 +19,7 @@
 import logging
 import re
 import string
-from typing import Any, Generator, Iterable, List, Tuple, Type
+from typing import Any, Generator, Iterable
 
 from .elements.dependency_spec import (
     BaseDependencySpec,
@@ -76,16 +76,14 @@ class VerilogParser(BaseSourceFile):
     source file
     """
 
-    def _getSourceContent(self):
-        # type: (...) -> Any
+    def _getSourceContent(self) -> Any:
         # Remove multiline comments
         content = readFile(str(self.filename))
         return content
         #  lines = _COMMENT.sub("", content)
         #  return re.sub(r"\r\n?|\n", " ", lines, flags=re.S)
 
-    def _iterDesignUnitMatches(self):
-        # type: (...) -> Any
+    def _iterDesignUnitMatches(self) -> Any:
         """
         Iterates over the matches of _DESIGN_UNITS against
         source's lines
@@ -101,12 +99,12 @@ class VerilogParser(BaseSourceFile):
 
             yield match.groupdict(), {Location(start_line, start_char)}
 
-    def _getDependencies(self):  # type: () -> Iterable[BaseDependencySpec]
+    def _getDependencies(self) -> Iterable[BaseDependencySpec]:
         text = self.getSourceContent()
 
-        match_groups = [
+        match_groups: list[tuple[str, type[BaseDependencySpec]]] = [
             ("include", IncludedPath)
-        ]  # type: List[Tuple[str, Type[BaseDependencySpec]]]
+        ]
 
         # Only SystemVerilog has imports or classes
         if self.filetype is FileType.systemverilog:
@@ -137,7 +135,7 @@ class VerilogParser(BaseSourceFile):
                 )
                 break
 
-    def _getDesignUnits(self):  # type: () -> Generator[VerilogDesignUnit, None, None]
+    def _getDesignUnits(self) -> Generator[VerilogDesignUnit, None, None]:
         for match, locations in self._iterDesignUnitMatches():
             if match["module_name"] is not None:
                 yield VerilogDesignUnit(

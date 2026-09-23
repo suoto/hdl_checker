@@ -21,20 +21,16 @@
 import logging
 from os import path as p
 from os import stat
-from typing import Union
-
-import six
 
 _logger = logging.getLogger(__name__)
 
 
-class Path(object):
+class Path:
     "Path helper class to speed up comparing different paths"
 
-    def __init__(self, name, base_path=None):
-        # type: (Union[Path, str], Union[Path, str, None]) -> None
+    def __init__(self, name: "Path | str", base_path: "Path | str | None" = None):
         assert isinstance(
-            name, (Path, six.string_types)
+            name, (Path, str)
         ), "Invalid type for path: {} ({})".format(name, type(name))
 
         if p.isabs(str(name)) or base_path is None:
@@ -44,32 +40,28 @@ class Path(object):
         self._name = p.normpath(str(_name))
 
     @property
-    def mtime(self):
-        # type: () -> float
+    def mtime(self) -> float:
         """
         Equivalent to os.path.getmtime(self.name)
         """
         return p.getmtime(self.name)
 
     @property
-    def abspath(self):
-        # type: () -> str
+    def abspath(self) -> str:
         """
         Equivalent to os.path.abspath(self.name)
         """
         return p.abspath(self.name)
 
     @property
-    def basename(self):
-        # type: () -> str
+    def basename(self) -> str:
         """
         Equivalent to os.path.basename(self.name)
         """
         return p.basename(self.name)
 
     @property
-    def dirname(self):
-        # type: () -> str
+    def dirname(self) -> str:
         """
         Equivalent to os.path.dirname(self.name)
         """
@@ -88,8 +80,7 @@ class Path(object):
     def __str__(self):
         return self.name
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return "{}({})".format(self.__class__.__name__, repr(self.name))
 
     @property
@@ -115,15 +106,6 @@ class Path(object):
 
         return NotImplemented  # pragma: no cover
 
-    def __ne__(self, other):  # pragma: no cover
-        """Overrides the default implementation (unnecessary in Python 3)"""
-        result = self.__eq__(other)
-
-        if result is NotImplemented:
-            return NotImplemented
-
-        return not result
-
     def __jsonEncode__(self):
         """
         Gets a dict that describes the current state of this object
@@ -139,8 +121,7 @@ class Path(object):
 
         return obj
 
-    def endswith(self, other):
-        # type: (str) -> bool
+    def endswith(self, other: str) -> bool:
         """
         Checks if the paths end with the same suffix
         """

@@ -22,18 +22,7 @@ import logging
 import os.path as p
 from itertools import chain
 from threading import RLock
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Iterable, Iterator
 
 from hdl_checker import DEFAULT_LIBRARY
 from hdl_checker.diagnostics import (  # pylint: disable=unused-import
@@ -61,32 +50,29 @@ from hdl_checker.types import (  # pylint: disable=unused-import
 )
 from hdl_checker.utils import HashableByKey, getMostCommonItem, isFileReadable
 
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache  # type: ignore
+from functools import lru_cache
 
 _logger = logging.getLogger(__name__)
 _LIBRARY_WORK = Identifier("work", case_sensitive=False)
 
-UnresolvedLibrary = Union[Identifier, None]
-LibraryUnitTuple = Tuple[UnresolvedLibrary, Identifier]
+UnresolvedLibrary = Identifier | None
+LibraryUnitTuple = tuple[UnresolvedLibrary, Identifier]
 
 
 class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
     "Stores info on and provides operations for a project file set"
 
-    def __init__(self):  # type: () -> None
+    def __init__(self) -> None:
         self._lock = RLock()
 
-        self._paths = set()  # type: Set[Path]
-        self._parse_timestamp = {}  # type: Dict[Path, float]
-        self._library_map = {}  # type: Dict[Path, Identifier]
-        self._flags_map = {}  # type: Dict[Path, Dict[BuildFlagScope, BuildFlags]]
-        self._dependencies_map = {}  # type: Dict[Path, Set[BaseDependencySpec]]
-        self._inferred_libraries = set()  # type: Set[Path]
-        self._design_units = set()  # type: Set[tAnyDesignUnit]
-        self._diags = {}  # type: Dict[Path, Set[CheckerDiagnostic]]
+        self._paths: set[Path] = set()
+        self._parse_timestamp: dict[Path, float] = {}
+        self._library_map: dict[Path, Identifier] = {}
+        self._flags_map: dict[Path, dict[BuildFlagScope, BuildFlags]] = {}
+        self._dependencies_map: dict[Path, set[BaseDependencySpec]] = {}
+        self._inferred_libraries: set[Path] = set()
+        self._design_units: set[tAnyDesignUnit] = set()
+        self._diags: dict[Path, set[CheckerDiagnostic]] = {}
 
         # Use this to know which methods should be cache
         self._cached_methods = {
@@ -101,12 +87,11 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return 0
 
     @property
-    def design_units(self):  # type: (...) -> FrozenSet[tAnyDesignUnit]
+    def design_units(self) -> frozenset[tAnyDesignUnit]:
         "Set of design units found"
         return frozenset(self._design_units)
 
-    def refresh(self):
-        # type: (...) -> Any
+    def refresh(self) -> None:
         """
         Clears caches, inferred libraries and parses and checks if any source
         should be parsed
@@ -122,8 +107,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         for path in self.paths:
             self._parseSourceIfNeeded(path)
 
-    def configure(self, root_config, root_path):
-        # type: (Dict[str, Any], str) -> int
+    def configure(self, root_config: dict[str, Any], root_path: str) -> int:
         """
         Handles adding sources, libraries and flags from a dict, unrolling and
         flatenning references.
@@ -145,13 +129,12 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
     def addSource(
         self,
-        path,  # type: Path
-        library,  # type: Optional[str]
-        source_specific_flags=None,  # type: Optional[BuildFlags]
-        single_flags=None,  # type: Optional[BuildFlags]
-        dependencies_flags=None,  # type: Optional[BuildFlags]
-    ):
-        # type: (...) -> None
+        path: Path,
+        library: str | None,
+        source_specific_flags: BuildFlags | None = None,
+        single_flags: BuildFlags | None = None,
+        dependencies_flags: BuildFlags | None = None,
+    ) -> None:
         """
         Adds a source to the database, triggering its parsing even if the
         source has already been added previously
@@ -178,11 +161,10 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         # TODO: Parse on a process pool
         self._parseSource(path)
 
-    def removeSource(self, path):
-        # type: (Path) -> None
+    def removeSource(self, path: Path) -> None:
         """
         Removes a path from the database. No error is raised if the path wasn't
-        added previously. In this case, avoid clearning LRU caches
+        added previously. In this case, avoid cleaning LRU caches
         """
         _logger.debug("Removing %s from database", path)
         clear_lru_caches = False
@@ -200,41 +182,23 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             except KeyError:
                 pass
 
-            try:
-                del self._parse_timestamp[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._library_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._flags_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._dependencies_map[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
-
-            try:
-                del self._diags[path]
-                clear_lru_caches = True
-            except KeyError:
-                pass
+            for mapping in (
+                self._parse_timestamp,
+                self._library_map,
+                self._flags_map,
+                self._dependencies_map,
+                self._diags,
+            ):
+                try:
+                    del mapping[path]
+                    clear_lru_caches = True
+                except KeyError:
+                    pass
 
             if clear_lru_caches:
                 self._clearLruCaches()
 
-    def _addDiagnostic(self, diagnostic):
-        # type: (CheckerDiagnostic) -> None
+    def _addDiagnostic(self, diagnostic: CheckerDiagnostic) -> None:
         """
         Adds a diagnostic to the diagnostic map. Diagnostics can then be read
         to report processing internals and might make it to the user interface
@@ -246,8 +210,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             self._diags[diagnostic.filename] = set()
         self._diags[diagnostic.filename].add(diagnostic)
 
-    def getDiagnosticsForPath(self, path):
-        # type: (Path) -> Iterable[CheckerDiagnostic]
+    def getDiagnosticsForPath(self, path: Path) -> Iterable[CheckerDiagnostic]:
         """
         Returns diagnostics generated a path. It does not trigger any
         processing or analysis though
@@ -285,8 +248,8 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
             state["sources"].append(source_info)
 
-        state["inferred_libraries"] = tuple(self._inferred_libraries)
-        state["design_units"] = tuple(self._design_units)
+        state["inferred_libraries"] = list(self._inferred_libraries)
+        state["design_units"] = list(self._design_units)
 
         return state
 
@@ -320,8 +283,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         return obj
 
-    def getFlags(self, path, scope=None):
-        # type: (Path, Optional[BuildFlagScope]) -> BuildFlags
+    def getFlags(self, path: Path, scope: BuildFlagScope | None = None) -> BuildFlags:
         """
         Return a list of flags for the given path or an empty tuple if the path
         is not found in the database.
@@ -337,13 +299,11 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return scope_flags + source_specific_flags
 
     @property
-    def paths(self):
-        # type: () -> Iterable[Path]
+    def paths(self) -> Iterable[Path]:
         "Returns a list of paths currently in the database"
         return frozenset(self._paths)
 
-    def _updatePathLibrary(self, path, library):
-        # type: (Path, Identifier) -> None
+    def _updatePathLibrary(self, path: Path, library: Identifier) -> None:
         """
         Updates dependencies of the given path so they reflect the change in
         their owner's path
@@ -391,8 +351,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         self._dependencies_map[path] -= unresolved_dependencies
 
     @lru_cache()
-    def getLibrary(self, path):
-        # type: (Path) -> UnresolvedLibrary
+    def getLibrary(self, path: Path) -> UnresolvedLibrary:
         """
         Gets the library the path is in, inferring and updating it if needed.
         Any unit that can be used from VHDL code can be bound to a library,
@@ -402,7 +361,6 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         if path not in self.paths:
             # Add the path to the project but put it on a different library
-            self._parseSourceIfNeeded(path)
             self._updatePathLibrary(path, Identifier("not_in_project", True))
             # Report paths that are valid (that is, not temporary) when they
             # can't be found in the project file
@@ -418,8 +376,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         return self._library_map.get(path, None)
 
-    def _parseSourceIfNeeded(self, path):
-        # type: (Path) -> None
+    def _parseSourceIfNeeded(self, path: Path) -> None:
         """
         Parses a given path if needed, removing info from the database prior to that
         """
@@ -434,10 +391,9 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         if mtime == self._parse_timestamp.get(path, 0):
             return
 
-        self._parseSource(path)
+        self._parseSource(path, mtime)
 
-    def _parseSource(self, path):
-        # type: (Path) -> None
+    def _parseSource(self, path: Path, mtime: float | None = None) -> None:
         """
         Extracts info from a source, taking care of removing previously defined
         items before
@@ -456,7 +412,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         with self._lock:
             # Update the timestamp
-            self._parse_timestamp[path] = p.getmtime(str(path))
+            self._parse_timestamp[path] = mtime if mtime is not None else p.getmtime(str(path))
 
             # Remove all design units that referred to this path before adding
             # new ones, but use the non API method for that to avoid recursing
@@ -471,13 +427,13 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         for meth in self._cached_methods:
             meth.cache_clear()
 
-    def getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
+    def getDesignUnitsByPath(self, path: Path) -> set[tAnyDesignUnit]:
         "Gets the design units for the given path (if any)"
         self._parseSourceIfNeeded(path)
         return self._getDesignUnitsByPath(path)
 
     @lru_cache(maxsize=128, typed=False)
-    def _getDesignUnitsByPath(self, path):  # type: (Path) -> Set[tAnyDesignUnit]
+    def _getDesignUnitsByPath(self, path: Path) -> set[tAnyDesignUnit]:
         """
         Gets the design units for the given path (if any). Differs from the
         public method in that changes to the file are not checked before
@@ -485,16 +441,14 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         """
         return {x for x in self.design_units if x.owner == path}
 
-    def getDependenciesByPath(self, path):
-        # type: (Path) -> FrozenSet[BaseDependencySpec]
+    def getDependenciesByPath(self, path: Path) -> frozenset[BaseDependencySpec]:
         """
         Returns parsed dependencies for the given path
         """
         self._parseSourceIfNeeded(path)
         return frozenset(self._dependencies_map.get(path, ()))
 
-    def getPathsByDesignUnit(self, unit):
-        # type: (tAnyDesignUnit) -> Iterator[Path]
+    def getPathsByDesignUnit(self, unit: tAnyDesignUnit) -> Iterator[Path]:
         """
         Return the source (or sources) that define the given design
         unit
@@ -505,8 +459,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             if (unit.name, unit.type_) == (design_unit.name, design_unit.type_)
         )
 
-    def _inferLibraryForPath(self, path):
-        # type: (Path) -> UnresolvedLibrary
+    def _inferLibraryForPath(self, path: Path) -> UnresolvedLibrary:
         """
         Tries to infer which library the given path should be compiled on by
         looking at where and how the design units it defines are used
@@ -534,7 +487,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         else:
             library = getMostCommonItem(all_libraries)
 
-            # For now we'll report this as an issue on the dependecy. In the
+            # For now we'll report this as an issue on the dependency. In the
             # future, we should probably store this diagnostic on a different
             # dict where the dependency is the key and put it all together when
             # the self.getDiagnosticsForPath is called (aka, cross reference on
@@ -549,15 +502,14 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return library
 
     @lru_cache()
-    def getLibrariesReferredByUnit(self, name):
-        # type: (Identifier) -> List[Identifier]
+    def getLibrariesReferredByUnit(self, name: Identifier) -> list[Identifier]:
         """
         Gets libraries that the (library, name) pair is used throughout the
         project
         """
         _logger.debug("Searching for uses of %s", repr(name))
 
-        result = []  # List[Identifier]
+        result: list[Identifier] = []
         for path, dependencies in self._dependencies_map.items():
             for dependency in dependencies:
                 if name != dependency.name:
@@ -573,8 +525,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return result
 
     @lru_cache()
-    def getPathsDefining(self, name, library=None):
-        # type: (Identifier, UnresolvedLibrary) -> Iterable[Path]
+    def getPathsDefining(self, name: Identifier, library: UnresolvedLibrary = None) -> Iterable[Path]:
         """
         Search for paths that define a given name optionally inside a library.
         """
@@ -615,8 +566,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         return paths
 
-    def _reportDependencyNotUnique(self, library, name, choices):
-        # type: (Optional[Identifier], Identifier, Iterable[Path]) -> None
+    def _reportDependencyNotUnique(self, library: Identifier | None, name: Identifier, choices: Iterable[Path]) -> None:
         """
         Reports a dependency failed to be resolved due to multiple files
         defining the required design unit
@@ -637,7 +587,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             if (library, name) == (dependency.library, dependency.name)
         ):
 
-            # Fill in a report for every occurence found
+            # Fill in a report for every occurrence found
             for location in dependency.locations:
                 self._addDiagnostic(
                     DependencyNotUnique(
@@ -649,8 +599,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
                     )
                 )
 
-    def resolveIncludedPath(self, included_path):
-        # type: (IncludedPath) -> Optional[Path]
+    def resolveIncludedPath(self, included_path: IncludedPath) -> Path | None:
         """
         Tries to resolve an include by searching for paths that end with the
         same set of strings as the included path
@@ -675,8 +624,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         return paths.pop()
 
-    def getDependenciesUnits(self, path):
-        # type: (Path) -> Set[LibraryUnitTuple]
+    def getDependenciesUnits(self, path: Path) -> set[LibraryUnitTuple]:
         """
         Returns design units that should be compiled before compiling the given
         path but only within the project file set. If a design unit can't be
@@ -684,7 +632,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         """
         self._parseSourceIfNeeded(path)
 
-        units = set()  # type: Set[LibraryUnitTuple]
+        units: set[LibraryUnitTuple] = set()
 
         search_paths = set((path,))
         own_units = {
@@ -739,8 +687,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         return units
 
     @lru_cache()
-    def getBuildSequence(self, path, builtin_libraries=None):
-        # type: (Path, Optional[Tuple[Identifier]]) -> Iterable[Tuple[Identifier, Path]]
+    def getBuildSequence(self, path: Path, builtin_libraries: tuple[Identifier, ...] | None = None) -> Iterable[tuple[Identifier, Path]]:
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path. This is the cached version of self._getBuildSequence(),
@@ -752,14 +699,13 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
             )
         )
 
-    def _getBuildSequence(self, path, builtin_libraries):
-        # type: (Path, FrozenSet[Identifier]) -> Iterable[Tuple[Identifier, Path]]
+    def _getBuildSequence(self, path: Path, builtin_libraries: frozenset[Identifier]) -> Iterable[tuple[Identifier, Path]]:
         """
         Gets the build sequence that satisfies the preconditions to compile the
         given path
         """
         self._diags[path] = set()
-        units_compiled = set()  # type: Set[LibraryUnitTuple]
+        units_compiled: set[LibraryUnitTuple] = set()
 
         units_to_build = self.getDependenciesUnits(path)
         paths_to_build = set(
@@ -775,12 +721,10 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
         # dependencies on the previous one
         iteration_limit = len(paths_to_build) + 1
 
-        path_needs_map = (
-            {}
-        )  # type: Dict[Path, Set[Tuple[UnresolvedLibrary, Identifier]]]
+        path_needs_map: dict[Path, set[tuple[UnresolvedLibrary, Identifier]]] = {}
 
         for i in range(iteration_limit):
-            paths_built = set()  # type: Set[Path]
+            paths_built: set[Path] = set()
 
             for current_path in paths_to_build:
                 own = {
@@ -855,8 +799,7 @@ class Database(HashableByKey):  # pylint: disable=too-many-instance-attributes
 
         _logger.error("Iteration limit of %d reached", iteration_limit)
 
-    def getReferencesToDesignUnit(self, unit):
-        # type: (Union[tAnyDesignUnit, BaseDependencySpec]) -> Iterable[BaseDependencySpec]
+    def getReferencesToDesignUnit(self, unit: tAnyDesignUnit | BaseDependencySpec) -> Iterable[BaseDependencySpec]:
         """
         Returns an iterable of BaseDependencySpec objects from all paths in the
         database that refer to the given design unit. Search is done by
